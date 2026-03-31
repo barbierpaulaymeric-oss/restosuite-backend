@@ -3,7 +3,7 @@ const { all, get } = require('../db');
 const router = Router();
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 const VOICE_PARSE_SYSTEM = `Tu es un assistant culinaire professionnel spécialisé dans les fiches techniques de restaurant français.
 À partir d'une transcription vocale d'un chef, tu dois extraire une fiche technique structurée en JSON.

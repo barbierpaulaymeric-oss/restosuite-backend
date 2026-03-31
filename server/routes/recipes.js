@@ -200,45 +200,8 @@ router.delete('/:id', (req, res) => {
 router.get('/:id/pdf', (req, res) => {
   const recipe = getFullRecipe(Number(req.params.id));
   if (!recipe) return res.status(404).json({ error: 'not found' });
-
-  let text = `═══════════════════════════════════════════\n`;
-  text += `  FICHE TECHNIQUE — ${recipe.name.toUpperCase()}\n`;
-  text += `═══════════════════════════════════════════\n\n`;
-  text += `Catégorie : ${recipe.category || '—'}    Portions : ${recipe.portions}\n`;
-  text += `Préparation : ${recipe.prep_time_min || '—'} min    Cuisson : ${recipe.cooking_time_min || '—'} min\n\n`;
-  text += `───────────────────────────────────────────\n`;
-  text += `  INGRÉDIENTS\n`;
-  text += `───────────────────────────────────────────\n`;
-  text += `${'Ingrédient'.padEnd(25)} ${'Brut'.padStart(8)} ${'Net'.padStart(8)} ${'Perte%'.padStart(7)} ${'Coût €'.padStart(8)}\n`;
-  text += `${'─'.repeat(25)} ${'─'.repeat(8)} ${'─'.repeat(8)} ${'─'.repeat(7)} ${'─'.repeat(8)}\n`;
-
-  for (const ing of recipe.ingredients) {
-    const waste = ing.custom_waste_percent ?? ing.default_waste_percent ?? 0;
-    text += `${(ing.ingredient_name || '').padEnd(25).slice(0, 25)} ${(ing.gross_quantity + ing.unit).padStart(8)} ${((ing.net_quantity || ing.gross_quantity) + ing.unit).padStart(8)} ${(waste + '%').padStart(7)} ${(ing.cost.toFixed(2)).padStart(8)}\n`;
-  }
-
-  text += `\n${'COÛT TOTAL MATIÈRE :'.padEnd(50)} ${recipe.total_cost.toFixed(2)} €\n`;
-  text += `${'COÛT PAR PORTION :'.padEnd(50)} ${recipe.cost_per_portion.toFixed(2)} €\n`;
-  if (recipe.selling_price) {
-    text += `${'PRIX DE VENTE :'.padEnd(50)} ${recipe.selling_price.toFixed(2)} €\n`;
-    text += `${'FOOD COST :'.padEnd(50)} ${recipe.food_cost_percent}%\n`;
-    text += `${'MARGE :'.padEnd(50)} ${recipe.margin.toFixed(2)} €\n`;
-  }
-
-  if (recipe.steps.length > 0) {
-    text += `\n───────────────────────────────────────────\n`;
-    text += `  PROCÉDURE\n`;
-    text += `───────────────────────────────────────────\n`;
-    for (const step of recipe.steps) {
-      text += `${step.step_number}. ${step.instruction}\n\n`;
-    }
-  }
-
-  if (recipe.notes) text += `\nNotes : ${recipe.notes}\n`;
-
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="fiche-${recipe.name.replace(/\s+/g, '-')}.txt"`);
-  res.send(text);
+  const { generatePDF } = require('./pdf-export');
+  generatePDF(recipe, res);
 });
 
 module.exports = router;
