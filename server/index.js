@@ -8,27 +8,55 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+
+// Stripe webhook needs raw body — mount BEFORE json parser
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
+
 app.use(express.json({ limit: '10mb' }));
+
+// Static files from client directory
 app.use(express.static(path.join(__dirname, '..', 'client')));
 
+// API routes
 app.use('/api/ingredients', require('./routes/ingredients'));
 app.use('/api/suppliers', require('./routes/suppliers'));
 app.use('/api/prices', require('./routes/prices'));
 app.use('/api/recipes', require('./routes/recipes'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/accounts', require('./routes/accounts'));
+app.use('/api/stripe', require('./routes/stripe'));
 
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'RestoSuite AI',
-    version: '1.0.0',
+    version: '1.1.0',
     timestamp: new Date().toISOString()
   });
 });
 
-app.get('*', (req, res) => {
+// Landing page on root
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'landing.html'));
+});
+
+// SPA app on /app (and sub-routes)
+app.get('/app', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
+});
+app.get('/app/*', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
+});
+
+// Catch-all: serve SPA for any non-API, non-static route
+// (only for routes that look like SPA navigation, not files)
+app.get('*', (req, res) => {
+  // If it looks like a file request (has extension), 404
+  if (path.extname(req.path)) {
+    return res.status(404).send('Not found');
+  }
+  // Otherwise serve landing page
+  res.sendFile(path.join(__dirname, '..', 'client', 'landing.html'));
 });
 
 app.use((err, req, res, next) => {
@@ -38,4 +66,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🍽️  RestoSuite AI running on http://0.0.0.0:${PORT}`);
+  console.log(`   Landing page: http://localhost:${PORT}/`);
+  console.log(`   App:          http://localhost:${PORT}/app`);
 });
