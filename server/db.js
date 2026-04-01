@@ -206,4 +206,18 @@ function run(sql, params = []) {
   return db.prepare(sql).run(...params);
 }
 
+// ─── Migration: Add trial_start to accounts ───
+try {
+  const cols = all("PRAGMA table_info(accounts)");
+  const hasTrialStart = cols.some(c => c.name === 'trial_start');
+  if (!hasTrialStart) {
+    db.exec("ALTER TABLE accounts ADD COLUMN trial_start DATETIME");
+    // Backfill existing accounts: set trial_start = created_at
+    db.exec("UPDATE accounts SET trial_start = created_at WHERE trial_start IS NULL");
+    console.log('✅ Migration: added trial_start to accounts');
+  }
+} catch (e) {
+  console.error('Migration trial_start error:', e.message);
+}
+
 module.exports = { db, all, get, run };

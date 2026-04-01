@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 require('./db'); // initializes tables synchronously
+const { requireWriteAccess } = require('./middleware/trial');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +22,22 @@ app.get('/', (req, res) => {
 
 // Static files from client directory (but skip index.html for root)
 app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
+
+// Trial write-protection middleware for write operations
+// Excludes: accounts (create/login), stripe, and GET requests
+const trialProtectedPaths = ['/api/ingredients', '/api/suppliers', '/api/prices', '/api/recipes', '/api/ai', '/api/haccp'];
+app.use(trialProtectedPaths, (req, res, next) => {
+  if (req.method === 'GET') return next();
+  // Allow HACCP PDF exports (GET only anyway) and pdf-export routes
+  return requireWriteAccess(req, res, next);
+});
+// Also protect account updates/deletes (but not create/login)
+app.use('/api/accounts/:id', (req, res, next) => {
+  if (req.method === 'GET') return next();
+  // Skip the status endpoint
+  if (req.path.endsWith('/status')) return next();
+  return requireWriteAccess(req, res, next);
+});
 
 // API routes
 app.use('/api/ingredients', require('./routes/ingredients'));

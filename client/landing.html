@@ -1288,43 +1288,42 @@
         <p>Commencez gratuitement. Passez en Pro quand vous êtes prêt.</p>
       </div>
       <div class="pricing__grid">
-        <!-- Free -->
+        <!-- Essai Gratuit -->
         <div class="pricing-card reveal reveal-delay-1">
-          <div class="pricing-card__name">Gratuit</div>
-          <div class="pricing-card__desc">Pour découvrir RestoSuite</div>
+          <div class="pricing-card__name">Essai Gratuit</div>
+          <div class="pricing-card__desc">60 jours · Accès complet</div>
           <div class="pricing-card__price">
             <span class="pricing-card__amount">0€</span>
-            <span class="pricing-card__period">/ mois</span>
+            <span class="pricing-card__period">pendant 60 jours</span>
           </div>
           <ul class="pricing-card__features">
-            <li><i data-lucide="check"></i> 5 fiches techniques</li>
+            <li><i data-lucide="check"></i> Fiches techniques illimitées</li>
             <li><i data-lucide="check"></i> Saisie vocale IA</li>
+            <li><i data-lucide="check"></i> Module HACCP complet</li>
             <li><i data-lucide="check"></i> Export PDF</li>
-            <li><i data-lucide="check"></i> 1 compte utilisateur</li>
-            <li class="disabled"><i data-lucide="x"></i> HACCP</li>
-            <li class="disabled"><i data-lucide="x"></i> Gestion stock</li>
-            <li class="disabled"><i data-lucide="x"></i> Support prioritaire</li>
+            <li><i data-lucide="check"></i> Multi-comptes</li>
+            <li><i data-lucide="check"></i> Aucune carte bancaire requise</li>
           </ul>
-          <a href="/app" class="btn btn--secondary">Démarrer gratuitement</a>
+          <a href="/app" class="btn btn--secondary">Démarrer mon essai gratuit</a>
         </div>
         <!-- Pro -->
         <div class="pricing-card pricing-card--pro reveal reveal-delay-2">
           <div class="pricing-card__name">Pro</div>
-          <div class="pricing-card__desc">Pour les restaurants qui veulent tout</div>
+          <div class="pricing-card__desc">Sans engagement, annulable à tout moment</div>
           <div class="pricing-card__price">
-            <span class="pricing-card__amount">29€</span>
+            <span class="pricing-card__amount">39€</span>
             <span class="pricing-card__period">/ mois</span>
           </div>
           <ul class="pricing-card__features">
             <li><i data-lucide="check"></i> Fiches techniques illimitées</li>
             <li><i data-lucide="check"></i> Saisie vocale IA</li>
+            <li><i data-lucide="check"></i> Module HACCP complet</li>
             <li><i data-lucide="check"></i> Export PDF</li>
-            <li><i data-lucide="check"></i> Comptes illimités</li>
-            <li><i data-lucide="check"></i> HACCP</li>
-            <li><i data-lucide="check"></i> Gestion stock</li>
+            <li><i data-lucide="check"></i> Multi-comptes</li>
             <li><i data-lucide="check"></i> Support prioritaire</li>
+            <li><i data-lucide="check"></i> Tout inclus</li>
           </ul>
-          <a href="#" class="btn btn--primary" id="subscribe-btn">S'abonner — 29€/mois</a>
+          <a href="#" class="btn btn--primary" id="subscribe-btn">S'abonner — 39€/mois</a>
         </div>
       </div>
     </div>
@@ -1399,7 +1398,7 @@
           </button>
           <div class="faq-item__answer">
             <div class="faq-item__answer-inner">
-              Oui. 5 fiches techniques gratuites, à vie. Pas de période d'essai, pas de piège. Vous passez en Pro uniquement si vous avez besoin de plus.
+              Oui. 60 jours d'essai gratuit avec accès complet à toutes les fonctionnalités. Aucune carte bancaire requise. Après l'essai, vos données restent accessibles en lecture seule — rien n'est perdu.
             </div>
           </div>
         </div>
@@ -1432,7 +1431,7 @@
           </button>
           <div class="faq-item__answer">
             <div class="faq-item__answer-inner">
-              À tout moment, en un clic. Sans engagement, sans frais cachés. Vous gardez l'accès jusqu'à la fin de la période payée, puis vous repassez en plan gratuit.
+              À tout moment, en un clic. Sans engagement, sans frais cachés. Vous gardez l'accès jusqu'à la fin de la période payée, puis vos données passent en lecture seule.
             </div>
           </div>
         </div>
@@ -1539,7 +1538,7 @@
     if (subscribeBtn) {
       subscribeBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        subscribeBtn.textContent = 'Redirection...';
+        subscribeBtn.textContent = 'Redirection vers le paiement...';
         subscribeBtn.style.pointerEvents = 'none';
         try {
           const res = await fetch('/api/stripe/create-checkout', {

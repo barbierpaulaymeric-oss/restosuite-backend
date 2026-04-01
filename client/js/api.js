@@ -11,12 +11,24 @@ const API = {
       headers: { 'Content-Type': 'application/json' },
       ...options,
     };
+
+    // Inject account_id header for trial middleware
+    const account = typeof getAccount === 'function' ? getAccount() : null;
+    if (account && account.id) {
+      config.headers['X-Account-Id'] = String(account.id);
+    }
+
     if (config.body && typeof config.body === 'object') {
       config.body = JSON.stringify(config.body);
     }
     const res = await fetch(url, config);
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
+      // Handle trial expired specifically
+      if (err.code === 'TRIAL_EXPIRED') {
+        showToast('Passez en Pro pour continuer à utiliser RestoSuite', 'error');
+        throw new Error(err.error);
+      }
       throw new Error(err.error || err.details || 'Erreur serveur');
     }
     const contentType = res.headers.get('content-type');

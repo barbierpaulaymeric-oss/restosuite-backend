@@ -2227,3 +2227,162 @@ tr:has(td[colspan]) td {
 
 /* ─── Responsive: make HACCP nav not shown for supplier role ─── */
 .role-equipier .nav-link[data-route="/haccp"] { display: flex !important; }
+
+/* ═══════════════════════════════════════════
+   TRIAL BANNER
+   ═══════════════════════════════════════════ */
+.trial-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: center;
+  z-index: 200;
+  position: sticky;
+  top: 0;
+  flex-wrap: wrap;
+}
+
+.trial-banner a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.trial-banner .btn {
+  text-decoration: none;
+  padding: 6px 16px;
+  font-size: var(--text-sm);
+}
+
+/* Warning: 14-4 days left */
+.trial-banner--warning {
+  background: rgba(229, 161, 0, 0.15);
+  color: var(--color-warning);
+  border-bottom: 1px solid rgba(229, 161, 0, 0.25);
+}
+
+/* Urgent: 3-1 days left */
+.trial-banner--urgent {
+  background: rgba(217, 48, 37, 0.15);
+  color: var(--color-danger);
+  border-bottom: 1px solid rgba(217, 48, 37, 0.3);
+}
+
+/* Expired */
+.trial-banner--expired {
+  background: rgba(217, 48, 37, 0.2);
+  color: var(--color-danger);
+  border-bottom: 1px solid rgba(217, 48, 37, 0.35);
+  padding: 14px 16px;
+}
+
+/* ═══════════════════════════════════════════
+   READ-ONLY MODE
+   ═══════════════════════════════════════════ */
+.read-only-mode .btn-primary:not(.subscribe-btn):not(.trial-banner .btn),
+.read-only-mode .btn-danger,
+.read-only-mode .btn-success,
+.read-only-mode [data-action="create"],
+.read-only-mode [data-action="delete"],
+.read-only-mode [data-action="save"],
+.read-only-mode .fab,
+.read-only-mode .recipe-form button[type="submit"],
+.read-only-mode .haccp-record-btn {
+  opacity: 0.4;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Keep PDF export clickable in read-only */
+.read-only-mode .btn-export-pdf,
+.read-only-mode [data-action="export-pdf"],
+.read-only-mode .pdf-export-btn {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* ═══════════════════════════════════════════
+   SUBSCRIBE PAGE
+   ═══════════════════════════════════════════ */
+.subscribe-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  padding: var(--space-6);
+}
+
+.subscribe-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8) var(--space-6);
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+
+.subscribe-title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  margin-bottom: var(--space-6);
+}
+
+.subscribe-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  text-align: left;
+}
+
+.subscribe-feature {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.subscribe-check {
+  flex-shrink: 0;
+}
+
+.subscribe-price {
+  margin-bottom: var(--space-5);
+}
+
+.subscribe-amount {
+  font-family: var(--font-mono);
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.subscribe-period {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  display: block;
+  margin-top: var(--space-1);
+}
+
+.subscribe-btn {
+  width: 100%;
+  padding: 16px;
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-5);
+}
+
+.subscribe-reassurance {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.subscribe-reassurance p {
+  margin-bottom: var(--space-1);
+}

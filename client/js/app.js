@@ -2,6 +2,75 @@
 // RestoSuite AI — App Bootstrap
 // ═══════════════════════════════════════════
 
+// ─── Trial status cache ───
+let _trialStatus = null;
+
+function getTrialStatus() { return _trialStatus; }
+
+async function fetchTrialStatus() {
+  const account = getAccount();
+  if (!account) return null;
+  try {
+    const status = await API.request(`/accounts/${account.id}/status`);
+    _trialStatus = status;
+    return status;
+  } catch (e) {
+    console.warn('Could not fetch trial status:', e);
+    return null;
+  }
+}
+
+function renderTrialBanner() {
+  // Remove existing banner
+  const existing = document.querySelector('.trial-banner');
+  if (existing) existing.remove();
+
+  const status = _trialStatus;
+  if (!status) return;
+
+  // Pro users: no banner
+  if (status.status === 'pro') {
+    document.body.classList.remove('read-only-mode');
+    return;
+  }
+
+  let bannerHTML = '';
+
+  if (status.status === 'expired') {
+    document.body.classList.add('read-only-mode');
+    bannerHTML = `
+      <div class="trial-banner trial-banner--expired">
+        <span>Votre essai gratuit est terminé. Vos données sont en lecture seule.</span>
+        <a href="#/subscribe" class="btn btn-primary btn-sm">Passer en Pro — 39€/mois</a>
+      </div>
+    `;
+  } else if (status.status === 'trial') {
+    document.body.classList.remove('read-only-mode');
+    const daysLeft = status.daysLeft;
+    
+    if (daysLeft <= 3) {
+      bannerHTML = `
+        <div class="trial-banner trial-banner--urgent">
+          <span>Plus que <strong>${daysLeft} jour${daysLeft > 1 ? 's' : ''}</strong> d'essai gratuit — vos données passeront en lecture seule</span>
+          <a href="#/subscribe">Passer en Pro</a>
+        </div>
+      `;
+    } else if (daysLeft <= 14) {
+      bannerHTML = `
+        <div class="trial-banner trial-banner--warning">
+          <span>Plus que ${daysLeft} jours d'essai gratuit</span>
+          <a href="#/subscribe">Passer en Pro</a>
+        </div>
+      `;
+    }
+    // daysLeft > 14: no banner
+  }
+
+  if (bannerHTML) {
+    document.body.insertAdjacentHTML('afterbegin', bannerHTML);
+  }
+}
+
 function registerRoutes() {
   // Prevent double-registration
   if (Router.routes.length > 0) return;
@@ -18,6 +87,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/traceability$/, renderHACCPTraceability);
   Router.add(/^\/more$/, () => new MoreView().render());
   Router.add(/^\/team$/, renderTeam);
+  Router.add(/^\/subscribe$/, renderSubscribe);
 }
 
 function bootApp(role, account) {
@@ -29,6 +99,9 @@ function bootApp(role, account) {
   if (window.lucide) lucide.createIcons();
   const displayName = account ? account.name : role;
   console.log('%c RestoSuite AI ', 'background:#E8722A;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600', `loaded (${displayName})`);
+
+  // Fetch trial status and render banner
+  fetchTrialStatus().then(() => renderTrialBanner());
 }
 
 function updateNavUser(account) {

@@ -5,6 +5,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { all, get, run } = require('../db');
+const { getAccountStatusById } = require('../middleware/trial');
 const router = express.Router();
 
 function hashPin(pin) {
@@ -57,7 +58,7 @@ router.post('/', (req, res) => {
 
   try {
     const result = run(
-      'INSERT INTO accounts (name, pin, role, permissions) VALUES (?, ?, ?, ?)',
+      'INSERT INTO accounts (name, pin, role, permissions, trial_start) VALUES (?, ?, ?, ?, datetime(\'now\'))',
       [name.trim(), hashedPin, role, JSON.stringify(permissions)]
     );
     res.json({
@@ -98,6 +99,13 @@ router.post('/login', (req, res) => {
     role: account.role,
     permissions: JSON.parse(account.permissions)
   });
+});
+
+// GET /api/accounts/:id/status — trial/subscription status
+router.get('/:id/status', (req, res) => {
+  const { id } = req.params;
+  const status = getAccountStatusById(Number(id));
+  res.json(status);
 });
 
 // PUT /api/accounts/:id — update account (gerant only)
