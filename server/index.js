@@ -14,8 +14,13 @@ app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json({ limit: '10mb' }));
 
-// Static files from client directory
-app.use(express.static(path.join(__dirname, '..', 'client')));
+// Landing page on root — BEFORE static middleware
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'landing.html'));
+});
+
+// Static files from client directory (but skip index.html for root)
+app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
 
 // API routes
 app.use('/api/ingredients', require('./routes/ingredients'));
@@ -33,11 +38,6 @@ app.get('/api/health', (req, res) => {
     version: '1.1.0',
     timestamp: new Date().toISOString()
   });
-});
-
-// Landing page on root
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'client', 'landing.html'));
 });
 
 // SPA app on /app (and sub-routes)
