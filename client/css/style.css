@@ -1234,3 +1234,256 @@ tr:has(td[colspan]) td {
 
 .text-sm { font-size: var(--text-sm); }
 .text-secondary { color: var(--text-secondary); }
+
+/* ═══════════════════════════════════════════
+   ROLE-BASED VISIBILITY
+   ═══════════════════════════════════════════ */
+.role-equipier .role-gerant-only { display: none !important; }
+.role-equipier .nav-link[data-route="/suppliers"] { display: none !important; }
+
+/* ═══════════════════════════════════════════
+   LOGIN / ROLE SELECTION SCREEN
+   ═══════════════════════════════════════════ */
+@keyframes login-fadeIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.login-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0F1723 0%, #1B2A4A 100%);
+  margin: calc(-1 * var(--space-4));
+  padding: var(--space-6);
+}
+
+@media (min-width: 768px) {
+  .login-screen {
+    margin: calc(-1 * var(--space-6));
+    margin-top: calc(-76px);
+    padding-top: var(--space-6);
+  }
+}
+
+.login-content {
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  animation: login-fadeIn 0.5s ease-out;
+}
+
+.login-logo {
+  margin-bottom: var(--space-5);
+}
+
+.login-logo-svg {
+  height: 80px;
+  width: auto;
+  filter: drop-shadow(0 4px 24px rgba(232, 114, 42, 0.3));
+}
+
+.login-title {
+  font: 700 var(--text-3xl)/var(--leading-tight) var(--font-sans);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.login-ai-badge {
+  display: inline-block;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+  margin-left: 2px;
+}
+
+.login-subtitle {
+  font: 600 var(--text-2xl)/var(--leading-tight) var(--font-sans);
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.login-tagline {
+  font: 400 var(--text-base)/var(--leading-normal) var(--font-sans);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-8);
+}
+
+.login-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.login-btn {
+  width: 100%;
+  max-width: 320px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-5);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.login-btn:active {
+  transform: scale(0.97);
+}
+
+.login-btn__icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+  width: 48px;
+  text-align: center;
+  line-height: 1;
+}
+
+.login-btn__icon-lucide {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent-light);
+  border-radius: var(--radius-md);
+  color: var(--color-accent);
+}
+
+.login-btn__icon-lucide svg {
+  width: 24px;
+  height: 24px;
+}
+
+.login-btn__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.login-btn__label {
+  font: 600 var(--text-lg)/var(--leading-tight) var(--font-sans);
+}
+
+.login-btn__sub {
+  font: 400 var(--text-xs)/var(--leading-normal) var(--font-sans);
+  color: var(--text-tertiary);
+}
+
+/* Restaurant button */
+.login-btn--restaurant {
+  background: var(--bg-elevated);
+  border-color: var(--color-accent);
+}
+
+.login-btn--restaurant:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-accent);
+}
+
+.login-btn--restaurant:hover .login-btn__sub {
+  color: rgba(255,255,255,0.7);
+}
+
+/* Fournisseur button */
+.login-btn--fournisseur {
+  background: transparent;
+  border-color: var(--border-default);
+}
+
+.login-btn--fournisseur:hover {
+  background: var(--bg-elevated);
+  border-color: var(--text-tertiary);
+}
+
+/* Gérant button */
+.login-btn--gerant {
+  background: var(--bg-elevated);
+  border-color: var(--color-accent);
+}
+
+.login-btn--gerant:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-accent);
+}
+
+.login-btn--gerant:hover .login-btn__icon-lucide {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+
+.login-btn--gerant:hover .login-btn__sub {
+  color: rgba(255,255,255,0.7);
+}
+
+/* Équipier button */
+.login-btn--equipier {
+  background: transparent;
+  border-color: var(--border-default);
+}
+
+.login-btn--equipier:hover {
+  background: var(--bg-elevated);
+  border-color: var(--text-tertiary);
+}
+
+/* Back button on restaurant select */
+.login-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font: 400 var(--text-sm)/1 var(--font-sans);
+  cursor: pointer;
+  margin-bottom: var(--space-6);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.login-back:hover {
+  color: var(--color-accent);
+  background: var(--color-accent-light);
+}
+
+/* Fournisseur coming soon */
+.fournisseur-coming {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-8) 0;
+}
+
+.fournisseur-coming h2 {
+  font: 600 var(--text-xl)/var(--leading-tight) var(--font-sans);
+  color: var(--text-primary);
+}
+
+/* View header (used in More) */
+.view-header {
+  margin-bottom: var(--space-5);
+}
+
+.view-header h1 {
+  margin-bottom: var(--space-1);
+}

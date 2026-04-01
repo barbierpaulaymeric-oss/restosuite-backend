@@ -76,9 +76,14 @@ class MoreView {
       </div>
 
       <div class="more-footer">
-        <p class="text-secondary text-sm" style="text-align:center; margin-top: 2rem;">
-          RestoSuite AI v1.0 — Votre cuisine tourne. Vos chiffres suivent.
-        </p>
+        <div style="text-align:center; margin-top: 2rem;">
+          <button class="btn btn-secondary" onclick="logout()" style="margin-bottom:1rem">
+            <i data-lucide="log-out" style="width:18px;height:18px"></i> Changer de profil
+          </button>
+          <p class="text-secondary text-sm">
+            RestoSuite AI v1.0 — Votre cuisine tourne. Vos chiffres suivent.
+          </p>
+        </div>
       </div>
     `;
     if (window.lucide) lucide.createIcons();

@@ -7,6 +7,12 @@ let formSteps = [];
 let allIngredients = [];
 
 async function renderRecipeForm(editId) {
+  // Équipier cannot create or edit recipes
+  if (getRole() === 'equipier') {
+    location.hash = '#/';
+    return;
+  }
+
   const app = document.getElementById('app');
   const isEdit = !!editId;
   let recipe = null;

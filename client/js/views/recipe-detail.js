@@ -30,24 +30,24 @@ async function renderRecipeDetail(id) {
         <div class="summary-value">${recipe.portions || 1}</div>
         <div class="summary-label">Portions</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card role-gerant-only">
         <div class="summary-value mono">${formatCurrency(recipe.total_cost)}</div>
         <div class="summary-label">Coût total</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card role-gerant-only">
         <div class="summary-value mono">${formatCurrency(recipe.cost_per_portion)}</div>
         <div class="summary-label">Coût / portion</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card role-gerant-only">
         <div class="summary-value mono">${formatCurrency(recipe.selling_price)}</div>
         <div class="summary-label">Prix de vente</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card role-gerant-only">
         <div class="summary-value"><span class="margin-badge ${marginClass}">${formatPercent(recipe.food_cost_percent)}</span></div>
         <div class="summary-label">Food cost</div>
       </div>
       ${recipe.margin != null ? `
-      <div class="summary-card">
+      <div class="summary-card role-gerant-only">
         <div class="summary-value mono text-success">${formatCurrency(recipe.margin)}</div>
         <div class="summary-label">Marge</div>
       </div>` : ''}
@@ -68,7 +68,7 @@ async function renderRecipeDetail(id) {
             <th class="numeric">Brut</th>
             <th class="numeric">Net</th>
             <th class="numeric">Perte</th>
-            <th class="numeric">Coût</th>
+            <th class="numeric role-gerant-only">Coût</th>
             <th>Notes</th>
           </tr>
         </thead>
@@ -81,11 +81,11 @@ async function renderRecipeDetail(id) {
               <td class="mono">${ing.gross_quantity}${ing.unit}</td>
               <td class="mono">${(ing.net_quantity || ing.gross_quantity).toFixed(1)}${ing.unit}</td>
               <td class="mono">${waste}%</td>
-              <td class="mono">${formatCurrency(ing.cost)}</td>
+              <td class="mono role-gerant-only">${formatCurrency(ing.cost)}</td>
               <td style="font-size:var(--text-sm);color:var(--text-tertiary);font-style:italic">${escapeHtml(ing.notes)}</td>
             </tr>`;
           }).join('')}
-          <tr class="total-row">
+          <tr class="total-row role-gerant-only">
             <td colspan="4" style="font-weight:600">TOTAL</td>
             <td class="mono" style="font-weight:600">${formatCurrency(recipe.total_cost)}</td>
             <td></td>
@@ -105,9 +105,9 @@ async function renderRecipeDetail(id) {
     <p style="color:var(--text-secondary);font-size:var(--text-sm)">${escapeHtml(recipe.notes)}</p>` : ''}
 
     <div class="actions-row">
-      <a href="#/edit/${recipe.id}" class="btn btn-primary"><i data-lucide="pencil" style="width:18px;height:18px"></i> Modifier</a>
+      <a href="#/edit/${recipe.id}" class="btn btn-primary role-gerant-only"><i data-lucide="pencil" style="width:18px;height:18px"></i> Modifier</a>
       <button class="btn btn-secondary" onclick="exportRecipe(${recipe.id})"><i data-lucide="download" style="width:18px;height:18px"></i> Exporter</button>
-      <button class="btn btn-danger" onclick="deleteRecipe(${recipe.id})"><i data-lucide="trash-2" style="width:18px;height:18px"></i> Supprimer</button>
+      <button class="btn btn-danger role-gerant-only" onclick="deleteRecipe(${recipe.id})"><i data-lucide="trash-2" style="width:18px;height:18px"></i> Supprimer</button>
     </div>
   `;
 

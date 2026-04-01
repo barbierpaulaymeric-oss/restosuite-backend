@@ -7,7 +7,7 @@ async function renderIngredients() {
   app.innerHTML = `
     <div class="page-header">
       <h1>Ingrédients</h1>
-      <button class="btn btn-primary" onclick="showIngredientModal()"><i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter</button>
+      <button class="btn btn-primary role-gerant-only" onclick="showIngredientModal()"><i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter</button>
     </div>
     <div class="search-bar">
       <span class="search-icon"><i data-lucide="search"></i></span>
@@ -38,8 +38,9 @@ async function renderIngredients() {
       return;
     }
 
+    const isGerant = getRole() === 'gerant';
     listEl.innerHTML = filtered.map(ing => `
-      <div class="card" onclick="showIngredientDetail(${ing.id})">
+      <div class="card" ${isGerant ? `onclick="showIngredientDetail(${ing.id})"` : ''}>
         <div class="card-header">
           <span class="card-title" style="text-transform:capitalize">${escapeHtml(ing.name)}</span>
           ${ing.category ? `<span class="card-category">${escapeHtml(ing.category)}</span>` : ''}

@@ -7,7 +7,7 @@ async function renderDashboard() {
   app.innerHTML = `
     <div class="page-header">
       <h1>Fiches Techniques</h1>
-      <a href="#/new" class="btn btn-primary"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle fiche</a>
+      <a href="#/new" class="btn btn-primary role-gerant-only"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle fiche</a>
     </div>
     <div class="search-bar">
       <span class="search-icon"><i data-lucide="search"></i></span>
@@ -37,7 +37,7 @@ async function renderDashboard() {
         <div class="empty-state">
           <div class="empty-icon"><i data-lucide="clipboard-list"></i></div>
           <p>${filter ? 'Aucun résultat' : 'Aucune fiche technique pour le moment'}</p>
-          ${!filter ? '<a href="#/new" class="btn btn-primary"><i data-lucide="mic" style="width:18px;height:18px"></i> Créer ma première fiche</a>' : ''}
+          ${!filter ? '<a href="#/new" class="btn btn-primary role-gerant-only"><i data-lucide="mic" style="width:18px;height:18px"></i> Créer ma première fiche</a>' : ''}
         </div>
       `;
       lucide.createIcons();
@@ -61,15 +61,15 @@ async function renderDashboard() {
               <span class="stat-value">${r.portions || 1}</span>
               <span class="stat-label">Portions</span>
             </div>
-            <div>
+            <div class="role-gerant-only">
               <span class="stat-value">${formatCurrency(r.cost_per_portion)}</span>
               <span class="stat-label">Coût matière</span>
             </div>
-            <div>
+            <div class="role-gerant-only">
               <span class="stat-value">${formatCurrency(r.selling_price)}</span>
               <span class="stat-label">Prix de vente</span>
             </div>
-            <div>
+            <div class="role-gerant-only">
               <span class="stat-value"><span class="margin-badge ${marginClass}">${formatPercent(r.food_cost_percent)}</span></span>
               <span class="stat-label">Food cost</span>
             </div>
