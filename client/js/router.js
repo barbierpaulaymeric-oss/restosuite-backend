@@ -17,7 +17,8 @@ const Router = {
       const route = link.dataset.route;
       const isActive = route === path || 
         (route !== '/' && path.startsWith(route)) ||
-        (route === '/haccp' && path.startsWith('/haccp'));
+        (route === '/haccp' && path.startsWith('/haccp')) ||
+        (route === '/stock' && path.startsWith('/stock'));
       if (isActive) {
         link.classList.add('active');
       } else {

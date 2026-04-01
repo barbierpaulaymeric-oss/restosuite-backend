@@ -156,6 +156,34 @@ const API = {
     return URL.createObjectURL(blob);
   },
 
+  // ─── Stock ───
+  getStock(q) {
+    const qs = q ? `?q=${encodeURIComponent(q)}` : '';
+    return this.request(`/stock${qs}`);
+  },
+  getStockAlerts() { return this.request('/stock/alerts'); },
+  postReception(data) { return this.request('/stock/reception', { method: 'POST', body: data }); },
+  postStockLoss(data) { return this.request('/stock/loss', { method: 'POST', body: data }); },
+  postStockAdjustment(data) { return this.request('/stock/adjustment', { method: 'POST', body: data }); },
+  postStockInventory(data) { return this.request('/stock/inventory', { method: 'POST', body: data }); },
+  getStockMovements(params) {
+    const qs = params ? new URLSearchParams(params).toString() : '';
+    return this.request(`/stock/movements${qs ? '?' + qs : ''}`);
+  },
+  async getStockExportUrl(from, to) {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const url = `${this.base}/stock/export/pdf?${params.toString()}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Erreur export PDF');
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  },
+  setStockMin(ingredientId, minQuantity) {
+    return this.request(`/stock/${ingredientId}/min`, { method: 'PUT', body: { min_quantity: minQuantity } });
+  },
+
   // AI
   parseVoice(text) {
     return this.request('/ai/parse-voice', { method: 'POST', body: { text } });

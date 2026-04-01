@@ -47,16 +47,27 @@ class MoreView {
           <p class="text-secondary text-sm">Saisie vocale, calcul des coûts, export PDF</p>
         </div>
 
-        <div class="more-card more-card--coming">
-          <div class="more-card__icon" style="background: var(--color-primary-light)">
+        <a href="#/stock" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+          <div class="more-card__icon" style="background: var(--color-accent)">
             <i data-lucide="warehouse"></i>
           </div>
           <div class="more-card__content">
             <h3>Stock & Réception</h3>
-            <span class="badge badge--warning">Bientôt</span>
+            <span class="badge badge--success">Actif</span>
           </div>
           <p class="text-secondary text-sm">Réception marchandise, suivi DLC, alertes stock bas</p>
-        </div>
+        </a>
+
+        <a href="#/ingredients" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+          <div class="more-card__icon" style="background: var(--color-info)">
+            <i data-lucide="package"></i>
+          </div>
+          <div class="more-card__content">
+            <h3>Ingrédients</h3>
+            <span class="badge badge--success">Actif</span>
+          </div>
+          <p class="text-secondary text-sm">Base de données ingrédients, allergènes, unités</p>
+        </a>
 
         <div class="more-card more-card--coming">
           <div class="more-card__icon" style="background: var(--color-primary-light)">

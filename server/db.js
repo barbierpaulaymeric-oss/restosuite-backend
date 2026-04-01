@@ -105,6 +105,36 @@ db.exec(`
     UNIQUE(ingredient_id, recipe_id, supplier_id)
   );
 
+  -- Stock actuel
+  CREATE TABLE IF NOT EXISTS stock (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingredient_id INTEGER NOT NULL,
+    quantity REAL NOT NULL DEFAULT 0,
+    unit TEXT NOT NULL,
+    min_quantity REAL DEFAULT 0,
+    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ingredient_id) REFERENCES ingredients(id)
+  );
+
+  -- Mouvements de stock (entrées/sorties)
+  CREATE TABLE IF NOT EXISTS stock_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingredient_id INTEGER NOT NULL,
+    movement_type TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    unit TEXT NOT NULL,
+    reason TEXT,
+    supplier_id INTEGER,
+    batch_number TEXT,
+    dlc DATE,
+    unit_price REAL,
+    recorded_by INTEGER,
+    recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ingredient_id) REFERENCES ingredients(id),
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+    FOREIGN KEY (recorded_by) REFERENCES accounts(id)
+  );
+
   -- HACCP: Zones de température
   CREATE TABLE IF NOT EXISTS temperature_zones (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

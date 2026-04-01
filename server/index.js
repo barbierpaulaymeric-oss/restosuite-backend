@@ -25,7 +25,7 @@ app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
 
 // Trial write-protection middleware for write operations
 // Excludes: accounts (create/login), stripe, and GET requests
-const trialProtectedPaths = ['/api/ingredients', '/api/suppliers', '/api/prices', '/api/recipes', '/api/ai', '/api/haccp'];
+const trialProtectedPaths = ['/api/ingredients', '/api/suppliers', '/api/prices', '/api/recipes', '/api/ai', '/api/haccp', '/api/stock'];
 app.use(trialProtectedPaths, (req, res, next) => {
   if (req.method === 'GET') return next();
   // Allow HACCP PDF exports (GET only anyway) and pdf-export routes
@@ -47,6 +47,7 @@ app.use('/api/recipes', require('./routes/recipes'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/haccp', require('./routes/haccp'));
+app.use('/api/stock', require('./routes/stock'));
 app.use('/api/stripe', require('./routes/stripe'));
 
 app.get('/api/health', (req, res) => {
@@ -56,6 +57,17 @@ app.get('/api/health', (req, res) => {
     version: '1.1.0',
     timestamp: new Date().toISOString()
   });
+});
+
+// Legal pages
+app.get('/mentions-legales', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'legal', 'mentions.html'));
+});
+app.get('/cgv', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'legal', 'cgv.html'));
+});
+app.get('/privacy', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'legal', 'privacy.html'));
 });
 
 // SPA app on /app (and sub-routes)
