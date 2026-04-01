@@ -116,6 +116,10 @@ class MoreView {
 
       <div class="more-footer">
         <div style="text-align:center; margin-top: 2rem;">
+          <button class="btn btn-secondary" id="btn-export-data" style="margin-bottom:1rem">
+            <i data-lucide="download" style="width:18px;height:18px"></i> Exporter mes données
+          </button>
+          <br>
           <button class="btn btn-secondary" onclick="logout()" style="margin-bottom:1rem">
             <i data-lucide="log-out" style="width:18px;height:18px"></i> Se déconnecter
           </button>
@@ -126,5 +130,33 @@ class MoreView {
       </div>
     `;
     if (window.lucide) lucide.createIcons();
+
+    // RGPD data export
+    const exportBtn = document.getElementById('btn-export-data');
+    if (exportBtn && account) {
+      exportBtn.addEventListener('click', async () => {
+        exportBtn.disabled = true;
+        exportBtn.innerHTML = '<i data-lucide="loader" style="width:18px;height:18px"></i> Export en cours…';
+        try {
+          const res = await fetch(`/api/accounts/${account.id}/export`);
+          if (!res.ok) throw new Error('Erreur export');
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          const today = new Date().toISOString().slice(0, 10);
+          a.download = `restosuite-export-${today}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast('Données exportées ✓', 'success');
+        } catch (e) {
+          showToast('Erreur lors de l\'export', 'error');
+        } finally {
+          exportBtn.disabled = false;
+          exportBtn.innerHTML = '<i data-lucide="download" style="width:18px;height:18px"></i> Exporter mes données';
+          if (window.lucide) lucide.createIcons();
+        }
+      });
+    }
   }
 }

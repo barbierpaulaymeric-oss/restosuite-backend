@@ -980,12 +980,13 @@ tr:has(td[colspan]) td {
    ═══════════════════════════════════════════ */
 .empty-state {
   text-align: center;
-  padding: var(--space-12) var(--space-6);
-  color: var(--text-tertiary);
+  padding: 3rem 1.5rem;
+  color: var(--text-secondary);
 }
 
 .empty-state .empty-icon {
-  margin-bottom: var(--space-4);
+  font-size: 3rem;
+  margin-bottom: 1rem;
   color: var(--text-tertiary);
 }
 
@@ -995,9 +996,17 @@ tr:has(td[colspan]) td {
   stroke-width: 1;
 }
 
+.empty-state h3 {
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
 .empty-state p {
   font-size: var(--text-base);
-  margin-bottom: var(--space-5);
+  margin-bottom: 1.5rem;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
   color: var(--text-secondary);
 }
 

@@ -94,11 +94,17 @@ async function loadStock(query) {
 
     const content = document.getElementById('stock-content');
     if (stock.length === 0) {
-      content.innerHTML = `
-        <div class="empty-state" style="text-align:center;padding:var(--space-10)">
-          <div style="font-size:3rem;margin-bottom:var(--space-4)">📦</div>
-          <p class="text-secondary">${query ? 'Aucun résultat' : 'Aucun stock enregistré'}</p>
-          ${!query ? '<p class="text-secondary text-sm">Commencez par une réception de marchandise</p>' : ''}
+      content.innerHTML = query ? `
+        <div class="empty-state">
+          <div class="empty-icon">📦</div>
+          <p>Aucun résultat</p>
+        </div>
+      ` : `
+        <div class="empty-state">
+          <div class="empty-icon">📦</div>
+          <h3>Votre stock est vide</h3>
+          <p>Enregistrez votre première réception pour commencer le suivi.</p>
+          <a href="#/stock/reception" class="btn btn-primary">Réception marchandise</a>
         </div>
       `;
       return;

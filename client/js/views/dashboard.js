@@ -34,11 +34,17 @@ async function renderDashboard() {
       : recipes;
 
     if (filtered.length === 0) {
-      listEl.innerHTML = `
+      listEl.innerHTML = filter ? `
         <div class="empty-state">
           <div class="empty-icon"><i data-lucide="clipboard-list"></i></div>
-          <p>${filter ? 'Aucun résultat' : 'Aucune fiche technique pour le moment'}</p>
-          ${!filter && perms.edit_recipes ? '<a href="#/new" class="btn btn-primary"><i data-lucide="mic" style="width:18px;height:18px"></i> Créer ma première fiche</a>' : ''}
+          <p>Aucun résultat</p>
+        </div>
+      ` : `
+        <div class="empty-state">
+          <div class="empty-icon">🎤</div>
+          <h3>Créez votre première fiche technique</h3>
+          <p>Dictez votre recette, l'IA fait le reste — coûts, portions, procédure.</p>
+          ${perms.edit_recipes ? '<a href="#/new" class="btn btn-primary">Nouvelle fiche</a>' : ''}
         </div>
       `;
       lucide.createIcons();

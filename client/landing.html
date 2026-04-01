@@ -696,12 +696,15 @@
       display: grid;
       grid-template-columns: 1fr;
       gap: 24px;
-      max-width: 800px;
+      max-width: 1100px;
       margin: 0 auto;
     }
     
     @media (min-width: 640px) {
       .pricing__grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (min-width: 960px) {
+      .pricing__grid { grid-template-columns: repeat(3, 1fr); }
     }
     
     .pricing-card {
@@ -1141,7 +1144,7 @@
           </div>
           <div class="hero__trust">
             <i data-lucide="shield-check"></i>
-            <span>Aucune carte bancaire requise • Données hébergées en Europe</span>
+            <span>Aucune carte bancaire requise • Données sécurisées, transfert conforme au Data Privacy Framework UE-US</span>
           </div>
         </div>
         <div class="hero__visual reveal">
@@ -1314,6 +1317,7 @@
             <span class="pricing-card__amount">39€</span>
             <span class="pricing-card__period">/ mois</span>
           </div>
+          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-top:-16px;margin-bottom:20px">ou 31€/mois facturé annuellement (372€/an) — <strong style="color:var(--color-success)">Économisez 20%</strong></p>
           <ul class="pricing-card__features">
             <li><i data-lucide="check"></i> Fiches techniques illimitées</li>
             <li><i data-lucide="check"></i> Saisie vocale IA</li>
@@ -1323,61 +1327,24 @@
             <li><i data-lucide="check"></i> Support prioritaire</li>
             <li><i data-lucide="check"></i> Tout inclus</li>
           </ul>
-          <a href="#" class="btn btn--primary" id="subscribe-btn">S'abonner — 39€/mois</a>
+          <a href="/app#/subscribe" class="btn btn--primary" id="subscribe-btn">S'abonner — 39€/mois</a>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ========== TESTIMONIALS ========== -->
-  <section class="section section--base">
-    <div class="container">
-      <div class="section-header reveal">
-        <h2>Ce qu'en disent les chefs</h2>
-        <p>Des restaurateurs qui ont gagné du temps — et de la marge.</p>
-      </div>
-      <div class="testimonials__grid">
-        <div class="testimonial-card reveal reveal-delay-1">
-          <span class="testimonial-card__example">Exemple</span>
-          <div class="testimonial-card__stars">
-            <i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i>
+        <!-- Business -->
+        <div class="pricing-card reveal reveal-delay-3">
+          <div class="pricing-card__name">Business</div>
+          <div class="pricing-card__desc">Multi-établissements · Sur mesure</div>
+          <div class="pricing-card__price">
+            <span class="pricing-card__amount">79€</span>
+            <span class="pricing-card__period">/ mois</span>
           </div>
-          <p class="testimonial-card__quote">« RestoSuite a changé ma façon de gérer mes coûts. Je dictais mes recettes entre deux services et tout était calculé. »</p>
-          <div class="testimonial-card__author">
-            <div class="testimonial-card__avatar">MC</div>
-            <div class="testimonial-card__info">
-              <span class="testimonial-card__name">Marc C.</span>
-              <span class="testimonial-card__role">Chef propriétaire, bistrot parisien</span>
-            </div>
-          </div>
-        </div>
-        <div class="testimonial-card reveal reveal-delay-2">
-          <span class="testimonial-card__example">Exemple</span>
-          <div class="testimonial-card__stars">
-            <i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i>
-          </div>
-          <p class="testimonial-card__quote">« La saisie vocale, c'est un game changer. Plus besoin de poser le couteau pour taper sur un clavier. »</p>
-          <div class="testimonial-card__author">
-            <div class="testimonial-card__avatar">SL</div>
-            <div class="testimonial-card__info">
-              <span class="testimonial-card__name">Sophie L.</span>
-              <span class="testimonial-card__role">Sous-cheffe, restaurant gastronomique</span>
-            </div>
-          </div>
-        </div>
-        <div class="testimonial-card reveal reveal-delay-3">
-          <span class="testimonial-card__example">Exemple</span>
-          <div class="testimonial-card__stars">
-            <i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i><i data-lucide="star"></i>
-          </div>
-          <p class="testimonial-card__quote">« Mes fiches techniques étaient sur Excel depuis 10 ans. En une journée, tout était migré. Le PDF est impeccable. »</p>
-          <div class="testimonial-card__author">
-            <div class="testimonial-card__avatar">TD</div>
-            <div class="testimonial-card__info">
-              <span class="testimonial-card__name">Thomas D.</span>
-              <span class="testimonial-card__role">Gérant, 3 brasseries à Lyon</span>
-            </div>
-          </div>
+          <ul class="pricing-card__features">
+            <li><i data-lucide="check"></i> Tout le plan Pro inclus</li>
+            <li><i data-lucide="check"></i> Multi-établissements</li>
+            <li><i data-lucide="check"></i> Support dédié</li>
+            <li><i data-lucide="check"></i> Analytics avancés</li>
+            <li><i data-lucide="check"></i> Accès API</li>
+          </ul>
+          <a href="mailto:contact@restosuite.fr" class="btn btn--secondary">Nous contacter</a>
         </div>
       </div>
     </div>
@@ -1420,7 +1387,7 @@
           </button>
           <div class="faq-item__answer">
             <div class="faq-item__answer-inner">
-              Oui. Vos données sont hébergées en Europe, chiffrées, et ne sont jamais partagées avec des tiers. Vos recettes restent les vôtres.
+              Oui. Vos données sont chiffrées et ne sont jamais partagées avec des tiers. Les transferts vers nos sous-traitants sont conformes au Data Privacy Framework UE-US. Vos recettes restent les vôtres.
             </div>
           </div>
         </div>
@@ -1486,7 +1453,7 @@
           <a href="/privacy">Confidentialité</a>
           <a href="mailto:contact@restosuite.fr">Contact</a>
         </div>
-        <div class="footer__copy">© 2026 Paul-Aymeric Barbier</div>
+        <div class="footer__copy">© 2026 RestoSuite — Paul-Aymeric Barbier</div>
       </div>
     </div>
   </footer>

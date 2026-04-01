@@ -197,4 +197,39 @@ router.delete('/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// GET /api/accounts/:id/export — RGPD data export
+router.get('/:id/export', (req, res) => {
+  const { id } = req.params;
+
+  const account = get('SELECT id, name, role, created_at, last_login FROM accounts WHERE id = ?', [id]);
+  if (!account) {
+    return res.status(404).json({ error: 'Compte introuvable' });
+  }
+
+  const recipes = all('SELECT * FROM recipes');
+  const ingredients = all('SELECT * FROM ingredients');
+  const stock = all('SELECT * FROM stock');
+  const temperature_logs = all('SELECT * FROM temperature_logs');
+  const cleaning_logs = all('SELECT * FROM cleaning_logs');
+  const traceability_logs = all('SELECT * FROM traceability_logs');
+  const supplier_prices = all('SELECT * FROM supplier_prices');
+
+  const exportData = {
+    exported_at: new Date().toISOString(),
+    account,
+    recipes,
+    ingredients,
+    stock,
+    temperature_logs,
+    cleaning_logs,
+    traceability_logs,
+    supplier_prices
+  };
+
+  const today = new Date().toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename="restosuite-export-${today}.json"`);
+  res.json(exportData);
+});
+
 module.exports = router;

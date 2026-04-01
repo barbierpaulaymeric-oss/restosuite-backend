@@ -29,10 +29,15 @@ async function renderIngredients() {
       : ingredients;
 
     if (filtered.length === 0) {
-      listEl.innerHTML = `
+      listEl.innerHTML = filter ? `
         <div class="empty-state">
           <div class="empty-icon"><i data-lucide="package"></i></div>
-          <p>${filter ? 'Aucun résultat' : 'Aucun ingrédient enregistré'}</p>
+          <p>Aucun résultat</p>
+        </div>` : `
+        <div class="empty-state">
+          <div class="empty-icon">🥕</div>
+          <h3>Aucun ingrédient</h3>
+          <p>Ajoutez vos premiers ingrédients pour calculer vos coûts.</p>
         </div>`;
       lucide.createIcons();
       return;

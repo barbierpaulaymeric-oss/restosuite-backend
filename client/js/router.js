@@ -12,6 +12,9 @@ const Router = {
   navigate(hash) {
     const path = hash.replace('#', '') || '/';
 
+    // Close any open modals on route change
+    document.querySelectorAll('.modal-overlay').forEach(el => el.remove());
+
     // Update nav active state
     document.querySelectorAll('.nav-link').forEach(link => {
       const route = link.dataset.route;

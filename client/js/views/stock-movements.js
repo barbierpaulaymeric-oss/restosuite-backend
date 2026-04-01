@@ -25,8 +25,8 @@ async function renderStockMovements() {
         <option value="adjustment">🔄 Ajustement</option>
         <option value="inventory">📋 Inventaire</option>
       </select>
-      <input type="date" id="mv-from" class="input" style="min-width:140px">
-      <input type="date" id="mv-to" class="input" style="min-width:140px">
+      <input type="date" id="mv-from" class="input" lang="fr" style="min-width:140px">
+      <input type="date" id="mv-to" class="input" lang="fr" style="min-width:140px">
       <button class="btn btn-secondary" id="mv-export-btn">📄 Export PDF</button>
     </div>
 

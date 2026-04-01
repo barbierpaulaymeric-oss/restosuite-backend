@@ -62,9 +62,9 @@ async function renderHACCPCleaning() {
         <!-- Export -->
         <div class="haccp-export-bar">
           <label class="text-secondary text-sm">Export PDF :</label>
-          <input type="date" class="form-control" id="export-from" style="min-height:36px;width:auto">
+          <input type="date" class="form-control" id="export-from" lang="fr" style="min-height:36px;width:auto">
           <span class="text-secondary">→</span>
-          <input type="date" class="form-control" id="export-to" style="min-height:36px;width:auto">
+          <input type="date" class="form-control" id="export-to" lang="fr" style="min-height:36px;width:auto">
           <button class="btn btn-secondary btn-sm" id="btn-export-cleaning">📄 Exporter</button>
         </div>
 

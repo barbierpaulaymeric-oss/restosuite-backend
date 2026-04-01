@@ -40,7 +40,7 @@ async function renderHACCPTemperatures() {
             </select>
           </div>
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
-            <input type="date" class="form-control" id="filter-date" style="min-height:40px">
+            <input type="date" class="form-control" id="filter-date" lang="fr" style="min-height:40px">
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-filter">Filtrer</button>
         </div>
@@ -69,9 +69,9 @@ async function renderHACCPTemperatures() {
         <!-- Export -->
         <div class="haccp-export-bar">
           <label class="text-secondary text-sm">Export PDF :</label>
-          <input type="date" class="form-control" id="export-from" style="min-height:36px;width:auto">
+          <input type="date" class="form-control" id="export-from" lang="fr" style="min-height:36px;width:auto">
           <span class="text-secondary">→</span>
-          <input type="date" class="form-control" id="export-to" style="min-height:36px;width:auto">
+          <input type="date" class="form-control" id="export-to" lang="fr" style="min-height:36px;width:auto">
           <button class="btn btn-secondary btn-sm" id="btn-export-temp">📄 Exporter</button>
         </div>
 

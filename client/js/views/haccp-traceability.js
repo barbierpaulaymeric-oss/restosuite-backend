@@ -46,7 +46,7 @@ async function renderHACCPTraceability() {
         <!-- Filters -->
         <div class="haccp-filters">
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
-            <input type="date" class="form-control" id="filter-date" style="min-height:40px" placeholder="Date">
+            <input type="date" class="form-control" id="filter-date" lang="fr" style="min-height:40px" placeholder="Date">
           </div>
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
             <input type="text" class="form-control" id="filter-supplier" style="min-height:40px" placeholder="Fournisseur">
@@ -57,9 +57,9 @@ async function renderHACCPTraceability() {
         <!-- Export -->
         <div class="haccp-export-bar">
           <label class="text-secondary text-sm">Export PDF :</label>
-          <input type="date" class="form-control" id="export-from" style="min-height:36px;width:auto">
+          <input type="date" class="form-control" id="export-from" lang="fr" style="min-height:36px;width:auto">
           <span class="text-secondary">→</span>
-          <input type="date" class="form-control" id="export-to" style="min-height:36px;width:auto">
+          <input type="date" class="form-control" id="export-to" lang="fr" style="min-height:36px;width:auto">
           <button class="btn btn-secondary btn-sm" id="btn-export-trace">📄 Exporter</button>
         </div>
 
@@ -178,7 +178,7 @@ function showReceptionModal() {
       <div class="form-row">
         <div class="form-group">
           <label>DLC</label>
-          <input type="date" class="form-control" id="rec-dlc">
+          <input type="date" class="form-control" id="rec-dlc" lang="fr">
         </div>
         <div class="form-group">
           <label>T° à réception (°C)</label>
