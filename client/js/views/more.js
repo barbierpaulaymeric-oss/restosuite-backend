@@ -80,16 +80,16 @@ class MoreView {
           <p class="text-secondary text-sm">Prise de commande tablette, tickets cuisine, suivi service</p>
         </div>
 
-        <div class="more-card more-card--coming">
-          <div class="more-card__icon" style="background: var(--color-primary-light)">
+        <a href="#/analytics" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+          <div class="more-card__icon" style="background: var(--color-accent)">
             <i data-lucide="bar-chart-3"></i>
           </div>
           <div class="more-card__content">
             <h3>Analytics</h3>
-            <span class="badge badge--warning">Bientôt</span>
+            <span class="badge badge--success">Actif</span>
           </div>
-          <p class="text-secondary text-sm">Food cost, marges, prédictions IA, commandes fournisseur auto</p>
-        </div>
+          <p class="text-secondary text-sm">Food cost, marges, prédictions IA, insights fournisseurs</p>
+        </a>
 
         <a href="#/haccp" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
           <div class="more-card__icon" style="background: var(--color-success)">

@@ -255,6 +255,16 @@ const API = {
     return this.supplierRequest('/history');
   },
 
+  // ─── Analytics ───
+  getAnalyticsKPIs() { return this.request('/analytics/kpis'); },
+  getAnalyticsFoodCost() { return this.request('/analytics/food-cost'); },
+  getAnalyticsStock() { return this.request('/analytics/stock'); },
+  getAnalyticsPrices() { return this.request('/analytics/prices'); },
+  getAnalyticsHACCP() { return this.request('/analytics/haccp'); },
+  getAnalyticsInsights(refresh = false) {
+    return this.request(`/analytics/ai-insights${refresh ? '?refresh=true' : ''}`);
+  },
+
   // AI
   parseVoice(text) {
     return this.request('/ai/parse-voice', { method: 'POST', body: { text } });
