@@ -7,10 +7,11 @@ async function renderSuppliers() {
   app.innerHTML = `
     <div class="page-header">
       <h1>Fournisseurs</h1>
-      <button class="btn btn-primary" onclick="showSupplierModal()">➕ Ajouter</button>
+      <button class="btn btn-primary" onclick="showSupplierModal()"><i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter</button>
     </div>
     <div id="supplier-list"><div class="loading"><div class="spinner"></div></div></div>
   `;
+  lucide.createIcons();
 
   let suppliers = [];
   try { suppliers = await API.getSuppliers(); } catch(e) { showToast('Erreur', 'error'); }
@@ -20,10 +21,11 @@ async function renderSuppliers() {
   if (suppliers.length === 0) {
     listEl.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">🏪</div>
+        <div class="empty-icon"><i data-lucide="truck"></i></div>
         <p>Aucun fournisseur enregistré</p>
-        <button class="btn btn-primary" onclick="showSupplierModal()">Ajouter un fournisseur</button>
+        <button class="btn btn-primary" onclick="showSupplierModal()"><i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter un fournisseur</button>
       </div>`;
+    lucide.createIcons();
     return;
   }
 
@@ -35,10 +37,10 @@ async function renderSuppliers() {
       </div>
       <div class="card-stats">
         ${s.phone ? `<div><span class="stat-value">${escapeHtml(s.phone)}</span><span class="stat-label">Téléphone</span></div>` : ''}
-        ${s.email ? `<div><span class="stat-value" style="font-size:0.8rem">${escapeHtml(s.email)}</span><span class="stat-label">Email</span></div>` : ''}
+        ${s.email ? `<div><span class="stat-value" style="font-size:var(--text-sm)">${escapeHtml(s.email)}</span><span class="stat-label">Email</span></div>` : ''}
         ${s.contact ? `<div><span class="stat-value">${escapeHtml(s.contact)}</span><span class="stat-label">Contact</span></div>` : ''}
       </div>
-      ${s.quality_notes ? `<p style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;font-style:italic">${escapeHtml(s.quality_notes)}</p>` : ''}
+      ${s.quality_notes ? `<p style="font-size:var(--text-sm);color:var(--text-tertiary);margin-top:var(--space-2);font-style:italic">${escapeHtml(s.quality_notes)}</p>` : ''}
     </div>
   `).join('');
 }
@@ -80,13 +82,17 @@ function showSupplierModal(supplier = null) {
         <textarea class="form-control" id="m-sup-notes" rows="2">${escapeHtml(supplier?.quality_notes || '')}</textarea>
       </div>
       <div class="actions-row">
-        <button class="btn btn-primary" id="m-sup-save">${isEdit ? 'Enregistrer' : 'Créer'}</button>
+        <button class="btn btn-primary" id="m-sup-save">
+          <i data-lucide="${isEdit ? 'save' : 'plus'}" style="width:18px;height:18px"></i>
+          ${isEdit ? 'Enregistrer' : 'Créer'}
+        </button>
         <button class="btn btn-secondary" id="m-sup-cancel">Annuler</button>
       </div>
     </div>
   `;
 
   document.body.appendChild(overlay);
+  lucide.createIcons();
 
   // Star rating interaction
   const starsEl = overlay.querySelector('#m-sup-stars');

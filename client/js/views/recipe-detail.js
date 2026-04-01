@@ -19,7 +19,7 @@ async function renderRecipeDetail(id) {
   app.innerHTML = `
     <div class="page-header">
       <div>
-        <a href="#/" style="color:var(--text-muted);text-decoration:none;font-size:0.85rem">← Fiches techniques</a>
+        <a href="#/" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px"></i> Fiches techniques</a>
         <h1 style="margin-top:4px">${escapeHtml(recipe.name)}</h1>
         ${recipe.category ? `<span class="card-category" style="margin-top:4px;display:inline-block">${escapeHtml(recipe.category)}</span>` : ''}
       </div>
@@ -54,9 +54,9 @@ async function renderRecipeDetail(id) {
     </div>
 
     ${recipe.prep_time_min || recipe.cooking_time_min ? `
-    <div style="display:flex;gap:16px;color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px">
-      ${recipe.prep_time_min ? `<span>⏱️ Préparation : ${recipe.prep_time_min} min</span>` : ''}
-      ${recipe.cooking_time_min ? `<span>🔥 Cuisson : ${recipe.cooking_time_min} min</span>` : ''}
+    <div class="recipe-meta">
+      ${recipe.prep_time_min ? `<span><i data-lucide="clock" style="width:16px;height:16px"></i> Préparation : ${recipe.prep_time_min} min</span>` : ''}
+      ${recipe.cooking_time_min ? `<span><i data-lucide="flame" style="width:16px;height:16px"></i> Cuisson : ${recipe.cooking_time_min} min</span>` : ''}
     </div>` : ''}
 
     <div class="section-title">Ingrédients</div>
@@ -65,10 +65,10 @@ async function renderRecipeDetail(id) {
         <thead>
           <tr>
             <th>Ingrédient</th>
-            <th style="text-align:right">Brut</th>
-            <th style="text-align:right">Net</th>
-            <th style="text-align:right">Perte</th>
-            <th style="text-align:right">Coût</th>
+            <th class="numeric">Brut</th>
+            <th class="numeric">Net</th>
+            <th class="numeric">Perte</th>
+            <th class="numeric">Coût</th>
             <th>Notes</th>
           </tr>
         </thead>
@@ -78,16 +78,16 @@ async function renderRecipeDetail(id) {
             return `
             <tr>
               <td>${escapeHtml(ing.ingredient_name)}</td>
-              <td class="mono" style="text-align:right">${ing.gross_quantity}${ing.unit}</td>
-              <td class="mono" style="text-align:right">${(ing.net_quantity || ing.gross_quantity).toFixed(1)}${ing.unit}</td>
-              <td class="mono" style="text-align:right">${waste}%</td>
-              <td class="mono" style="text-align:right">${formatCurrency(ing.cost)}</td>
-              <td class="text-muted" style="font-size:0.8rem;font-style:italic">${escapeHtml(ing.notes)}</td>
+              <td class="mono">${ing.gross_quantity}${ing.unit}</td>
+              <td class="mono">${(ing.net_quantity || ing.gross_quantity).toFixed(1)}${ing.unit}</td>
+              <td class="mono">${waste}%</td>
+              <td class="mono">${formatCurrency(ing.cost)}</td>
+              <td style="font-size:var(--text-sm);color:var(--text-tertiary);font-style:italic">${escapeHtml(ing.notes)}</td>
             </tr>`;
           }).join('')}
-          <tr style="border-top:2px solid var(--border);font-weight:700">
-            <td colspan="4">TOTAL</td>
-            <td class="mono" style="text-align:right">${formatCurrency(recipe.total_cost)}</td>
+          <tr class="total-row">
+            <td colspan="4" style="font-weight:600">TOTAL</td>
+            <td class="mono" style="font-weight:600">${formatCurrency(recipe.total_cost)}</td>
             <td></td>
           </tr>
         </tbody>
@@ -102,14 +102,16 @@ async function renderRecipeDetail(id) {
 
     ${recipe.notes ? `
     <div class="section-title">Notes</div>
-    <p style="color:var(--text-secondary);font-size:0.9rem">${escapeHtml(recipe.notes)}</p>` : ''}
+    <p style="color:var(--text-secondary);font-size:var(--text-sm)">${escapeHtml(recipe.notes)}</p>` : ''}
 
     <div class="actions-row">
-      <a href="#/edit/${recipe.id}" class="btn btn-primary">✏️ Modifier</a>
-      <button class="btn btn-secondary" onclick="exportRecipe(${recipe.id})">📄 Exporter</button>
-      <button class="btn btn-danger" onclick="deleteRecipe(${recipe.id})">🗑️ Supprimer</button>
+      <a href="#/edit/${recipe.id}" class="btn btn-primary"><i data-lucide="pencil" style="width:18px;height:18px"></i> Modifier</a>
+      <button class="btn btn-secondary" onclick="exportRecipe(${recipe.id})"><i data-lucide="download" style="width:18px;height:18px"></i> Exporter</button>
+      <button class="btn btn-danger" onclick="deleteRecipe(${recipe.id})"><i data-lucide="trash-2" style="width:18px;height:18px"></i> Supprimer</button>
     </div>
   `;
+
+  lucide.createIcons();
 }
 
 async function deleteRecipe(id) {

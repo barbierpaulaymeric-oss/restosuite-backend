@@ -7,13 +7,15 @@ async function renderDashboard() {
   app.innerHTML = `
     <div class="page-header">
       <h1>Fiches Techniques</h1>
-      <a href="#/new" class="btn btn-primary">➕ Nouvelle fiche</a>
+      <a href="#/new" class="btn btn-primary"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle fiche</a>
     </div>
     <div class="search-bar">
+      <span class="search-icon"><i data-lucide="search"></i></span>
       <input type="text" id="recipe-search" placeholder="Rechercher une fiche..." autocomplete="off">
     </div>
     <div id="recipe-list"><div class="loading"><div class="spinner"></div></div></div>
   `;
+  lucide.createIcons();
 
   let recipes = [];
   try {
@@ -33,18 +35,23 @@ async function renderDashboard() {
     if (filtered.length === 0) {
       listEl.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">📋</div>
+          <div class="empty-icon"><i data-lucide="clipboard-list"></i></div>
           <p>${filter ? 'Aucun résultat' : 'Aucune fiche technique pour le moment'}</p>
-          ${!filter ? '<a href="#/new" class="btn btn-primary">🎤 Créer ma première fiche</a>' : ''}
+          ${!filter ? '<a href="#/new" class="btn btn-primary"><i data-lucide="mic" style="width:18px;height:18px"></i> Créer ma première fiche</a>' : ''}
         </div>
       `;
+      lucide.createIcons();
       return;
     }
 
     listEl.innerHTML = filtered.map(r => {
       const marginClass = getMarginClass(r.food_cost_percent);
+      const costBorderClass = r.food_cost_percent == null ? '' :
+        r.food_cost_percent < 30 ? 'card--cost-good' :
+        r.food_cost_percent <= 35 ? 'card--cost-warning' : 'card--cost-danger';
+
       return `
-        <div class="card" onclick="location.hash='#/recipe/${r.id}'">
+        <div class="card ${costBorderClass}" onclick="location.hash='#/recipe/${r.id}'">
           <div class="card-header">
             <span class="card-title">${escapeHtml(r.name)}</span>
             ${r.category ? `<span class="card-category">${escapeHtml(r.category)}</span>` : ''}
@@ -55,11 +62,11 @@ async function renderDashboard() {
               <span class="stat-label">Portions</span>
             </div>
             <div>
-              <span class="stat-value mono">${formatCurrency(r.cost_per_portion)}</span>
+              <span class="stat-value">${formatCurrency(r.cost_per_portion)}</span>
               <span class="stat-label">Coût matière</span>
             </div>
             <div>
-              <span class="stat-value mono">${formatCurrency(r.selling_price)}</span>
+              <span class="stat-value">${formatCurrency(r.selling_price)}</span>
               <span class="stat-label">Prix de vente</span>
             </div>
             <div>

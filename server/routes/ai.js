@@ -132,6 +132,155 @@ router.post('/parse-voice', async (req, res) => {
   }
 });
 
+// Voice-based recipe modification & supplier preferences
+const VOICE_MODIFY_SYSTEM = `Tu es un assistant culinaire professionnel.
+Le chef te donne une instruction vocale pour modifier une fiche technique existante ou exprimer une préférence fournisseur.
+
+## Types d'instructions possibles
+
+### Modification de recette
+- "Change la quantité de bœuf à 200g"
+- "Enlève les câpres"
+- "Ajoute 50g de cornichons ciselés"
+- "Passe à 6 portions"
+- "Le temps de cuisson c'est 15 minutes"
+
+### Préférence fournisseur
+- "Pour le bœuf je veux Bigard, meilleure qualité"
+- "Les échalotes toujours chez Pomona"
+- "Le beurre je préfère AOP Poitou chez Metro, c'est plus cher mais la qualité est là"
+
+## Format de sortie
+Retourne un JSON avec cette structure :
+{
+  "actions": [
+    {
+      "type": "modify_ingredient",
+      "ingredient_name": "filet de bœuf",
+      "changes": { "gross_quantity": 200, "unit": "g" }
+    },
+    {
+      "type": "remove_ingredient",
+      "ingredient_name": "câpres"
+    },
+    {
+      "type": "add_ingredient",
+      "ingredient": { "name": "cornichons", "gross_quantity": 50, "unit": "g", "waste_percent": 5, "notes": "ciselés" }
+    },
+    {
+      "type": "modify_recipe",
+      "changes": { "portions": 6 }
+    },
+    {
+      "type": "supplier_preference",
+      "ingredient_name": "filet de bœuf",
+      "supplier_name": "Bigard",
+      "reason": "meilleure qualité",
+      "quality_rating": 5,
+      "scope": "global"
+    }
+  ]
+}
+
+## Règles
+- scope peut être "global" (pour tout l'ingrédient) ou "recipe" (juste pour cette recette)
+- Si le chef dit "toujours" ou "je veux", c'est global
+- Si le chef dit "pour cette recette" ou "ici", c'est recipe
+- Recalcule le brut/net si la quantité change en tenant compte du % de perte
+- Retourne UNIQUEMENT le JSON, rien d'autre`;
+
+router.post('/modify-voice', async (req, res) => {
+  const { text, recipe_id } = req.body;
+  if (!text) return res.status(400).json({ error: 'text is required' });
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+
+  // Get current recipe context for the AI
+  let recipeContext = '';
+  if (recipe_id) {
+    const recipe = get('SELECT * FROM recipes WHERE id = ?', [recipe_id]);
+    if (recipe) {
+      const ingredients = all(`
+        SELECT ri.*, i.name as ingredient_name 
+        FROM recipe_ingredients ri JOIN ingredients i ON i.id = ri.ingredient_id 
+        WHERE ri.recipe_id = ?`, [recipe_id]);
+      recipeContext = `\n\nRecette actuelle: "${recipe.name}" (${recipe.portions} portions)\nIngrédients: ${ingredients.map(i => `${i.ingredient_name} ${i.gross_quantity}${i.unit}`).join(', ')}`;
+    }
+  }
+
+  try {
+    const response = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `Instruction vocale du chef :\n"${text}"${recipeContext}\n\nAnalyse et retourne les actions à effectuer en JSON.` }] }],
+        systemInstruction: { parts: [{ text: VOICE_MODIFY_SYSTEM }] },
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.2 }
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(502).json({ error: 'AI service error', details: err });
+    }
+
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!content) return res.status(502).json({ error: 'Empty AI response' });
+
+    const actions = JSON.parse(content);
+    
+    // Apply supplier preferences immediately
+    if (actions.actions) {
+      const { run: dbRun } = require('../db');
+      for (const action of actions.actions) {
+        if (action.type === 'supplier_preference') {
+          // Find or create supplier
+          let supplier = get('SELECT * FROM suppliers WHERE LOWER(name) = LOWER(?)', [action.supplier_name]);
+          if (!supplier) {
+            const info = dbRun(
+              'INSERT INTO suppliers (name, quality_rating, quality_notes) VALUES (?, ?, ?)',
+              [action.supplier_name, action.quality_rating || 3, action.reason || null]
+            );
+            supplier = get('SELECT * FROM suppliers WHERE id = ?', [info.lastInsertRowid]);
+          }
+          
+          // Find ingredient
+          const ingredient = get('SELECT * FROM ingredients WHERE LOWER(name) LIKE ?', 
+            [`%${action.ingredient_name.toLowerCase()}%`]);
+          
+          if (supplier && ingredient) {
+            // Save preference
+            try {
+              dbRun(
+                `INSERT OR REPLACE INTO ingredient_supplier_prefs (ingredient_id, recipe_id, supplier_id, reason)
+                 VALUES (?, ?, ?, ?)`,
+                [ingredient.id, action.scope === 'recipe' ? recipe_id : null, supplier.id, action.reason || null]
+              );
+              
+              // Also update ingredient's preferred supplier if global
+              if (action.scope === 'global') {
+                dbRun('UPDATE ingredients SET preferred_supplier_id = ? WHERE id = ?', [supplier.id, ingredient.id]);
+              }
+              
+              action.applied = true;
+              action.supplier_id = supplier.id;
+              action.ingredient_id = ingredient.id;
+            } catch (e) {
+              action.applied = false;
+              action.error = e.message;
+            }
+          }
+        }
+      }
+    }
+
+    res.json(actions);
+  } catch (e) {
+    console.error('AI modify error:', e);
+    res.status(500).json({ error: 'Failed to process voice command', details: e.message });
+  }
+});
+
 router.post('/suggest-suppliers', async (req, res) => {
   const { ingredient_ids } = req.body;
   if (!ingredient_ids || !ingredient_ids.length) {

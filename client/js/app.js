@@ -13,4 +13,7 @@ Router.add(/^\/suppliers$/, renderSuppliers);
 // Start
 Router.init();
 
-console.log('🍽️ RestoSuite AI loaded');
+// Initialize Lucide icons in nav
+if (window.lucide) lucide.createIcons();
+
+console.log('%c RestoSuite AI ', 'background:#E8722A;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600', 'loaded');

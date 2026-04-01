@@ -39,14 +39,16 @@ async function renderRecipeForm(editId) {
   app.innerHTML = `
     <div class="page-header">
       <div>
-        <a href="#/" style="color:var(--text-muted);text-decoration:none;font-size:0.85rem">← Retour</a>
+        <a href="#/" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px"></i> Retour</a>
         <h1 style="margin-top:4px">${isEdit ? 'Modifier la fiche' : 'Nouvelle fiche technique'}</h1>
       </div>
     </div>
 
     ${!isEdit ? `
     <div class="mic-container">
-      <button class="mic-btn" id="mic-btn" onclick="toggleMic()">🎤</button>
+      <button class="mic-btn" id="mic-btn" onclick="toggleMic()">
+        <i data-lucide="mic"></i>
+      </button>
       <div class="mic-status" id="mic-status">Appuyez pour dicter votre recette</div>
     </div>
     ` : ''}
@@ -101,14 +103,14 @@ async function renderRecipeForm(editId) {
         </select>
         <input type="number" class="form-control" id="add-ing-waste" placeholder="Perte%" style="width:80px" step="any" min="0" max="100">
         <input type="text" class="form-control" id="add-ing-notes" placeholder="Notes" style="width:120px">
-        <button class="btn btn-primary btn-sm" onclick="addIngredientLine()">+</button>
+        <button class="btn btn-primary btn-sm" onclick="addIngredientLine()"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
       </div>
 
       <div class="section-title">Procédure</div>
       <div id="steps-list"></div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <input type="text" class="form-control" id="add-step" placeholder="Nouvelle étape..." style="flex:1">
-        <button class="btn btn-primary btn-sm" onclick="addStepLine()">+</button>
+        <button class="btn btn-primary btn-sm" onclick="addStepLine()"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
       </div>
 
       <div class="section-title">Tarification</div>
@@ -119,7 +121,7 @@ async function renderRecipeForm(editId) {
         </div>
         <div class="form-group">
           <label>Food Cost</label>
-          <div id="live-margin" style="padding:10px 14px;font-family:var(--font-mono);font-size:1.1rem;font-weight:700">—</div>
+          <div id="live-margin" style="padding:12px 16px;font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:var(--text-secondary)">—</div>
         </div>
       </div>
 
@@ -129,12 +131,16 @@ async function renderRecipeForm(editId) {
       </div>
 
       <div class="actions-row">
-        <button class="btn btn-primary" onclick="saveRecipe(${editId || 'null'})">${isEdit ? '💾 Enregistrer' : '✅ Créer la fiche'}</button>
+        <button class="btn btn-primary" onclick="saveRecipe(${editId || 'null'})">
+          <i data-lucide="${isEdit ? 'save' : 'check'}" style="width:18px;height:18px"></i>
+          ${isEdit ? 'Enregistrer' : 'Créer la fiche'}
+        </button>
         <a href="#/" class="btn btn-secondary">Annuler</a>
       </div>
     </div>
   `;
 
+  lucide.createIcons();
   renderIngredientLines();
   renderStepLines();
   updateLiveMargin();
@@ -150,7 +156,7 @@ function renderIngredientLines() {
   const el = document.getElementById('ing-list');
   if (!el) return;
   if (formIngredients.length === 0) {
-    el.innerHTML = '<p class="text-muted" style="font-size:0.85rem;padding:8px 0">Aucun ingrédient ajouté</p>';
+    el.innerHTML = '<p class="text-muted" style="font-size:var(--text-sm);padding:8px 0">Aucun ingrédient ajouté</p>';
     return;
   }
   el.innerHTML = formIngredients.map((ing, i) => {
@@ -160,11 +166,12 @@ function renderIngredientLines() {
         <span class="ing-name">${escapeHtml(ing.name)} ${ing.notes ? `<span class="ing-notes">(${escapeHtml(ing.notes)})</span>` : ''}</span>
         <span class="ing-qty">${ing.gross_quantity}${ing.unit}</span>
         <span class="ing-qty text-muted">→ ${net}${ing.unit}</span>
-        <span class="text-muted" style="font-size:0.8rem">${ing.waste_percent}%</span>
-        <span class="ing-remove" onclick="removeIngredient(${i})">✕</span>
+        <span class="text-muted" style="font-size:var(--text-sm);font-family:var(--font-mono)">${ing.waste_percent}%</span>
+        <span class="ing-remove" onclick="removeIngredient(${i})"><i data-lucide="x" style="width:16px;height:16px"></i></span>
       </div>
     `;
   }).join('');
+  lucide.createIcons();
   updateLiveMargin();
 }
 
@@ -172,12 +179,13 @@ function renderStepLines() {
   const el = document.getElementById('steps-list');
   if (!el) return;
   if (formSteps.length === 0) {
-    el.innerHTML = '<p class="text-muted" style="font-size:0.85rem;padding:8px 0">Aucune étape ajoutée</p>';
+    el.innerHTML = '<p class="text-muted" style="font-size:var(--text-sm);padding:8px 0">Aucune étape ajoutée</p>';
     return;
   }
   el.innerHTML = `<ol class="steps-list">${formSteps.map((s, i) =>
-    `<li><span style="flex:1">${escapeHtml(s)}</span><span class="ing-remove" onclick="removeStep(${i})" style="cursor:pointer;opacity:0.5">✕</span></li>`
+    `<li><span style="flex:1">${escapeHtml(s)}</span><span class="ing-remove" onclick="removeStep(${i})"><i data-lucide="x" style="width:14px;height:14px"></i></span></li>`
   ).join('')}</ol>`;
+  lucide.createIcons();
 }
 
 function addIngredientLine() {
@@ -235,11 +243,10 @@ function updateLiveMargin() {
   const priceInput = document.getElementById('f-price');
   if (!el || !priceInput) return;
 
-  // Estimate total cost (rough — no supplier prices in form context, so display placeholder or 0)
   const price = parseFloat(priceInput.value) || 0;
-  // We can't calc real cost without supplier prices, but show the ratio if price is set
   if (price <= 0) {
     el.innerHTML = '—';
+    el.style.color = 'var(--text-secondary)';
     return;
   }
   el.innerHTML = `<span class="text-accent">Prix : ${formatCurrency(price)}</span>`;
@@ -322,7 +329,7 @@ function startMic() {
   recognition.onstart = () => {
     isRecording = true;
     btn.classList.add('recording');
-    status.textContent = '🔴 Écoute en cours... Parlez naturellement';
+    status.textContent = 'Écoute en cours… Parlez naturellement';
     status.className = 'mic-status recording';
   };
 
@@ -334,16 +341,16 @@ function startMic() {
     transcript = transcript.trim();
     stopMic();
 
-    status.textContent = '⏳ Analyse en cours...';
+    status.textContent = 'Analyse en cours…';
     status.className = 'mic-status processing';
 
     try {
       const parsed = await API.parseVoice(transcript);
-      status.textContent = '✅ Fiche analysée ! Vérifiez et ajustez ci-dessous.';
+      status.textContent = 'Fiche analysée ! Vérifiez et ajustez ci-dessous.';
       status.className = 'mic-status success';
       populateFromAI(parsed);
     } catch (e) {
-      status.textContent = '❌ Erreur : ' + e.message;
+      status.textContent = 'Erreur : ' + e.message;
       status.className = 'mic-status';
       showToast('Erreur IA : ' + e.message, 'error');
     }
@@ -362,7 +369,6 @@ function startMic() {
 
   recognition.onend = () => {
     if (isRecording) {
-      // Auto stopped — process what we have
       isRecording = false;
       btn.classList.remove('recording');
     }

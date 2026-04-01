@@ -7,13 +7,15 @@ async function renderIngredients() {
   app.innerHTML = `
     <div class="page-header">
       <h1>Ingrédients</h1>
-      <button class="btn btn-primary" onclick="showIngredientModal()">➕ Ajouter</button>
+      <button class="btn btn-primary" onclick="showIngredientModal()"><i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter</button>
     </div>
     <div class="search-bar">
+      <span class="search-icon"><i data-lucide="search"></i></span>
       <input type="text" id="ing-search" placeholder="Rechercher un ingrédient..." autocomplete="off">
     </div>
     <div id="ing-list"><div class="loading"><div class="spinner"></div></div></div>
   `;
+  lucide.createIcons();
 
   let ingredients = [];
   try { ingredients = await API.getIngredients(); } catch(e) { showToast('Erreur', 'error'); }
@@ -29,9 +31,10 @@ async function renderIngredients() {
     if (filtered.length === 0) {
       listEl.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">🥕</div>
+          <div class="empty-icon"><i data-lucide="package"></i></div>
           <p>${filter ? 'Aucun résultat' : 'Aucun ingrédient enregistré'}</p>
         </div>`;
+      lucide.createIcons();
       return;
     }
 
@@ -43,7 +46,7 @@ async function renderIngredients() {
         </div>
         <div class="card-stats">
           <div>
-            <span class="stat-value mono">${ing.waste_percent}%</span>
+            <span class="stat-value">${ing.waste_percent}%</span>
             <span class="stat-label">Perte</span>
           </div>
           <div>
@@ -51,7 +54,7 @@ async function renderIngredients() {
             <span class="stat-label">Unité</span>
           </div>
           ${ing.allergens ? `<div>
-            <span class="stat-value" style="font-size:0.75rem">${escapeHtml(ing.allergens)}</span>
+            <span class="stat-value" style="font-size:var(--text-xs)">${escapeHtml(ing.allergens)}</span>
             <span class="stat-label">Allergènes</span>
           </div>` : ''}
         </div>
@@ -104,14 +107,18 @@ function showIngredientModal(ingredient = null) {
         </div>
       </div>
       <div class="actions-row">
-        <button class="btn btn-primary" id="m-ing-save">${isEdit ? 'Enregistrer' : 'Créer'}</button>
+        <button class="btn btn-primary" id="m-ing-save">
+          <i data-lucide="${isEdit ? 'save' : 'plus'}" style="width:18px;height:18px"></i>
+          ${isEdit ? 'Enregistrer' : 'Créer'}
+        </button>
         <button class="btn btn-secondary" id="m-ing-cancel">Annuler</button>
-        ${isEdit ? '<button class="btn btn-danger" id="m-ing-delete">Supprimer</button>' : ''}
+        ${isEdit ? '<button class="btn btn-danger" id="m-ing-delete"><i data-lucide="trash-2" style="width:18px;height:18px"></i> Supprimer</button>' : ''}
       </div>
     </div>
   `;
 
   document.body.appendChild(overlay);
+  lucide.createIcons();
 
   overlay.querySelector('#m-ing-cancel').onclick = () => overlay.remove();
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
