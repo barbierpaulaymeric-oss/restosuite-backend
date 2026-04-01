@@ -91,6 +91,7 @@ function registerRoutes() {
   Router.add(/^\/more$/, () => new MoreView().render());
   Router.add(/^\/team$/, renderTeam);
   Router.add(/^\/subscribe$/, renderSubscribe);
+  Router.add(/^\/supplier-portal$/, renderSupplierPortalManage);
 }
 
 function bootApp(role, account) {
@@ -132,6 +133,14 @@ function updateNavUser(account) {
 }
 
 (function init() {
+  // Check supplier session first
+  const supplierSession = getSupplierSession();
+  if (supplierSession && getSupplierToken()) {
+    document.body.classList.add('supplier-mode');
+    bootSupplierApp(supplierSession);
+    return;
+  }
+
   const account = getAccount();
 
   // Check account-based auth first

@@ -184,6 +184,77 @@ const API = {
     return this.request(`/stock/${ingredientId}/min`, { method: 'PUT', body: { min_quantity: minQuantity } });
   },
 
+  // ─── Supplier Portal (restaurant side) ───
+  inviteSupplier(data) {
+    return this.request('/supplier-portal/invite', { method: 'POST', body: data });
+  },
+  getSupplierAccounts() {
+    return this.request('/supplier-portal/accounts');
+  },
+  revokeSupplierAccess(id) {
+    return this.request(`/supplier-portal/accounts/${id}`, { method: 'DELETE' });
+  },
+  getSupplierNotifications() {
+    return this.request('/supplier-portal/notifications');
+  },
+  getSupplierNotificationsUnread() {
+    return this.request('/supplier-portal/notifications/unread-count');
+  },
+  markNotificationRead(id) {
+    return this.request(`/supplier-portal/notifications/${id}/read`, { method: 'PUT' });
+  },
+  markAllNotificationsRead() {
+    return this.request('/supplier-portal/notifications/read-all', { method: 'PUT' });
+  },
+
+  // ─── Supplier Portal (supplier side) ───
+  supplierLogin(pin) {
+    return this.request('/supplier-portal/login-by-name', { method: 'POST', body: { pin } });
+  },
+  supplierRequest(path, options = {}) {
+    const token = getSupplierToken();
+    if (!token) throw new Error('Non connecté');
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Supplier-Token': token,
+      },
+      ...options,
+    };
+    if (config.body && typeof config.body === 'object') {
+      config.body = JSON.stringify(config.body);
+    }
+    return fetch(this.base + '/supplier-portal' + path, config).then(async r => {
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: r.statusText }));
+        if (r.status === 401) {
+          clearSupplierSession();
+          location.reload();
+        }
+        throw new Error(err.error || 'Erreur serveur');
+      }
+      return r.json();
+    });
+  },
+  getSupplierCatalog() {
+    return this.supplierRequest('/catalog');
+  },
+  addSupplierProduct(data) {
+    return this.supplierRequest('/catalog', { method: 'POST', body: data });
+  },
+  updateSupplierProduct(id, data) {
+    return this.supplierRequest(`/catalog/${id}`, { method: 'PUT', body: data });
+  },
+  deleteSupplierProduct(id) {
+    return this.supplierRequest(`/catalog/${id}`, { method: 'DELETE' });
+  },
+  toggleSupplierProductAvailability(id, available) {
+    return this.supplierRequest(`/catalog/${id}/availability`, { method: 'PUT', body: { available } });
+  },
+  getSupplierHistory() {
+    return this.supplierRequest('/history');
+  },
+
   // AI
   parseVoice(text) {
     return this.request('/ai/parse-voice', { method: 'POST', body: { text } });
@@ -246,4 +317,23 @@ function renderStars(rating, interactive = false, onChange = null) {
 function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ─── Supplier session helpers ───
+function getSupplierToken() {
+  return sessionStorage.getItem('restosuite_supplier_token');
+}
+function getSupplierSession() {
+  try {
+    const stored = sessionStorage.getItem('restosuite_supplier_session');
+    return stored ? JSON.parse(stored) : null;
+  } catch { return null; }
+}
+function setSupplierSession(data) {
+  sessionStorage.setItem('restosuite_supplier_token', data.token);
+  sessionStorage.setItem('restosuite_supplier_session', JSON.stringify(data));
+}
+function clearSupplierSession() {
+  sessionStorage.removeItem('restosuite_supplier_token');
+  sessionStorage.removeItem('restosuite_supplier_session');
 }

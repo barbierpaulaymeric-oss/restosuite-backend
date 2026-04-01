@@ -179,6 +179,46 @@ db.exec(`
     FOREIGN KEY (completed_by) REFERENCES accounts(id)
   );
 
+  -- Portail fournisseur: Comptes fournisseur
+  CREATE TABLE IF NOT EXISTS supplier_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplier_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT,
+    pin TEXT NOT NULL,
+    access_token TEXT,
+    last_login DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+  );
+
+  -- Portail fournisseur: Catalogue
+  CREATE TABLE IF NOT EXISTS supplier_catalog (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplier_id INTEGER NOT NULL,
+    product_name TEXT NOT NULL,
+    category TEXT,
+    unit TEXT NOT NULL,
+    price REAL NOT NULL,
+    min_order REAL DEFAULT 0,
+    available INTEGER DEFAULT 1,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+  );
+
+  -- Portail fournisseur: Notifications de changement de prix
+  CREATE TABLE IF NOT EXISTS price_change_notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplier_id INTEGER NOT NULL,
+    product_name TEXT NOT NULL,
+    old_price REAL,
+    new_price REAL,
+    change_type TEXT DEFAULT 'update',
+    read INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+  );
+
   -- HACCP: Traçabilité (réception marchandise)
   CREATE TABLE IF NOT EXISTS traceability_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

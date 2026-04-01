@@ -341,40 +341,7 @@ class LoginView {
   }
 
   renderFournisseurPage(app) {
-    const nav = document.getElementById('nav');
-    if (nav) nav.style.display = 'none';
-
-    app.innerHTML = `
-      <div class="login-screen">
-        <div class="login-content">
-          <div class="login-logo">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none" class="login-logo-svg" style="height:60px">
-              <path d="M40 6 L74 40 L40 74 L6 40 Z" fill="#E8722A" />
-              <path d="M40 6 L24 24 L40 20 L56 24 Z" fill="#1B2A4A" />
-              <path d="M6 40 L24 24 L40 20 L56 24 L74 40" fill="none" stroke="#1B2A4A" stroke-width="3" />
-            </svg>
-          </div>
-          <div class="fournisseur-coming">
-            <i data-lucide="construction" style="width:48px;height:48px;color:var(--color-warning)"></i>
-            <h2>Portail Fournisseur</h2>
-            <p class="text-secondary">Bientôt disponible</p>
-            <p class="text-secondary text-sm" style="max-width:320px;margin:0 auto">
-              Vous pourrez bientôt mettre à jour vos catalogues et tarifs directement depuis cette interface.
-            </p>
-            <button class="btn btn-secondary" id="fournisseur-back" style="margin-top:1.5rem">
-              <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Changer de profil
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-
-    if (window.lucide) lucide.createIcons();
-
-    document.getElementById('fournisseur-back').addEventListener('click', () => {
-      this.screen = 'landing';
-      this.render();
-    });
+    renderSupplierLogin();
   }
 }
 

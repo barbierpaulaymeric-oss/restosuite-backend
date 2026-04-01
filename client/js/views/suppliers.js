@@ -4,10 +4,18 @@
 
 async function renderSuppliers() {
   const app = document.getElementById('app');
+  const isGerant = getRole() === 'gerant';
+
   app.innerHTML = `
     <div class="page-header">
       <h1>Fournisseurs</h1>
-      <button class="btn btn-primary" onclick="showSupplierModal()"><i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter</button>
+      <div style="display:flex;gap:var(--space-2)">
+        ${isGerant ? `<button class="btn btn-secondary" onclick="location.hash='#/supplier-portal'" id="btn-portal">
+          <i data-lucide="link" style="width:18px;height:18px"></i> <span class="btn-label-desktop">Portail</span>
+          <span class="portal-badge" id="portal-badge" style="display:none"></span>
+        </button>` : ''}
+        <button class="btn btn-primary" onclick="showSupplierModal()"><i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter</button>
+      </div>
     </div>
     <div id="supplier-list"><div class="loading"><div class="spinner"></div></div></div>
   `;
@@ -27,6 +35,17 @@ async function renderSuppliers() {
       </div>`;
     lucide.createIcons();
     return;
+  }
+
+  // Load notification badge for portal button
+  if (isGerant) {
+    API.getSupplierNotificationsUnread().then(({ count }) => {
+      const badge = document.getElementById('portal-badge');
+      if (badge && count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-flex';
+      }
+    }).catch(() => {});
   }
 
   listEl.innerHTML = suppliers.map(s => `

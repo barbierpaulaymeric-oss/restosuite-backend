@@ -49,6 +49,7 @@ app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/haccp', require('./routes/haccp'));
 app.use('/api/stock', require('./routes/stock'));
 app.use('/api/stripe', require('./routes/stripe'));
+app.use('/api/supplier-portal', require('./routes/supplier-portal'));
 
 app.get('/api/health', (req, res) => {
   res.json({
