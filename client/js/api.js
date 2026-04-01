@@ -100,6 +100,50 @@ const API = {
     return this.request(`/accounts/${id}?caller_id=${callerId}`, { method: 'DELETE' });
   },
 
+  // ─── HACCP ───
+  // Zones
+  getHACCPZones() { return this.request('/haccp/zones'); },
+  createHACCPZone(data) { return this.request('/haccp/zones', { method: 'POST', body: data }); },
+  updateHACCPZone(id, data) { return this.request(`/haccp/zones/${id}`, { method: 'PUT', body: data }); },
+  deleteHACCPZone(id) { return this.request(`/haccp/zones/${id}`, { method: 'DELETE' }); },
+
+  // Temperature logs
+  getTemperatures(params) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/haccp/temperatures${qs ? '?' + qs : ''}`);
+  },
+  recordTemperature(data) { return this.request('/haccp/temperatures', { method: 'POST', body: data }); },
+  getTemperaturesToday() { return this.request('/haccp/temperatures/today'); },
+  getTemperatureAlerts() { return this.request('/haccp/temperatures/alerts'); },
+
+  // Cleaning
+  getCleaningTasks() { return this.request('/haccp/cleaning'); },
+  createCleaningTask(data) { return this.request('/haccp/cleaning', { method: 'POST', body: data }); },
+  updateCleaningTask(id, data) { return this.request(`/haccp/cleaning/${id}`, { method: 'PUT', body: data }); },
+  deleteCleaningTask(id) { return this.request(`/haccp/cleaning/${id}`, { method: 'DELETE' }); },
+  markCleaningDone(id, data) { return this.request(`/haccp/cleaning/${id}/done`, { method: 'POST', body: data }); },
+  getCleaningToday() { return this.request('/haccp/cleaning/today'); },
+
+  // Traceability
+  getTraceability(params) {
+    const qs = params ? new URLSearchParams(params).toString() : '';
+    return this.request(`/haccp/traceability${qs ? '?' + qs : ''}`);
+  },
+  createTraceability(data) { return this.request('/haccp/traceability', { method: 'POST', body: data }); },
+  getDLCAlerts() { return this.request('/haccp/traceability/dlc-alerts'); },
+
+  // HACCP PDF exports — returns blob URL
+  async getHACCPExportUrl(type, from, to) {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const url = `${this.base}/haccp/export/${type}?${params.toString()}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Erreur export PDF');
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  },
+
   // AI
   parseVoice(text) {
     return this.request('/ai/parse-voice', { method: 'POST', body: { text } });

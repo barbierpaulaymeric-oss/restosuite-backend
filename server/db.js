@@ -104,7 +104,97 @@ db.exec(`
     reason TEXT,
     UNIQUE(ingredient_id, recipe_id, supplier_id)
   );
+
+  -- HACCP: Zones de température
+  CREATE TABLE IF NOT EXISTS temperature_zones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'fridge',
+    min_temp REAL NOT NULL DEFAULT 0,
+    max_temp REAL NOT NULL DEFAULT 4,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- HACCP: Relevés de température
+  CREATE TABLE IF NOT EXISTS temperature_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    zone_id INTEGER NOT NULL,
+    temperature REAL NOT NULL,
+    recorded_by INTEGER,
+    recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT,
+    is_alert INTEGER DEFAULT 0,
+    FOREIGN KEY (zone_id) REFERENCES temperature_zones(id),
+    FOREIGN KEY (recorded_by) REFERENCES accounts(id)
+  );
+
+  -- HACCP: Plan de nettoyage
+  CREATE TABLE IF NOT EXISTS cleaning_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    zone TEXT NOT NULL,
+    frequency TEXT NOT NULL DEFAULT 'daily',
+    product TEXT,
+    method TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS cleaning_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL,
+    completed_by INTEGER,
+    completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT,
+    FOREIGN KEY (task_id) REFERENCES cleaning_tasks(id),
+    FOREIGN KEY (completed_by) REFERENCES accounts(id)
+  );
+
+  -- HACCP: Traçabilité (réception marchandise)
+  CREATE TABLE IF NOT EXISTS traceability_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_name TEXT NOT NULL,
+    supplier TEXT,
+    batch_number TEXT,
+    dlc DATE,
+    temperature_at_reception REAL,
+    quantity REAL,
+    unit TEXT DEFAULT 'kg',
+    received_by INTEGER,
+    received_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT,
+    FOREIGN KEY (received_by) REFERENCES accounts(id)
+  );
 `);
+
+// ─── HACCP: Seed default zones & cleaning tasks ───
+const zoneCount = get('SELECT COUNT(*) as c FROM temperature_zones');
+if (zoneCount && zoneCount.c === 0) {
+  const defaultZones = [
+    { name: 'Frigo 1', type: 'fridge', min_temp: 0, max_temp: 4 },
+    { name: 'Frigo 2', type: 'fridge', min_temp: 0, max_temp: 4 },
+    { name: 'Congélateur', type: 'freezer', min_temp: -25, max_temp: -18 },
+    { name: 'Chambre froide positive', type: 'cold_room', min_temp: 0, max_temp: 3 },
+  ];
+  for (const z of defaultZones) {
+    run('INSERT INTO temperature_zones (name, type, min_temp, max_temp) VALUES (?, ?, ?, ?)',
+      [z.name, z.type, z.min_temp, z.max_temp]);
+  }
+}
+
+const taskCount = get('SELECT COUNT(*) as c FROM cleaning_tasks');
+if (taskCount && taskCount.c === 0) {
+  const defaultTasks = [
+    { name: 'Plans de travail', zone: 'Cuisine', frequency: 'daily', product: 'Dégraissant + désinfectant', method: 'Nettoyer, rincer, désinfecter' },
+    { name: 'Sols cuisine', zone: 'Cuisine', frequency: 'daily', product: 'Détergent sols', method: 'Balayer puis laver' },
+    { name: 'Frigos', zone: 'Stockage', frequency: 'weekly', product: 'Nettoyant alimentaire', method: 'Vider, nettoyer parois et clayettes, rincer' },
+    { name: 'Hotte et filtres', zone: 'Cuisine', frequency: 'weekly', product: 'Dégraissant', method: 'Démonter filtres, tremper, nettoyer' },
+    { name: 'Congélateur', zone: 'Stockage', frequency: 'monthly', product: 'Nettoyant alimentaire', method: 'Dégivrer si nécessaire, nettoyer' },
+  ];
+  for (const t of defaultTasks) {
+    run('INSERT INTO cleaning_tasks (name, zone, frequency, product, method) VALUES (?, ?, ?, ?, ?)',
+      [t.name, t.zone, t.frequency, t.product, t.method]);
+  }
+}
 
 function all(sql, params = []) {
   return db.prepare(sql).all(...params);

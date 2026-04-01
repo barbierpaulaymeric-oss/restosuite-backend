@@ -12,6 +12,10 @@ function registerRoutes() {
   Router.add(/^\/edit\/(\d+)$/, (id) => renderRecipeForm(parseInt(id)));
   Router.add(/^\/ingredients$/, renderIngredients);
   Router.add(/^\/suppliers$/, renderSuppliers);
+  Router.add(/^\/haccp$/, renderHACCPDashboard);
+  Router.add(/^\/haccp\/temperatures$/, renderHACCPTemperatures);
+  Router.add(/^\/haccp\/cleaning$/, renderHACCPCleaning);
+  Router.add(/^\/haccp\/traceability$/, renderHACCPTraceability);
   Router.add(/^\/more$/, () => new MoreView().render());
   Router.add(/^\/team$/, renderTeam);
 }

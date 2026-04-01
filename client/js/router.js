@@ -15,7 +15,10 @@ const Router = {
     // Update nav active state
     document.querySelectorAll('.nav-link').forEach(link => {
       const route = link.dataset.route;
-      if (route === path || (route !== '/' && path.startsWith(route))) {
+      const isActive = route === path || 
+        (route !== '/' && path.startsWith(route)) ||
+        (route === '/haccp' && path.startsWith('/haccp'));
+      if (isActive) {
         link.classList.add('active');
       } else {
         link.classList.remove('active');
