@@ -83,6 +83,23 @@ const API = {
     return this.request(`/recipes/${id}/pdf`);
   },
 
+  // Accounts
+  getAccounts() {
+    return this.request('/accounts');
+  },
+  createAccount(data) {
+    return this.request('/accounts', { method: 'POST', body: data });
+  },
+  loginAccount(id, pin) {
+    return this.request('/accounts/login', { method: 'POST', body: { id, pin } });
+  },
+  updateAccount(id, data) {
+    return this.request(`/accounts/${id}`, { method: 'PUT', body: data });
+  },
+  deleteAccount(id, callerId) {
+    return this.request(`/accounts/${id}?caller_id=${callerId}`, { method: 'DELETE' });
+  },
+
   // AI
   parseVoice(text) {
     return this.request('/ai/parse-voice', { method: 'POST', body: { text } });

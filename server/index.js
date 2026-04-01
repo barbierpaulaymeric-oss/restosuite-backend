@@ -16,6 +16,7 @@ app.use('/api/suppliers', require('./routes/suppliers'));
 app.use('/api/prices', require('./routes/prices'));
 app.use('/api/recipes', require('./routes/recipes'));
 app.use('/api/ai', require('./routes/ai'));
+app.use('/api/accounts', require('./routes/accounts'));
 
 app.get('/api/health', (req, res) => {
   res.json({

@@ -76,6 +76,15 @@ db.exec(`
     price REAL,
     recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+  CREATE TABLE IF NOT EXISTS accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    pin TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'equipier',
+    permissions TEXT NOT NULL DEFAULT '{}',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_login DATETIME
+  );
   CREATE TABLE IF NOT EXISTS ingredient_supplier_prefs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ingredient_id INTEGER NOT NULL REFERENCES ingredients(id),
