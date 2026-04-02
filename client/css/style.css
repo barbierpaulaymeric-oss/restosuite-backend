@@ -5,15 +5,6 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* ─── Logo Badge (JPG on dark backgrounds) ─── */
-.logo-badge {
-  background: white;
-  border-radius: 6px;
-  padding: 3px 6px;
-  height: 28px;
-  width: auto;
-}
-
 /* ─── Design Tokens ─── */
 :root {
   /* Primaires */

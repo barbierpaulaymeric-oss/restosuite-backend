@@ -28,7 +28,7 @@ async function renderServiceView() {
     <div class="svc-shell">
       <header class="svc-header">
         <div class="svc-header__left">
-          <img src="assets/logo.jpg" alt="RestoSuite" class="logo-badge">
+          <img src="assets/logo.png" alt="RestoSuite" style="height: 28px; width: auto;">
           <span class="svc-header__title">Service</span>
           <span class="svc-header__user">— ${escapeHtml(_serviceState.account?.name || 'Serveur')}</span>
         </div>

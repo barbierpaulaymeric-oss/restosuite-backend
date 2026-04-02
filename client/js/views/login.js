@@ -58,7 +58,7 @@ class LoginView {
       <div class="login-screen">
         <div class="login-content">
           <div class="login-logo">
-            <img src="assets/logo.jpg" alt="RestoSuite" style="height: 80px; width: auto;">
+            <img src="assets/logo.png" alt="RestoSuite" style="height: 80px; width: auto;">
           </div>
           <h1 class="login-title">Resto<span class="text-accent">Suite</span> <span class="login-ai-badge">AI</span></h1>
           <p class="login-tagline">Votre cuisine tourne. Vos chiffres suivent.</p>

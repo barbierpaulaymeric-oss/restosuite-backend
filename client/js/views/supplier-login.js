@@ -11,7 +11,7 @@ function renderSupplierLogin() {
     <div class="login-screen supplier-theme">
       <div class="login-content">
         <div class="login-logo">
-          <img src="assets/logo.jpg" alt="RestoSuite" style="height: 60px; width: auto;">
+          <img src="assets/logo.png" alt="RestoSuite" style="height: 60px; width: auto;">
         </div>
         <h1 class="login-title" style="font-size:var(--text-2xl)">Portail <span style="color:#4A90D9">Fournisseur</span></h1>
         <p class="login-tagline">Entrez votre code d'accès</p>

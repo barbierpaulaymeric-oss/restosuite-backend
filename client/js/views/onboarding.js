@@ -66,7 +66,7 @@ class OnboardingWizard {
   renderWelcome(body, footer) {
     body.innerHTML = `
       <div class="ob-step ob-welcome">
-        <div class="ob-icon"><img src="assets/logo.jpg" alt="RestoSuite" style="height: 64px; width: auto;"></div>
+        <div class="ob-icon"><img src="assets/logo.png" alt="RestoSuite" style="height: 64px; width: auto;"></div>
         <h2 class="ob-title">Bienvenue sur RestoSuite !</h2>
         <p class="ob-desc">Configurons votre restaurant en quelques minutes.</p>
       </div>
