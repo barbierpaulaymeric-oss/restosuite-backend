@@ -2,6 +2,49 @@
 // RestoSuite AI — App Bootstrap
 // ═══════════════════════════════════════════
 
+// ─── PWA Install Prompt ───
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  showInstallBanner();
+});
+
+function showInstallBanner() {
+  if (localStorage.getItem('restosuite_install_dismissed')) return;
+
+  const banner = document.createElement('div');
+  banner.className = 'install-banner';
+  banner.innerHTML = `
+    <div class="install-content">
+      <img src="assets/icon-192.png" width="40" height="40" style="border-radius:8px">
+      <div>
+        <strong>Installer RestoSuite</strong>
+        <small>Accès rapide depuis votre écran d'accueil</small>
+      </div>
+    </div>
+    <div class="install-actions">
+      <button class="install-btn" id="installBtn">Installer</button>
+      <button class="install-dismiss" id="dismissBtn">Plus tard</button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+
+  document.getElementById('installBtn').addEventListener('click', async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const result = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+    }
+    banner.remove();
+  });
+
+  document.getElementById('dismissBtn').addEventListener('click', () => {
+    localStorage.setItem('restosuite_install_dismissed', 'true');
+    banner.remove();
+  });
+}
+
 // ─── Trial status cache ───
 let _trialStatus = null;
 

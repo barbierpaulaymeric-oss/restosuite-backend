@@ -20,6 +20,14 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'client', 'landing.html'));
 });
 
+// PWA: serve sw.js and manifest.json from root
+app.get('/sw.js', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'sw.js'));
+});
+app.get('/manifest.json', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'manifest.json'));
+});
+
 // Static files from client directory (but skip index.html for root)
 app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
 
