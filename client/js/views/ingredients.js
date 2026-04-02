@@ -7,7 +7,11 @@ async function renderIngredients() {
   app.innerHTML = `
     <div class="page-header">
       <h1>Ingrédients</h1>
-      <button class="btn btn-primary role-gerant-only" onclick="showIngredientModal()"><i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary role-gerant-only" onclick="showCSVImportModal()"><i data-lucide="upload" style="width:16px;height:16px"></i> Importer</button>
+        <a href="/api/ingredients/export-csv" class="btn btn-secondary role-gerant-only" download="ingredients.csv"><i data-lucide="download" style="width:16px;height:16px"></i> Exporter</a>
+        <button class="btn btn-primary role-gerant-only" onclick="showIngredientModal()"><i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter</button>
+      </div>
     </div>
     <div class="search-bar">
       <span class="search-icon"><i data-lucide="search"></i></span>
@@ -182,6 +186,118 @@ function showIngredientModal(ingredient = null) {
       } catch (e) { showToast(e.message, 'error'); }
     };
   }
+}
+
+function showCSVImportModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:600px">
+      <h2>📥 Importer des ingrédients (CSV)</h2>
+      <p class="text-muted" style="font-size:var(--text-sm);margin-bottom:12px">Format attendu : <code>nom;catégorie;unité;prix_au_kg;pourcentage_perte</code><br>Séparateur : <code>;</code> ou <code>,</code></p>
+      <div class="form-group">
+        <input type="file" id="csv-file-input" accept=".csv,.txt" class="form-control">
+      </div>
+      <div id="csv-preview" style="display:none">
+        <h3 style="font-size:var(--text-sm);margin-bottom:8px">Aperçu (5 premières lignes)</h3>
+        <div id="csv-preview-content"></div>
+      </div>
+      <div class="actions-row" style="margin-top:16px">
+        <button class="btn btn-primary" id="csv-confirm-btn" disabled>Confirmer l'import</button>
+        <button class="btn btn-secondary" id="csv-cancel-btn">Annuler</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  let parsedRows = [];
+
+  overlay.querySelector('#csv-cancel-btn').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('#csv-file-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target.result;
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      // Detect delimiter
+      const delimiter = lines[0].includes(';') ? ';' : ',';
+      // Skip header if it looks like one
+      let startIdx = 0;
+      const firstLine = lines[0].toLowerCase();
+      if (firstLine.includes('nom') || firstLine.includes('name')) startIdx = 1;
+
+      parsedRows = [];
+      for (let i = startIdx; i < lines.length; i++) {
+        const parts = lines[i].split(delimiter).map(s => s.trim());
+        if (parts.length >= 1 && parts[0]) {
+          parsedRows.push({
+            name: parts[0],
+            category: parts[1] || null,
+            default_unit: parts[2] || 'g',
+            price_per_kg: parseFloat(parts[3]) || 0,
+            waste_percent: parseFloat(parts[4]) || 0
+          });
+        }
+      }
+
+      // Show preview
+      const preview = overlay.querySelector('#csv-preview');
+      const content = overlay.querySelector('#csv-preview-content');
+      if (parsedRows.length === 0) {
+        content.innerHTML = '<p class="text-muted">Aucune ligne valide détectée.</p>';
+        preview.style.display = 'block';
+        return;
+      }
+
+      const previewRows = parsedRows.slice(0, 5);
+      content.innerHTML = `
+        <table class="csv-preview-table">
+          <thead><tr><th>Nom</th><th>Catégorie</th><th>Unité</th><th>Prix/kg</th><th>Perte %</th></tr></thead>
+          <tbody>${previewRows.map(r => `
+            <tr>
+              <td>${escapeHtml(r.name)}</td>
+              <td>${escapeHtml(r.category || '—')}</td>
+              <td>${r.default_unit}</td>
+              <td>${r.price_per_kg}</td>
+              <td>${r.waste_percent}%</td>
+            </tr>
+          `).join('')}</tbody>
+        </table>
+        <p class="text-muted" style="font-size:var(--text-xs)">${parsedRows.length} ingrédient(s) détecté(s)</p>
+      `;
+      preview.style.display = 'block';
+      overlay.querySelector('#csv-confirm-btn').disabled = false;
+    };
+    reader.readAsText(file);
+  });
+
+  overlay.querySelector('#csv-confirm-btn').addEventListener('click', async () => {
+    if (parsedRows.length === 0) return;
+    const btn = overlay.querySelector('#csv-confirm-btn');
+    btn.disabled = true;
+    btn.textContent = 'Import en cours…';
+
+    let success = 0, errors = 0;
+    for (const row of parsedRows) {
+      try {
+        await API.createIngredient({
+          name: row.name,
+          category: row.category,
+          default_unit: row.default_unit,
+          waste_percent: row.waste_percent
+        });
+        success++;
+      } catch (e) { errors++; }
+    }
+
+    overlay.remove();
+    showToast(`${success} ingrédient(s) importé(s)${errors > 0 ? `, ${errors} erreur(s)` : ''}`, errors > 0 ? 'info' : 'success');
+    renderIngredients();
+  });
 }
 
 async function showIngredientDetail(id) {

@@ -112,6 +112,41 @@ function renderTrialBanner() {
   if (bannerHTML) {
     document.body.insertAdjacentHTML('afterbegin', bannerHTML);
   }
+
+  // Also render a compact trial badge in the nav
+  renderTrialHeaderBadge();
+}
+
+function renderTrialHeaderBadge() {
+  const existing = document.querySelector('.trial-header-badge');
+  if (existing) existing.remove();
+
+  const status = _trialStatus;
+  if (!status || status.status !== 'trial') return;
+
+  const daysLeft = status.daysLeft;
+  let badgeClass, label;
+  if (daysLeft <= 3) {
+    badgeClass = 'trial-header-badge--red';
+    label = `🔴 Essai : ${daysLeft}j — Passer en Pro`;
+  } else if (daysLeft <= 14) {
+    badgeClass = 'trial-header-badge--yellow';
+    label = `⚠️ Essai : ${daysLeft}j`;
+  } else {
+    badgeClass = 'trial-header-badge--green';
+    label = `Essai : ${daysLeft}j restants`;
+  }
+
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+  const navLinks = nav.querySelector('.nav-links');
+  if (!navLinks) return;
+
+  const badge = document.createElement('a');
+  badge.href = '#/subscribe';
+  badge.className = `trial-header-badge ${badgeClass}`;
+  badge.textContent = label;
+  navLinks.insertBefore(badge, navLinks.firstChild);
 }
 
 function registerRoutes() {
