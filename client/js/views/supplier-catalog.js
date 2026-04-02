@@ -15,7 +15,7 @@ function bootSupplierApp(session) {
     <div class="supplier-shell">
       <header class="supplier-header">
         <div class="supplier-header__left">
-          <img src="assets/logo-outline.png" alt="RestoSuite" style="height: 28px; width: auto; margin-right: 8px;">
+          <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 28px; width: auto; margin-right: 8px;">
           <div>
             <span class="supplier-header__title">Portail Fournisseur</span>
             <span class="supplier-header__name">${escapeHtml(session.supplier_name || session.name)}</span>
