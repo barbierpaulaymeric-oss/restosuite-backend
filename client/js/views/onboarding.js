@@ -167,7 +167,7 @@ class OnboardingWizard {
           <input type="number" class="ob-zone-input" value="${z.max}" data-field="max" data-index="${i}" step="1">
           <span class="ob-zone-unit">°C</span>
         </div>
-        <button class="ob-zone-delete" data-index="${i}" title="Supprimer">✕</button>
+        <button class="ob-zone-delete" data-index="${i}" title="Supprimer" aria-label="Supprimer la zone">✕</button>
       </div>
     `).join('');
 

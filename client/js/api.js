@@ -293,6 +293,7 @@ function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
+  toast.setAttribute('role', 'alert');
   toast.textContent = message;
   container.appendChild(toast);
   setTimeout(() => {

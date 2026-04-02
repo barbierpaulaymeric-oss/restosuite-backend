@@ -55,7 +55,7 @@ async function renderHACCPTemperatures() {
                 <span>${escapeHtml(z.name)} (${z.min_temp}° / ${z.max_temp}°)</span>
                 <div class="gap-8" style="display:flex">
                   <button class="btn btn-ghost btn-sm btn-edit-zone" data-id="${z.id}" data-name="${escapeHtml(z.name)}" data-type="${z.type}" data-min="${z.min_temp}" data-max="${z.max_temp}">✏️</button>
-                  <button class="btn btn-ghost btn-sm btn-delete-zone" data-id="${z.id}" data-name="${escapeHtml(z.name)}">🗑️</button>
+                  <button class="btn btn-ghost btn-sm btn-delete-zone" aria-label="Supprimer la zone" data-id="${z.id}" data-name="${escapeHtml(z.name)}">🗑️</button>
                 </div>
               </div>
             `).join('')}

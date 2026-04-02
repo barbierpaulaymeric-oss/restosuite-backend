@@ -119,7 +119,7 @@ async function renderSupplierCatalogTab() {
                 <input type="checkbox" ${p.available ? 'checked' : ''} data-toggle-id="${p.id}">
                 <span class="supplier-toggle__slider"></span>
               </label>
-              <button class="btn-icon supplier-product-card__delete" data-delete-id="${p.id}" data-delete-name="${escapeHtml(p.product_name)}" title="Supprimer">
+              <button class="btn-icon supplier-product-card__delete" aria-label="Supprimer le produit" data-delete-id="${p.id}" data-delete-name="${escapeHtml(p.product_name)}" title="Supprimer">
                 <i data-lucide="trash-2" style="width:16px;height:16px"></i>
               </button>
             </div>

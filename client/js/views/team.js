@@ -57,7 +57,7 @@ async function renderTeam() {
           <button class="btn btn-secondary btn-sm" onclick="showPermissionsModal(${a.id})">
             <i data-lucide="shield" style="width:16px;height:16px"></i> Permissions
           </button>
-          <button class="btn btn-danger btn-sm" onclick="deleteTeamMember(${a.id}, '${escapeHtml(a.name)}')">
+          <button class="btn btn-danger btn-sm" aria-label="Supprimer le membre" onclick="deleteTeamMember(${a.id}, '${escapeHtml(a.name)}')">
             <i data-lucide="trash-2" style="width:16px;height:16px"></i>
           </button>
         </div>

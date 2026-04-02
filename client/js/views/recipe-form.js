@@ -237,7 +237,7 @@ function renderIngredientLines() {
         <span class="ing-qty">${ing.gross_quantity}${ing.unit}</span>
         <span class="ing-qty text-muted">→ ${net}${ing.unit}</span>
         <span class="text-muted" style="font-size:var(--text-sm);font-family:var(--font-mono)">${ing.waste_percent}%</span>
-        <span class="ing-remove" onclick="removeIngredient(${i})"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+        <span class="ing-remove" role="button" aria-label="Retirer l'ingrédient" onclick="removeIngredient(${i})"><i data-lucide="x" style="width:16px;height:16px"></i></span>
       </div>
     `;
   }).join('');
@@ -257,7 +257,7 @@ function renderSubRecipeLines() {
       <span class="ing-name">📋 ${escapeHtml(sr.name)}</span>
       <span class="ing-qty">${sr.quantity} portion${sr.quantity !== 1 ? 's' : ''}</span>
       <span class="ing-qty text-muted">${sr.cost > 0 ? formatCurrency(sr.cost) : ''}</span>
-      <span class="ing-remove" onclick="removeSubRecipe(${i})"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+      <span class="ing-remove" role="button" aria-label="Retirer la sous-recette" onclick="removeSubRecipe(${i})"><i data-lucide="x" style="width:16px;height:16px"></i></span>
     </div>
   `).join('');
   lucide.createIcons();
@@ -303,7 +303,7 @@ function renderStepLines() {
     return;
   }
   el.innerHTML = `<ol class="steps-list">${formSteps.map((s, i) =>
-    `<li><span style="flex:1">${escapeHtml(s)}</span><span class="ing-remove" onclick="removeStep(${i})"><i data-lucide="x" style="width:14px;height:14px"></i></span></li>`
+    `<li><span style="flex:1">${escapeHtml(s)}</span><span class="ing-remove" role="button" aria-label="Retirer l'étape" onclick="removeStep(${i})"><i data-lucide="x" style="width:14px;height:14px"></i></span></li>`
   ).join('')}</ol>`;
   lucide.createIcons();
 }

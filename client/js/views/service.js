@@ -445,9 +445,9 @@ function _svcRenderCart() {
         <span class="svc-cart-item__name">${escapeHtml(item.name)}</span>
         <span class="svc-cart-item__price">${formatCurrency(subtotal)}</span>
         <div class="svc-cart-item__actions">
-          <button class="svc-qty-btn" onclick="_svcChangeQty(${item.recipe_id}, -1)">−</button>
-          <button class="svc-qty-btn" onclick="_svcChangeQty(${item.recipe_id}, 1)">+</button>
-          <button class="svc-qty-btn svc-qty-btn--delete" onclick="_svcRemoveItem(${item.recipe_id})">🗑️</button>
+          <button class="svc-qty-btn" aria-label="Réduire la quantité" onclick="_svcChangeQty(${item.recipe_id}, -1)">−</button>
+          <button class="svc-qty-btn" aria-label="Augmenter la quantité" onclick="_svcChangeQty(${item.recipe_id}, 1)">+</button>
+          <button class="svc-qty-btn svc-qty-btn--delete" aria-label="Supprimer" onclick="_svcRemoveItem(${item.recipe_id})">🗑️</button>
         </div>
       </div>
     `;

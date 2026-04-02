@@ -82,7 +82,7 @@ async function renderOrdersDashboard() {
               <div class="order-card__actions">
                 ${order.status === 'en_cours' ? `
                   <button class="btn btn-primary btn-sm" onclick="sendOrderFromDash(${order.id})">Envoyer</button>
-                  <button class="btn btn-danger btn-sm" onclick="cancelOrderFromDash(${order.id})"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+                  <button class="btn btn-danger btn-sm" aria-label="Annuler la commande" onclick="cancelOrderFromDash(${order.id})"><i data-lucide="x" style="width:14px;height:14px"></i></button>
                 ` : ''}
                 ${order.status === 'prêt' ? `
                   <button class="btn btn-primary btn-sm" onclick="completeOrderFromDash(${order.id})">Terminé</button>
@@ -201,9 +201,9 @@ async function renderNewOrder() {
           <span class="menu-card__price mono">${r.selling_price ? formatCurrency(r.selling_price) : '—'}</span>
         </div>
         <div class="menu-card__actions">
-          <button class="btn btn-sm btn-secondary menu-minus" data-id="${r.id}" data-name="${escapeHtml(r.name)}" data-price="${r.selling_price || 0}">−</button>
+          <button class="btn btn-sm btn-secondary menu-minus" aria-label="Retirer" data-id="${r.id}" data-name="${escapeHtml(r.name)}" data-price="${r.selling_price || 0}">−</button>
           <span class="menu-card__qty" id="menu-qty-${r.id}">0</span>
-          <button class="btn btn-sm btn-primary menu-plus" data-id="${r.id}" data-name="${escapeHtml(r.name)}" data-price="${r.selling_price || 0}">+</button>
+          <button class="btn btn-sm btn-primary menu-plus" aria-label="Ajouter" data-id="${r.id}" data-name="${escapeHtml(r.name)}" data-price="${r.selling_price || 0}">+</button>
         </div>
       </div>
     `).join('')}</div>`;
@@ -335,7 +335,7 @@ async function renderKitchenView() {
         <a href="#/orders" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px"></i> Commandes</a>
         <h1 style="margin-top:4px">🍳 Cuisine</h1>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="renderKitchenView()"><i data-lucide="refresh-cw" style="width:16px;height:16px"></i></button>
+      <button class="btn btn-secondary btn-sm" aria-label="Rafraîchir" onclick="renderKitchenView()"><i data-lucide="refresh-cw" style="width:16px;height:16px"></i></button>
     </div>
     <div id="kitchen-tickets"><div class="loading"><div class="spinner"></div></div></div>
   `;

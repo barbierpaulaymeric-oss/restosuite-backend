@@ -817,89 +817,34 @@
     /* ============================================
        TESTIMONIALS
        ============================================ */
-    .testimonials__grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 20px;
-    }
-    
-    @media (min-width: 768px) {
-      .testimonials__grid { grid-template-columns: repeat(3, 1fr); }
-    }
-    
-    .testimonial-card {
-      padding: 28px;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border-light);
-      border-radius: var(--radius-lg);
-      position: relative;
-    }
-    
-    .testimonial-card__stars {
+    /* ============================================
+       METRICS
+       ============================================ */
+    .metrics-row {
       display: flex;
-      gap: 2px;
-      margin-bottom: 14px;
-    }
-    .testimonial-card__stars i {
-      width: 16px;
-      height: 16px;
-      color: #E5A100;
-      fill: #E5A100;
-    }
-    
-    .testimonial-card__quote {
-      font-size: 0.9375rem;
-      color: var(--text-secondary);
-      line-height: 1.65;
-      margin-bottom: 16px;
-      font-style: italic;
-    }
-    
-    .testimonial-card__author {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    
-    .testimonial-card__avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: var(--color-primary-light);
-      display: flex;
-      align-items: center;
+      flex-wrap: wrap;
       justify-content: center;
-      font-weight: 600;
-      font-size: 0.875rem;
-      color: var(--color-accent);
+      gap: 40px;
     }
     
-    .testimonial-card__info {
+    .metric {
       display: flex;
       flex-direction: column;
+      align-items: center;
+      text-align: center;
     }
     
-    .testimonial-card__name {
-      font-size: 0.875rem;
-      font-weight: 600;
+    .metric-number {
+      font-size: 3rem;
+      font-weight: 700;
+      color: var(--color-accent);
+      line-height: 1.2;
     }
     
-    .testimonial-card__role {
-      font-size: 0.8125rem;
+    .metric-label {
+      font-size: 0.9rem;
       color: var(--text-tertiary);
-    }
-    
-    .testimonial-card__example {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      font-size: 0.625rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-tertiary);
-      background: var(--bg-sunken);
-      padding: 2px 8px;
-      border-radius: 999px;
+      margin-top: 4px;
     }
     
     /* ============================================
@@ -1084,6 +1029,38 @@
     .reveal-delay-4 { transition-delay: 0.4s; }
     .reveal-delay-5 { transition-delay: 0.5s; }
     
+    /* ============================================
+       STICKY CTA (mobile)
+       ============================================ */
+    .sticky-cta {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 12px 16px;
+      background: rgba(15, 25, 35, 0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-top: 1px solid rgba(255,255,255,0.1);
+      z-index: 100;
+    }
+    @media (max-width: 768px) {
+      .sticky-cta.show { display: block; }
+    }
+    .btn-sticky {
+      display: block;
+      background: var(--color-accent);
+      color: white;
+      text-align: center;
+      padding: 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      font-family: var(--font-sans);
+    }
+    .btn-sticky:hover { background: var(--color-accent-hover); }
+
     /* Reduced motion */
     @media (prefers-reduced-motion: reduce) {
       .reveal {
@@ -1337,14 +1314,41 @@
             <span class="pricing-card__amount">79€</span>
             <span class="pricing-card__period">/ mois</span>
           </div>
+          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:12px;font-weight:500">Tout le plan Pro, plus :</p>
           <ul class="pricing-card__features">
-            <li><i data-lucide="check"></i> Tout le plan Pro inclus</li>
             <li><i data-lucide="check"></i> Multi-établissements</li>
             <li><i data-lucide="check"></i> Support dédié</li>
             <li><i data-lucide="check"></i> Analytics avancés</li>
             <li><i data-lucide="check"></i> Accès API</li>
           </ul>
           <a href="mailto:contact@restosuite.fr" class="btn btn--secondary">Nous contacter</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== METRICS ========== -->
+  <section class="section section--base">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>Pourquoi RestoSuite ?</h2>
+      </div>
+      <div class="metrics-row reveal">
+        <div class="metric">
+          <span class="metric-number">60</span>
+          <span class="metric-label">jours d'essai gratuit</span>
+        </div>
+        <div class="metric">
+          <span class="metric-number">100%</span>
+          <span class="metric-label">fonctionnalités incluses</span>
+        </div>
+        <div class="metric">
+          <span class="metric-number">0€</span>
+          <span class="metric-label">sans carte bancaire</span>
+        </div>
+        <div class="metric">
+          <span class="metric-number">👨‍🍳</span>
+          <span class="metric-label">créé par un chef professionnel</span>
         </div>
       </div>
     </div>
@@ -1449,10 +1453,15 @@
           <a href="/privacy">Confidentialité</a>
           <a href="mailto:contact@restosuite.fr">Contact</a>
         </div>
-        <div class="footer__copy">© 2026 RestoSuite — Paul-Aymeric Barbier</div>
+        <div class="footer__copy">© 2026 RestoSuite</div>
       </div>
     </div>
   </footer>
+
+  <!-- Sticky CTA mobile -->
+  <div class="sticky-cta" id="sticky-cta">
+    <a href="/app" class="btn-sticky">Essai gratuit 60 jours →</a>
+  </div>
 
   <!-- ========== SCRIPTS ========== -->
   <script>
@@ -1497,6 +1506,13 @@
 
     document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 
+    // Fallback: if reveals are still hidden after 2s, force them visible
+    setTimeout(() => {
+      document.querySelectorAll('.reveal').forEach(el => {
+        el.classList.add('visible');
+      });
+    }, 2000);
+
     // Stripe checkout (subscribe button)
     const subscribeBtn = document.getElementById('subscribe-btn');
     if (subscribeBtn) {
@@ -1522,6 +1538,22 @@
           window.location.href = '/app';
         }
       });
+    }
+
+    // Sticky CTA: show only when hero CTA is not visible (mobile)
+    const heroActions = document.querySelector('.hero__actions');
+    const stickyCta = document.getElementById('sticky-cta');
+    if (heroActions && stickyCta) {
+      const stickyObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            stickyCta.classList.remove('show');
+          } else {
+            stickyCta.classList.add('show');
+          }
+        });
+      }, { threshold: 0 });
+      stickyObserver.observe(heroActions);
     }
 
     // Header background on scroll
