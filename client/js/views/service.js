@@ -28,13 +28,7 @@ async function renderServiceView() {
     <div class="svc-shell">
       <header class="svc-header">
         <div class="svc-header__left">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" fill="none" height="28">
-            <g transform="translate(0, 4)">
-              <path d="M20 4 L36 20 L20 38 L4 20 Z" fill="#E8722A" />
-              <path d="M20 4 L12 14 L20 12 L28 14 Z" fill="#1B2A4A" />
-            </g>
-            <text x="52" y="28" font-family="Inter, sans-serif" font-weight="600" font-size="22" fill="#F7F5F2" letter-spacing="-0.5">Resto<tspan font-weight="700">Suite</tspan></text>
-          </svg>
+          <img src="assets/logo-light.svg" alt="RestoSuite" style="height: 28px; width: auto;">
           <span class="svc-header__title">Service</span>
           <span class="svc-header__user">— ${escapeHtml(_serviceState.account?.name || 'Serveur')}</span>
         </div>

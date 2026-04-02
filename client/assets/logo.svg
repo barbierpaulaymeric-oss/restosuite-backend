@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 180" fill="none">
+  <!-- Knife handle -->
+  <path d="M12,130 Q8,118 18,112 L82,98 Q90,96 92,102 L92,108 Q90,116 82,118 Z" fill="#1B2A4A"/>
+  
+  <!-- Knife blade -->
+  <path d="M82,100 Q88,94 100,72 L140,20 Q144,14 148,18 Q152,24 146,32 L108,88 Q104,96 92,102 Z" fill="#1B2A4A"/>
+  
+  <!-- Curved base swoosh -->
+  <path d="M18,125 Q50,132 90,126 Q120,120 170,118 Q175,118 175,122 Q174,126 170,126 Q120,128 90,132 Q50,138 18,132 Z" fill="#1B2A4A"/>
+  
+  <!-- Bar 1 (shortest) -->
+  <rect x="92" y="102" width="16" height="22" rx="1" fill="#1B2A4A"/>
+  
+  <!-- Bar 2 -->
+  <rect x="114" y="86" width="16" height="38" rx="1" fill="#1B2A4A"/>
+  
+  <!-- Bar 3 -->
+  <rect x="136" y="66" width="16" height="58" rx="1" fill="#1B2A4A"/>
+  
+  <!-- Bar 4 (tallest) -->
+  <rect x="158" y="42" width="16" height="82" rx="1" fill="#1B2A4A"/>
+  
+  <!-- Orange dot -->
+  <circle cx="166" cy="28" r="9" fill="#E8722A"/>
+</svg>

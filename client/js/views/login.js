@@ -58,11 +58,7 @@ class LoginView {
       <div class="login-screen">
         <div class="login-content">
           <div class="login-logo">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none" class="login-logo-svg">
-              <path d="M40 6 L74 40 L40 74 L6 40 Z" fill="#E8722A" />
-              <path d="M40 6 L24 24 L40 20 L56 24 Z" fill="#1B2A4A" />
-              <path d="M6 40 L24 24 L40 20 L56 24 L74 40" fill="none" stroke="#1B2A4A" stroke-width="3" />
-            </svg>
+            <img src="assets/logo.svg" alt="RestoSuite" style="height: 80px; width: auto;">
           </div>
           <h1 class="login-title">Resto<span class="text-accent">Suite</span> <span class="login-ai-badge">AI</span></h1>
           <p class="login-tagline">Votre cuisine tourne. Vos chiffres suivent.</p>

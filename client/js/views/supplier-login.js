@@ -11,11 +11,7 @@ function renderSupplierLogin() {
     <div class="login-screen supplier-theme">
       <div class="login-content">
         <div class="login-logo">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none" class="login-logo-svg" style="height:60px">
-            <path d="M40 6 L74 40 L40 74 L6 40 Z" fill="#4A90D9" />
-            <path d="M40 6 L24 24 L40 20 L56 24 Z" fill="#1B2A4A" />
-            <path d="M6 40 L24 24 L40 20 L56 24 L74 40" fill="none" stroke="#1B2A4A" stroke-width="3" />
-          </svg>
+          <img src="assets/logo.svg" alt="RestoSuite" style="height: 60px; width: auto;">
         </div>
         <h1 class="login-title" style="font-size:var(--text-2xl)">Portail <span style="color:#4A90D9">Fournisseur</span></h1>
         <p class="login-tagline">Entrez votre code d'accès</p>
