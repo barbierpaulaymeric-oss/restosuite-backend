@@ -15,6 +15,14 @@ app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json({ limit: '10mb' }));
 
+// SEO: sitemap and robots.txt — BEFORE static middleware
+app.get('/sitemap.xml', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'sitemap.xml'));
+});
+app.get('/robots.txt', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'robots.txt'));
+});
+
 // Landing page on root — BEFORE static middleware
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'client', 'landing.html'));
