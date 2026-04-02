@@ -369,7 +369,9 @@ try {
   `);
   const accCols = all("PRAGMA table_info(accounts)");
   if (!accCols.some(c => c.name === 'referral_code')) {
-    db.exec("ALTER TABLE accounts ADD COLUMN referral_code TEXT UNIQUE");
+    db.exec("ALTER TABLE accounts ADD COLUMN referral_code TEXT");
+    // Create unique index separately (SQLite doesn't support UNIQUE in ALTER TABLE)
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_referral_code ON accounts(referral_code) WHERE referral_code IS NOT NULL");
     console.log('✅ Migration: added referral_code to accounts');
   }
   if (!accCols.some(c => c.name === 'referred_by')) {

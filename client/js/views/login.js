@@ -364,12 +364,19 @@ class LoginView {
 
       try {
         console.log('[RestoSuite] Calling API.createAccount...');
-        const account = await API.createAccount({ name: nameVal, pin: pinVal });
+        const createData = { name: nameVal, pin: pinVal };
+        // Pass referral code if stored from landing page
+        const storedReferral = localStorage.getItem('restosuite_referral');
+        if (storedReferral) {
+          createData.referral_code = storedReferral;
+        }
+        const account = await API.createAccount(createData);
         console.log('[RestoSuite] Account created:', account);
 
         // Auto-login
         localStorage.setItem('restosuite_account', JSON.stringify(account));
         localStorage.removeItem('restosuite_role');
+        localStorage.removeItem('restosuite_referral');
 
         const nav = document.getElementById('nav');
         if (nav) nav.style.display = '';

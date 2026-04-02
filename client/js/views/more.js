@@ -123,6 +123,18 @@ class MoreView {
         </label>
       </div>
 
+      ${isGerant ? `
+      <div style="margin-top:var(--space-4);margin-bottom:var(--space-5)">
+        <div class="card" style="padding:var(--space-4)">
+          <h3 style="margin-bottom:var(--space-3)">🎁 Programme de parrainage</h3>
+          <p class="text-secondary text-sm" style="margin-bottom:var(--space-3)">Partagez RestoSuite avec vos collègues !</p>
+          <div id="referral-section">
+            <p class="text-secondary text-sm">Chargement…</p>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+
       <div class="more-footer">
         <div style="text-align:center; margin-top: 2rem;">
           <button class="btn btn-secondary" id="btn-export-data" style="margin-bottom:1rem">
@@ -177,6 +189,68 @@ class MoreView {
           if (window.lucide) lucide.createIcons();
         }
       });
+    }
+
+    // Referral section
+    const referralSection = document.getElementById('referral-section');
+    if (referralSection && account) {
+      this.loadReferralData(account, referralSection);
+    }
+  }
+
+  async loadReferralData(account, container) {
+    try {
+      const [codeRes, statsRes] = await Promise.all([
+        fetch(`/api/referrals/my-code?account_id=${account.id}`),
+        fetch(`/api/referrals/stats?account_id=${account.id}`)
+      ]);
+      const codeData = await codeRes.json();
+      const statsData = await statsRes.json();
+
+      const referralLink = `https://www.restosuite.fr/?ref=${codeData.code}`;
+
+      container.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:var(--space-3);flex-wrap:wrap">
+          <span class="text-sm">Votre code :</span>
+          <code style="background:var(--bg-sunken);padding:6px 12px;border-radius:var(--radius-sm);font-weight:600;font-size:0.95rem">${escapeHtml(codeData.code)}</code>
+          <button class="btn btn-sm btn-secondary" id="btn-copy-referral" style="padding:6px 12px;font-size:0.8rem">
+            📋 Copier le lien
+          </button>
+        </div>
+        <div class="text-secondary text-sm" style="margin-bottom:var(--space-2)">
+          🎯 Parrainez un restaurateur → <strong>vous gagnez 1 mois gratuit</strong>
+        </div>
+        <div class="text-secondary text-sm" style="margin-bottom:var(--space-3)">
+          🎁 Votre filleul gagne <strong>15 jours supplémentaires</strong>
+        </div>
+        <div class="text-sm">
+          <span class="text-secondary">Parrainages effectués : </span><strong>${statsData.total_referrals}</strong>
+          ${statsData.bonus_days > 0 ? ` · <span style="color:var(--color-success)">+${statsData.bonus_days} jours bonus</span>` : ''}
+        </div>
+      `;
+
+      const copyBtn = document.getElementById('btn-copy-referral');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(referralLink);
+            copyBtn.textContent = '✅ Copié !';
+            setTimeout(() => { copyBtn.textContent = '📋 Copier le lien'; }, 2000);
+          } catch (e) {
+            // Fallback
+            const input = document.createElement('input');
+            input.value = referralLink;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            document.body.removeChild(input);
+            copyBtn.textContent = '✅ Copié !';
+            setTimeout(() => { copyBtn.textContent = '📋 Copier le lien'; }, 2000);
+          }
+        });
+      }
+    } catch (e) {
+      container.innerHTML = '<p class="text-secondary text-sm">Erreur lors du chargement du parrainage</p>';
     }
   }
 }

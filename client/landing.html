@@ -1513,6 +1513,15 @@
 
   <!-- ========== SCRIPTS ========== -->
   <script>
+    // Store referral code from URL
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref');
+      if (ref) {
+        localStorage.setItem('restosuite_referral', ref);
+      }
+    })();
+
     // Initialize Lucide icons
     document.addEventListener('DOMContentLoaded', () => {
       if (window.lucide) lucide.createIcons();

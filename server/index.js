@@ -2,13 +2,45 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 require('./db'); // initializes tables synchronously
 const { requireWriteAccess } = require('./middleware/trial');
+const { backupDatabase } = require('./backup');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+
+// ─── Rate Limiting ───
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  message: { error: 'Trop de requêtes, réessayez dans quelques minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', globalLimiter);
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 30,
+  message: { error: 'Limite IA atteinte. Réessayez dans une heure.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/ai/', aiLimiter);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Trop de tentatives, réessayez dans 15 minutes' },
+});
+app.use('/api/accounts/login', authLimiter);
+
+// ─── DB Backup ───
+backupDatabase(); // on startup
+setInterval(backupDatabase, 6 * 60 * 60 * 1000); // every 6 hours
 
 // Stripe webhook needs raw body — mount BEFORE json parser
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
@@ -68,6 +100,21 @@ app.use('/api/stripe', require('./routes/stripe'));
 app.use('/api/supplier-portal', require('./routes/supplier-portal'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/orders', require('./routes/orders'));
+app.use('/api/referrals', require('./routes/referrals'));
+
+// Admin endpoints
+app.post('/api/admin/backup', (req, res) => {
+  backupDatabase();
+  res.json({ ok: true, message: 'Backup effectué' });
+});
+
+app.get('/api/admin/export-db', (req, res) => {
+  const dbPath = path.join(__dirname, 'data', 'restosuite.db');
+  if (!require('fs').existsSync(dbPath)) {
+    return res.status(404).json({ error: 'No database found' });
+  }
+  res.download(dbPath, 'restosuite-backup.db');
+});
 
 app.get('/api/health', (req, res) => {
   res.json({
