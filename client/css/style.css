@@ -106,6 +106,84 @@
   --nav-height: 64px;
 }
 
+/* ─── Light Theme ─── */
+[data-theme="light"] {
+  --bg-sunken: #F0F0F0;
+  --bg-base: #FFFFFF;
+  --bg-elevated: #F7F7F7;
+  --text-primary: #1B2A4A;
+  --text-secondary: #4A5568;
+  --text-tertiary: #718096;
+  --border-default: #E2E8F0;
+  --border-light: #EDF2F7;
+  --color-primary: #1B2A4A;
+  --color-primary-light: #2A3F6B;
+  --color-accent: #E8722A;
+  --color-accent-hover: #D4611F;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .login-screen {
+  background: linear-gradient(135deg, #E2E8F0 0%, #F7F7F7 100%);
+}
+
+[data-theme="light"] .nav-bottom {
+  background: #FFFFFF;
+  border-top-color: #E2E8F0;
+  border-bottom-color: #E2E8F0;
+}
+
+[data-theme="light"] .mockup__bar {
+  background: #EDF2F7;
+}
+
+[data-theme="light"] tbody tr:hover td {
+  background: rgba(232, 114, 42, 0.06);
+}
+
+[data-theme="light"] .btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #CBD5E0;
+}
+
+/* ─── Theme Toggle ─── */
+.toggle { position: relative; width: 48px; height: 26px; display: inline-block; }
+.toggle input { display: none; }
+.toggle-slider {
+  position: absolute; inset: 0;
+  background: var(--bg-sunken);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 20px; height: 20px;
+  left: 3px; bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+.toggle input:checked + .toggle-slider { background: var(--color-accent); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(22px); }
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
+
 /* Tablet+ type scale bump */
 @media (min-width: 768px) {
   :root {

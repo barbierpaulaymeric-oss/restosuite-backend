@@ -2,6 +2,12 @@
 // RestoSuite AI — App Bootstrap
 // ═══════════════════════════════════════════
 
+// ─── Theme Init (before paint) ───
+(function() {
+  const savedTheme = localStorage.getItem('restosuite_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+})();
+
 // ─── PWA Install Prompt ───
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {

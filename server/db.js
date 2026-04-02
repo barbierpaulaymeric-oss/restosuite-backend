@@ -354,6 +354,36 @@ try {
   // Tables may already exist
 }
 
+// ─── Migration: Referral program ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS referrals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      referrer_code TEXT UNIQUE NOT NULL,
+      referrer_account_id INTEGER NOT NULL,
+      referred_account_id INTEGER,
+      status TEXT DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      completed_at DATETIME
+    );
+  `);
+  const accCols = all("PRAGMA table_info(accounts)");
+  if (!accCols.some(c => c.name === 'referral_code')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN referral_code TEXT UNIQUE");
+    console.log('✅ Migration: added referral_code to accounts');
+  }
+  if (!accCols.some(c => c.name === 'referred_by')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN referred_by TEXT");
+    console.log('✅ Migration: added referred_by to accounts');
+  }
+  if (!accCols.some(c => c.name === 'referral_bonus_days')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN referral_bonus_days INTEGER DEFAULT 0");
+    console.log('✅ Migration: added referral_bonus_days to accounts');
+  }
+} catch (e) {
+  console.error('Migration referral error:', e.message);
+}
+
 // ─── Seed: Common ingredients with prices ───
 try {
   const seedIngredients = require('./seed-ingredients');

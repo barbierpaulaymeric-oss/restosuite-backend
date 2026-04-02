@@ -114,6 +114,15 @@ class MoreView {
         </div>
       </div>
 
+      <div class="section-title" style="margin-top: var(--space-6);">Préférences</div>
+      <div class="setting-row">
+        <span>🌙 Mode sombre</span>
+        <label class="toggle">
+          <input type="checkbox" id="themeToggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
       <div class="more-footer">
         <div style="text-align:center; margin-top: 2rem;">
           <button class="btn btn-secondary" id="btn-export-data" style="margin-bottom:1rem">
@@ -130,6 +139,17 @@ class MoreView {
       </div>
     `;
     if (window.lucide) lucide.createIcons();
+
+    // Theme toggle
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+      themeToggle.checked = document.documentElement.getAttribute('data-theme') !== 'light';
+      themeToggle.addEventListener('change', () => {
+        const theme = themeToggle.checked ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('restosuite_theme', theme);
+      });
+    }
 
     // RGPD data export
     const exportBtn = document.getElementById('btn-export-data');
