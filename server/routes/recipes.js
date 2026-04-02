@@ -243,14 +243,15 @@ router.post('/', (req, res) => {
       }
 
       let ingredientId = ing.ingredient_id;
-      if (!ingredientId && ing.name) {
-        const existing = get('SELECT id FROM ingredients WHERE name = ?', [ing.name.trim().toLowerCase()]);
+      const ingName = ing.name || ing.ingredient_name;
+      if (!ingredientId && ingName) {
+        const existing = get('SELECT id FROM ingredients WHERE name = ?', [ingName.trim().toLowerCase()]);
         if (existing) {
           ingredientId = existing.id;
         } else {
           const newIng = run(
             'INSERT INTO ingredients (name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?)',
-            [ing.name.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
+            [ingName.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
           );
           ingredientId = newIng.lastInsertRowid;
         }
@@ -309,14 +310,15 @@ router.put('/:id', (req, res) => {
       }
 
       let ingredientId = ing.ingredient_id;
-      if (!ingredientId && ing.name) {
-        const ex = get('SELECT id FROM ingredients WHERE name = ?', [ing.name.trim().toLowerCase()]);
+      const ingName2 = ing.name || ing.ingredient_name;
+      if (!ingredientId && ingName2) {
+        const ex = get('SELECT id FROM ingredients WHERE name = ?', [ingName2.trim().toLowerCase()]);
         if (ex) {
           ingredientId = ex.id;
         } else {
           const newIng = run(
             'INSERT INTO ingredients (name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?)',
-            [ing.name.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
+            [ingName.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
           );
           ingredientId = newIng.lastInsertRowid;
         }

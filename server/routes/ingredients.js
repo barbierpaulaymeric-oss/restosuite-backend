@@ -6,7 +6,7 @@ router.get('/export-csv', (req, res) => {
   const rows = all('SELECT * FROM ingredients ORDER BY name');
   const header = 'nom;catégorie;unité;prix_au_kg;pourcentage_perte';
   const lines = rows.map(r =>
-    `${r.name};${r.category || ''};${r.default_unit || 'g'};${r.price_per_kg || 0};${r.waste_percent || 0}`
+    `${r.name};${r.category || ''};${r.default_unit || 'g'};${r.price_per_unit || 0};${r.waste_percent || 0}`
   );
   const csv = [header, ...lines].join('\n');
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');

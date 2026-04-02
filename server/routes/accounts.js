@@ -44,7 +44,7 @@ const SALLE_PERMISSIONS = {
   export_pdf: false
 };
 
-const VALID_ROLES = ['gerant', 'cuisinier', 'equipier', 'salle'];
+const VALID_ROLES = ['gerant', 'cuisinier', 'equipier', 'salle', 'fournisseur'];
 
 function generateReferralCode(name) {
   const base = name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 6);

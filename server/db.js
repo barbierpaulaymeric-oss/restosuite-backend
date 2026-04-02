@@ -56,10 +56,10 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS recipe_ingredients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
-    ingredient_id INTEGER NOT NULL REFERENCES ingredients(id),
+    ingredient_id INTEGER REFERENCES ingredients(id),
     gross_quantity REAL NOT NULL,
     net_quantity REAL,
-    unit TEXT NOT NULL,
+    unit TEXT NOT NULL DEFAULT 'portions',
     custom_waste_percent REAL,
     notes TEXT
   );
@@ -384,6 +384,34 @@ try {
   }
 } catch (e) {
   console.error('Migration referral error:', e.message);
+}
+
+// ─── Migration: Make ingredient_id nullable in recipe_ingredients (for sub-recipes) ───
+try {
+  const riCols2 = all("PRAGMA table_info(recipe_ingredients)");
+  const ingIdCol = riCols2.find(c => c.name === 'ingredient_id');
+  if (ingIdCol && ingIdCol.notnull === 1) {
+    // ingredient_id is NOT NULL — need to recreate table with nullable ingredient_id
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS recipe_ingredients_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+        ingredient_id INTEGER REFERENCES ingredients(id),
+        gross_quantity REAL NOT NULL,
+        net_quantity REAL,
+        unit TEXT NOT NULL DEFAULT 'portions',
+        custom_waste_percent REAL,
+        notes TEXT,
+        sub_recipe_id INTEGER REFERENCES recipes(id)
+      );
+      INSERT INTO recipe_ingredients_new SELECT id, recipe_id, ingredient_id, gross_quantity, net_quantity, unit, custom_waste_percent, notes, sub_recipe_id FROM recipe_ingredients;
+      DROP TABLE recipe_ingredients;
+      ALTER TABLE recipe_ingredients_new RENAME TO recipe_ingredients;
+    `);
+    console.log('✅ Migration: made ingredient_id nullable in recipe_ingredients');
+  }
+} catch (e) {
+  console.error('Migration nullable ingredient_id error:', e.message);
 }
 
 // ─── Seed: Common ingredients with prices ───
