@@ -290,4 +290,53 @@ try {
   console.error('Migration trial_start error:', e.message);
 }
 
+// ─── Migration: Add recipe_type to recipes ───
+try {
+  const recipeCols = all("PRAGMA table_info(recipes)");
+  if (!recipeCols.some(c => c.name === 'recipe_type')) {
+    db.exec("ALTER TABLE recipes ADD COLUMN recipe_type TEXT DEFAULT 'plat'");
+    console.log('✅ Migration: added recipe_type to recipes');
+  }
+} catch (e) {
+  console.error('Migration recipe_type error:', e.message);
+}
+
+// ─── Migration: Add sub_recipe_id to recipe_ingredients ───
+try {
+  const riCols = all("PRAGMA table_info(recipe_ingredients)");
+  if (!riCols.some(c => c.name === 'sub_recipe_id')) {
+    db.exec("ALTER TABLE recipe_ingredients ADD COLUMN sub_recipe_id INTEGER REFERENCES recipes(id)");
+    // Make ingredient_id nullable for sub-recipe rows
+    console.log('✅ Migration: added sub_recipe_id to recipe_ingredients');
+  }
+} catch (e) {
+  console.error('Migration sub_recipe_id error:', e.message);
+}
+
+// ─── Migration: Orders tables ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      table_number INTEGER NOT NULL,
+      status TEXT DEFAULT 'en_cours',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      total_cost REAL DEFAULT 0,
+      notes TEXT
+    );
+    CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL REFERENCES orders(id),
+      recipe_id INTEGER NOT NULL REFERENCES recipes(id),
+      quantity INTEGER DEFAULT 1,
+      status TEXT DEFAULT 'en_attente',
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+} catch (e) {
+  // Tables may already exist
+}
+
 module.exports = { db, all, get, run };

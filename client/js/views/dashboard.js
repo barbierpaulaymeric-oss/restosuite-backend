@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════
-// Dashboard — Fiches Techniques
+// Dashboard — Fiches Techniques (with recipe type filter)
 // ═══════════════════════════════════════════
 
 async function renderDashboard() {
@@ -14,6 +14,12 @@ async function renderDashboard() {
       <span class="search-icon"><i data-lucide="search"></i></span>
       <input type="text" id="recipe-search" placeholder="Rechercher une fiche..." autocomplete="off">
     </div>
+    <div class="recipe-type-filters" style="display:flex;gap:8px;margin-bottom:16px;overflow-x:auto">
+      <button class="haccp-subnav__link active" data-type="">Tous</button>
+      <button class="haccp-subnav__link" data-type="plat">🍽️ Plats</button>
+      <button class="haccp-subnav__link" data-type="sous_recette">📋 Sous-recettes</button>
+      <button class="haccp-subnav__link" data-type="base">🫕 Bases</button>
+    </div>
     <div id="recipe-list"><div class="loading"><div class="spinner"></div></div></div>
   `;
   lucide.createIcons();
@@ -27,14 +33,24 @@ async function renderDashboard() {
 
   const listEl = document.getElementById('recipe-list');
   const searchInput = document.getElementById('recipe-search');
+  let currentTypeFilter = '';
 
-  function renderList(filter = '') {
-    const filtered = filter
-      ? recipes.filter(r => r.name.toLowerCase().includes(filter.toLowerCase()) || (r.category || '').toLowerCase().includes(filter.toLowerCase()))
-      : recipes;
+  function renderList(filter = '', typeFilter = '') {
+    let filtered = recipes;
+
+    if (typeFilter) {
+      filtered = filtered.filter(r => (r.recipe_type || 'plat') === typeFilter);
+    }
+
+    if (filter) {
+      filtered = filtered.filter(r =>
+        r.name.toLowerCase().includes(filter.toLowerCase()) ||
+        (r.category || '').toLowerCase().includes(filter.toLowerCase())
+      );
+    }
 
     if (filtered.length === 0) {
-      listEl.innerHTML = filter ? `
+      listEl.innerHTML = filter || typeFilter ? `
         <div class="empty-state">
           <div class="empty-icon"><i data-lucide="clipboard-list"></i></div>
           <p>Aucun résultat</p>
@@ -58,10 +74,15 @@ async function renderDashboard() {
         r.food_cost_percent < 30 ? 'card--cost-good' :
         r.food_cost_percent <= 35 ? 'card--cost-warning' : 'card--cost-danger';
 
+      const recipeType = r.recipe_type || 'plat';
+      const typeBadge = recipeType === 'sous_recette' ? '<span class="recipe-type-badge recipe-type--sub">📋</span>' :
+        recipeType === 'base' ? '<span class="recipe-type-badge recipe-type--base">🫕</span>' :
+        '<span class="recipe-type-badge recipe-type--plat">🍽️</span>';
+
       return `
         <div class="card ${costBorderClass}" onclick="location.hash='#/recipe/${r.id}'">
           <div class="card-header">
-            <span class="card-title">${escapeHtml(r.name)}</span>
+            <span class="card-title">${typeBadge} ${escapeHtml(r.name)}</span>
             ${r.category ? `<span class="card-category">${escapeHtml(r.category)}</span>` : ''}
           </div>
           <div class="card-stats">
@@ -92,6 +113,16 @@ async function renderDashboard() {
   renderList();
 
   searchInput.addEventListener('input', (e) => {
-    renderList(e.target.value);
+    renderList(e.target.value, currentTypeFilter);
+  });
+
+  // Type filter buttons
+  document.querySelectorAll('.recipe-type-filters button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.recipe-type-filters button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTypeFilter = btn.dataset.type;
+      renderList(searchInput.value, currentTypeFilter);
+    });
   });
 }

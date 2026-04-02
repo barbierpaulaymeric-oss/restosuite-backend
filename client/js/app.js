@@ -83,6 +83,9 @@ function registerRoutes() {
   Router.add(/^\/stock$/, renderStockDashboard);
   Router.add(/^\/stock\/reception$/, renderStockReception);
   Router.add(/^\/stock\/movements$/, renderStockMovements);
+  Router.add(/^\/orders$/, renderOrdersDashboard);
+  Router.add(/^\/orders\/new$/, renderNewOrder);
+  Router.add(/^\/orders\/kitchen$/, renderKitchenView);
   Router.add(/^\/suppliers$/, renderSuppliers);
   Router.add(/^\/haccp$/, renderHACCPDashboard);
   Router.add(/^\/haccp\/temperatures$/, renderHACCPTemperatures);

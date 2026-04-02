@@ -265,6 +265,20 @@ const API = {
     return this.request(`/analytics/ai-insights${refresh ? '?refresh=true' : ''}`);
   },
 
+  // ─── Orders ───
+  getOrders(status) {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.request(`/orders${qs}`);
+  },
+  getOrder(id) { return this.request(`/orders/${id}`); },
+  createOrder(data) { return this.request('/orders', { method: 'POST', body: data }); },
+  updateOrder(id, data) { return this.request(`/orders/${id}`, { method: 'PUT', body: data }); },
+  updateOrderItem(orderId, itemId, data) {
+    return this.request(`/orders/${orderId}/items/${itemId}`, { method: 'PUT', body: data });
+  },
+  sendOrder(id) { return this.request(`/orders/${id}/send`, { method: 'POST' }); },
+  cancelOrder(id) { return this.request(`/orders/${id}`, { method: 'DELETE' }); },
+
   // AI
   parseVoice(text) {
     return this.request('/ai/parse-voice', { method: 'POST', body: { text } });

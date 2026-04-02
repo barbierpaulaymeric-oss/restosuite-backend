@@ -21,7 +21,8 @@ const Router = {
       const isActive = route === path || 
         (route !== '/' && path.startsWith(route)) ||
         (route === '/haccp' && path.startsWith('/haccp')) ||
-        (route === '/stock' && path.startsWith('/stock'));
+        (route === '/stock' && path.startsWith('/stock')) ||
+        (route === '/orders' && path.startsWith('/orders'));
       if (isActive) {
         link.classList.add('active');
       } else {

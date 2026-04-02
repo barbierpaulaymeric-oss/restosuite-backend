@@ -1,10 +1,12 @@
 // ═══════════════════════════════════════════
-// Recipe Form — New / Edit
+// Recipe Form — New / Edit (with sub-recipes)
 // ═══════════════════════════════════════════
 
 let formIngredients = [];
+let formSubRecipes = [];
 let formSteps = [];
 let allIngredients = [];
+let allRecipesForSub = [];
 
 async function renderRecipeForm(editId) {
   // Check edit permission
@@ -30,18 +32,45 @@ async function renderRecipeForm(editId) {
 
   // Load ingredients for autocomplete
   try { allIngredients = await API.getIngredients(); } catch(e) { allIngredients = []; }
+  // Load sub-recipes
+  try {
+    const allRecipes = await API.getRecipes();
+    allRecipesForSub = allRecipes.filter(r =>
+      (r.recipe_type === 'sous_recette' || r.recipe_type === 'base') &&
+      (!editId || r.id !== editId)
+    );
+  } catch(e) { allRecipesForSub = []; }
 
-  formIngredients = recipe ? recipe.ingredients.map(ing => ({
-    name: ing.ingredient_name,
-    ingredient_id: ing.ingredient_id,
-    gross_quantity: ing.gross_quantity,
-    net_quantity: ing.net_quantity,
-    unit: ing.unit,
-    waste_percent: ing.custom_waste_percent ?? ing.default_waste_percent ?? 0,
-    notes: ing.notes || ''
-  })) : [];
+  // Separate regular ingredients and sub-recipe ingredients
+  formIngredients = [];
+  formSubRecipes = [];
+
+  if (recipe) {
+    for (const ing of recipe.ingredients) {
+      if (ing.is_sub_recipe || ing.sub_recipe_id) {
+        formSubRecipes.push({
+          sub_recipe_id: ing.sub_recipe_id,
+          name: ing.sub_recipe_name || ing.sub_recipe?.name || `Recette #${ing.sub_recipe_id}`,
+          quantity: ing.gross_quantity,
+          cost: ing.cost || 0
+        });
+      } else {
+        formIngredients.push({
+          name: ing.ingredient_name,
+          ingredient_id: ing.ingredient_id,
+          gross_quantity: ing.gross_quantity,
+          net_quantity: ing.net_quantity,
+          unit: ing.unit,
+          waste_percent: ing.custom_waste_percent ?? ing.default_waste_percent ?? 0,
+          notes: ing.notes || ''
+        });
+      }
+    }
+  }
 
   formSteps = recipe ? recipe.steps.map(s => s.instruction) : [];
+
+  const recipeType = recipe?.recipe_type || 'plat';
 
   app.innerHTML = `
     <div class="page-header">
@@ -74,6 +103,21 @@ async function renderRecipeForm(editId) {
               `<option value="${c}" ${recipe?.category === c ? 'selected' : ''}>${c.charAt(0).toUpperCase() + c.slice(1)}</option>`
             ).join('')}
           </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Type de recette</label>
+          <select class="form-control" id="f-recipe-type" onchange="onRecipeTypeChange()">
+            <option value="plat" ${recipeType === 'plat' ? 'selected' : ''}>🍽️ Plat final</option>
+            <option value="sous_recette" ${recipeType === 'sous_recette' ? 'selected' : ''}>📋 Sous-recette</option>
+            <option value="base" ${recipeType === 'base' ? 'selected' : ''}>🫕 Base / Fond</option>
+          </select>
+        </div>
+        <div class="form-group" id="f-price-group" style="${recipeType === 'plat' ? '' : 'display:none'}">
+          <label>Prix de vente TTC (€)</label>
+          <input type="number" class="form-control" id="f-price" value="${recipe?.selling_price || ''}" step="0.5" min="0" oninput="updateLiveMargin()">
         </div>
       </div>
 
@@ -113,6 +157,20 @@ async function renderRecipeForm(editId) {
         <button class="btn btn-primary btn-sm" onclick="addIngredientLine()"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
       </div>
 
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Sous-recettes</span>
+      </div>
+      <div id="sub-recipe-list"></div>
+      <div style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
+        <select class="form-control" id="add-sub-recipe" style="flex:1;min-width:180px">
+          <option value="">— Choisir une sous-recette —</option>
+          ${allRecipesForSub.map(r => `<option value="${r.id}">${r.recipe_type === 'base' ? '🫕' : '📋'} ${escapeHtml(r.name)}</option>`).join('')}
+        </select>
+        <input type="number" class="form-control" id="add-sub-qty" placeholder="Portions" style="width:100px" step="any" min="0.1" value="1">
+        <button class="btn btn-primary btn-sm" onclick="addSubRecipeLine()"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
+      </div>
+      ${allRecipesForSub.length === 0 ? '<p class="text-muted" style="font-size:var(--text-xs);margin-top:4px">Aucune sous-recette disponible. Créez d\'abord des fiches de type "Sous-recette" ou "Base".</p>' : ''}
+
       <div class="section-title">Procédure</div>
       <div id="steps-list"></div>
       <div style="display:flex;gap:8px;margin-top:8px">
@@ -122,11 +180,7 @@ async function renderRecipeForm(editId) {
 
       <div class="section-title">Tarification</div>
       <div class="form-row">
-        <div class="form-group">
-          <label>Prix de vente TTC (€)</label>
-          <input type="number" class="form-control" id="f-price" value="${recipe?.selling_price || ''}" step="0.5" min="0" oninput="updateLiveMargin()">
-        </div>
-        <div class="form-group">
+        <div class="form-group" id="f-price-section">
           <label>Food Cost</label>
           <div id="live-margin" style="padding:12px 16px;font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:var(--text-secondary)">—</div>
         </div>
@@ -149,6 +203,7 @@ async function renderRecipeForm(editId) {
 
   lucide.createIcons();
   renderIngredientLines();
+  renderSubRecipeLines();
   renderStepLines();
   updateLiveMargin();
   setupIngredientAutocomplete();
@@ -157,6 +212,14 @@ async function renderRecipeForm(editId) {
   document.getElementById('add-step').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); addStepLine(); }
   });
+}
+
+function onRecipeTypeChange() {
+  const type = document.getElementById('f-recipe-type').value;
+  const priceGroup = document.getElementById('f-price-group');
+  if (priceGroup) {
+    priceGroup.style.display = type === 'plat' ? '' : 'none';
+  }
 }
 
 function renderIngredientLines() {
@@ -180,6 +243,56 @@ function renderIngredientLines() {
   }).join('');
   lucide.createIcons();
   updateLiveMargin();
+}
+
+function renderSubRecipeLines() {
+  const el = document.getElementById('sub-recipe-list');
+  if (!el) return;
+  if (formSubRecipes.length === 0) {
+    el.innerHTML = '<p class="text-muted" style="font-size:var(--text-sm);padding:8px 0">Aucune sous-recette ajoutée</p>';
+    return;
+  }
+  el.innerHTML = formSubRecipes.map((sr, i) => `
+    <div class="ing-line">
+      <span class="ing-name">📋 ${escapeHtml(sr.name)}</span>
+      <span class="ing-qty">${sr.quantity} portion${sr.quantity !== 1 ? 's' : ''}</span>
+      <span class="ing-qty text-muted">${sr.cost > 0 ? formatCurrency(sr.cost) : ''}</span>
+      <span class="ing-remove" onclick="removeSubRecipe(${i})"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+    </div>
+  `).join('');
+  lucide.createIcons();
+}
+
+function addSubRecipeLine() {
+  const select = document.getElementById('add-sub-recipe');
+  const qtyInput = document.getElementById('add-sub-qty');
+  const recipeId = parseInt(select.value);
+  const qty = parseFloat(qtyInput.value) || 1;
+
+  if (!recipeId) { showToast('Sélectionnez une sous-recette', 'error'); return; }
+
+  // Check if already added
+  if (formSubRecipes.some(sr => sr.sub_recipe_id === recipeId)) {
+    showToast('Cette sous-recette est déjà ajoutée', 'error');
+    return;
+  }
+
+  const recipe = allRecipesForSub.find(r => r.id === recipeId);
+  formSubRecipes.push({
+    sub_recipe_id: recipeId,
+    name: recipe ? recipe.name : `#${recipeId}`,
+    quantity: qty,
+    cost: recipe ? (recipe.cost_per_portion || 0) * qty : 0
+  });
+
+  select.value = '';
+  qtyInput.value = '1';
+  renderSubRecipeLines();
+}
+
+function removeSubRecipe(i) {
+  formSubRecipes.splice(i, 1);
+  renderSubRecipeLines();
 }
 
 function renderStepLines() {
@@ -423,24 +536,39 @@ async function saveRecipe(editId) {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { showToast('Nom du plat requis', 'error'); return; }
 
+  const recipeType = document.getElementById('f-recipe-type').value;
+
+  // Build combined ingredients array (regular + sub-recipes)
+  const allIngs = formIngredients.map(ing => ({
+    name: ing.name,
+    ingredient_id: ing.ingredient_id,
+    gross_quantity: ing.gross_quantity,
+    net_quantity: ing.net_quantity,
+    unit: ing.unit,
+    waste_percent: ing.waste_percent,
+    custom_waste_percent: ing.waste_percent,
+    notes: ing.notes
+  }));
+
+  // Add sub-recipes
+  for (const sr of formSubRecipes) {
+    allIngs.push({
+      sub_recipe_id: sr.sub_recipe_id,
+      gross_quantity: sr.quantity,
+      unit: 'portion'
+    });
+  }
+
   const data = {
     name,
     category: document.getElementById('f-category').value || null,
     portions: parseInt(document.getElementById('f-portions').value) || 1,
     prep_time_min: parseInt(document.getElementById('f-prep').value) || null,
     cooking_time_min: parseInt(document.getElementById('f-cooking').value) || null,
-    selling_price: parseFloat(document.getElementById('f-price').value) || null,
+    selling_price: recipeType === 'plat' ? (parseFloat(document.getElementById('f-price').value) || null) : null,
     notes: document.getElementById('f-notes').value.trim() || null,
-    ingredients: formIngredients.map(ing => ({
-      name: ing.name,
-      ingredient_id: ing.ingredient_id,
-      gross_quantity: ing.gross_quantity,
-      net_quantity: ing.net_quantity,
-      unit: ing.unit,
-      waste_percent: ing.waste_percent,
-      custom_waste_percent: ing.waste_percent,
-      notes: ing.notes
-    })),
+    recipe_type: recipeType,
+    ingredients: allIngs,
     steps: formSteps
   };
 
