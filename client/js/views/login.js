@@ -288,14 +288,17 @@ class LoginView {
             <div class="form-group">
               <label>Votre nom</label>
               <input type="text" class="form-control" id="create-name" placeholder="ex: Paul-Aymeric" autocomplete="off">
+              <div class="field-error" id="err-name"></div>
             </div>
             <div class="form-group">
               <label>Code PIN (4 chiffres)</label>
-              <input type="password" class="form-control" id="create-pin" placeholder="••••" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="font-family:var(--font-mono);font-size:var(--text-xl);text-align:center;letter-spacing:0.5em">
+              <input type="tel" class="form-control" id="create-pin" placeholder="••••" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password" style="font-family:var(--font-mono);font-size:var(--text-xl);text-align:center;letter-spacing:0.5em;-webkit-text-security:disc">
+              <div class="field-error" id="err-pin"></div>
             </div>
             <div class="form-group">
               <label>Confirmer le PIN</label>
-              <input type="password" class="form-control" id="create-pin2" placeholder="••••" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="font-family:var(--font-mono);font-size:var(--text-xl);text-align:center;letter-spacing:0.5em">
+              <input type="tel" class="form-control" id="create-pin2" placeholder="••••" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password" style="font-family:var(--font-mono);font-size:var(--text-xl);text-align:center;letter-spacing:0.5em;-webkit-text-security:disc">
+              <div class="field-error" id="err-pin2"></div>
             </div>
           </div>
 
@@ -315,27 +318,73 @@ class LoginView {
       this.render();
     });
 
-    document.getElementById('create-submit').addEventListener('click', async () => {
-      const name = document.getElementById('create-name').value.trim();
-      const pin = document.getElementById('create-pin').value;
-      const pin2 = document.getElementById('create-pin2').value;
-      const errorEl = document.getElementById('create-error');
+    // Real-time validation on input
+    const nameEl = document.getElementById('create-name');
+    const pinEl = document.getElementById('create-pin');
+    const pin2El = document.getElementById('create-pin2');
 
-      if (!name) { errorEl.textContent = 'Le nom est requis'; return; }
-      if (!/^\d{4}$/.test(pin)) { errorEl.textContent = 'Le PIN doit être 4 chiffres'; return; }
-      if (pin !== pin2) { errorEl.textContent = 'Les PIN ne correspondent pas'; return; }
+    // Filter non-digit characters from PIN fields
+    [pinEl, pin2El].forEach(el => {
+      el.addEventListener('input', () => {
+        el.value = el.value.replace(/[^0-9]/g, '');
+      });
+    });
+
+    document.getElementById('create-submit').addEventListener('click', async () => {
+      // Read values directly from DOM inputs
+      const nameVal = nameEl.value.trim();
+      const pinVal = pinEl.value.replace(/[^0-9]/g, '');
+      const pin2Val = pin2El.value.replace(/[^0-9]/g, '');
+
+      console.log('[RestoSuite] Create account attempt:', { name: nameVal, pinLength: pinVal.length, pin2Length: pin2Val.length });
+
+      // Clear previous errors
+      document.getElementById('err-name').textContent = '';
+      document.getElementById('err-pin').textContent = '';
+      document.getElementById('err-pin2').textContent = '';
+      const errorEl = document.getElementById('create-error');
+      errorEl.textContent = '';
+
+      // Validate with field-level errors
+      let valid = true;
+      if (!nameVal) {
+        document.getElementById('err-name').textContent = 'Le nom est requis';
+        valid = false;
+      }
+      if (!/^\d{4}$/.test(pinVal)) {
+        document.getElementById('err-pin').textContent = 'Le PIN doit être exactement 4 chiffres';
+        valid = false;
+      }
+      if (pinVal !== pin2Val) {
+        document.getElementById('err-pin2').textContent = 'Les PIN ne correspondent pas';
+        valid = false;
+      }
+      if (!valid) return;
+
+      // Disable button during request
+      const submitBtn = document.getElementById('create-submit');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Création...';
 
       try {
-        const account = await API.createAccount({ name, pin });
+        console.log('[RestoSuite] Calling API.createAccount...');
+        const account = await API.createAccount({ name: nameVal, pin: pinVal });
+        console.log('[RestoSuite] Account created:', account);
+
         // Auto-login
         localStorage.setItem('restosuite_account', JSON.stringify(account));
         localStorage.removeItem('restosuite_role');
 
         const nav = document.getElementById('nav');
         if (nav) nav.style.display = '';
-        bootApp(account.role, account);
+        bootApp(account.role, account, { isNewAccount: true });
       } catch (e) {
-        errorEl.textContent = e.message || 'Erreur lors de la création';
+        console.error('[RestoSuite] Account creation error:', e);
+        errorEl.textContent = e.message || 'Erreur lors de la création du compte';
+        showToast(e.message || 'Erreur lors de la création', 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i data-lucide="check" style="width:18px;height:18px"></i> Créer le compte';
+        if (window.lucide) lucide.createIcons();
       }
     });
   }

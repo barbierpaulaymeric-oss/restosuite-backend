@@ -2937,3 +2937,175 @@ tr:has(td[colspan]) td {
   color: var(--text-tertiary); display: block; margin-bottom: var(--space-1);
 }
 .insight-message { font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--text-primary); }
+
+/* Field-level validation errors */
+.field-error {
+  color: var(--color-danger); font-size: var(--text-xs);
+  margin-top: var(--space-1); min-height: 0;
+}
+
+/* ═══════════════════════════════════════════
+   Onboarding Wizard
+   ═══════════════════════════════════════════ */
+.onboarding-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: rgba(10, 16, 25, 0.85);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--space-4);
+  opacity: 0; transition: opacity 0.3s ease;
+}
+.onboarding-overlay.visible { opacity: 1; }
+
+.onboarding-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  width: 100%; max-width: 500px;
+  max-height: 90vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+
+.onboarding-progress {
+  height: 4px; background: var(--bg-sunken);
+  flex-shrink: 0;
+}
+.onboarding-progress-bar {
+  height: 100%; background: var(--color-accent);
+  transition: width 0.4s ease;
+  border-radius: 0 2px 2px 0;
+}
+
+.onboarding-body {
+  flex: 1; overflow-y: auto; padding: var(--space-8) var(--space-6);
+}
+.onboarding-body.slide-in-right {
+  animation: obSlideRight 0.35s ease;
+}
+.onboarding-body.slide-in-left {
+  animation: obSlideLeft 0.35s ease;
+}
+@keyframes obSlideRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes obSlideLeft {
+  from { opacity: 0; transform: translateX(-40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.onboarding-footer {
+  flex-shrink: 0;
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--border-light);
+}
+
+/* Step content */
+.ob-step { text-align: center; }
+.ob-icon { font-size: 3.5rem; margin-bottom: var(--space-4); }
+.ob-icon--large { font-size: 4rem; }
+.ob-title {
+  font-size: var(--text-2xl); font-weight: 700;
+  color: var(--text-primary); margin-bottom: var(--space-3);
+  letter-spacing: var(--tracking-tight);
+}
+.ob-desc {
+  font-size: var(--text-base); color: var(--text-secondary);
+  line-height: var(--leading-normal); margin-bottom: var(--space-6);
+}
+
+/* Buttons */
+.ob-buttons {
+  display: flex; justify-content: space-between; align-items: center; gap: var(--space-3);
+}
+.ob-buttons--finish {
+  flex-direction: column; gap: var(--space-3);
+}
+.ob-buttons--finish .btn { width: 100%; }
+.ob-btn-next { min-width: 140px; }
+.btn-ghost {
+  background: transparent; color: var(--text-secondary);
+  border: none; cursor: pointer; font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-4); border-radius: var(--radius-md);
+  transition: color 0.2s, background 0.2s;
+}
+.btn-ghost:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+
+/* Restaurant form */
+.ob-form { text-align: left; max-width: 360px; margin: 0 auto; }
+.ob-form .form-group { margin-bottom: var(--space-4); }
+.ob-form label {
+  display: block; font-size: var(--text-sm); font-weight: 500;
+  color: var(--text-secondary); margin-bottom: var(--space-1);
+}
+.ob-form select.form-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239CA3AF' viewBox='0 0 16 16'%3E%3Cpath d='M1.5 5.5l6.5 6.5 6.5-6.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+/* Zones */
+.ob-zones { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4); }
+.ob-zone-row {
+  display: flex; align-items: center; gap: var(--space-2);
+  background: var(--bg-sunken); border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+.ob-zone-name {
+  flex: 1; min-width: 0;
+  background: transparent; border: 1px solid transparent;
+  color: var(--text-primary); font-size: var(--text-sm); font-weight: 500;
+  padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  transition: border-color 0.2s;
+}
+.ob-zone-name:focus { border-color: var(--color-accent); outline: none; }
+.ob-zone-range {
+  display: flex; align-items: center; gap: var(--space-1);
+  flex-shrink: 0;
+}
+.ob-zone-input {
+  width: 52px; text-align: center;
+  background: var(--bg-elevated); border: 1px solid var(--border-default);
+  color: var(--text-primary); font-size: var(--text-sm);
+  padding: var(--space-1); border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+}
+.ob-zone-input:focus { border-color: var(--color-accent); outline: none; }
+.ob-zone-sep, .ob-zone-unit {
+  font-size: var(--text-xs); color: var(--text-tertiary); white-space: nowrap;
+}
+.ob-zone-delete {
+  background: none; border: none; color: var(--text-tertiary);
+  cursor: pointer; font-size: var(--text-base); padding: var(--space-1);
+  border-radius: var(--radius-sm); transition: color 0.2s, background 0.2s;
+}
+.ob-zone-delete:hover { color: var(--color-danger); background: var(--color-danger-light); }
+.ob-add-zone {
+  font-size: var(--text-sm); color: var(--color-accent); margin-top: var(--space-2);
+}
+
+/* Feature dots */
+.ob-dots { display: flex; justify-content: center; gap: var(--space-2); margin-top: var(--space-6); }
+.ob-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--border-default); cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.ob-dot.active { background: var(--color-accent); transform: scale(1.2); }
+.ob-dot:hover { background: var(--text-tertiary); }
+
+/* Features step */
+.ob-features .ob-desc { max-width: 320px; margin: 0 auto var(--space-4); }
+
+/* Responsive */
+@media (max-width: 480px) {
+  .onboarding-card { max-height: 100vh; border-radius: 0; }
+  .onboarding-overlay { padding: 0; }
+  .onboarding-body { padding: var(--space-6) var(--space-4); }
+  .ob-zone-row { flex-wrap: wrap; }
+  .ob-zone-name { width: 100%; flex: none; }
+}

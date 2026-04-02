@@ -95,7 +95,7 @@ function registerRoutes() {
   Router.add(/^\/supplier-portal$/, renderSupplierPortalManage);
 }
 
-function bootApp(role, account) {
+function bootApp(role, account, opts = {}) {
   applyRole(role);
   updateNavUser(account);
   registerRoutes();
@@ -107,6 +107,11 @@ function bootApp(role, account) {
 
   // Fetch trial status and render banner
   fetchTrialStatus().then(() => renderTrialBanner());
+
+  // Show onboarding wizard for new gérant accounts (first time only)
+  if (opts.isNewAccount && role === 'gerant' && typeof showOnboardingIfNeeded === 'function') {
+    showOnboardingIfNeeded();
+  }
 }
 
 function updateNavUser(account) {

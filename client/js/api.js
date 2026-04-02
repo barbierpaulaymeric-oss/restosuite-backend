@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════
 
 const API = {
-  base: '/api',
+  base: window.location.origin + '/api',
 
   async request(path, options = {}) {
     const url = this.base + path;
