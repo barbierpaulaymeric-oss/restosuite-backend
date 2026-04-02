@@ -11,6 +11,29 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://www.restosuite.fr/blog/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.restosuite.fr/blog/food-cost-restaurant.html</loc>
+    <lastmod>2026-04-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.restosuite.fr/blog/haccp-restaurant-guide.html</loc>
+    <lastmod>2026-04-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.restosuite.fr/blog/gestion-stock-restaurant.html</loc>
+    <lastmod>2026-04-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://www.restosuite.fr/legal/mentions.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestion des stocks en restaurant : méthodes et outils 2026</title>
+  <meta name="description" content="Guide complet de gestion des stocks en restaurant : méthodes FIFO, FEFO, réception marchandise, inventaire, alertes stock bas et lien avec le food cost.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://www.restosuite.fr/blog/gestion-stock-restaurant.html">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://www.restosuite.fr/blog/gestion-stock-restaurant.html">
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:title" content="Gestion des stocks en restaurant : méthodes et outils 2026">
+  <meta property="og:description" content="FIFO, FEFO, inventaire, réception marchandise : les méthodes de gestion des stocks qui font la différence sur vos marges.">
+  <meta property="og:site_name" content="RestoSuite AI">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Gestion des stocks en restaurant : méthodes et outils 2026">
+  <meta name="twitter:description" content="FIFO, FEFO, inventaire, réception marchandise : les méthodes de gestion des stocks en restaurant.">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Comment gérer les stocks de votre restaurant efficacement",
+    "description": "Guide complet de gestion des stocks en restaurant : méthodes FIFO, FEFO, réception marchandise, inventaire et lien avec le food cost.",
+    "datePublished": "2026-04-03",
+    "dateModified": "2026-04-03",
+    "author": { "@type": "Organization", "name": "RestoSuite AI", "url": "https://www.restosuite.fr" },
+    "publisher": { "@type": "Organization", "name": "RestoSuite AI", "url": "https://www.restosuite.fr" },
+    "mainEntityOfPage": "https://www.restosuite.fr/blog/gestion-stock-restaurant.html",
+    "keywords": ["gestion stock restaurant", "inventaire restaurant", "réception marchandise", "perte restaurant"]
+  }
+  </script>
+  <link rel="icon" type="image/png" href="../favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/blog.css">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --color-primary: #1B2A4A; --color-primary-light: #2A3F6B;
+      --color-accent: #E8722A; --color-accent-hover: #D4611F;
+      --color-accent-light: rgba(232,114,42,0.12); --color-success: #2D8B55;
+      --bg-base: #0F1723; --bg-elevated: #1B2A4A; --bg-sunken: #0A1019;
+      --text-primary: #F7F5F2; --text-secondary: #9CA3AF; --text-tertiary: #6B7280;
+      --border-default: #2A3F6B; --border-light: #1E3055;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+      --radius-sm: 6px; --radius-md: 10px; --radius-lg: 12px; --radius-xl: 16px;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--font-sans); color: var(--text-primary); background: var(--bg-base); -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+  </style>
+</head>
+<body class="blog-body">
+
+  <!-- Header -->
+  <header class="blog-header">
+    <div class="blog-header__inner">
+      <a href="/" class="blog-header__logo">
+        <img src="../assets/logo-outline-thin.png" alt="RestoSuite" style="height: 28px; width: auto;">
+        Resto<span>Suite</span> <span class="blog-header__logo-ai">AI</span>
+      </a>
+      <nav class="blog-header__nav">
+        <a href="/blog/">Blog</a>
+        <a href="/#fonctionnalites">Fonctionnalités</a>
+        <a href="/#tarifs">Tarifs</a>
+      </nav>
+      <a href="/app" class="blog-header__cta">Essai gratuit</a>
+    </div>
+  </header>
+
+  <!-- Article -->
+  <article class="blog-article">
+    <h1>Comment gérer les stocks de votre restaurant efficacement</h1>
+    <div class="blog-meta">
+      <span>📅 3 avril 2026</span>
+      <span>⏱️ 6 min de lecture</span>
+      <span>📦 Stock & Logistique</span>
+    </div>
+
+    <!-- TOC -->
+    <nav class="blog-toc">
+      <div class="blog-toc__title">📋 Sommaire</div>
+      <ol>
+        <li><a href="#pourquoi">Pourquoi la gestion des stocks est critique</a></li>
+        <li><a href="#methodes">Les méthodes : FIFO, LIFO, FEFO</a></li>
+        <li><a href="#reception">Réception marchandise</a></li>
+        <li><a href="#inventaire">Inventaire : fréquence et méthode</a></li>
+        <li><a href="#alertes">Alertes stock bas</a></li>
+        <li><a href="#food-cost">Lien entre stock et food cost</a></li>
+      </ol>
+    </nav>
+
+    <div class="blog-content">
+
+      <!-- 1 -->
+      <h2 id="pourquoi">1. Pourquoi la gestion des stocks est critique 🎯</h2>
+
+      <p>En restauration, le stock représente de l'<strong>argent immobilisé</strong>. Chaque produit dans votre chambre froide est un billet de banque qui attend d'être transformé en chiffre d'affaires — ou qui risque de finir à la poubelle.</p>
+
+      <p>Une mauvaise gestion des stocks génère trois types de pertes :</p>
+
+      <ul>
+        <li><strong>🗑️ Pertes directes</strong> — DLC dépassées, produits abîmés, casse</li>
+        <li><strong>💸 Sur-stockage</strong> — capital immobilisé, espace perdu, risque accru de péremption</li>
+        <li><strong>🚫 Ruptures</strong> — plats indisponibles en service, perte de CA et frustration client</li>
+      </ul>
+
+      <p>Les études du secteur estiment que les restaurants mal organisés <strong>perdent entre 5 % et 10 % de leurs achats</strong> en gaspillage lié au stock. Sur un budget achats de 120 000 €/an, ça représente <strong>6 000 à 12 000 €</strong> jetés — littéralement.</p>
+
+      <blockquote>
+        <strong>💡 Fait :</strong> un restaurant qui passe d'une gestion « au feeling » à une gestion structurée réduit ses pertes de 30 à 50 % en moyenne dès les premiers mois.
+      </blockquote>
+
+      <!-- 2 -->
+      <h2 id="methodes">2. Les méthodes : FIFO, LIFO, FEFO 🔄</h2>
+
+      <p>Trois méthodes de rotation des stocks existent. En restauration, <strong>deux sont pertinentes</strong> :</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Méthode</th>
+            <th>Principe</th>
+            <th>Usage en restaurant</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>FIFO</strong><br><em>First In, First Out</em></td>
+            <td>Le premier arrivé est le premier sorti</td>
+            <td>✅ Méthode de base — fonctionne pour la plupart des produits</td>
+          </tr>
+          <tr>
+            <td><strong>FEFO</strong><br><em>First Expired, First Out</em></td>
+            <td>Le premier à périmer est le premier sorti</td>
+            <td>✅ Idéal pour les produits frais — priorité à la DLC la plus proche</td>
+          </tr>
+          <tr>
+            <td><strong>LIFO</strong><br><em>Last In, First Out</em></td>
+            <td>Le dernier arrivé est le premier sorti</td>
+            <td>❌ Inadapté en restauration — risque de péremption</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>En pratique : combiner FIFO et FEFO</h3>
+
+      <p>La méthode la plus efficace en restaurant est de combiner les deux :</p>
+
+      <ol>
+        <li><strong>À la réception</strong>, rangez les nouveaux produits <strong>derrière</strong> les anciens (FIFO)</li>
+        <li><strong>Chaque matin</strong>, vérifiez les DLC et placez <strong>devant</strong> les produits qui périment en premier (FEFO)</li>
+        <li><strong>Étiquetez</strong> clairement chaque produit avec la date de réception et la DLC</li>
+      </ol>
+
+      <div class="blog-callout">
+        <div class="blog-callout__emoji">🏷️</div>
+        <div class="blog-callout__text">
+          <strong>Règle simple :</strong> si un produit n'est pas étiqueté avec sa date, considérez qu'il n'existe pas. L'étiquetage systématique est la base de toute gestion de stock sérieuse.
+        </div>
+      </div>
+
+      <!-- 3 -->
+      <h2 id="reception">3. Réception marchandise 🚛</h2>
+
+      <p>La réception est le <strong>premier point de contrôle</strong> de votre chaîne de sécurité alimentaire. Un produit mal contrôlé à l'entrée peut contaminer tout votre stock.</p>
+
+      <h3>Checklist de réception</h3>
+
+      <p>À chaque livraison, vérifiez systématiquement :</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Contrôle</th>
+            <th>Quoi vérifier</th>
+            <th>Action si non conforme</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>🌡️ Température</td>
+            <td>Conforme aux seuils réglementaires</td>
+            <td>Refuser le produit, noter la non-conformité</td>
+          </tr>
+          <tr>
+            <td>📦 Emballage</td>
+            <td>Intact, propre, pas de déformation</td>
+            <td>Refuser si endommagé</td>
+          </tr>
+          <tr>
+            <td>📅 DLC / DDM</td>
+            <td>Date suffisante pour l'utilisation prévue</td>
+            <td>Refuser si DLC trop courte</td>
+          </tr>
+          <tr>
+            <td>🔢 Quantité</td>
+            <td>Correspond au bon de commande</td>
+            <td>Signaler l'écart au fournisseur</td>
+          </tr>
+          <tr>
+            <td>👀 Aspect visuel</td>
+            <td>Couleur, odeur, texture normales</td>
+            <td>Refuser si suspect</td>
+          </tr>
+          <tr>
+            <td>🏷️ Étiquetage</td>
+            <td>N° de lot, origine, allergènes</td>
+            <td>Demander les informations manquantes</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Après le contrôle, <strong>rangez immédiatement</strong> les produits dans la zone de stockage adaptée. Chaque minute hors chambre froide compte — surtout en été.</p>
+
+      <!-- 4 -->
+      <h2 id="inventaire">4. Inventaire : fréquence et méthode 📊</h2>
+
+      <p>L'inventaire est le moment de vérité : il confronte ce que vous <strong>pensez avoir</strong> avec ce que vous avez <strong>réellement</strong>.</p>
+
+      <h3>Quelle fréquence ?</h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Type de produit</th>
+            <th>Fréquence recommandée</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Produits frais (viande, poisson, légumes)</td>
+            <td>Quotidien ou tous les 2 jours</td>
+          </tr>
+          <tr>
+            <td>Produits semi-frais (fromage, crème, charcuterie)</td>
+            <td>Hebdomadaire</td>
+          </tr>
+          <tr>
+            <td>Produits secs et épicerie</td>
+            <td>Bimensuel ou mensuel</td>
+          </tr>
+          <tr>
+            <td>Boissons et alcools</td>
+            <td>Hebdomadaire à mensuel</td>
+          </tr>
+          <tr>
+            <td>Inventaire complet</td>
+            <td>Mensuel (obligatoire pour le suivi financier)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Méthode d'inventaire efficace</h3>
+
+      <ol>
+        <li><strong>Faites-le toujours au même moment</strong> — avant l'ouverture ou après la fermeture, jamais en plein service</li>
+        <li><strong>Suivez un parcours fixe</strong> — zone par zone, étagère par étagère, toujours dans le même ordre</li>
+        <li><strong>Comptez en binôme</strong> — un compte, l'autre note (ou scanne)</li>
+        <li><strong>Pesez, ne devinez pas</strong> — les conteneurs entamés doivent être pesés</li>
+        <li><strong>Comparez immédiatement</strong> — stock réel vs stock théorique, identifiez les écarts</li>
+      </ol>
+
+      <!-- 5 -->
+      <h2 id="alertes">5. Alertes stock bas ⚡</h2>
+
+      <p>Rien de pire qu'un serveur qui doit annoncer « désolé, on n'a plus de… » en plein service. Les <strong>alertes stock bas</strong> sont votre filet de sécurité contre les ruptures.</p>
+
+      <h3>Comment définir vos seuils d'alerte</h3>
+
+      <p>Pour chaque ingrédient clé, calculez :</p>
+
+      <div class="formula-block">
+        Stock minimum = Consommation journalière × Délai de livraison (en jours) + Marge de sécurité
+      </div>
+
+      <p><strong>Exemple :</strong> vous utilisez 5 kg de tomates par jour. Votre fournisseur livre en 2 jours. Avec 1 jour de marge de sécurité :</p>
+      <p>Stock minimum = 5 × 2 + 5 = <strong>15 kg</strong></p>
+      <p>Dès que votre stock tombe sous 15 kg, l'alerte se déclenche et vous passez commande.</p>
+
+      <div class="blog-callout">
+        <div class="blog-callout__emoji">📱</div>
+        <div class="blog-callout__text">
+          <strong>Version numérique :</strong> avec un logiciel de gestion, les alertes sont automatiques — notification push ou email dès qu'un seuil est atteint. Plus de vérification manuelle à oublier.
+        </div>
+      </div>
+
+      <!-- 6 -->
+      <h2 id="food-cost">6. Lien entre stock et food cost 🔗</h2>
+
+      <p>Stock et food cost sont <strong>intimement liés</strong>. Votre food cost théorique (celui de vos fiches techniques) ne raconte qu'une partie de l'histoire. Le food cost réel intègre les pertes, le gaspillage, le vol et les erreurs de commande.</p>
+
+      <p>La formule du <strong>food cost réel</strong> (aussi appelé « consommation matière ») :</p>
+
+      <div class="formula-block">
+        Food Cost réel = (Stock début + Achats – Stock fin) ÷ CA HT × 100
+      </div>
+
+      <p>Comparez-le avec votre food cost théorique :</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Écart</th>
+            <th>Interprétation</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>< 2 points</td>
+            <td>✅ Normal — pertes incompressibles</td>
+            <td>Maintenir la rigueur</td>
+          </tr>
+          <tr>
+            <td>2 – 5 points</td>
+            <td>⚠️ Attention — pertes significatives</td>
+            <td>Analyser les causes (portions, pertes, casse)</td>
+          </tr>
+          <tr>
+            <td>> 5 points</td>
+            <td>🚨 Problème — pertes anormales</td>
+            <td>Audit complet : vol, erreurs de commande, grammages</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Un inventaire mensuel rigoureux est le <strong>seul moyen fiable</strong> de calculer cet écart. Sans inventaire, vous pilotez à l'aveugle — et votre marge en paie le prix.</p>
+
+      <blockquote>
+        <strong>🎯 Objectif :</strong> maintenir l'écart entre food cost théorique et réel sous les 2 points. C'est le signe d'une cuisine bien gérée.
+      </blockquote>
+
+      <!-- CTA -->
+      <div class="blog-cta">
+        <h3>📦 Gérez vos stocks sans effort</h3>
+        <p>RestoSuite AI automatise la réception marchandise, le suivi DLC, les alertes stock bas et le calcul du food cost réel — en temps réel.</p>
+        <a href="/app" class="btn">Essayer gratuitement — 60 jours</a>
+        <p class="blog-cta__note">Aucune carte bancaire requise</p>
+      </div>
+
+    </div>
+  </article>
+
+  <!-- Footer -->
+  <footer class="blog-footer">
+    <div class="blog-footer__inner">
+      <div class="blog-footer__links">
+        <a href="/">Accueil</a>
+        <a href="/blog/">Blog</a>
+        <a href="/legal/mentions.html">Mentions légales</a>
+        <a href="/legal/cgv.html">CGV</a>
+        <a href="/legal/privacy.html">Confidentialité</a>
+        <a href="mailto:contact@restosuite.fr">Contact</a>
+      </div>
+      <div class="blog-footer__copy">© 2026 RestoSuite AI</div>
+    </div>
+  </footer>
+
+</body>
+</html>
