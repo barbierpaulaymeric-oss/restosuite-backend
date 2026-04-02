@@ -222,6 +222,7 @@ function _svcBuildTableState() {
 
 function _svcNotifyReady(tableNum) {
   showToast(`✅ Table ${tableNum} — Plat(s) prêt(s) !`, 'success');
+  if (typeof playKitchenNotificationSound === 'function') playKitchenNotificationSound();
   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
   // Update notification badge
   const badge = document.getElementById('svc-notif-count');

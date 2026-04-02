@@ -11,14 +11,14 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, category, default_unit, waste_percent, allergens } = req.body;
+  const { name, category, default_unit, waste_percent, allergens, price_per_unit, price_unit } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const normalized = name.trim().toLowerCase();
   const existing = get('SELECT * FROM ingredients WHERE name = ?', [normalized]);
   if (existing) return res.json(existing);
   const info = run(
-    'INSERT INTO ingredients (name, category, default_unit, waste_percent, allergens) VALUES (?, ?, ?, ?, ?)',
-    [normalized, category || null, default_unit || 'g', waste_percent || 0, allergens || null]
+    'INSERT INTO ingredients (name, category, default_unit, waste_percent, allergens, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [normalized, category || null, default_unit || 'g', waste_percent || 0, allergens || null, price_per_unit || 0, price_unit || 'kg']
   );
   res.status(201).json(get('SELECT * FROM ingredients WHERE id = ?', [info.lastInsertRowid]));
 });
@@ -26,15 +26,17 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   const existing = get('SELECT * FROM ingredients WHERE id = ?', [Number(req.params.id)]);
   if (!existing) return res.status(404).json({ error: 'not found' });
-  const { name, category, default_unit, waste_percent, allergens } = req.body;
+  const { name, category, default_unit, waste_percent, allergens, price_per_unit, price_unit } = req.body;
   run(
-    'UPDATE ingredients SET name = ?, category = ?, default_unit = ?, waste_percent = ?, allergens = ? WHERE id = ?',
+    'UPDATE ingredients SET name = ?, category = ?, default_unit = ?, waste_percent = ?, allergens = ?, price_per_unit = ?, price_unit = ? WHERE id = ?',
     [
       name ? name.trim().toLowerCase() : existing.name,
       category !== undefined ? category : existing.category,
       default_unit || existing.default_unit,
       waste_percent !== undefined ? waste_percent : existing.waste_percent,
       allergens !== undefined ? allergens : existing.allergens,
+      price_per_unit !== undefined ? price_per_unit : (existing.price_per_unit || 0),
+      price_unit !== undefined ? price_unit : (existing.price_unit || 'kg'),
       Number(req.params.id)
     ]
   );

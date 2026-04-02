@@ -30,7 +30,11 @@ async function renderStockDashboard() {
     </div>
     <div id="stock-alerts-section"></div>
     <div id="stock-content">
-      <div class="loading-spinner" style="text-align:center;padding:var(--space-8)">Chargement...</div>
+      <div class="skeleton skeleton-row"></div>
+      <div class="skeleton skeleton-row"></div>
+      <div class="skeleton skeleton-row"></div>
+      <div class="skeleton skeleton-row"></div>
+      <div class="skeleton skeleton-row"></div>
     </div>
   `;
 

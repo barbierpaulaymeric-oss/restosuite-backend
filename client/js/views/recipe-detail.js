@@ -22,6 +22,11 @@ async function renderRecipeDetail(id) {
   const hasSubRecipes = recipe.ingredients.some(i => i.is_sub_recipe);
 
   app.innerHTML = `
+    <nav aria-label="Breadcrumb" class="breadcrumb">
+      <a href="#/">Fiches</a>
+      <span class="breadcrumb-sep">›</span>
+      <span class="breadcrumb-current">${escapeHtml(recipe.name)}</span>
+    </nav>
     <div class="page-header">
       <div>
         <a href="#/" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px"></i> Fiches techniques</a>

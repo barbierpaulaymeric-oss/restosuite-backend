@@ -20,7 +20,12 @@ async function renderDashboard() {
       <button class="haccp-subnav__link" data-type="sous_recette">📋 Sous-recettes</button>
       <button class="haccp-subnav__link" data-type="base">🫕 Bases</button>
     </div>
-    <div id="recipe-list"><div class="loading"><div class="spinner"></div></div></div>
+    <div id="recipe-list">
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+    </div>
   `;
   lucide.createIcons();
 

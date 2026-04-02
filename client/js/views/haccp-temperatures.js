@@ -17,6 +17,11 @@ async function renderHACCPTemperatures() {
 
     app.innerHTML = `
       <div class="haccp-page">
+        <nav aria-label="Breadcrumb" class="breadcrumb">
+          <a href="#/haccp">HACCP</a>
+          <span class="breadcrumb-sep">›</span>
+          <span class="breadcrumb-current">Températures</span>
+        </nav>
         <div class="page-header">
           <h1>🌡️ Températures</h1>
           <button class="btn btn-primary" id="btn-new-temp">

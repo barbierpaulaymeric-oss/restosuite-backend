@@ -125,7 +125,57 @@ router.post('/parse-voice', async (req, res) => {
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!content) return res.status(502).json({ error: 'Empty AI response' });
 
-    res.json(JSON.parse(content));
+    const parsed = JSON.parse(content);
+
+    // Match ingredients with existing DB entries (fuzzy) and enrich with prices
+    if (parsed.ingredients && parsed.ingredients.length > 0) {
+      let estimatedCost = 0;
+      for (const ing of parsed.ingredients) {
+        const name = (ing.name || '').toLowerCase().trim();
+        // Exact match first, then fuzzy
+        let match = get('SELECT * FROM ingredients WHERE name = ?', [name]);
+        if (!match) {
+          match = get('SELECT * FROM ingredients WHERE name LIKE ? ORDER BY LENGTH(name) ASC LIMIT 1', [`%${name}%`]);
+        }
+        if (match) {
+          ing.ingredient_id = match.id;
+          ing.matched_name = match.name;
+          ing.price_per_unit = match.price_per_unit || 0;
+          ing.price_unit = match.price_unit || 'kg';
+          // Calc cost for this ingredient
+          if (match.price_per_unit > 0) {
+            const p = match.price_per_unit;
+            const pu = match.price_unit || 'kg';
+            let costPerBase = 0;
+            if (pu === 'kg') costPerBase = p / 1000;
+            else if (pu === 'g') costPerBase = p;
+            else if (pu === 'l') costPerBase = p / 1000;
+            else if (pu === 'cl') costPerBase = p / 100;
+            else if (pu === 'pièce' || pu === 'botte') costPerBase = p;
+            else costPerBase = p / 1000;
+
+            let qtyInBase = ing.gross_quantity || 0;
+            const unit = ing.unit || 'g';
+            if (unit === 'kg') qtyInBase *= 1000;
+            else if (unit === 'l') qtyInBase *= 1000;
+            else if (unit === 'cl') qtyInBase *= 10;
+
+            ing.estimated_cost = Math.round(qtyInBase * costPerBase * 100) / 100;
+            estimatedCost += ing.estimated_cost;
+          }
+          // Use DB waste_percent if AI didn't provide one
+          if (!ing.waste_percent && match.waste_percent) {
+            ing.waste_percent = match.waste_percent;
+          }
+        }
+      }
+      parsed.estimated_total_cost = Math.round(estimatedCost * 100) / 100;
+      if (parsed.portions > 0) {
+        parsed.estimated_cost_per_portion = Math.round((estimatedCost / parsed.portions) * 100) / 100;
+      }
+    }
+
+    res.json(parsed);
   } catch (e) {
     console.error('AI parse error:', e);
     res.status(500).json({ error: 'Failed to parse voice input', details: e.message });

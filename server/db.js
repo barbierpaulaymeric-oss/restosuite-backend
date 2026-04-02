@@ -313,6 +313,21 @@ try {
   console.error('Migration sub_recipe_id error:', e.message);
 }
 
+// ─── Migration: Add price_per_unit to ingredients ───
+try {
+  const ingCols = all("PRAGMA table_info(ingredients)");
+  if (!ingCols.some(c => c.name === 'price_per_unit')) {
+    db.exec("ALTER TABLE ingredients ADD COLUMN price_per_unit REAL DEFAULT 0");
+    console.log('✅ Migration: added price_per_unit to ingredients');
+  }
+  if (!ingCols.some(c => c.name === 'price_unit')) {
+    db.exec("ALTER TABLE ingredients ADD COLUMN price_unit TEXT DEFAULT 'kg'");
+    console.log('✅ Migration: added price_unit to ingredients');
+  }
+} catch (e) {
+  console.error('Migration price_per_unit error:', e.message);
+}
+
 // ─── Migration: Orders tables ───
 try {
   db.exec(`
@@ -337,6 +352,14 @@ try {
   `);
 } catch (e) {
   // Tables may already exist
+}
+
+// ─── Seed: Common ingredients with prices ───
+try {
+  const seedIngredients = require('./seed-ingredients');
+  seedIngredients(db, get, run);
+} catch (e) {
+  console.error('Seed ingredients error:', e.message);
 }
 
 module.exports = { db, all, get, run };

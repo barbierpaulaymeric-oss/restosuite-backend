@@ -18,6 +18,11 @@ async function renderStockReception() {
   }
 
   app.innerHTML = `
+    <nav aria-label="Breadcrumb" class="breadcrumb">
+      <a href="#/stock">Stock</a>
+      <span class="breadcrumb-sep">›</span>
+      <span class="breadcrumb-current">Réception</span>
+    </nav>
     <div class="view-header">
       <div style="display:flex;align-items:center;gap:var(--space-3)">
         <a href="#/stock" style="color:var(--text-secondary);text-decoration:none;font-size:1.5rem">←</a>

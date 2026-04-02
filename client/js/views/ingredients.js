@@ -59,6 +59,10 @@ async function renderIngredients() {
             <span class="stat-value">${ing.default_unit}</span>
             <span class="stat-label">Unité</span>
           </div>
+          <div>
+            <span class="stat-value">${ing.price_per_unit > 0 ? ing.price_per_unit.toFixed(2) + '€' : '—'}</span>
+            <span class="stat-label">${ing.price_per_unit > 0 ? '/' + (ing.price_unit || 'kg') : 'Prix'}</span>
+          </div>
           ${ing.allergens ? `<div>
             <span class="stat-value" style="font-size:var(--text-xs)">${escapeHtml(ing.allergens)}</span>
             <span class="stat-label">Allergènes</span>
@@ -112,6 +116,20 @@ function showIngredientModal(ingredient = null) {
           <input type="text" class="form-control" id="m-ing-allergens" value="${escapeHtml(ingredient?.allergens || '')}" placeholder="gluten, lait...">
         </div>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Prix unitaire (€)</label>
+          <input type="number" class="form-control" id="m-ing-price" value="${ingredient?.price_per_unit || ''}" min="0" step="0.1" placeholder="ex: 4.50€/kg">
+        </div>
+        <div class="form-group">
+          <label>Unité de prix</label>
+          <select class="form-control" id="m-ing-price-unit">
+            ${['kg','l','pièce','botte'].map(u =>
+              `<option value="${u}" ${(ingredient?.price_unit || 'kg') === u ? 'selected' : ''}>${u}</option>`
+            ).join('')}
+          </select>
+        </div>
+      </div>
       <div class="actions-row">
         <button class="btn btn-primary" id="m-ing-save">
           <i data-lucide="${isEdit ? 'save' : 'plus'}" style="width:18px;height:18px"></i>
@@ -135,7 +153,9 @@ function showIngredientModal(ingredient = null) {
       category: document.getElementById('m-ing-cat').value || null,
       default_unit: document.getElementById('m-ing-unit').value,
       waste_percent: parseFloat(document.getElementById('m-ing-waste').value) || 0,
-      allergens: document.getElementById('m-ing-allergens').value.trim() || null
+      allergens: document.getElementById('m-ing-allergens').value.trim() || null,
+      price_per_unit: parseFloat(document.getElementById('m-ing-price').value) || 0,
+      price_unit: document.getElementById('m-ing-price-unit').value || 'kg'
     };
     if (!data.name) { showToast('Nom requis', 'error'); return; }
     try {

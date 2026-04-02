@@ -7,6 +7,8 @@ let formSubRecipes = [];
 let formSteps = [];
 let allIngredients = [];
 let allRecipesForSub = [];
+let _draftAutoSaveTimer = null;
+const DRAFT_KEY = 'restosuite_recipe_draft';
 
 async function renderRecipeForm(editId) {
   // Check edit permission
@@ -212,6 +214,44 @@ async function renderRecipeForm(editId) {
   document.getElementById('add-step').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); addStepLine(); }
   });
+
+  // Draft auto-save (creation mode only)
+  if (!isEdit) {
+    _startDraftAutoSave();
+    // Check for existing draft
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const draft = JSON.parse(saved);
+        const age = Date.now() - (draft.savedAt || 0);
+        // Only restore drafts less than 24h old
+        if (age < 86400000) {
+          const draftBanner = document.createElement('div');
+          draftBanner.className = 'draft-restore-banner';
+          draftBanner.innerHTML = `
+            <span>📝 Un brouillon a été sauvegardé. Reprendre ?</span>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" id="draft-restore">Reprendre</button>
+              <button class="btn btn-secondary btn-sm" id="draft-discard">Ignorer</button>
+            </div>
+          `;
+          const formContent = document.getElementById('recipe-form-content');
+          formContent.parentNode.insertBefore(draftBanner, formContent);
+          document.getElementById('draft-restore').addEventListener('click', () => {
+            _restoreDraft(draft);
+            draftBanner.remove();
+            showToast('Brouillon restauré', 'success');
+          });
+          document.getElementById('draft-discard').addEventListener('click', () => {
+            _clearDraft();
+            draftBanner.remove();
+          });
+        } else {
+          _clearDraft();
+        }
+      }
+    } catch (e) { /* ignore parse errors */ }
+  }
 }
 
 function onRecipeTypeChange() {
@@ -466,7 +506,14 @@ function startMic() {
 
     try {
       const parsed = await API.parseVoice(transcript);
-      status.textContent = 'Fiche analysée ! Vérifiez et ajustez ci-dessous.';
+      let statusMsg = 'Fiche analysée ! Vérifiez et ajustez ci-dessous.';
+      if (parsed.estimated_total_cost > 0) {
+        statusMsg += ` Food cost estimé : ${parsed.estimated_total_cost.toFixed(2)}€`;
+        if (parsed.estimated_cost_per_portion > 0) {
+          statusMsg += ` (${parsed.estimated_cost_per_portion.toFixed(2)}€/portion)`;
+        }
+      }
+      status.textContent = statusMsg;
       status.className = 'mic-status success';
       populateFromAI(parsed);
     } catch (e) {
@@ -515,8 +562,8 @@ function populateFromAI(parsed) {
 
   if (parsed.ingredients && parsed.ingredients.length > 0) {
     formIngredients = parsed.ingredients.map(ing => ({
-      name: (ing.name || '').toLowerCase(),
-      ingredient_id: null,
+      name: (ing.matched_name || ing.name || '').toLowerCase(),
+      ingredient_id: ing.ingredient_id || null,
       gross_quantity: ing.gross_quantity || 0,
       net_quantity: ing.net_quantity || null,
       unit: ing.unit || 'g',
@@ -530,6 +577,65 @@ function populateFromAI(parsed) {
     formSteps = parsed.steps;
     renderStepLines();
   }
+}
+
+// ─── Auto-save draft ───
+function _collectDraftData() {
+  return {
+    name: document.getElementById('f-name')?.value || '',
+    category: document.getElementById('f-category')?.value || '',
+    recipe_type: document.getElementById('f-recipe-type')?.value || 'plat',
+    portions: document.getElementById('f-portions')?.value || '1',
+    prep_time_min: document.getElementById('f-prep')?.value || '',
+    cooking_time_min: document.getElementById('f-cooking')?.value || '',
+    selling_price: document.getElementById('f-price')?.value || '',
+    notes: document.getElementById('f-notes')?.value || '',
+    ingredients: formIngredients,
+    subRecipes: formSubRecipes,
+    steps: formSteps,
+    savedAt: Date.now()
+  };
+}
+
+function _saveDraft() {
+  try {
+    const data = _collectDraftData();
+    // Only save if there's meaningful content
+    if (data.name || formIngredients.length || formSteps.length) {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+    }
+  } catch (e) { /* localStorage full or unavailable */ }
+}
+
+function _clearDraft() {
+  localStorage.removeItem(DRAFT_KEY);
+  if (_draftAutoSaveTimer) {
+    clearInterval(_draftAutoSaveTimer);
+    _draftAutoSaveTimer = null;
+  }
+}
+
+function _startDraftAutoSave() {
+  if (_draftAutoSaveTimer) clearInterval(_draftAutoSaveTimer);
+  _draftAutoSaveTimer = setInterval(_saveDraft, 30000);
+}
+
+function _restoreDraft(draft) {
+  if (draft.name) document.getElementById('f-name').value = draft.name;
+  if (draft.category) document.getElementById('f-category').value = draft.category;
+  if (draft.recipe_type) {
+    document.getElementById('f-recipe-type').value = draft.recipe_type;
+    onRecipeTypeChange();
+  }
+  if (draft.portions) document.getElementById('f-portions').value = draft.portions;
+  if (draft.prep_time_min) document.getElementById('f-prep').value = draft.prep_time_min;
+  if (draft.cooking_time_min) document.getElementById('f-cooking').value = draft.cooking_time_min;
+  if (draft.selling_price) document.getElementById('f-price').value = draft.selling_price;
+  if (draft.notes) document.getElementById('f-notes').value = draft.notes;
+  if (draft.ingredients) { formIngredients = draft.ingredients; renderIngredientLines(); }
+  if (draft.subRecipes) { formSubRecipes = draft.subRecipes; renderSubRecipeLines(); }
+  if (draft.steps) { formSteps = draft.steps; renderStepLines(); }
+  updateLiveMargin();
 }
 
 async function saveRecipe(editId) {
@@ -581,6 +687,7 @@ async function saveRecipe(editId) {
       result = await API.createRecipe(data);
       showToast('Fiche créée !', 'success');
     }
+    _clearDraft();
     location.hash = `#/recipe/${result.id}`;
   } catch (e) {
     showToast('Erreur : ' + e.message, 'error');

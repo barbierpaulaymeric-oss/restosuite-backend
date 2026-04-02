@@ -3,14 +3,28 @@ const { all, get, run } = require('../db');
 const router = Router();
 
 function calcIngredientCost(ingredientId, grossQty, unit) {
-  const price = get(`
+  // 1. Try supplier_prices first (best price)
+  const supplierPrice = get(`
     SELECT sp.price, sp.unit FROM supplier_prices sp
     WHERE sp.ingredient_id = ? ORDER BY sp.price ASC LIMIT 1
   `, [ingredientId]);
-  if (!price) return 0;
 
-  const p = price.price;
-  const pu = price.unit;
+  let p, pu;
+
+  if (supplierPrice && supplierPrice.price > 0) {
+    p = supplierPrice.price;
+    pu = supplierPrice.unit;
+  } else {
+    // 2. Fallback: use ingredient's own price_per_unit
+    const ingredient = get(`
+      SELECT price_per_unit, price_unit FROM ingredients WHERE id = ?
+    `, [ingredientId]);
+    if (!ingredient || !ingredient.price_per_unit || ingredient.price_per_unit <= 0) return 0;
+    p = ingredient.price_per_unit;
+    pu = ingredient.price_unit || 'kg';
+  }
+
+  // Convert price to cost-per-base-unit (g for kg, ml for l, 1 for pièce/botte)
   let costPerBase = 0;
   if (pu === 'kg') costPerBase = p / 1000;
   else if (pu === 'g') costPerBase = p;
@@ -19,6 +33,7 @@ function calcIngredientCost(ingredientId, grossQty, unit) {
   else if (pu === 'pièce' || pu === 'botte') costPerBase = p;
   else costPerBase = p / 1000;
 
+  // Convert quantity to base unit
   let qtyInBase = grossQty;
   if (unit === 'kg') qtyInBase = grossQty * 1000;
   else if (unit === 'l') qtyInBase = grossQty * 1000;
@@ -234,8 +249,8 @@ router.post('/', (req, res) => {
           ingredientId = existing.id;
         } else {
           const newIng = run(
-            'INSERT INTO ingredients (name, category, default_unit, waste_percent) VALUES (?, ?, ?, ?)',
-            [ing.name.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0]
+            'INSERT INTO ingredients (name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?)',
+            [ing.name.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
           );
           ingredientId = newIng.lastInsertRowid;
         }
@@ -300,8 +315,8 @@ router.put('/:id', (req, res) => {
           ingredientId = ex.id;
         } else {
           const newIng = run(
-            'INSERT INTO ingredients (name, category, default_unit, waste_percent) VALUES (?, ?, ?, ?)',
-            [ing.name.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0]
+            'INSERT INTO ingredients (name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?)',
+            [ing.name.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
           );
           ingredientId = newIng.lastInsertRowid;
         }

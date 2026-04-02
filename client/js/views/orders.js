@@ -326,6 +326,7 @@ async function submitOrder(sendImmediately) {
 
 // ─── Kitchen View ───
 let kitchenRefreshInterval = null;
+let _kitchenPrevOrderIds = null;
 
 async function renderKitchenView() {
   const app = document.getElementById('app');
@@ -347,6 +348,7 @@ async function renderKitchenView() {
     kitchenRefreshInterval = null;
   }
 
+  _kitchenPrevOrderIds = null;
   await loadKitchenTickets();
 
   // Auto-refresh every 15s
@@ -371,6 +373,16 @@ async function loadKitchenTickets() {
   } catch (e) {
     return;
   }
+
+  // Detect new orders for notification sound
+  const currentIds = new Set(orders.map(o => o.id));
+  if (_kitchenPrevOrderIds !== null) {
+    const hasNewOrders = orders.some(o => !_kitchenPrevOrderIds.has(o.id));
+    if (hasNewOrders) {
+      playKitchenNotificationSound();
+    }
+  }
+  _kitchenPrevOrderIds = currentIds;
 
   const el = document.getElementById('kitchen-tickets');
   if (!el) return;
@@ -431,6 +443,32 @@ async function updateKitchenItem(orderId, itemId, status) {
   } catch (e) {
     showToast('Erreur : ' + e.message, 'error');
   }
+}
+
+// ─── Kitchen notification sound ───
+function playKitchenNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 800;
+    gain.gain.value = 0.3;
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+    setTimeout(() => {
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.frequency.value = 1000;
+      gain2.gain.value = 0.3;
+      osc2.start();
+      osc2.stop(ctx.currentTime + 0.15);
+    }, 200);
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  } catch (e) { /* Web Audio not available */ }
 }
 
 // ─── Helpers ───
