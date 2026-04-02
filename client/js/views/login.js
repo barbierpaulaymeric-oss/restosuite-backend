@@ -129,7 +129,7 @@ class LoginView {
                 ${renderAvatar(a.name, 48)}
                 <div class="profile-info">
                   <span class="profile-name">${escapeHtml(a.name)}</span>
-                  <span class="profile-role">${a.role === 'gerant' ? '👑 Gérant' : '👤 Équipier'}</span>
+                  <span class="profile-role">${_getRoleLabel(a.role)}</span>
                 </div>
                 <i data-lucide="chevron-right" style="width:20px;height:20px;color:var(--text-tertiary)"></i>
               </button>
@@ -400,6 +400,15 @@ function getAccount() {
     const stored = localStorage.getItem('restosuite_account');
     return stored ? JSON.parse(stored) : null;
   } catch { return null; }
+}
+
+function _getRoleLabel(role) {
+  switch (role) {
+    case 'gerant': return '👑 Gérant';
+    case 'cuisinier': return '👨‍🍳 Cuisinier';
+    case 'salle': return '🍽️ Salle';
+    default: return '👤 Équipier';
+  }
 }
 
 function getRole() {

@@ -99,7 +99,7 @@ async function renderRecipeForm(editId) {
           <label>Catégorie</label>
           <select class="form-control" id="f-category">
             <option value="">—</option>
-            ${['entrée','plat','dessert','amuse-bouche','accompagnement','sauce','base'].map(c =>
+            ${['entrée','plat','dessert','boisson','amuse-bouche','accompagnement','sauce','base'].map(c =>
               `<option value="${c}" ${recipe?.category === c ? 'selected' : ''}>${c.charAt(0).toUpperCase() + c.slice(1)}</option>`
             ).join('')}
           </select>

@@ -69,16 +69,16 @@ class MoreView {
           <p class="text-secondary text-sm">Base de données ingrédients, allergènes, unités</p>
         </a>
 
-        <div class="more-card more-card--coming">
-          <div class="more-card__icon" style="background: var(--color-primary-light)">
-            <i data-lucide="shopping-cart"></i>
+        <a href="#/service" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+          <div class="more-card__icon" style="background: var(--color-accent)">
+            <i data-lucide="concierge-bell"></i>
           </div>
           <div class="more-card__content">
-            <h3>Commandes</h3>
-            <span class="badge badge--warning">Bientôt</span>
+            <h3>Service (Salle)</h3>
+            <span class="badge badge--success">Actif</span>
           </div>
-          <p class="text-secondary text-sm">Prise de commande tablette, tickets cuisine, suivi service</p>
-        </div>
+          <p class="text-secondary text-sm">Prise de commande tablette, plan de salle, suivi service</p>
+        </a>
 
         <a href="#/analytics" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
           <div class="more-card__icon" style="background: var(--color-accent)">

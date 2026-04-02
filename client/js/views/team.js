@@ -48,7 +48,7 @@ async function renderTeam() {
           ${renderAvatar(a.name, 44)}
           <div class="team-card__info">
             <span class="team-card__name">${escapeHtml(a.name)}</span>
-            <span class="team-card__role">${isGerant ? '👑 Gérant' : '👤 Équipier'}</span>
+            <span class="team-card__role">${_getRoleLabel(a.role)}</span>
           </div>
           <span class="team-card__login">Dernière connexion : ${lastLogin}</span>
         </div>
@@ -80,10 +80,18 @@ function showAddMemberModal() {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal">
-      <h2>Ajouter un équipier</h2>
+      <h2>Ajouter un membre</h2>
       <div class="form-group">
         <label>Nom</label>
         <input type="text" class="form-control" id="m-member-name" placeholder="Prénom ou surnom" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Rôle</label>
+        <select class="form-control" id="m-member-role">
+          <option value="equipier">👤 Équipier — accès limité</option>
+          <option value="cuisinier">👨‍🍳 Cuisinier — accès cuisine</option>
+          <option value="salle">🍽️ Salle — commandes uniquement</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Code PIN (4 chiffres)</label>
@@ -107,6 +115,7 @@ function showAddMemberModal() {
 
   overlay.querySelector('#m-member-save').onclick = async () => {
     const name = document.getElementById('m-member-name').value.trim();
+    const role = document.getElementById('m-member-role').value;
     const pin = document.getElementById('m-member-pin').value;
     const errorEl = document.getElementById('m-member-error');
 
@@ -114,8 +123,8 @@ function showAddMemberModal() {
     if (!/^\d{4}$/.test(pin)) { errorEl.textContent = 'Le PIN doit être 4 chiffres'; return; }
 
     try {
-      await API.createAccount({ name, pin });
-      showToast('Équipier ajouté', 'success');
+      await API.createAccount({ name, pin, role });
+      showToast('Membre ajouté', 'success');
       overlay.remove();
       renderTeam();
     } catch (e) {

@@ -20,6 +20,14 @@ const GERANT_PERMISSIONS = {
   export_pdf: true
 };
 
+const CUISINIER_PERMISSIONS = {
+  view_recipes: true,
+  view_costs: false,
+  edit_recipes: false,
+  view_suppliers: false,
+  export_pdf: false
+};
+
 const EQUIPIER_DEFAULT_PERMISSIONS = {
   view_recipes: true,
   view_costs: false,
@@ -27,6 +35,25 @@ const EQUIPIER_DEFAULT_PERMISSIONS = {
   view_suppliers: false,
   export_pdf: false
 };
+
+const SALLE_PERMISSIONS = {
+  view_recipes: true,
+  view_costs: false,
+  edit_recipes: false,
+  view_suppliers: false,
+  export_pdf: false
+};
+
+const VALID_ROLES = ['gerant', 'cuisinier', 'equipier', 'salle'];
+
+function getPermissionsForRole(role) {
+  switch (role) {
+    case 'gerant': return GERANT_PERMISSIONS;
+    case 'cuisinier': return CUISINIER_PERMISSIONS;
+    case 'salle': return SALLE_PERMISSIONS;
+    default: return EQUIPIER_DEFAULT_PERMISSIONS;
+  }
+}
 
 // GET /api/accounts — list all accounts (no PIN)
 router.get('/', (req, res) => {
@@ -51,8 +78,9 @@ router.post('/', (req, res) => {
   // Check if this is the first account → becomes gerant
   const existing = all('SELECT id FROM accounts');
   const isFirst = existing.length === 0;
-  const role = isFirst ? 'gerant' : 'equipier';
-  const permissions = isFirst ? GERANT_PERMISSIONS : EQUIPIER_DEFAULT_PERMISSIONS;
+  const requestedRole = req.body.role;
+  const role = isFirst ? 'gerant' : (requestedRole && VALID_ROLES.includes(requestedRole) ? requestedRole : 'equipier');
+  const permissions = getPermissionsForRole(role);
 
   const hashedPin = hashPin(pin);
 

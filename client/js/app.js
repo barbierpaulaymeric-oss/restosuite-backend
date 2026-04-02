@@ -96,13 +96,22 @@ function registerRoutes() {
   Router.add(/^\/team$/, renderTeam);
   Router.add(/^\/subscribe$/, renderSubscribe);
   Router.add(/^\/supplier-portal$/, renderSupplierPortalManage);
+  Router.add(/^\/service$/, renderServiceView);
 }
 
 function bootApp(role, account, opts = {}) {
   applyRole(role);
   updateNavUser(account);
   registerRoutes();
-  location.hash = '#/';
+
+  // Role-based redirect: salle goes to service view, hide nav
+  if (role === 'salle') {
+    const nav = document.getElementById('nav');
+    if (nav) nav.style.display = 'none';
+    location.hash = '#/service';
+  } else {
+    location.hash = '#/';
+  }
   Router.init();
   if (window.lucide) lucide.createIcons();
   const displayName = account ? account.name : role;

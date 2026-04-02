@@ -12,6 +12,11 @@ const Router = {
   navigate(hash) {
     const path = hash.replace('#', '') || '/';
 
+    // Clean up service view if leaving it
+    if (typeof _svcCleanup === 'function' && !path.startsWith('/service')) {
+      _svcCleanup();
+    }
+
     // Close any open modals on route change
     document.querySelectorAll('.modal-overlay').forEach(el => el.remove());
 
