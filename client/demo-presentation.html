@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RestoSuite AI — Présentation</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:Inter,sans-serif; background:#0F1923; color:#F7F5F2; overflow:hidden; }
+
+.slide { display:none; width:100vw; height:100vh; padding:60px 80px; flex-direction:column; justify-content:center; position:relative; }
+.slide.active { display:flex; }
+
+/* Navigation */
+.nav { position:fixed; bottom:30px; right:40px; z-index:100; display:flex; gap:12px; align-items:center; }
+.nav button { background:rgba(232,114,42,0.2); border:1px solid rgba(232,114,42,0.4); color:#E8722A; padding:10px 20px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; transition:all 0.2s; }
+.nav button:hover { background:#E8722A; color:white; }
+.nav .counter { color:#8899aa; font-size:13px; }
+
+.progress { position:fixed; top:0; left:0; height:3px; background:#E8722A; transition:width 0.3s; z-index:100; }
+
+/* Typography */
+h1 { font-size:56px; font-weight:800; line-height:1.1; margin-bottom:24px; }
+h2 { font-size:42px; font-weight:700; line-height:1.2; margin-bottom:20px; }
+h3 { font-size:28px; font-weight:600; margin-bottom:16px; }
+.subtitle { font-size:22px; color:#8899aa; font-weight:400; line-height:1.5; }
+.accent { color:#E8722A; }
+.green { color:#4CAF50; }
+
+/* Layouts */
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center; }
+.three-col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:30px; }
+
+/* Cards */
+.feature-card { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:32px; }
+.feature-card .icon { font-size:40px; margin-bottom:16px; }
+.feature-card h3 { font-size:20px; margin-bottom:8px; }
+.feature-card p { color:#8899aa; font-size:15px; line-height:1.6; }
+
+/* Screenshot */
+.screenshot { border-radius:12px; border:1px solid rgba(255,255,255,0.1); max-width:100%; max-height:70vh; object-fit:contain; box-shadow:0 20px 60px rgba(0,0,0,0.4); }
+.screenshot-small { border-radius:10px; border:1px solid rgba(255,255,255,0.1); width:100%; object-fit:cover; box-shadow:0 10px 30px rgba(0,0,0,0.3); }
+
+/* Stat */
+.stat { text-align:center; }
+.stat .number { font-size:64px; font-weight:800; color:#E8722A; }
+.stat .label { font-size:16px; color:#8899aa; margin-top:8px; }
+
+/* List */
+.check-list { list-style:none; }
+.check-list li { font-size:20px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.05); display:flex; align-items:center; gap:12px; }
+.check-list li::before { content:'✅'; font-size:18px; }
+
+/* Tags */
+.tag { display:inline-block; background:rgba(232,114,42,0.15); color:#E8722A; padding:6px 16px; border-radius:20px; font-size:14px; font-weight:600; margin:4px; }
+.tag-green { background:rgba(76,175,80,0.15); color:#4CAF50; }
+
+/* Slide-specific */
+.logo-big { height:80px; margin-bottom:24px; }
+.badge { display:inline-block; background:#E8722A; color:white; padding:8px 20px; border-radius:24px; font-size:14px; font-weight:600; margin-bottom:20px; }
+
+/* Animations */
+@keyframes fadeInUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
+.slide.active > * { animation: fadeInUp 0.5s ease both; }
+.slide.active > *:nth-child(2) { animation-delay: 0.1s; }
+.slide.active > *:nth-child(3) { animation-delay: 0.2s; }
+.slide.active > *:nth-child(4) { animation-delay: 0.3s; }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<!-- SLIDE 1: Title -->
+<div class="slide active" id="slide-1" style="text-align:center; justify-content:center; align-items:center;">
+  <img src="assets/logo-outline-thin.png" alt="RestoSuite" class="logo-big">
+  <h1>RestoSuite <span class="accent">AI</span></h1>
+  <p class="subtitle" style="max-width:600px;">Votre cuisine tourne. Vos chiffres suivent.<br>Le premier assistant cuisine propulsé par l'IA.</p>
+  <div style="margin-top:40px;">
+    <span class="tag">SaaS</span>
+    <span class="tag">PWA</span>
+    <span class="tag">Intelligence Artificielle</span>
+    <span class="tag-green tag">0€ de coût technique</span>
+  </div>
+</div>
+
+<!-- SLIDE 2: Problem -->
+<div class="slide" id="slide-2">
+  <div class="badge">Le problème</div>
+  <h2>Les restaurateurs perdent de l'argent<br>sans le savoir</h2>
+  <div class="three-col" style="margin-top:40px;">
+    <div class="feature-card">
+      <div class="icon">📊</div>
+      <h3>Food cost flou</h3>
+      <p>67% des restaurateurs ne connaissent pas le coût réel de leurs plats. Ils fixent les prix au feeling.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📋</div>
+      <h3>HACCP papier</h3>
+      <p>Des classeurs entiers de relevés papier. Impossible à retrouver en cas de contrôle sanitaire.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📦</div>
+      <h3>Stock invisible</h3>
+      <p>Pertes, ruptures, DLC dépassées. Le stock est géré de mémoire, pas de données.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 3: Solution -->
+<div class="slide" id="slide-3">
+  <div class="badge">La solution</div>
+  <h2>Un assistant qui fait le travail<br><span class="accent">à votre place</span></h2>
+  <p class="subtitle" style="margin-bottom:40px;">Dictez vos recettes à voix haute. L'IA calcule tout : coûts, marges, food cost.<br>Le HACCP se remplit tout seul. Le stock se met à jour automatiquement.</p>
+  <div class="three-col">
+    <div class="stat">
+      <div class="number">30s</div>
+      <div class="label">pour créer une fiche technique</div>
+    </div>
+    <div class="stat">
+      <div class="number">0</div>
+      <div class="label">papier, tout est digital</div>
+    </div>
+    <div class="stat">
+      <div class="number">24/7</div>
+      <div class="label">accessible depuis n'importe quel appareil</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 4: Recipe detail -->
+<div class="slide" id="slide-4">
+  <div class="two-col">
+    <div>
+      <div class="badge">Fiches Techniques</div>
+      <h2>Food cost calculé<br>au centime près</h2>
+      <ul class="check-list">
+        <li>Coût matière automatique par recette</li>
+        <li>Sous-recettes imbriquées (fond → sauce → plat)</li>
+        <li>Food cost %, marge en euros</li>
+        <li>Export PDF professionnel</li>
+        <li>Saisie vocale : dictez, l'IA écrit</li>
+      </ul>
+    </div>
+    <img src="assets/demo/slide-recipe.jpg" class="screenshot">
+  </div>
+</div>
+
+<!-- SLIDE 5: Stock -->
+<div class="slide" id="slide-5">
+  <div class="two-col">
+    <img src="assets/demo/slide-stock.jpg" class="screenshot">
+    <div>
+      <div class="badge">Gestion Stock</div>
+      <h2>Votre stock en<br>temps réel</h2>
+      <ul class="check-list">
+        <li>Déduction automatique à chaque commande</li>
+        <li>Alertes stock bas</li>
+        <li>Suivi des livraisons fournisseur</li>
+        <li>Scan de facture par IA</li>
+        <li>Mercuriale : suivi des prix</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 6: HACCP -->
+<div class="slide" id="slide-6">
+  <div class="two-col">
+    <div>
+      <div class="badge">HACCP Digital</div>
+      <h2>Conforme en<br><span class="accent">2 clics</span></h2>
+      <ul class="check-list">
+        <li>Relevés de température</li>
+        <li>Plan de nettoyage avec suivi</li>
+        <li>Traçabilité complète (lot → plat)</li>
+        <li>Alertes DLC automatiques</li>
+        <li>Export PDF pour les contrôles</li>
+      </ul>
+    </div>
+    <img src="assets/demo/slide-haccp.jpg" class="screenshot">
+  </div>
+</div>
+
+<!-- SLIDE 7: Delivery & Lot tracking -->
+<div class="slide" id="slide-7">
+  <div class="badge">Traçabilité</div>
+  <h2>Du fournisseur à l'assiette :<br><span class="accent">chaque lot est tracé</span></h2>
+  <div class="three-col" style="margin-top:40px;">
+    <div class="feature-card">
+      <div class="icon">🚚</div>
+      <h3>Bon de livraison digital</h3>
+      <p>Le fournisseur envoie son bon depuis son portail. N° lot, DLC, température — tout est pré-rempli.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🌡️</div>
+      <h3>Réception contrôlée</h3>
+      <p>Vérification température, DLC, qualité visuelle. Alertes automatiques si un seuil est dépassé.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🔍</div>
+      <h3>Traçabilité complète</h3>
+      <p>En cas de rappel sanitaire : retrouvez en 10 secondes quel lot est dans quel plat, servi à quelle table.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 8: QR Code -->
+<div class="slide" id="slide-8">
+  <div class="badge">Innovation</div>
+  <h2>Commande par <span class="accent">QR Code</span></h2>
+  <p class="subtitle" style="margin-bottom:40px;">Le client scanne, consulte la carte et commande depuis son téléphone.<br>Le serveur valide. La cuisine reçoit le ticket.</p>
+  <div class="three-col">
+    <div class="feature-card" style="text-align:center;">
+      <div class="icon">📱</div>
+      <h3>1. Le client scanne</h3>
+      <p>QR code imprimé sur la table, ouvre le menu sur son téléphone.</p>
+    </div>
+    <div class="feature-card" style="text-align:center;">
+      <div class="icon">🛒</div>
+      <h3>2. Il commande</h3>
+      <p>Il parcourt la carte, ajoute au panier, envoie sa commande.</p>
+    </div>
+    <div class="feature-card" style="text-align:center;">
+      <div class="icon">✅</div>
+      <h3>3. Le serveur valide</h3>
+      <p>La commande apparaît avec un badge QR. Un clic pour valider et envoyer en cuisine.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 9: AI Features -->
+<div class="slide" id="slide-9">
+  <div class="badge">Intelligence Artificielle</div>
+  <h2>L'IA qui fait gagner<br>de l'argent</h2>
+  <div class="three-col" style="margin-top:40px;">
+    <div class="feature-card">
+      <div class="icon">🎤</div>
+      <h3>Saisie vocale</h3>
+      <p>« 200g de suprême de volaille, 50g de beurre, fond de veau » → fiche technique complète avec coûts.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📷</div>
+      <h3>Scan de facture</h3>
+      <p>Photographiez la facture fournisseur. L'IA extrait produits, prix, lots et pré-remplit le bon de réception.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">💡</div>
+      <h3>Suggestions menu</h3>
+      <p>« Votre entrecôte a un food cost de 42%. Remplacez par du faux-filet → 31%. » Des conseils concrets pour vos marges.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 10: Pricing -->
+<div class="slide" id="slide-10" style="text-align:center; align-items:center;">
+  <div class="badge">Tarifs</div>
+  <h2>Essai gratuit. <span class="accent">Zéro engagement.</span></h2>
+  <p class="subtitle" style="margin-bottom:40px;">Testez tout pendant 60 jours. Vos données restent même après.</p>
+  <div class="three-col" style="max-width:900px;">
+    <div class="feature-card">
+      <h3>Essai Gratuit</h3>
+      <p class="accent" style="font-size:32px; font-weight:800;">0€</p>
+      <p>60 jours • Accès complet</p>
+    </div>
+    <div class="feature-card" style="border-color:#E8722A; transform:scale(1.05);">
+      <h3>Pro</h3>
+      <p class="accent" style="font-size:32px; font-weight:800;">39€<span style="font-size:16px;">/mois</span></p>
+      <p>1 établissement • Toutes les fonctionnalités</p>
+    </div>
+    <div class="feature-card">
+      <h3>Business</h3>
+      <p class="accent" style="font-size:32px; font-weight:800;">79€<span style="font-size:16px;">/mois</span></p>
+      <p>Multi-sites • Support prioritaire</p>
+    </div>
+  </div>
+  <p style="margin-top:24px; color:#4CAF50; font-weight:600;">🎁 Tarif fondateur : 29€/mois à vie pour les 200 premiers clients</p>
+</div>
+
+<!-- SLIDE 11: Tech -->
+<div class="slide" id="slide-11">
+  <div class="badge">Technique</div>
+  <h2>0€ de coût d'infrastructure</h2>
+  <div class="two-col" style="margin-top:40px;">
+    <div>
+      <ul class="check-list">
+        <li>Application web progressive (PWA)</li>
+        <li>Installable sur iPhone et Android</li>
+        <li>Fonctionne hors-ligne</li>
+        <li>Hébergement gratuit (Render)</li>
+        <li>IA : Google Gemini (quota gratuit)</li>
+        <li>Paiement : Stripe</li>
+        <li>Domaine : restosuite.fr</li>
+      </ul>
+    </div>
+    <div>
+      <div class="feature-card" style="margin-bottom:20px;">
+        <h3>Stack</h3>
+        <p>Node.js + Express + SQLite + Gemini 2.5 Flash</p>
+      </div>
+      <div class="feature-card" style="margin-bottom:20px;">
+        <h3>Coût mensuel</h3>
+        <p style="font-size:32px; font-weight:800;" class="green">0€</p>
+      </div>
+      <div class="feature-card">
+        <h3>Marge nette</h3>
+        <p style="font-size:32px; font-weight:800;" class="green">~95%</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 12: Roadmap -->
+<div class="slide" id="slide-12" style="text-align:center; align-items:center;">
+  <img src="assets/logo-outline-thin.png" alt="RestoSuite" class="logo-big">
+  <h2>RestoSuite <span class="accent">AI</span></h2>
+  <p class="subtitle" style="max-width:500px; margin-bottom:40px;">Votre cuisine tourne. Vos chiffres suivent.</p>
+  <div style="display:flex; gap:20px; flex-wrap:wrap; justify-content:center;">
+    <span class="tag">🌐 www.restosuite.fr</span>
+    <span class="tag">📱 iPhone & Android</span>
+    <span class="tag">🎤 Saisie vocale IA</span>
+    <span class="tag">📊 Food cost automatique</span>
+    <span class="tag">🛡️ HACCP digital</span>
+    <span class="tag">🚚 Traçabilité lot</span>
+    <span class="tag">📷 Scan facture</span>
+    <span class="tag">📱 QR code commande</span>
+  </div>
+  <p style="margin-top:60px; font-size:18px; color:#8899aa;">Merci ! Des questions ? 🎩</p>
+</div>
+
+<!-- Navigation -->
+<div class="nav">
+  <button onclick="prev()">← Précédent</button>
+  <span class="counter" id="counter">1 / 12</span>
+  <button onclick="next()">Suivant →</button>
+</div>
+
+<script>
+let current = 0;
+const slides = document.querySelectorAll('.slide');
+const total = slides.length;
+
+function show(n) {
+  slides.forEach(s => s.classList.remove('active'));
+  slides[n].classList.add('active');
+  document.getElementById('counter').textContent = `${n+1} / ${total}`;
+  document.getElementById('progress').style.width = `${((n+1)/total)*100}%`;
+}
+
+function next() { if (current < total-1) { current++; show(current); } }
+function prev() { if (current > 0) { current--; show(current); } }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+  if (e.key === 'ArrowLeft') prev();
+  if (e.key === 'f' || e.key === 'F') document.documentElement.requestFullscreen?.();
+  if (e.key === 'Escape') document.exitFullscreen?.();
+});
+
+// Swipe support
+let touchStartX = 0;
+document.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
+document.addEventListener('touchend', e => {
+  const diff = touchStartX - e.changedTouches[0].clientX;
+  if (Math.abs(diff) > 50) { diff > 0 ? next() : prev(); }
+});
+
+show(0);
+</script>
+</body>
+</html>
