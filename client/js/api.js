@@ -12,7 +12,13 @@ const API = {
       ...options,
     };
 
-    // Inject account_id header for trial middleware
+    // Inject JWT token if available
+    const token = localStorage.getItem('restosuite_token');
+    if (token) {
+      config.headers['Authorization'] = 'Bearer ' + token;
+    }
+
+    // Inject account_id header for trial middleware (legacy compat)
     const account = typeof getAccount === 'function' ? getAccount() : null;
     if (account && account.id) {
       config.headers['X-Account-Id'] = String(account.id);
@@ -22,6 +28,16 @@ const API = {
       config.body = JSON.stringify(config.body);
     }
     const res = await fetch(url, config);
+    if (res.status === 401) {
+      // JWT expired or invalid — force re-login
+      localStorage.removeItem('restosuite_token');
+      localStorage.removeItem('restosuite_account');
+      if (window.location.hash !== '#/login') {
+        window.location.hash = '#/login';
+        window.location.reload();
+      }
+      throw new Error('Session expirée');
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
       // Handle trial expired specifically
@@ -93,6 +109,28 @@ const API = {
   },
   getRecipePdf(id) {
     return this.request(`/recipes/${id}/pdf`);
+  },
+
+  // Auth
+  register(data) {
+    return this.request('/auth/register', { method: 'POST', body: data });
+  },
+  login(data) {
+    return this.request('/auth/login', { method: 'POST', body: data });
+  },
+  pinLogin(data) {
+    return this.request('/auth/pin-login', { method: 'POST', body: data });
+  },
+  getMe() {
+    return this.request('/auth/me');
+  },
+
+  // Onboarding
+  getOnboardingStatus() {
+    return this.request('/onboarding/status');
+  },
+  saveOnboardingStep(step, data) {
+    return this.request(`/onboarding/step/${step}`, { method: 'PUT', body: data });
   },
 
   // Accounts

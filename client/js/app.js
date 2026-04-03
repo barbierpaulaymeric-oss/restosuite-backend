@@ -205,11 +205,6 @@ function bootApp(role, account, opts = {}) {
 
   // Fetch trial status and render banner
   fetchTrialStatus().then(() => renderTrialBanner());
-
-  // Show onboarding wizard for new gérant accounts (first time only)
-  if (opts.isNewAccount && role === 'gerant' && typeof showOnboardingIfNeeded === 'function') {
-    showOnboardingIfNeeded();
-  }
 }
 
 function updateNavUser(account) {
@@ -236,7 +231,7 @@ function updateNavUser(account) {
   }
 }
 
-(function init() {
+(async function init() {
   // Check supplier session first
   const supplierSession = getSupplierSession();
   if (supplierSession && getSupplierToken()) {
@@ -245,14 +240,55 @@ function updateNavUser(account) {
     return;
   }
 
-  const account = getAccount();
+  // Check for JWT token
+  const token = localStorage.getItem('restosuite_token');
 
-  // Check account-based auth first
-  if (account) {
-    // Fournisseur case (shouldn't happen but just in case)
+  if (token) {
+    try {
+      // Verify token with server
+      const result = await API.getMe();
+      const account = result.account;
+
+      // Update stored account with fresh data
+      localStorage.setItem('restosuite_account', JSON.stringify(account));
+
+      // Check if onboarding is complete
+      if (account.onboarding_step < 7 && account.is_owner) {
+        // Show onboarding wizard
+        const nav = document.getElementById('nav');
+        if (nav) nav.style.display = 'none';
+
+        const wizard = new OnboardingWizard(() => {
+          if (nav) nav.style.display = '';
+          bootApp(account.role, account);
+        });
+        wizard.show();
+        return;
+      }
+
+      // Fournisseur case
+      if (account.role === 'fournisseur') {
+        const login = new LoginView();
+        login.mode = 'login';
+        login.render();
+        return;
+      }
+
+      bootApp(account.role, account);
+      return;
+    } catch (e) {
+      // Token invalid — clear and show login
+      console.warn('Token verification failed:', e);
+      localStorage.removeItem('restosuite_token');
+      localStorage.removeItem('restosuite_account');
+    }
+  }
+
+  // Fallback: check old account-based auth (legacy)
+  const account = getAccount();
+  if (account && !token) {
     if (account.role === 'fournisseur') {
       const login = new LoginView();
-      login.screen = 'fournisseur';
       login.render();
       return;
     }
@@ -260,17 +296,15 @@ function updateNavUser(account) {
     return;
   }
 
-  // Fallback: check old role system
+  // Fallback: check old role system (legacy)
   const role = localStorage.getItem('restosuite_role');
   if (role && role !== 'fournisseur') {
-    // Migrate: old system, boot with role but no account
     bootApp(role, null);
     return;
   }
 
   if (role === 'fournisseur') {
     const login = new LoginView();
-    login.screen = 'fournisseur';
     login.render();
     return;
   }

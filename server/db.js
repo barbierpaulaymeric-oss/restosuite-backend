@@ -179,6 +179,32 @@ db.exec(`
     FOREIGN KEY (completed_by) REFERENCES accounts(id)
   );
 
+  -- Restaurants
+  CREATE TABLE IF NOT EXISTS restaurants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    type TEXT,
+    address TEXT,
+    city TEXT,
+    postal_code TEXT,
+    phone TEXT,
+    covers INTEGER DEFAULT 30,
+    siret TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Tables (plan de salle)
+  CREATE TABLE IF NOT EXISTS tables (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER REFERENCES restaurants(id),
+    table_number INTEGER NOT NULL,
+    zone TEXT DEFAULT 'Salle',
+    seats INTEGER DEFAULT 4,
+    position_x REAL,
+    position_y REAL,
+    active INTEGER DEFAULT 1
+  );
+
   -- Portail fournisseur: Comptes fournisseur
   CREATE TABLE IF NOT EXISTS supplier_accounts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -448,6 +474,47 @@ try {
   }
 } catch (e) {
   console.error('Migration nullable ingredient_id error:', e.message);
+}
+
+// ─── Migration: Add auth columns to accounts ───
+try {
+  const authCols = all("PRAGMA table_info(accounts)");
+  const colNames = authCols.map(c => c.name);
+  if (!colNames.includes('email')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN email TEXT");
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_email ON accounts(email) WHERE email IS NOT NULL");
+    console.log('✅ Migration: added email to accounts');
+  }
+  if (!colNames.includes('password_hash')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN password_hash TEXT");
+    console.log('✅ Migration: added password_hash to accounts');
+  }
+  if (!colNames.includes('first_name')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN first_name TEXT");
+    console.log('✅ Migration: added first_name to accounts');
+  }
+  if (!colNames.includes('last_name')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN last_name TEXT");
+    console.log('✅ Migration: added last_name to accounts');
+  }
+  if (!colNames.includes('phone')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN phone TEXT");
+    console.log('✅ Migration: added phone to accounts');
+  }
+  if (!colNames.includes('restaurant_id')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN restaurant_id INTEGER REFERENCES restaurants(id)");
+    console.log('✅ Migration: added restaurant_id to accounts');
+  }
+  if (!colNames.includes('onboarding_step')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN onboarding_step INTEGER DEFAULT 0");
+    console.log('✅ Migration: added onboarding_step to accounts');
+  }
+  if (!colNames.includes('is_owner')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN is_owner INTEGER DEFAULT 0");
+    console.log('✅ Migration: added is_owner to accounts');
+  }
+} catch (e) {
+  console.error('Migration auth columns error:', e.message);
 }
 
 // ─── Seed: Common ingredients with prices ───

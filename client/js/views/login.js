@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════
-// Login — Multi-account with PIN
+// Login — Email/Password + PIN rapide
 // ═══════════════════════════════════════════
 
 const AVATAR_COLORS = [
@@ -23,10 +23,7 @@ function renderAvatar(name, size = 40) {
 
 class LoginView {
   constructor() {
-    this.screen = 'landing'; // 'landing' | 'profiles' | 'pin' | 'create-gerant' | 'fournisseur'
-    this.accounts = [];
-    this.selectedAccount = null;
-    this.pinDigits = [];
+    this.mode = 'login'; // 'login' | 'register' | 'pin'
   }
 
   async render() {
@@ -34,129 +31,230 @@ class LoginView {
     const nav = document.getElementById('nav');
     if (nav) nav.style.display = 'none';
 
-    switch (this.screen) {
-      case 'landing':
-        this.renderLanding(app);
-        break;
-      case 'profiles':
-        await this.renderProfiles(app);
-        break;
-      case 'pin':
-        this.renderPinScreen(app);
-        break;
-      case 'create-gerant':
-        this.renderCreateGerant(app);
-        break;
-      case 'fournisseur':
-        this.renderFournisseurPage(app);
-        break;
+    switch (this.mode) {
+      case 'login': this.renderLogin(app); break;
+      case 'register': this.renderRegister(app); break;
+      case 'pin': this.renderPinLogin(app); break;
     }
   }
 
-  renderLanding(app) {
+  renderLogin(app) {
     app.innerHTML = `
       <div class="login-screen">
-        <div class="login-content">
+        <div class="login-content" style="max-width:400px">
           <div class="login-logo">
             <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 80px; width: auto;">
           </div>
           <h1 class="login-title">Resto<span class="text-accent">Suite</span> <span class="login-ai-badge">AI</span></h1>
           <p class="login-tagline">Votre cuisine tourne. Vos chiffres suivent.</p>
 
-          <div class="login-buttons">
-            <button class="login-btn login-btn--restaurant" id="btn-restaurant">
-              <span class="login-btn__icon">🍽️</span>
-              <span class="login-btn__text">
-                <span class="login-btn__label">Restaurant</span>
-                <span class="login-btn__sub">Gérer vos fiches et votre cuisine</span>
-              </span>
-            </button>
-            <button class="login-btn login-btn--fournisseur" id="btn-fournisseur">
-              <span class="login-btn__icon">🚚</span>
-              <span class="login-btn__text">
-                <span class="login-btn__label">Fournisseur</span>
-                <span class="login-btn__sub">Catalogue et tarifs</span>
-              </span>
-            </button>
+          <div class="auth-tabs" style="display:flex;gap:0;margin-bottom:var(--space-5);border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--border-primary)">
+            <button class="auth-tab active" id="tab-login" style="flex:1;padding:10px;font-weight:600;font-size:var(--text-sm);border:none;cursor:pointer;background:var(--color-primary);color:#fff;transition:all 0.2s">Connexion</button>
+            <button class="auth-tab" id="tab-register" style="flex:1;padding:10px;font-weight:600;font-size:var(--text-sm);border:none;cursor:pointer;background:var(--bg-secondary);color:var(--text-secondary);transition:all 0.2s">Inscription</button>
+          </div>
+
+          <div style="text-align:left;width:100%">
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" class="form-control" id="login-email" placeholder="votre@email.com" autocomplete="email">
+            </div>
+            <div class="form-group">
+              <label>Mot de passe</label>
+              <input type="password" class="form-control" id="login-password" placeholder="••••••••" autocomplete="current-password">
+            </div>
+          </div>
+
+          <div id="login-error" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
+
+          <button class="btn btn-primary" id="login-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
+            Se connecter
+          </button>
+
+          <div style="margin-top:var(--space-4);text-align:center">
+            <a href="#" id="forgot-password" style="color:var(--text-tertiary);font-size:var(--text-sm);text-decoration:none;cursor:not-allowed;opacity:0.5">Mot de passe oublié ?</a>
+          </div>
+
+          <div style="margin-top:var(--space-6);padding-top:var(--space-4);border-top:1px solid var(--border-primary);text-align:center">
+            <a href="#" id="pin-login-link" style="color:var(--text-secondary);font-size:var(--text-sm);text-decoration:none">
+              🔢 Connexion rapide par PIN (équipiers)
+            </a>
           </div>
         </div>
       </div>
     `;
 
-    document.getElementById('btn-restaurant').addEventListener('click', async () => {
-      try {
-        this.accounts = await API.getAccounts();
-      } catch (e) {
-        this.accounts = [];
-      }
-
-      if (this.accounts.length === 0) {
-        this.screen = 'create-gerant';
-      } else {
-        this.screen = 'profiles';
-      }
+    document.getElementById('tab-register').addEventListener('click', () => {
+      this.mode = 'register';
       this.render();
     });
 
-    document.getElementById('btn-fournisseur').addEventListener('click', () => {
-      this.screen = 'fournisseur';
+    document.getElementById('pin-login-link').addEventListener('click', (e) => {
+      e.preventDefault();
+      this.mode = 'pin';
       this.render();
+    });
+
+    document.getElementById('login-submit').addEventListener('click', () => this.handleLogin());
+    document.getElementById('login-password').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.handleLogin();
     });
   }
 
-  async renderProfiles(app) {
-    try {
-      this.accounts = await API.getAccounts();
-    } catch (e) { /* keep existing */ }
+  async handleLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errorEl = document.getElementById('login-error');
+    const submitBtn = document.getElementById('login-submit');
 
+    errorEl.textContent = '';
+    if (!email) { errorEl.textContent = 'L\'email est requis'; return; }
+    if (!password) { errorEl.textContent = 'Le mot de passe est requis'; return; }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Connexion...';
+
+    try {
+      const result = await API.login({ email, password });
+      localStorage.setItem('restosuite_token', result.token);
+      localStorage.setItem('restosuite_account', JSON.stringify(result.account));
+
+      const nav = document.getElementById('nav');
+      if (nav) nav.style.display = '';
+
+      if (result.account.onboarding_step < 7) {
+        // Go to onboarding
+        const wizard = new OnboardingWizard(() => {
+          bootApp(result.account.role, result.account);
+        });
+        wizard.show();
+      } else {
+        bootApp(result.account.role, result.account);
+      }
+    } catch (e) {
+      errorEl.textContent = e.message || 'Erreur de connexion';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Se connecter';
+    }
+  }
+
+  renderRegister(app) {
     app.innerHTML = `
       <div class="login-screen">
-        <div class="login-content" style="max-width:440px">
-          <button class="login-back" id="login-back">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i>
-            Retour
-          </button>
-          <h2 class="login-subtitle">Qui êtes-vous ?</h2>
-          <p class="login-tagline">Sélectionnez votre profil</p>
+        <div class="login-content" style="max-width:400px">
+          <div class="login-logo">
+            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 80px; width: auto;">
+          </div>
+          <h1 class="login-title">Resto<span class="text-accent">Suite</span> <span class="login-ai-badge">AI</span></h1>
+          <p class="login-tagline">Créez votre compte — essai gratuit 60 jours</p>
 
-          <div class="profiles-list">
-            ${this.accounts.map(a => `
-              <button class="profile-card" data-id="${a.id}">
-                ${renderAvatar(a.name, 48)}
-                <div class="profile-info">
-                  <span class="profile-name">${escapeHtml(a.name)}</span>
-                  <span class="profile-role">${_getRoleLabel(a.role)}</span>
-                </div>
-                <i data-lucide="chevron-right" style="width:20px;height:20px;color:var(--text-tertiary)"></i>
-              </button>
-            `).join('')}
+          <div class="auth-tabs" style="display:flex;gap:0;margin-bottom:var(--space-5);border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--border-primary)">
+            <button class="auth-tab" id="tab-login" style="flex:1;padding:10px;font-weight:600;font-size:var(--text-sm);border:none;cursor:pointer;background:var(--bg-secondary);color:var(--text-secondary);transition:all 0.2s">Connexion</button>
+            <button class="auth-tab active" id="tab-register" style="flex:1;padding:10px;font-weight:600;font-size:var(--text-sm);border:none;cursor:pointer;background:var(--color-primary);color:#fff;transition:all 0.2s">Inscription</button>
+          </div>
+
+          <div style="text-align:left;width:100%">
+            <div style="display:flex;gap:var(--space-3)">
+              <div class="form-group" style="flex:1">
+                <label>Prénom</label>
+                <input type="text" class="form-control" id="reg-firstname" placeholder="Paul" autocomplete="given-name">
+              </div>
+              <div class="form-group" style="flex:1">
+                <label>Nom</label>
+                <input type="text" class="form-control" id="reg-lastname" placeholder="Dupont" autocomplete="family-name">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" class="form-control" id="reg-email" placeholder="votre@email.com" autocomplete="email">
+            </div>
+            <div class="form-group">
+              <label>Mot de passe (6 caractères min.)</label>
+              <input type="password" class="form-control" id="reg-password" placeholder="••••••••" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+              <label>Confirmer le mot de passe</label>
+              <input type="password" class="form-control" id="reg-password2" placeholder="••••••••" autocomplete="new-password">
+            </div>
+          </div>
+
+          <div id="reg-error" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
+
+          <button class="btn btn-primary" id="reg-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
+            Créer mon compte
+          </button>
+
+          <div style="margin-top:var(--space-6);padding-top:var(--space-4);border-top:1px solid var(--border-primary);text-align:center">
+            <a href="#" id="pin-login-link" style="color:var(--text-secondary);font-size:var(--text-sm);text-decoration:none">
+              🔢 Connexion rapide par PIN (équipiers)
+            </a>
           </div>
         </div>
       </div>
     `;
 
-    if (window.lucide) lucide.createIcons();
-
-    document.getElementById('login-back').addEventListener('click', () => {
-      this.screen = 'landing';
+    document.getElementById('tab-login').addEventListener('click', () => {
+      this.mode = 'login';
       this.render();
     });
 
-    app.querySelectorAll('.profile-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const id = parseInt(card.dataset.id);
-        this.selectedAccount = this.accounts.find(a => a.id === id);
-        this.pinDigits = [];
-        this.screen = 'pin';
-        this.render();
-      });
+    document.getElementById('pin-login-link').addEventListener('click', (e) => {
+      e.preventDefault();
+      this.mode = 'pin';
+      this.render();
+    });
+
+    document.getElementById('reg-submit').addEventListener('click', () => this.handleRegister());
+    document.getElementById('reg-password2').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.handleRegister();
     });
   }
 
-  renderPinScreen(app) {
-    const account = this.selectedAccount;
-    if (!account) { this.screen = 'profiles'; this.render(); return; }
+  async handleRegister() {
+    const firstName = document.getElementById('reg-firstname').value.trim();
+    const lastName = document.getElementById('reg-lastname').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const password2 = document.getElementById('reg-password2').value;
+    const errorEl = document.getElementById('reg-error');
+    const submitBtn = document.getElementById('reg-submit');
 
+    errorEl.textContent = '';
+
+    if (!email) { errorEl.textContent = 'L\'email est requis'; return; }
+    if (!password || password.length < 6) { errorEl.textContent = 'Le mot de passe doit faire au moins 6 caractères'; return; }
+    if (password !== password2) { errorEl.textContent = 'Les mots de passe ne correspondent pas'; return; }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Création...';
+
+    try {
+      const result = await API.register({
+        email,
+        password,
+        first_name: firstName,
+        last_name: lastName
+      });
+
+      localStorage.setItem('restosuite_token', result.token);
+      localStorage.setItem('restosuite_account', JSON.stringify(result.account));
+
+      // Go directly to onboarding
+      const nav = document.getElementById('nav');
+      if (nav) nav.style.display = 'none';
+
+      const wizard = new OnboardingWizard(() => {
+        if (nav) nav.style.display = '';
+        bootApp(result.account.role, result.account);
+      });
+      wizard.show();
+    } catch (e) {
+      errorEl.textContent = e.message || 'Erreur lors de l\'inscription';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Créer mon compte';
+    }
+  }
+
+  renderPinLogin(app) {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content pin-content">
@@ -165,10 +263,11 @@ class LoginView {
             Retour
           </button>
 
-          <div class="pin-avatar">
-            ${renderAvatar(account.name, 64)}
-            <span class="pin-name">${escapeHtml(account.name)}</span>
+          <div style="margin-bottom:var(--space-4)">
+            <span style="font-size:2.5rem">🔢</span>
           </div>
+          <h2 class="login-subtitle">Connexion rapide</h2>
+          <p class="login-tagline">Entrez votre PIN à 4 chiffres</p>
 
           <div class="pin-dots" id="pin-dots">
             <span class="pin-dot"></span>
@@ -200,32 +299,24 @@ class LoginView {
     `;
 
     if (window.lucide) lucide.createIcons();
+    this.pinDigits = [];
 
     document.getElementById('pin-back').addEventListener('click', () => {
-      this.screen = 'profiles';
+      this.mode = 'login';
       this.render();
     });
 
-    this.setupPinHandlers();
-  }
-
-  setupPinHandlers() {
     const pad = document.getElementById('pin-pad');
-    if (!pad) return;
-
     pad.querySelectorAll('.pin-key[data-digit]').forEach(key => {
       key.addEventListener('click', () => {
         if (this.pinDigits.length >= 4) return;
         this.pinDigits.push(key.dataset.digit);
         this.updatePinDots();
-
-        if (this.pinDigits.length === 4) {
-          this.attemptLogin();
-        }
+        if (this.pinDigits.length === 4) this.handlePinLogin();
       });
     });
 
-    document.getElementById('pin-delete')?.addEventListener('click', () => {
+    document.getElementById('pin-delete').addEventListener('click', () => {
       this.pinDigits.pop();
       this.updatePinDots();
       document.getElementById('pin-error').textContent = '';
@@ -240,154 +331,26 @@ class LoginView {
     });
   }
 
-  async attemptLogin() {
+  async handlePinLogin() {
     const pin = this.pinDigits.join('');
     try {
-      const account = await API.loginAccount(this.selectedAccount.id, pin);
-      // Success — store in localStorage
-      localStorage.setItem('restosuite_account', JSON.stringify(account));
-      localStorage.removeItem('restosuite_role'); // clean up old system
+      const result = await API.pinLogin({ pin });
+
+      localStorage.setItem('restosuite_token', result.token);
+      localStorage.setItem('restosuite_account', JSON.stringify(result.account));
 
       const nav = document.getElementById('nav');
       if (nav) nav.style.display = '';
-      bootApp(account.role, account);
+      bootApp(result.account.role, result.account);
     } catch (e) {
-      // Wrong PIN
       this.pinDigits = [];
       this.updatePinDots();
       const dotsEl = document.getElementById('pin-dots');
       const errorEl = document.getElementById('pin-error');
       dotsEl.classList.add('shake');
       errorEl.textContent = 'PIN incorrect';
-      setTimeout(() => {
-        dotsEl.classList.remove('shake');
-      }, 600);
+      setTimeout(() => dotsEl.classList.remove('shake'), 600);
     }
-  }
-
-  renderCreateGerant(app) {
-    app.innerHTML = `
-      <div class="login-screen">
-        <div class="login-content">
-          <button class="login-back" id="create-back">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i>
-            Retour
-          </button>
-
-          <div style="margin-bottom:var(--space-6)">
-            <span style="font-size:3rem">👑</span>
-          </div>
-          <h2 class="login-subtitle">Créer votre compte Gérant</h2>
-          <p class="login-tagline">Ce sera le compte principal avec accès complet</p>
-
-          <div style="text-align:left;width:100%;max-width:320px;margin:0 auto">
-            <div class="form-group">
-              <label>Votre nom</label>
-              <input type="text" class="form-control" id="create-name" placeholder="ex: Paul-Aymeric" autocomplete="off">
-              <div class="field-error" id="err-name"></div>
-            </div>
-            <div class="form-group">
-              <label>Code PIN (4 chiffres)</label>
-              <input type="tel" class="form-control" id="create-pin" placeholder="••••" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password" style="font-family:var(--font-mono);font-size:var(--text-xl);text-align:center;letter-spacing:0.5em;-webkit-text-security:disc">
-              <div class="field-error" id="err-pin"></div>
-            </div>
-            <div class="form-group">
-              <label>Confirmer le PIN</label>
-              <input type="tel" class="form-control" id="create-pin2" placeholder="••••" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password" style="font-family:var(--font-mono);font-size:var(--text-xl);text-align:center;letter-spacing:0.5em;-webkit-text-security:disc">
-              <div class="field-error" id="err-pin2"></div>
-            </div>
-          </div>
-
-          <button class="btn btn-primary" id="create-submit" style="margin-top:var(--space-4);min-width:200px">
-            <i data-lucide="check" style="width:18px;height:18px"></i>
-            Créer le compte
-          </button>
-          <div id="create-error" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-3);min-height:20px"></div>
-        </div>
-      </div>
-    `;
-
-    if (window.lucide) lucide.createIcons();
-
-    document.getElementById('create-back').addEventListener('click', () => {
-      this.screen = 'landing';
-      this.render();
-    });
-
-    // Real-time validation on input
-    const nameEl = document.getElementById('create-name');
-    const pinEl = document.getElementById('create-pin');
-    const pin2El = document.getElementById('create-pin2');
-
-    // Filter non-digit characters from PIN fields
-    [pinEl, pin2El].forEach(el => {
-      el.addEventListener('input', () => {
-        el.value = el.value.replace(/[^0-9]/g, '');
-      });
-    });
-
-    document.getElementById('create-submit').addEventListener('click', async () => {
-      // Read values directly from DOM inputs
-      const nameVal = nameEl.value.trim();
-      const pinVal = pinEl.value.replace(/[^0-9]/g, '');
-      const pin2Val = pin2El.value.replace(/[^0-9]/g, '');
-
-      console.log('[RestoSuite] Create account attempt:', { name: nameVal, pinLength: pinVal.length, pin2Length: pin2Val.length });
-
-      // Clear previous errors
-      document.getElementById('err-name').textContent = '';
-      document.getElementById('err-pin').textContent = '';
-      document.getElementById('err-pin2').textContent = '';
-      const errorEl = document.getElementById('create-error');
-      errorEl.textContent = '';
-
-      // Validate with field-level errors
-      let valid = true;
-      if (!nameVal) {
-        document.getElementById('err-name').textContent = 'Le nom est requis';
-        valid = false;
-      }
-      if (!/^\d{4}$/.test(pinVal)) {
-        document.getElementById('err-pin').textContent = 'Le PIN doit être exactement 4 chiffres';
-        valid = false;
-      }
-      if (pinVal !== pin2Val) {
-        document.getElementById('err-pin2').textContent = 'Les PIN ne correspondent pas';
-        valid = false;
-      }
-      if (!valid) return;
-
-      // Disable button during request
-      const submitBtn = document.getElementById('create-submit');
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Création...';
-
-      try {
-        console.log('[RestoSuite] Calling API.createAccount...');
-        const createData = { name: nameVal, pin: pinVal };
-        const account = await API.createAccount(createData);
-        console.log('[RestoSuite] Account created:', account);
-
-        // Auto-login
-        localStorage.setItem('restosuite_account', JSON.stringify(account));
-        localStorage.removeItem('restosuite_role');
-
-        const nav = document.getElementById('nav');
-        if (nav) nav.style.display = '';
-        bootApp(account.role, account, { isNewAccount: true });
-      } catch (e) {
-        console.error('[RestoSuite] Account creation error:', e);
-        errorEl.textContent = e.message || 'Erreur lors de la création du compte';
-        showToast(e.message || 'Erreur lors de la création', 'error');
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i data-lucide="check" style="width:18px;height:18px"></i> Créer le compte';
-        if (window.lucide) lucide.createIcons();
-      }
-    });
-  }
-
-  renderFournisseurPage(app) {
-    renderSupplierLogin();
   }
 }
 
@@ -404,6 +367,7 @@ function _getRoleLabel(role) {
     case 'gerant': return '👑 Gérant';
     case 'cuisinier': return '👨‍🍳 Cuisinier';
     case 'salle': return '🍽️ Salle';
+    case 'serveur': return '🍽️ Serveur';
     default: return '👤 Équipier';
   }
 }
@@ -411,14 +375,12 @@ function _getRoleLabel(role) {
 function getRole() {
   const account = getAccount();
   if (account) return account.role;
-  // Fallback to old system
   return localStorage.getItem('restosuite_role');
 }
 
 function getPermissions() {
   const account = getAccount();
   if (!account) {
-    // Fallback for old role system
     const role = localStorage.getItem('restosuite_role');
     if (role === 'gerant') {
       return { view_recipes: true, view_costs: true, edit_recipes: true, view_suppliers: true, export_pdf: true };
@@ -430,7 +392,6 @@ function getPermissions() {
 
 function applyRole(role) {
   document.body.className = role ? `role-${role}` : '';
-  // Apply permission-based visibility
   const perms = getPermissions();
   document.body.classList.toggle('perm-no-costs', !perms.view_costs);
   document.body.classList.toggle('perm-no-edit', !perms.edit_recipes);
@@ -440,6 +401,7 @@ function applyRole(role) {
 
 function logout() {
   localStorage.removeItem('restosuite_account');
+  localStorage.removeItem('restosuite_token');
   localStorage.removeItem('restosuite_role');
   document.body.className = '';
   location.hash = '';

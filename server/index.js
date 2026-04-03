@@ -37,6 +37,9 @@ const authLimiter = rateLimit({
   message: { error: 'Trop de tentatives, réessayez dans 15 minutes' },
 });
 app.use('/api/accounts/login', authLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/pin-login', authLimiter);
 
 // ─── DB Backup ───
 backupDatabase(); // on startup
@@ -88,6 +91,8 @@ app.use('/api/accounts/:id', (req, res, next) => {
 });
 
 // API routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/onboarding', require('./routes/onboarding'));
 app.use('/api/ingredients', require('./routes/ingredients'));
 app.use('/api/suppliers', require('./routes/suppliers'));
 app.use('/api/prices', require('./routes/prices'));
