@@ -87,6 +87,15 @@ router.post('/reception', (req, res) => {
         [ingredient.name, supplier ? supplier.name : null, batch_number || null, dlc || null, temperature ?? null, quantity, unit, recorded_by || null, notes || null]
       );
 
+      // 4. Track price history for mercuriale
+      if (unit_price && unit_price > 0) {
+        run(
+          `INSERT INTO price_history (ingredient_id, supplier_id, price, recorded_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+          [ingredient_id, supplier_id || null, unit_price]
+        );
+      }
+
       results.push({ movement_id: mvInfo.lastInsertRowid, ingredient_id, quantity });
     }
     return results;

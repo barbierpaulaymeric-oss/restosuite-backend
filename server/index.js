@@ -58,6 +58,11 @@ app.get('/robots.txt', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'client', 'robots.txt'));
 });
 
+// Public menu page — BEFORE static middleware
+app.get('/menu', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'menu.html'));
+});
+
 // Landing page on root — BEFORE static middleware
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'client', 'landing.html'));
@@ -106,6 +111,9 @@ app.use('/api/supplier-portal', require('./routes/supplier-portal'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/deliveries', require('./routes/deliveries'));
+app.use('/api/qrcode', require('./routes/qrcode'));
+app.use('/api/menu', require('./routes/menu'));
+app.use('/api/alerts', require('./routes/alerts'));
 
 // Admin endpoints
 app.post('/api/admin/backup', (req, res) => {
@@ -169,4 +177,16 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🍽️  RestoSuite AI running on http://0.0.0.0:${PORT}`);
   console.log(`   Landing page: http://localhost:${PORT}/`);
   console.log(`   App:          http://localhost:${PORT}/app`);
+
+  // Keep-alive: ping self every 14 minutes to prevent Render free tier sleep
+  if (process.env.RENDER || process.env.NODE_ENV === 'production') {
+    const KEEP_ALIVE_URL = process.env.RENDER_EXTERNAL_URL || 'https://restosuite-backend.onrender.com';
+    setInterval(() => {
+      fetch(`${KEEP_ALIVE_URL}/api/health`)
+        .then(r => r.json())
+        .then(d => console.log(`🏓 Keep-alive: ${d.status}`))
+        .catch(e => console.error('Keep-alive failed:', e.message));
+    }, 14 * 60 * 1000);
+    console.log('🏓 Keep-alive enabled (14min interval)');
+  }
 });

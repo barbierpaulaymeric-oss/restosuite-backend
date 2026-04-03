@@ -183,6 +183,8 @@ function registerRoutes() {
   Router.add(/^\/subscribe$/, renderSubscribe);
   Router.add(/^\/supplier-portal$/, renderSupplierPortalManage);
   Router.add(/^\/service$/, renderServiceView);
+  Router.add(/^\/scan-invoice$/, renderScanInvoice);
+  Router.add(/^\/mercuriale$/, renderMercuriale);
 }
 
 function bootApp(role, account, opts = {}) {

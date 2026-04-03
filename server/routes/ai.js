@@ -1,9 +1,17 @@
 const { Router } = require('express');
 const { all, get } = require('../db');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const router = Router();
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyCx2uPzQjARvLHiQhA2qin26R6M0OqEhe4';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+// ─── Multer config for invoice uploads ───
+const uploadDir = '/tmp/restosuite-uploads';
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const upload = multer({ dest: uploadDir, limits: { fileSize: 10 * 1024 * 1024 } });
 
 const VOICE_PARSE_SYSTEM = `Tu es un assistant culinaire professionnel spécialisé dans les fiches techniques de restaurant français.
 À partir d'une transcription vocale d'un chef, tu dois extraire une fiche technique structurée en JSON.
@@ -365,6 +373,180 @@ router.post('/suggest-suppliers', async (req, res) => {
   });
 
   res.json(suggestions);
+});
+
+// ═══════════════════════════════════════════
+// POST /api/ai/scan-invoice — Scan facture fournisseur via Gemini Vision
+// ═══════════════════════════════════════════
+router.post('/scan-invoice', upload.single('invoice'), async (req, res) => {
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+
+  let imageBase64 = null;
+  let mimeType = 'image/jpeg';
+
+  // Support multipart file upload OR base64 in body
+  if (req.file) {
+    const fileBuffer = fs.readFileSync(req.file.path);
+    imageBase64 = fileBuffer.toString('base64');
+    mimeType = req.file.mimetype || 'image/jpeg';
+    // Cleanup temp file
+    fs.unlink(req.file.path, () => {});
+  } else if (req.body && req.body.image_base64) {
+    imageBase64 = req.body.image_base64.replace(/^data:image\/\w+;base64,/, '');
+    mimeType = req.body.mime_type || 'image/jpeg';
+  }
+
+  if (!imageBase64) {
+    return res.status(400).json({ error: 'Image requise (fichier ou base64)' });
+  }
+
+  const prompt = "Extrais les données de cette facture fournisseur de restaurant. Retourne un JSON avec : supplier_name, invoice_number, invoice_date, items (array de {product_name, quantity, unit, unit_price, total_price, batch_number, dlc}), total_ht, tva, total_ttc. Si un champ n'est pas visible, mets null.";
+
+  try {
+    const response = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType, data: imageBase64 } }
+          ]
+        }],
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('Gemini Vision error:', err);
+      return res.status(502).json({ error: 'Erreur service IA', details: err });
+    }
+
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!content) return res.status(502).json({ error: 'Réponse IA vide' });
+
+    const parsed = JSON.parse(content);
+
+    // Match product_name with existing ingredients (fuzzy)
+    if (parsed.items && Array.isArray(parsed.items)) {
+      for (const item of parsed.items) {
+        const name = (item.product_name || '').toLowerCase().trim();
+        if (!name) continue;
+        let match = get('SELECT id, name FROM ingredients WHERE LOWER(name) = ?', [name]);
+        if (!match) {
+          match = get('SELECT id, name FROM ingredients WHERE LOWER(name) LIKE ? ORDER BY LENGTH(name) ASC LIMIT 1', [`%${name}%`]);
+        }
+        if (match) {
+          item.ingredient_id = match.id;
+          item.matched_ingredient = match.name;
+        }
+      }
+    }
+
+    res.json(parsed);
+  } catch (e) {
+    console.error('Invoice scan error:', e);
+    res.status(500).json({ error: 'Erreur scan facture', details: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════
+// GET /api/ai/menu-suggestions — Suggestions menu par marge
+// ═══════════════════════════════════════════
+router.get('/menu-suggestions', async (req, res) => {
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+
+  try {
+    // Get all recipes with cost data
+    const recipes = all(`
+      SELECT r.id, r.name, r.category, r.selling_price, r.notes,
+        COALESCE((
+          SELECT SUM(
+            ri.gross_quantity * COALESCE(
+              (SELECT sp.price / CASE
+                WHEN sp.unit = 'kg' THEN 1000
+                WHEN sp.unit = 'L' THEN 1000
+                ELSE 1
+              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1),
+              0
+            )
+          )
+          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id
+        ), 0) as total_cost
+      FROM recipes r
+      WHERE r.recipe_type = 'plat' OR r.recipe_type IS NULL
+    `);
+
+    const recipesData = recipes
+      .filter(r => r.selling_price > 0)
+      .map(r => ({
+        id: r.id,
+        name: r.name,
+        category: r.category,
+        selling_price: r.selling_price,
+        total_cost: Math.round(r.total_cost * 100) / 100,
+        food_cost_pct: r.selling_price > 0 ? Math.round((r.total_cost / r.selling_price) * 1000) / 10 : null,
+        margin: Math.round((r.selling_price - r.total_cost) * 100) / 100
+      }));
+
+    // Get ingredients in stock
+    const stockIngredients = all(`
+      SELECT i.name, s.quantity, s.unit
+      FROM stock s JOIN ingredients i ON i.id = s.ingredient_id
+      WHERE s.quantity > 0
+      ORDER BY s.quantity DESC LIMIT 30
+    `);
+
+    const prompt = `Voici les fiches techniques d'un restaurant avec leur food cost :
+${JSON.stringify(recipesData, null, 2)}
+
+Ingrédients actuellement en stock :
+${JSON.stringify(stockIngredients, null, 2)}
+
+Analyse et donne :
+1) Les 3 plats les plus rentables à mettre en avant
+2) Les 3 plats avec le food cost trop élevé et des suggestions pour les améliorer (substitution d'ingrédients)
+3) Une suggestion de plat du jour basée sur les ingrédients en stock
+
+Réponds en JSON avec cette structure :
+{
+  "top_profitable": [{"name": "...", "food_cost_pct": ..., "reason": "..."}],
+  "to_improve": [{"name": "...", "food_cost_pct": ..., "suggestion": "..."}],
+  "daily_special": {"name": "...", "description": "...", "key_ingredients": ["..."]}
+}`;
+
+    const geminiRes = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.7 }
+      })
+    });
+
+    if (!geminiRes.ok) {
+      // Fallback: return raw data analysis
+      const sorted = [...recipesData].sort((a, b) => a.food_cost_pct - b.food_cost_pct);
+      return res.json({
+        top_profitable: sorted.slice(0, 3).map(r => ({ name: r.name, food_cost_pct: r.food_cost_pct, reason: 'Meilleur ratio coût/prix' })),
+        to_improve: sorted.slice(-3).reverse().map(r => ({ name: r.name, food_cost_pct: r.food_cost_pct, suggestion: 'Revoir les portions ou substituer des ingrédients coûteux' })),
+        daily_special: { name: 'Suggestion non disponible', description: 'Service IA temporairement indisponible', key_ingredients: [] },
+        fallback: true
+      });
+    }
+
+    const data = await geminiRes.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!content) return res.status(502).json({ error: 'Réponse IA vide' });
+
+    const suggestions = JSON.parse(content);
+    res.json(suggestions);
+  } catch (e) {
+    console.error('Menu suggestions error:', e);
+    res.status(500).json({ error: 'Erreur suggestions menu', details: e.message });
+  }
 });
 
 module.exports = router;

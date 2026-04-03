@@ -6,6 +6,7 @@ async function renderDashboard() {
   const app = document.getElementById('app');
   const perms = getPermissions();
   app.innerHTML = `
+    <div id="dashboard-alerts"></div>
     <div class="page-header">
       <h1>Fiches Techniques</h1>
       ${perms.edit_recipes ? `<a href="#/new" class="btn btn-primary"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle fiche</a>` : ''}
@@ -130,4 +131,43 @@ async function renderDashboard() {
       renderList(searchInput.value, currentTypeFilter);
     });
   });
+
+  // Fetch daily alerts
+  try {
+    const alertData = await API.request('/alerts/daily-summary');
+    const alertsDiv = document.getElementById('dashboard-alerts');
+    if (!alertsDiv) return;
+    let html = '';
+    if (alertData.summary.critical > 0) {
+      const details = [];
+      if (alertData.dlc_alerts.filter(a => a.days_remaining <= 0).length > 0)
+        details.push(`${alertData.dlc_alerts.filter(a => a.days_remaining <= 0).length} DLC expirée(s)`);
+      if (alertData.temp_alerts.length > 0)
+        details.push(`${alertData.temp_alerts.length} alerte(s) température`);
+      html += `<a href="#/haccp" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
+        <div style="background:var(--color-danger);color:white;padding:var(--space-3);border-radius:var(--radius-lg);cursor:pointer">
+          🚨 <strong>${alertData.summary.critical} alerte(s) critique(s)</strong> — ${details.join(', ')}
+        </div></a>`;
+    }
+    if (alertData.summary.warnings > 0) {
+      const details = [];
+      if (alertData.dlc_alerts.filter(a => a.days_remaining > 0).length > 0)
+        details.push(`${alertData.dlc_alerts.filter(a => a.days_remaining > 0).length} DLC proche(s)`);
+      if (alertData.low_stock.length > 0)
+        details.push(`${alertData.low_stock.length} stock(s) bas`);
+      html += `<a href="#/stock" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
+        <div style="background:var(--color-warning);color:#000;padding:var(--space-3);border-radius:var(--radius-lg);cursor:pointer">
+          ⚠️ <strong>${alertData.summary.warnings} avertissement(s)</strong> — ${details.join(', ')}
+        </div></a>`;
+    }
+    if (alertData.summary.pending > 0) {
+      html += `<a href="#/deliveries" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
+        <div style="background:var(--color-info);color:white;padding:var(--space-3);border-radius:var(--radius-lg);cursor:pointer">
+          📦 <strong>${alertData.summary.pending} livraison(s) en attente</strong>
+        </div></a>`;
+    }
+    if (html) alertsDiv.innerHTML = html;
+  } catch (e) {
+    // Silently fail — alerts are non-blocking
+  }
 }

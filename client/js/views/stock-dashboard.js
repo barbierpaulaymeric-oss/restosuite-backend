@@ -20,6 +20,9 @@ async function renderStockDashboard() {
       <a href="#/stock/reception" class="btn btn-accent btn-lg" style="flex:1;min-width:180px;text-decoration:none;text-align:center">
         📥 Réception
       </a>
+      <a href="#/scan-invoice" class="btn btn-secondary" style="flex:1;min-width:160px;text-decoration:none;text-align:center">
+        📷 Scanner facture
+      </a>
       ${isGerant ? `
       <button class="btn btn-secondary" id="stock-inventory-btn" style="flex:1;min-width:140px">
         📋 Inventaire

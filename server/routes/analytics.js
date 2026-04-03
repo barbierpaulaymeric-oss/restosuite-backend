@@ -591,4 +591,89 @@ function generateFallbackInsights(topCostRecipes, stockAlerts, priceChanges) {
   return insights;
 }
 
+// ═══════════════════════════════════════════
+// GET /api/analytics/price-trends — Historique prix d'un ingrédient
+// ═══════════════════════════════════════════
+router.get('/price-trends', (req, res) => {
+  try {
+    const { ingredient_id, period } = req.query;
+    if (!ingredient_id) return res.status(400).json({ error: 'ingredient_id requis' });
+
+    let days = 30;
+    if (period === '90d') days = 90;
+    else if (period === '1y') days = 365;
+
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+
+    const trends = all(`
+      SELECT ph.price, ph.recorded_at as date,
+             COALESCE(s.name, 'Inconnu') as supplier_name
+      FROM price_history ph
+      LEFT JOIN suppliers s ON s.id = ph.supplier_id
+      WHERE ph.ingredient_id = ? AND ph.recorded_at >= ?
+      ORDER BY ph.recorded_at ASC
+    `, [Number(ingredient_id), since]);
+
+    res.json(trends);
+  } catch (e) {
+    console.error('Price trends error:', e);
+    res.status(500).json({ error: 'Erreur tendances prix' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// GET /api/analytics/price-alerts — Alertes variation prix > 10%
+// ═══════════════════════════════════════════
+router.get('/price-alerts', (req, res) => {
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+
+    // Get latest price per ingredient from supplier_prices
+    const ingredients = all(`
+      SELECT i.id, i.name as ingredient_name,
+             sp.price as current_price, sp.unit,
+             s.name as supplier_name
+      FROM supplier_prices sp
+      JOIN ingredients i ON i.id = sp.ingredient_id
+      JOIN suppliers s ON s.id = sp.supplier_id
+      WHERE sp.id IN (
+        SELECT id FROM supplier_prices sp2
+        WHERE sp2.ingredient_id = sp.ingredient_id
+        ORDER BY sp2.last_updated DESC LIMIT 1
+      )
+    `);
+
+    const alerts = [];
+    for (const ing of ingredients) {
+      // Get avg price over last 30 days from price_history
+      const avg = get(`
+        SELECT AVG(price) as avg_price
+        FROM price_history
+        WHERE ingredient_id = ? AND recorded_at >= ? AND price > 0
+      `, [ing.id, thirtyDaysAgo]);
+
+      if (avg && avg.avg_price && avg.avg_price > 0) {
+        const variation = ((ing.current_price - avg.avg_price) / avg.avg_price) * 100;
+        if (Math.abs(variation) > 10) {
+          alerts.push({
+            ingredient_id: ing.id,
+            ingredient_name: ing.ingredient_name,
+            current_price: Math.round(ing.current_price * 100) / 100,
+            avg_price: Math.round(avg.avg_price * 100) / 100,
+            variation_percent: Math.round(variation * 10) / 10,
+            supplier_name: ing.supplier_name
+          });
+        }
+      }
+    }
+
+    // Sort by absolute variation descending
+    alerts.sort((a, b) => Math.abs(b.variation_percent) - Math.abs(a.variation_percent));
+    res.json(alerts);
+  } catch (e) {
+    console.error('Price alerts error:', e);
+    res.status(500).json({ error: 'Erreur alertes prix' });
+  }
+});
+
 module.exports = router;

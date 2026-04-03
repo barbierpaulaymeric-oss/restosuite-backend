@@ -91,6 +91,17 @@ class MoreView {
           <p class="text-secondary text-sm">Food cost, marges, prédictions IA, insights fournisseurs</p>
         </a>
 
+        <a href="#/mercuriale" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+          <div class="more-card__icon" style="background: var(--color-accent)">
+            <i data-lucide="trending-up"></i>
+          </div>
+          <div class="more-card__content">
+            <h3>📊 Mercuriale</h3>
+            <span class="badge badge--success">Actif</span>
+          </div>
+          <p class="text-secondary text-sm">Suivi des prix fournisseurs, alertes variations, tendances</p>
+        </a>
+
         <a href="#/haccp" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
           <div class="more-card__icon" style="background: var(--color-success)">
             <i data-lucide="shield-check"></i>
