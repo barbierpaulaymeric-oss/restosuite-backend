@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Menu — RestoSuite</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#0F1923; color:#F7F5F2; font-family:Inter,sans-serif; min-height:100vh; padding-bottom:100px; }
+    .header { padding:24px 16px; text-align:center; border-bottom:1px solid rgba(255,255,255,0.1); }
+    .header h1 { font-size:24px; font-weight:700; }
+    .header .table-badge { display:inline-block; background:#E8722A; color:white; padding:4px 12px; border-radius:20px; font-size:14px; margin-top:8px; }
+    .category { padding:16px; }
+    .category h2 { font-size:18px; font-weight:600; color:#E8722A; margin-bottom:12px; text-transform:capitalize; }
+    .menu-item { background:rgba(255,255,255,0.05); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
+    .menu-item .info { flex:1; }
+    .menu-item .name { font-size:16px; font-weight:600; }
+    .menu-item .desc { font-size:13px; color:#8899aa; margin-top:4px; }
+    .menu-item .price { font-size:18px; font-weight:700; color:#E8722A; white-space:nowrap; margin-left:16px; }
+    .menu-item .add-btn { background:#E8722A; color:white; border:none; width:36px; height:36px; border-radius:50%; font-size:20px; cursor:pointer; margin-left:12px; display:flex; align-items:center; justify-content:center; }
+    .menu-item .add-btn:active { transform:scale(0.9); }
+    .cart { position:fixed; bottom:0; left:0; right:0; background:#1a2a3a; border-top:2px solid #E8722A; padding:16px; display:none; z-index:50; }
+    .cart.visible { display:block; }
+    .cart-summary { display:flex; justify-content:space-between; align-items:center; }
+    .cart-total { font-size:18px; font-weight:700; }
+    .cart-count { font-size:14px; color:#8899aa; }
+    .cart-btn { background:#E8722A; color:white; border:none; padding:12px 24px; border-radius:8px; font-size:16px; font-weight:600; cursor:pointer; }
+    .cart-btn:active { transform:scale(0.97); }
+    .cart-items { max-height:200px; overflow-y:auto; margin-bottom:12px; }
+    .cart-item { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
+    .cart-item .qty-controls { display:flex; align-items:center; gap:8px; }
+    .cart-item .qty-btn { background:rgba(255,255,255,0.1); border:none; color:white; width:28px; height:28px; border-radius:50%; cursor:pointer; font-size:16px; }
+    .loading { text-align:center; padding:60px 20px; color:#8899aa; }
+    .loading .spinner { width:32px; height:32px; border:3px solid rgba(255,255,255,0.1); border-top-color:#E8722A; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .success-overlay { position:fixed; inset:0; background:rgba(15,25,35,0.95); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:100; }
+    .success-overlay.visible { display:flex; }
+    .success-overlay .checkmark { font-size:64px; margin-bottom:16px; }
+    .success-overlay h2 { font-size:24px; margin-bottom:8px; }
+    .success-overlay p { color:#8899aa; }
+    .empty { text-align:center; padding:60px 20px; color:#8899aa; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1 id="restaurant-name">Restaurant</h1>
+    <div class="table-badge" id="table-badge">Table ?</div>
+  </div>
+  <div id="menu-container">
+    <div class="loading"><div class="spinner"></div><p>Chargement du menu…</p></div>
+  </div>
+  <div class="cart" id="cart">
+    <div class="cart-items" id="cart-items"></div>
+    <div class="cart-summary">
+      <div>
+        <div class="cart-count" id="cart-count">0 article</div>
+        <div class="cart-total" id="cart-total">0,00 €</div>
+      </div>
+      <button class="cart-btn" onclick="submitOrder()">Commander</button>
+    </div>
+  </div>
+  <div class="success-overlay" id="success">
+    <div class="checkmark">✅</div>
+    <h2>Commande envoyée !</h2>
+    <p>Un serveur va la valider sous peu.</p>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const tableNumber = params.get('table') || '?';
+    document.getElementById('table-badge').textContent = 'Table ' + tableNumber;
+
+    let cart = {};
+    let menuData = {};
+
+    async function loadMenu() {
+      try {
+        const res = await fetch('/api/menu');
+        const data = await res.json();
+
+        // Backend returns { menu: { category: [...] } }
+        const categories = data.menu || data.categories || {};
+        if (data.restaurant_name) {
+          document.getElementById('restaurant-name').textContent = data.restaurant_name;
+        }
+
+        menuData = {};
+        const container = document.getElementById('menu-container');
+
+        if (Object.keys(categories).length === 0) {
+          container.innerHTML = '<div class="empty"><p>Aucun plat disponible pour le moment.</p></div>';
+          return;
+        }
+
+        container.innerHTML = '';
+
+        for (const [cat, items] of Object.entries(categories)) {
+          const section = document.createElement('div');
+          section.className = 'category';
+          section.innerHTML = '<h2>' + cat + '</h2>';
+          for (const item of items) {
+            const id = item.id;
+            const price = item.price || item.selling_price || 0;
+            const name = item.name || '';
+            const desc = item.description || '';
+            menuData[id] = { id, name, price, description: desc };
+
+            const div = document.createElement('div');
+            div.className = 'menu-item';
+            div.innerHTML =
+              '<div class="info">' +
+                '<div class="name">' + escapeHtml(name) + '</div>' +
+                (desc ? '<div class="desc">' + escapeHtml(desc) + '</div>' : '') +
+              '</div>' +
+              '<div class="price">' + price.toFixed(2) + ' €</div>' +
+              '<button class="add-btn" onclick="addToCart(' + id + ')">+</button>';
+            section.appendChild(div);
+          }
+          container.appendChild(section);
+        }
+      } catch (e) {
+        document.getElementById('menu-container').innerHTML =
+          '<div class="empty"><p>Erreur de chargement du menu.</p></div>';
+      }
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    function addToCart(id) {
+      cart[id] = (cart[id] || 0) + 1;
+      updateCart();
+    }
+
+    function removeFromCart(id) {
+      if (cart[id] > 1) cart[id]--;
+      else delete cart[id];
+      updateCart();
+    }
+
+    function updateCart() {
+      const cartEl = document.getElementById('cart');
+      const itemsEl = document.getElementById('cart-items');
+      const countEl = document.getElementById('cart-count');
+      const totalEl = document.getElementById('cart-total');
+
+      const entries = Object.entries(cart);
+      if (entries.length === 0) { cartEl.classList.remove('visible'); return; }
+      cartEl.classList.add('visible');
+
+      let total = 0;
+      let count = 0;
+      itemsEl.innerHTML = '';
+
+      for (const [id, qty] of entries) {
+        const item = menuData[id];
+        if (!item) continue;
+        total += item.price * qty;
+        count += qty;
+
+        const div = document.createElement('div');
+        div.className = 'cart-item';
+        div.innerHTML =
+          '<span>' + escapeHtml(item.name) + '</span>' +
+          '<div class="qty-controls">' +
+            '<button class="qty-btn" onclick="removeFromCart(' + id + ')">−</button>' +
+            '<span>' + qty + '</span>' +
+            '<button class="qty-btn" onclick="addToCart(' + id + ')">+</button>' +
+            '<span style="width:60px;text-align:right">' + (item.price * qty).toFixed(2) + ' €</span>' +
+          '</div>';
+        itemsEl.appendChild(div);
+      }
+
+      countEl.textContent = count + ' article' + (count > 1 ? 's' : '');
+      totalEl.textContent = total.toFixed(2) + ' €';
+    }
+
+    async function submitOrder() {
+      const items = Object.entries(cart).map(function(entry) {
+        return { recipe_id: Number(entry[0]), quantity: entry[1] };
+      });
+      if (items.length === 0) return;
+
+      try {
+        const res = await fetch('/api/menu/order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table_number: Number(tableNumber), items: items })
+        });
+        if (res.ok) {
+          document.getElementById('success').classList.add('visible');
+          cart = {};
+          updateCart();
+          setTimeout(function() {
+            document.getElementById('success').classList.remove('visible');
+          }, 5000);
+        } else {
+          const err = await res.json();
+          alert('Erreur: ' + (err.error || 'Commande échouée'));
+        }
+      } catch (e) {
+        alert('Erreur: ' + e.message);
+      }
+    }
+
+    loadMenu();
+  </script>
+</body>
+</html>

@@ -185,6 +185,7 @@ function registerRoutes() {
   Router.add(/^\/service$/, renderServiceView);
   Router.add(/^\/scan-invoice$/, renderScanInvoice);
   Router.add(/^\/mercuriale$/, renderMercuriale);
+  Router.add(/^\/qrcodes$/, renderQRCodes);
 }
 
 function bootApp(role, account, opts = {}) {

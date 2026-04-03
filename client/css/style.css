@@ -3082,6 +3082,7 @@ tr:has(td[colspan]) td {
   border-left: 4px solid var(--border-default);
   transition: all var(--transition-base);
 }
+.order-card--qr-pending { border-left-color: #E8722A; background: rgba(232, 114, 42, 0.05); }
 .order-card--pending { border-left-color: var(--color-info); }
 .order-card--sent { border-left-color: var(--color-accent); }
 .order-card--ready { border-left-color: var(--color-success); }
@@ -3105,6 +3106,7 @@ tr:has(td[colspan]) td {
   color: var(--text-tertiary);
 }
 
+.order-badge--qr-pending { background: rgba(232, 114, 42, 0.15); color: #E8722A; }
 .order-badge--pending { background: rgba(74, 144, 217, 0.12); color: var(--color-info); }
 .order-badge--sent { background: var(--color-accent-light); color: var(--color-accent); }
 .order-badge--ready { background: var(--color-success-light); color: var(--color-success); }

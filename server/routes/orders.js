@@ -163,7 +163,7 @@ router.post('/:id/send', (req, res) => {
   const id = Number(req.params.id);
   const order = get('SELECT * FROM orders WHERE id = ?', [id]);
   if (!order) return res.status(404).json({ error: 'Commande introuvable' });
-  if (order.status !== 'en_cours') {
+  if (order.status !== 'en_cours' && order.status !== 'en_attente_validation') {
     return res.status(400).json({ error: 'Commande déjà envoyée' });
   }
 

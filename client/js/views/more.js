@@ -113,6 +113,17 @@ class MoreView {
           <p class="text-secondary text-sm">Relevés températures, plan de nettoyage, traçabilité, export PDF</p>
         </a>
 
+        <a href="#/qrcodes" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+          <div class="more-card__icon" style="background: var(--color-accent)">
+            <i data-lucide="qr-code"></i>
+          </div>
+          <div class="more-card__content">
+            <h3>📱 QR Codes Menu</h3>
+            <span class="badge badge--success">Actif</span>
+          </div>
+          <p class="text-secondary text-sm">Menu digital, commande client par QR code, impression par table</p>
+        </a>
+
         <div class="more-card more-card--coming">
           <div class="more-card__icon" style="background: var(--color-primary-light)">
             <i data-lucide="truck"></i>

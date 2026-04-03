@@ -15,6 +15,7 @@ async function renderOrdersDashboard() {
     </div>
     <div class="orders-subnav" style="display:flex;gap:8px;margin-bottom:20px;overflow-x:auto">
       <button class="haccp-subnav__link active" data-filter="">Toutes</button>
+      <button class="haccp-subnav__link" data-filter="en_attente_validation">📱 QR</button>
       <button class="haccp-subnav__link" data-filter="en_cours">En cours</button>
       <button class="haccp-subnav__link" data-filter="envoyé">Envoyées</button>
       <button class="haccp-subnav__link" data-filter="prêt">Prêtes</button>
@@ -62,6 +63,7 @@ async function renderOrdersDashboard() {
         const statusClass = getOrderStatusClass(order.status);
         const statusLabel = getOrderStatusLabel(order.status);
         const elapsed = getElapsedTime(order.created_at);
+        const isQROrder = order.status === 'en_attente_validation' || (order.notes && order.notes.includes('QR'));
         const itemsHtml = order.items.map(it =>
           `<div class="order-item-line">
             <span>${it.quantity > 1 ? it.quantity + '× ' : ''}${escapeHtml(it.recipe_name)}</span>
@@ -73,6 +75,7 @@ async function renderOrdersDashboard() {
           <div class="order-card order-card--${statusClass}">
             <div class="order-card__header">
               <span class="order-card__table">Table ${table}</span>
+              ${isQROrder ? '<span class="badge" style="background:#E8722A;color:white;font-size:11px;padding:2px 6px;border-radius:4px">📱 QR</span>' : ''}
               <span class="order-card__timer">${elapsed}</span>
             </div>
             <span class="badge order-badge--${statusClass}">${statusLabel}</span>
@@ -80,6 +83,10 @@ async function renderOrdersDashboard() {
             <div class="order-card__footer">
               <span class="order-card__total mono">${formatCurrency(order.total_cost)}</span>
               <div class="order-card__actions">
+                ${order.status === 'en_attente_validation' ? `
+                  <button class="btn btn-primary btn-sm" onclick="validateQROrder(${order.id})">✅ Valider</button>
+                  <button class="btn btn-danger btn-sm" onclick="rejectQROrder(${order.id})">❌ Refuser</button>
+                ` : ''}
                 ${order.status === 'en_cours' ? `
                   <button class="btn btn-primary btn-sm" onclick="sendOrderFromDash(${order.id})">Envoyer</button>
                   <button class="btn btn-danger btn-sm" aria-label="Annuler la commande" onclick="cancelOrderFromDash(${order.id})"><i data-lucide="x" style="width:14px;height:14px"></i></button>
@@ -136,6 +143,27 @@ async function completeOrderFromDash(id) {
   try {
     await API.updateOrder(id, { status: 'terminé' });
     showToast('Commande terminée', 'success');
+    renderOrdersDashboard();
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+  }
+}
+
+async function validateQROrder(id) {
+  try {
+    await API.sendOrder(id);
+    showToast('Commande QR validée et envoyée en cuisine', 'success');
+    renderOrdersDashboard();
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+  }
+}
+
+async function rejectQROrder(id) {
+  if (!confirm('Refuser cette commande QR ?')) return;
+  try {
+    await API.cancelOrder(id);
+    showToast('Commande QR refusée', 'success');
     renderOrdersDashboard();
   } catch (e) {
     showToast('Erreur : ' + e.message, 'error');
@@ -474,6 +502,7 @@ function playKitchenNotificationSound() {
 // ─── Helpers ───
 function getOrderStatusClass(status) {
   switch (status) {
+    case 'en_attente_validation': return 'qr-pending';
     case 'en_cours': return 'pending';
     case 'envoyé': return 'sent';
     case 'prêt': return 'ready';
@@ -485,6 +514,7 @@ function getOrderStatusClass(status) {
 
 function getOrderStatusLabel(status) {
   switch (status) {
+    case 'en_attente_validation': return '📱 À valider';
     case 'en_cours': return 'En cours';
     case 'envoyé': return 'Envoyée';
     case 'prêt': return 'Prête';

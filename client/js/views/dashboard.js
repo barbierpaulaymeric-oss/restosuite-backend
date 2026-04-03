@@ -7,6 +7,7 @@ async function renderDashboard() {
   const perms = getPermissions();
   app.innerHTML = `
     <div id="dashboard-alerts"></div>
+    <div id="ai-suggestions-container"></div>
     <div class="page-header">
       <h1>Fiches Techniques</h1>
       ${perms.edit_recipes ? `<a href="#/new" class="btn btn-primary"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle fiche</a>` : ''}
@@ -132,6 +133,9 @@ async function renderDashboard() {
     });
   });
 
+  // AI Suggestions card
+  loadAISuggestions();
+
   // Fetch daily alerts
   try {
     const alertData = await API.request('/alerts/daily-summary');
@@ -170,4 +174,119 @@ async function renderDashboard() {
   } catch (e) {
     // Silently fail — alerts are non-blocking
   }
+}
+
+// ═══════════════════════════════════════════
+// AI Suggestions Card
+// ═══════════════════════════════════════════
+async function loadAISuggestions() {
+  const container = document.getElementById('ai-suggestions-container');
+  if (!container) return;
+
+  // Check cache first (24h TTL)
+  const cacheKey = 'restosuite_suggestions_cache';
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      const { data, timestamp } = JSON.parse(cached);
+      if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
+        renderAISuggestions(container, data);
+        return;
+      }
+    } catch (e) { /* invalid cache */ }
+  }
+
+  // Show loading state
+  container.innerHTML = `
+    <div style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
+        <h3 style="margin:0">💡 Suggestions IA</h3>
+      </div>
+      <p class="text-secondary text-sm" style="text-align:center;padding:var(--space-4)">Analyse en cours…</p>
+    </div>
+  `;
+
+  try {
+    const data = await API.request('/ai/menu-suggestions');
+    if (data.error) throw new Error(data.error);
+    localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+    renderAISuggestions(container, data);
+  } catch (e) {
+    container.innerHTML = '';
+  }
+}
+
+function renderAISuggestions(container, data) {
+  const topItems = data.top_profitable || data.top_margin || [];
+  const improveItems = data.to_improve || [];
+  const daily = data.daily_special || null;
+
+  if (topItems.length === 0 && improveItems.length === 0 && !daily) {
+    container.innerHTML = '';
+    return;
+  }
+
+  let topHtml = '';
+  if (topItems.length > 0) {
+    topHtml = `
+      <div style="margin-bottom:var(--space-3)">
+        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-success)">🟢 Plats les plus rentables</h4>
+        ${topItems.map(item => `
+          <div style="padding:6px 0;border-bottom:1px solid var(--color-border)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(item.name)}</span>
+              <span class="badge badge--success" style="font-size:11px">${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : '?')}%</span>
+            </div>
+            <p class="text-secondary" style="font-size:12px;margin-top:2px">${escapeHtml(item.reason || '')}</p>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  let improveHtml = '';
+  if (improveItems.length > 0) {
+    improveHtml = `
+      <div style="margin-bottom:var(--space-3)">
+        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-danger)">🔴 À améliorer</h4>
+        ${improveItems.map(item => `
+          <div style="padding:6px 0;border-bottom:1px solid var(--color-border)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(item.name)}</span>
+              <span class="badge badge--danger" style="font-size:11px">${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : '?')}%</span>
+            </div>
+            <p class="text-secondary" style="font-size:12px;margin-top:2px">${escapeHtml(item.suggestion || '')}</p>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  let dailyHtml = '';
+  if (daily && daily.name) {
+    dailyHtml = `
+      <div>
+        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-accent)">⭐ Suggestion plat du jour</h4>
+        <div style="background:rgba(232,114,42,0.1);border-radius:var(--radius-md);padding:var(--space-3)">
+          <strong>${escapeHtml(daily.name)}</strong>
+          <p class="text-secondary" style="font-size:12px;margin-top:4px">${escapeHtml(daily.description || daily.reason || '')}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    <div style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
+        <h3 style="margin:0">💡 Suggestions IA</h3>
+        <button class="btn btn-secondary btn-sm" onclick="refreshAISuggestions()" title="Rafraîchir" style="padding:4px 8px">🔄</button>
+      </div>
+      ${topHtml}${improveHtml}${dailyHtml}
+    </div>
+  `;
+}
+
+async function refreshAISuggestions() {
+  localStorage.removeItem('restosuite_suggestions_cache');
+  await loadAISuggestions();
 }
