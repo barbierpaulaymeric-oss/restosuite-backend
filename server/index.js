@@ -100,7 +100,6 @@ app.use('/api/stripe', require('./routes/stripe'));
 app.use('/api/supplier-portal', require('./routes/supplier-portal'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/orders', require('./routes/orders'));
-app.use('/api/referrals', require('./routes/referrals'));
 
 // Admin endpoints
 app.post('/api/admin/backup', (req, res) => {

@@ -46,12 +46,6 @@ const SALLE_PERMISSIONS = {
 
 const VALID_ROLES = ['gerant', 'cuisinier', 'equipier', 'salle', 'fournisseur'];
 
-function generateReferralCode(name) {
-  const base = name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 6);
-  const suffix = Math.random().toString(36).slice(2, 6);
-  return `${base}-${suffix}`;
-}
-
 function getPermissionsForRole(role) {
   switch (role) {
     case 'gerant': return GERANT_PERMISSIONS;
@@ -91,41 +85,18 @@ router.post('/', (req, res) => {
   const hashedPin = hashPin(pin);
 
   try {
-    // Generate referral code for gerant accounts
-    const referralCode = (role === 'gerant') ? generateReferralCode(name.trim()) : null;
-
     const result = run(
-      'INSERT INTO accounts (name, pin, role, permissions, trial_start, referral_code) VALUES (?, ?, ?, ?, datetime(\'now\'), ?)',
-      [name.trim(), hashedPin, role, JSON.stringify(permissions), referralCode]
+      'INSERT INTO accounts (name, pin, role, permissions, trial_start) VALUES (?, ?, ?, ?, datetime(\'now\'))',
+      [name.trim(), hashedPin, role, JSON.stringify(permissions)]
     );
 
     const newAccountId = result.lastInsertRowid;
-
-    // Apply referral code if provided
-    const referredBy = req.body.referral_code;
-    if (referredBy) {
-      const referrer = get('SELECT id, referral_bonus_days FROM accounts WHERE referral_code = ?', [referredBy]);
-      if (referrer && referrer.id !== newAccountId) {
-        // Referrer gets 30 bonus days
-        run('UPDATE accounts SET referral_bonus_days = COALESCE(referral_bonus_days, 0) + 30 WHERE id = ?', [referrer.id]);
-        // New account gets 15 bonus days
-        run('UPDATE accounts SET referred_by = ?, referral_bonus_days = 15 WHERE id = ?', [referredBy, newAccountId]);
-        // Record referral
-        try {
-          run(
-            'INSERT INTO referrals (referrer_code, referrer_account_id, referred_account_id, status, completed_at) VALUES (?, ?, ?, ?, datetime(\'now\'))',
-            [referredBy, referrer.id, newAccountId, 'completed']
-          );
-        } catch (refErr) { /* ignore duplicate */ }
-      }
-    }
 
     res.json({
       id: newAccountId,
       name: name.trim(),
       role,
-      permissions,
-      referral_code: referralCode
+      permissions
     });
   } catch (e) {
     res.status(500).json({ error: 'Erreur lors de la création du compte' });
