@@ -241,8 +241,8 @@
       top: 0;
       left: 0;
       right: 0;
-      z-index: 100;
-      background: rgba(15,23,35,0.85);
+      z-index: 1000;
+      background: rgba(15, 23, 35, 0.98);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border-light);
@@ -335,7 +335,7 @@
       right: 0;
       bottom: 0;
       background: var(--bg-base);
-      z-index: 99;
+      z-index: 999;
       padding: 24px;
       flex-direction: column;
       gap: 8px;
@@ -1110,6 +1110,68 @@
 </head>
 <body>
 
+  <!-- Loading screen (shown during cold start / slow API) -->
+  <div id="loading-screen" style="display:none; position:fixed; inset:0; z-index:9999; background:#0F1923; align-items:center; justify-content:center; flex-direction:column;">
+    <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height:80px; margin-bottom:24px;">
+    <div style="color:#F7F5F2; font-family:Inter,sans-serif; font-size:18px; font-weight:600; margin-bottom:16px;">RestoSuite AI</div>
+    <div style="width:200px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+      <div id="loading-bar" style="width:0%; height:100%; background:#E8722A; border-radius:2px; transition:width 0.5s;"></div>
+    </div>
+    <div style="color:#8899aa; font-size:13px; margin-top:12px;" id="loading-text">Chargement...</div>
+  </div>
+  <script>
+  (function() {
+    var screen = document.getElementById('loading-screen');
+    var bar = document.getElementById('loading-bar');
+    var text = document.getElementById('loading-text');
+    var messages = ['Chargement...', 'Préparation de votre espace...', 'Connexion au serveur...', 'Presque prêt...'];
+    var progress = 0, msgIndex = 0, shown = false;
+
+    // Only show loading screen if server takes > 2s to respond
+    var showTimer = setTimeout(function() {
+      screen.style.display = 'flex';
+      shown = true;
+    }, 2000);
+
+    var interval = setInterval(function() {
+      progress = Math.min(progress + Math.random() * 15, 90);
+      bar.style.width = progress + '%';
+      if (progress > 25 * (msgIndex + 1) && msgIndex < messages.length - 1) {
+        msgIndex++;
+        text.textContent = messages[msgIndex];
+      }
+    }, 800);
+
+    function hideScreen() {
+      clearTimeout(showTimer);
+      clearInterval(interval);
+      if (shown) {
+        bar.style.width = '100%';
+        text.textContent = 'C\'est parti !';
+        setTimeout(function() {
+          screen.style.opacity = '0';
+          screen.style.transition = 'opacity 0.3s';
+          setTimeout(function() { screen.remove(); }, 300);
+        }, 400);
+      } else {
+        screen.remove();
+      }
+    }
+
+    function checkServer() {
+      fetch('/api/health')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.status === 'ok') { hideScreen(); }
+          else { setTimeout(checkServer, 2000); }
+        })
+        .catch(function() { setTimeout(checkServer, 2000); });
+    }
+
+    setTimeout(checkServer, 1000);
+  })();
+  </script>
+
   <!-- ========== HEADER ========== -->
   <header class="header" id="header">
     <div class="header__inner">
@@ -1608,9 +1670,9 @@
     const header = document.getElementById('header');
     window.addEventListener('scroll', () => {
       if (window.scrollY > 20) {
-        header.style.background = 'rgba(15,23,35,0.95)';
+        header.style.background = '#0F1723';
       } else {
-        header.style.background = 'rgba(15,23,35,0.85)';
+        header.style.background = 'rgba(15, 23, 35, 0.98)';
       }
     }, { passive: true });
   </script>
