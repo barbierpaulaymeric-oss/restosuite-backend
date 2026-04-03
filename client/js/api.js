@@ -255,6 +255,32 @@ const API = {
     return this.supplierRequest('/history');
   },
 
+  // ─── Supplier Delivery Notes (supplier side) ───
+  createSupplierDeliveryNote(data) {
+    return this.supplierRequest('/delivery-notes', { method: 'POST', body: data });
+  },
+  getSupplierDeliveryNotes() {
+    return this.supplierRequest('/delivery-notes');
+  },
+  getSupplierDeliveryNote(id) {
+    return this.supplierRequest(`/delivery-notes/${id}`);
+  },
+
+  // ─── Deliveries (restaurant side) ───
+  getDeliveries(status) {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.request(`/deliveries${qs}`);
+  },
+  getDelivery(id) {
+    return this.request(`/deliveries/${id}`);
+  },
+  receiveDelivery(id, data) {
+    return this.request(`/deliveries/${id}/receive`, { method: 'PUT', body: data });
+  },
+  getDlcAlerts() {
+    return this.request('/deliveries/dlc-alerts');
+  },
+
   // ─── Analytics ───
   getAnalyticsKPIs() { return this.request('/analytics/kpis'); },
   getAnalyticsFoodCost() { return this.request('/analytics/food-cost'); },

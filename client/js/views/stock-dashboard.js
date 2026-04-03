@@ -12,7 +12,11 @@ async function renderStockDashboard() {
       <h1>📦 Stock</h1>
       <p class="text-secondary">Vue d'ensemble du stock actuel</p>
     </div>
+    <div id="delivery-pending-banner" style="margin-bottom:var(--space-4)"></div>
     <div class="stock-actions" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5);flex-wrap:wrap">
+      <a href="#/deliveries" class="btn btn-primary btn-lg" id="btn-deliveries-link" style="flex:1;min-width:180px;text-decoration:none;text-align:center">
+        🚚 Livraisons
+      </a>
       <a href="#/stock/reception" class="btn btn-accent btn-lg" style="flex:1;min-width:180px;text-decoration:none;text-align:center">
         📥 Réception
       </a>
@@ -53,6 +57,15 @@ async function renderStockDashboard() {
   }
 
   await loadStock();
+
+  // Fetch pending deliveries count for badge
+  try {
+    const pending = await API.getDeliveries('pending');
+    const btn = document.getElementById('btn-deliveries-link');
+    if (btn && pending.length > 0) {
+      btn.innerHTML = `🚚 Livraisons <span style="background:var(--color-danger);color:white;border-radius:50%;padding:2px 7px;font-size:var(--text-xs);margin-left:6px">${pending.length}</span>`;
+    }
+  } catch (e) { /* ignore */ }
 }
 
 async function loadStock(query) {

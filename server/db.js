@@ -219,6 +219,42 @@ db.exec(`
     FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
   );
 
+  -- Bons de livraison fournisseur
+  CREATE TABLE IF NOT EXISTS delivery_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+    status TEXT DEFAULT 'pending',
+    delivery_date DATE,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    received_at DATETIME,
+    received_by INTEGER REFERENCES accounts(id),
+    reception_notes TEXT,
+    total_amount REAL DEFAULT 0
+  );
+
+  -- Lignes de bon de livraison
+  CREATE TABLE IF NOT EXISTS delivery_note_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    delivery_note_id INTEGER NOT NULL REFERENCES delivery_notes(id) ON DELETE CASCADE,
+    ingredient_id INTEGER REFERENCES ingredients(id),
+    product_name TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    unit TEXT DEFAULT 'kg',
+    price_per_unit REAL,
+    batch_number TEXT,
+    dlc DATE,
+    temperature_required REAL,
+    temperature_measured REAL,
+    fishing_zone TEXT,
+    fishing_method TEXT,
+    origin TEXT,
+    sanitary_approval TEXT,
+    status TEXT DEFAULT 'pending',
+    rejection_reason TEXT,
+    notes TEXT
+  );
+
   -- HACCP: Traçabilité (réception marchandise)
   CREATE TABLE IF NOT EXISTS traceability_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

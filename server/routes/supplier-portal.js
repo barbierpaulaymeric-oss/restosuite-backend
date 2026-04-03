@@ -333,4 +333,90 @@ router.get('/history', requireSupplierAuth, (req, res) => {
   res.json(history);
 });
 
+// ═════════════════════════════════════════
+// DELIVERY NOTES (supplier side)
+// ═════════════════════════════════════════
+
+// POST /delivery-notes — Create a delivery note
+router.post('/delivery-notes', requireSupplierAuth, (req, res) => {
+  const { delivery_date, notes, items } = req.body;
+  const supplierId = req.supplierAccount.supplier_id;
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Au moins un produit est requis' });
+  }
+
+  const { db } = require('../db');
+  const transaction = db.transaction(() => {
+    let totalAmount = 0;
+
+    const noteResult = run(
+      'INSERT INTO delivery_notes (supplier_id, delivery_date, notes) VALUES (?, ?, ?)',
+      [supplierId, delivery_date || null, notes || null]
+    );
+    const noteId = noteResult.lastInsertRowid;
+
+    for (const item of items) {
+      // Try to match ingredient by name
+      let ingredientId = null;
+      if (item.product_name) {
+        const matched = get('SELECT id FROM ingredients WHERE name LIKE ? COLLATE NOCASE', [item.product_name.trim()]);
+        if (matched) ingredientId = matched.id;
+      }
+
+      const lineTotal = (item.quantity || 0) * (item.price_per_unit || 0);
+      totalAmount += lineTotal;
+
+      run(
+        `INSERT INTO delivery_note_items (delivery_note_id, ingredient_id, product_name, quantity, unit, price_per_unit, batch_number, dlc, temperature_required, fishing_zone, fishing_method, origin, sanitary_approval, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [noteId, ingredientId, item.product_name, item.quantity || 0, item.unit || 'kg',
+         item.price_per_unit || null, item.batch_number || null, item.dlc || null,
+         item.temperature_required || null, item.fishing_zone || null, item.fishing_method || null,
+         item.origin || null, item.sanitary_approval || null, item.notes || null]
+      );
+    }
+
+    // Update total
+    run('UPDATE delivery_notes SET total_amount = ? WHERE id = ?', [totalAmount, noteId]);
+
+    // Return the full note
+    const note = get('SELECT * FROM delivery_notes WHERE id = ?', [noteId]);
+    const noteItems = all('SELECT * FROM delivery_note_items WHERE delivery_note_id = ?', [noteId]);
+    return { ...note, items: noteItems };
+  });
+
+  try {
+    const result = transaction();
+    res.status(201).json(result);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// GET /delivery-notes — List supplier's delivery notes
+router.get('/delivery-notes', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const notes = all(`
+    SELECT dn.*,
+           (SELECT COUNT(*) FROM delivery_note_items WHERE delivery_note_id = dn.id) as item_count
+    FROM delivery_notes dn
+    WHERE dn.supplier_id = ?
+    ORDER BY dn.created_at DESC
+  `, [supplierId]);
+  res.json(notes);
+});
+
+// GET /delivery-notes/:id — Delivery note detail
+router.get('/delivery-notes/:id', requireSupplierAuth, (req, res) => {
+  const id = Number(req.params.id);
+  const supplierId = req.supplierAccount.supplier_id;
+
+  const note = get('SELECT * FROM delivery_notes WHERE id = ? AND supplier_id = ?', [id, supplierId]);
+  if (!note) return res.status(404).json({ error: 'Bon de livraison introuvable' });
+
+  const items = all('SELECT * FROM delivery_note_items WHERE delivery_note_id = ?', [id]);
+  res.json({ ...note, items });
+});
+
 module.exports = router;

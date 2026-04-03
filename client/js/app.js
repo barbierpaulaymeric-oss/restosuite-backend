@@ -165,6 +165,8 @@ function registerRoutes() {
   Router.add(/^\/edit\/(\d+)$/, (id) => renderRecipeForm(parseInt(id)));
   Router.add(/^\/ingredients$/, renderIngredients);
   Router.add(/^\/stock$/, renderStockDashboard);
+  Router.add(/^\/deliveries$/, renderDeliveries);
+  Router.add(/^\/deliveries\/(\d+)$/, (id) => renderDeliveryDetail(parseInt(id)));
   Router.add(/^\/stock\/reception$/, renderStockReception);
   Router.add(/^\/stock\/movements$/, renderStockMovements);
   Router.add(/^\/orders$/, renderOrdersDashboard);

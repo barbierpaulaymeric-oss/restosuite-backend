@@ -29,6 +29,9 @@ function bootSupplierApp(session) {
         <button class="supplier-nav__tab active" data-tab="catalog">
           <i data-lucide="package" style="width:18px;height:18px"></i> Catalogue
         </button>
+        <button class="supplier-nav__tab" data-tab="deliveries">
+          <i data-lucide="truck" style="width:18px;height:18px"></i> Livraisons
+        </button>
         <button class="supplier-nav__tab" data-tab="history">
           <i data-lucide="history" style="width:18px;height:18px"></i> Historique
         </button>
@@ -51,6 +54,7 @@ function bootSupplierApp(session) {
       document.querySelectorAll('.supplier-nav__tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       if (tab.dataset.tab === 'catalog') renderSupplierCatalogTab();
+      else if (tab.dataset.tab === 'deliveries') renderSupplierDeliveriesTab();
       else renderSupplierHistoryTab();
     });
   });
