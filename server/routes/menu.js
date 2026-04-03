@@ -40,7 +40,8 @@ router.get('/', (req, res) => {
       if (!sorted[cat]) sorted[cat] = categories[cat];
     }
 
-    res.json({ menu: sorted });
+    const restaurant = get('SELECT name FROM restaurants LIMIT 1');
+    res.json({ restaurant_name: restaurant?.name || 'Restaurant', categories: sorted });
   } catch (e) {
     console.error('Menu error:', e);
     res.status(500).json({ error: 'Erreur chargement menu' });
