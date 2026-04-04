@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════
-// RestoSuite AI — Analytics Dashboard
+// RestoSuite — Analytics Dashboard
 // ═══════════════════════════════════════════
 
 async function renderAnalytics() {

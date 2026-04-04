@@ -495,7 +495,7 @@ class OnboardingWizard {
       <div class="ob-step ob-finish">
         <div class="ob-icon" style="font-size:4rem">🎉</div>
         <h2 class="ob-title">Votre restaurant est configuré !</h2>
-        <p class="ob-desc">Tout est prêt. Commencez à utiliser RestoSuite AI.</p>
+        <p class="ob-desc">Tout est prêt. Commencez à utiliser RestoSuite.</p>
 
         <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-4);margin-top:var(--space-4);text-align:left;width:100%">
           <h3 style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-3)">📋 Récapitulatif</h3>

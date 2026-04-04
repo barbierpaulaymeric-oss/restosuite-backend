@@ -1,4 +1,4 @@
-# RestoSuite AI — Business Review
+# RestoSuite — Business Review
 
 **Date :** 2 avril 2026  
 **Auteur :** Consultant business senior — SaaS B2B, FoodTech, stratégie de lancement  
@@ -521,7 +521,7 @@ MOIS 3-6 : ACCÉLÉRATION
 
 ### Le résumé en une phrase
 
-> **RestoSuite AI a les bons ingrédients — un marché réel, un produit différencié, un fondateur crédible — mais la recette n'est pas encore prête à servir. 6 semaines de travail focalisé sur les fondamentaux (food cost, paiement, acquisition) feront la différence entre un side-project abandonné et un SaaS B2B viable.**
+> **RestoSuite a les bons ingrédients — un marché réel, un produit différencié, un fondateur crédible — mais la recette n'est pas encore prête à servir. 6 semaines de travail focalisé sur les fondamentaux (food cost, paiement, acquisition) feront la différence entre un side-project abandonné et un SaaS B2B viable.**
 
 ### Score final
 

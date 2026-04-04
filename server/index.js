@@ -132,7 +132,7 @@ app.get('/api/admin/export-db', (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    service: 'RestoSuite AI',
+    service: 'RestoSuite',
     version: '1.1.0',
     timestamp: new Date().toISOString()
   });
@@ -174,7 +174,7 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🍽️  RestoSuite AI running on http://0.0.0.0:${PORT}`);
+  console.log(`🍽️  RestoSuite running on http://0.0.0.0:${PORT}`);
   console.log(`   Landing page: http://localhost:${PORT}/`);
   console.log(`   App:          http://localhost:${PORT}/app`);
 

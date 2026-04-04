@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════
-// RestoSuite AI — App Bootstrap
+// RestoSuite — App Bootstrap
 // ═══════════════════════════════════════════
 
 // ─── Theme Init (before paint) ───
@@ -204,7 +204,7 @@ function bootApp(role, account, opts = {}) {
   Router.init();
   if (window.lucide) lucide.createIcons();
   const displayName = account ? account.name : role;
-  console.log('%c RestoSuite AI ', 'background:#E8722A;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600', `loaded (${displayName})`);
+  console.log('%c RestoSuite ', 'background:#E8722A;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600', `loaded (${displayName})`);
 
   // Fetch trial status and render banner
   fetchTrialStatus().then(() => renderTrialBanner());

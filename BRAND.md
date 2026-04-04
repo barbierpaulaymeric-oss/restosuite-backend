@@ -1,4 +1,4 @@
-# RestoSuite AI — Brand Guidelines
+# RestoSuite — Brand Guidelines
 
 > Document créé le 1er avril 2026
 > Direction artistique complète — identité visuelle, UI kit, stratégie de marque
@@ -19,7 +19,7 @@
 
 ## 1. Nom & Positionnement
 
-### Le nom : **RestoSuite AI**
+### Le nom : **RestoSuite**
 
 **Verdict : on garde.** Voici pourquoi :
 
@@ -880,9 +880,9 @@ Ces icônes doivent respecter la grille 24x24, stroke 1.5px, style Lucide.
 - **Ce qui ne marche pas :** Zenchef est front-of-house (réservation, CRM). Pas de concurrence directe sur le back-of-house. Mais le niveau de polish est la référence.
 - **Leçon :** Ce niveau de qualité visuelle est attendu par les restaurateurs modernes. C'est le standard à atteindre.
 
-### Positionnement RestoSuite AI — Comment se différencier
+### Positionnement RestoSuite — Comment se différencier
 
-| Axe | Concurrents | RestoSuite AI |
+| Axe | Concurrents | RestoSuite |
 |-----|-------------|---------------|
 | **Couleur** | Bleu/violet/orange vif | **Bleu ardoise + orange cuivre** — ancré dans la cuisine, pas dans la tech |
 | **Ton** | Corporate OU cheap | **Expert et direct** — parle comme un chef, pas comme un marketeur |
@@ -892,7 +892,7 @@ Ces icônes doivent respecter la grille 24x24, stroke 1.5px, style Lucide.
 | **Voix** | Absent chez tous | **Voice-first** — le micro est un différenciateur majeur |
 
 **La promesse unique :**
-> Là où Koust est un tableur amélioré, Inpulse un outil corporate, et Yokitup un outil gratuit limité — **RestoSuite AI est le bras droit du chef.** Il comprend le métier, il parle le langage, il a la densité d'un outil pro et l'intelligence d'un copilote.
+> Là où Koust est un tableur amélioré, Inpulse un outil corporate, et Yokitup un outil gratuit limité — **RestoSuite est le bras droit du chef.** Il comprend le métier, il parle le langage, il a la densité d'un outil pro et l'intelligence d'un copilote.
 
 ---
 

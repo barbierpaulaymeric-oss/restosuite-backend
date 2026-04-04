@@ -1,4 +1,4 @@
-# RestoSuite AI — Product Review
+# RestoSuite — Product Review
 
 **Date :** 2 avril 2026  
 **Évaluateur :** Consultant SaaS / Product Manager senior — spécialisation B2B restauration  
@@ -9,7 +9,7 @@
 
 ## Résumé exécutif
 
-RestoSuite AI est un produit **surprenamment complet pour un solo-founder**. Le périmètre fonctionnel couvre les fiches techniques, le HACCP, le stock, les fournisseurs et l'analytics — c'est large. L'UX est cohérente, le dark theme est maîtrisé, et l'ensemble fait plus « produit » que « prototype ». Cependant, plusieurs points critiques empêchent un lancement commercial immédiat : des données de test visibles (coûts à 0€, témoignages factices labellisés), un SIRET manquant, et des modules annoncés mais non livrés (Commandes, Portail Fournisseur). Le potentiel est réel — il faut resserrer l'exécution.
+RestoSuite est un produit **surprenamment complet pour un solo-founder**. Le périmètre fonctionnel couvre les fiches techniques, le HACCP, le stock, les fournisseurs et l'analytics — c'est large. L'UX est cohérente, le dark theme est maîtrisé, et l'ensemble fait plus « produit » que « prototype ». Cependant, plusieurs points critiques empêchent un lancement commercial immédiat : des données de test visibles (coûts à 0€, témoignages factices labellisés), un SIRET manquant, et des modules annoncés mais non livrés (Commandes, Portail Fournisseur). Le potentiel est réel — il faut resserrer l'exécution.
 
 **Note globale : 6.5/10** — Solide fondation, pas encore prêt à vendre.
 
@@ -86,7 +86,7 @@ RestoSuite AI est un produit **surprenamment complet pour un solo-founder**. Le 
 
 ### Comparaison marché
 
-| Critère | RestoSuite AI | Koust (~79€/mois) | Melba (~69€/mois) | Inpulse (~99€/mois) |
+| Critère | RestoSuite | Koust (~79€/mois) | Melba (~69€/mois) | Inpulse (~99€/mois) |
 |---------|--------------|--------------------|--------------------|---------------------|
 | Fiches techniques | ✅ | ✅ | ✅ | ✅ |
 | Food cost automatique | ❌ (cassé) | ✅ | ✅ | ✅ |
@@ -246,7 +246,7 @@ RestoSuite AI est un produit **surprenamment complet pour un solo-founder**. Le 
 
 ## Conclusion
 
-RestoSuite AI a le bon positionnement : un outil simple, pas cher, avec un vrai différenciant (saisie vocale IA) et un HACCP intégré que les concurrents facturent en option. Le périmètre fonctionnel est ambitieux pour un solo-founder et l'exécution UI est propre.
+RestoSuite a le bon positionnement : un outil simple, pas cher, avec un vrai différenciant (saisie vocale IA) et un HACCP intégré que les concurrents facturent en option. Le périmètre fonctionnel est ambitieux pour un solo-founder et l'exécution UI est propre.
 
 Mais le produit n'est **pas vendable aujourd'hui**. Le food cost à 0€ partout, c'est comme vendre une calculatrice qui n'affiche pas les résultats. Le SIRET manquant bloque la facturation. Les témoignages factices et la contradiction sur l'hébergement EU minent la confiance.
 
@@ -260,4 +260,4 @@ Le marché est là. Le produit a du potentiel. Il faut juste finir de le rendre 
 
 ---
 
-*Rapport généré le 2 avril 2026 — RestoSuite AI v1.0*
+*Rapport généré le 2 avril 2026 — RestoSuite v1.0*

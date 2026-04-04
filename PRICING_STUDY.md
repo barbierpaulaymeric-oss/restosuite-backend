@@ -1,7 +1,7 @@
-# Étude de Marché & Analyse Tarifaire — RestoSuite AI
+# Étude de Marché & Analyse Tarifaire — RestoSuite
 
 **Date :** 1er avril 2026  
-**Objet :** Positionnement concurrentiel et recommandation tarifaire pour RestoSuite AI  
+**Objet :** Positionnement concurrentiel et recommandation tarifaire pour RestoSuite  
 **Marché cible :** Restauration commerciale en France
 
 ---
@@ -10,7 +10,7 @@
 
 Le marché de la restauration en France compte **179 000+ établissements** (Insee 2024) pour un CA global de **120 Mds €**. La digitalisation du secteur est en plein essor mais reste incomplète : **78% des restaurateurs utilisent déjà des outils numériques**, mais **80% estiment ne pas avoir achevé leur transition digitale** (GNI 2022). L'HACCP digital, les fiches techniques et le pilotage du food cost sont des besoins critiques et peu satisfaits par une solution unique et abordable.
 
-**L'opportunité pour RestoSuite AI** réside dans un positionnement unique : **IA vocale + fiches techniques + HACCP dans un seul outil**, à un prix accessible pour les indépendants (qui représentent ~85% du marché). Aucun concurrent ne combine ces trois piliers avec de l'IA intégrée.
+**L'opportunité pour RestoSuite** réside dans un positionnement unique : **IA vocale + fiches techniques + HACCP dans un seul outil**, à un prix accessible pour les indépendants (qui représentent ~85% du marché). Aucun concurrent ne combine ces trois piliers avec de l'IA intégrée.
 
 **Recommandation tarifaire :** Scénario B (aligné marché) avec une phase de lancement agressive (6 mois). Prix recommandé : **Gratuit / 39€ / 79€ / sur devis**, avec essai gratuit 14 jours sur le plan Pro.
 
@@ -219,7 +219,7 @@ Le marché de la restauration en France compte **179 000+ établissements** (Ins
 **Faiblesses :**
 - Aucun rapport avec la gestion de cuisine (food cost, fiches techniques, HACCP)
 - Prix élevé
-- N'est **pas un concurrent direct** de RestoSuite AI
+- N'est **pas un concurrent direct** de RestoSuite
 
 **Positionnement :** Premium — concurrent indirect uniquement (front-of-house)
 
@@ -366,7 +366,7 @@ Prix élevé
     │
     │  ● Traqfood
     │
-    │           ★ RestoSuite AI (cible)
+    │           ★ RestoSuite (cible)
     │
 Prix bas
 ```
@@ -398,7 +398,7 @@ Prix bas
 | Cafés, bars, brasseries | ~25 000 | ~14% |
 | Traiteurs et services de restauration | ~19 000 | ~10% |
 
-**Marché adressable pour RestoSuite AI :**
+**Marché adressable pour RestoSuite :**
 - **Cœur de cible :** Restauration traditionnelle + brasseries + gastronomique = **~85 000-100 000 établissements**
 - **Cible élargie :** + dark kitchens + traiteurs + restauration rapide de qualité = **~120 000 établissements**
 
@@ -414,7 +414,7 @@ Prix bas
 | Restaurants avec commande QR code/borne | **24%** | Reservit 2025 |
 | Restaurants avec paiement mobile | **34%** | Reservit 2025 |
 
-**Analyse :** La digitalisation est concentrée sur le **front-of-house** (réservation, paiement, commande). Le **back-of-house** (fiches techniques, food cost, HACCP, stock) reste largement sous-digitalisé. C'est précisément le créneau de RestoSuite AI.
+**Analyse :** La digitalisation est concentrée sur le **front-of-house** (réservation, paiement, commande). Le **back-of-house** (fiches techniques, food cost, HACCP, stock) reste largement sous-digitalisé. C'est précisément le créneau de RestoSuite.
 
 **Estimation back-of-house digitalisé :**
 - Logiciel de fiches techniques/food cost : **~10-15%** des restaurants (estimation basée sur les volumes clients déclarés par Koust, Melba, etc.)
@@ -470,7 +470,7 @@ Prix bas
 | **Dark kitchen / cloud kitchen** | N/A | ~1 500+ | 50-150€ | Food cost, fiches techniques, HACCP, DLC | Haute |
 | **Traiteur / restau collective** | Variable | ~20 000 | 100-300€ | Production en volume, traçabilité HACCP, étiquettes INCO | Moyenne |
 
-### 3.2 Persona prioritaire pour RestoSuite AI
+### 3.2 Persona prioritaire pour RestoSuite
 
 **🎯 Cible #1 : Le restaurant indépendant moyen (50-150 couverts)**
 - Gérant-cuisinier, 1-3 sous-chefs, 2-5 équipiers
@@ -601,7 +601,7 @@ Prix bas
 
 ---
 
-## 5. Avantage Concurrentiel RestoSuite AI
+## 5. Avantage Concurrentiel RestoSuite
 
 ### 5.1 Ce que RestoSuite fait et que les autres ne font pas
 
@@ -615,7 +615,7 @@ Prix bas
 
 ### 5.2 USP (Unique Selling Proposition)
 
-> **"RestoSuite AI : dictez vos recettes, maîtrisez vos marges, soyez conforme HACCP — le tout dans un seul outil à partir de 39€/mois."**
+> **"RestoSuite : dictez vos recettes, maîtrisez vos marges, soyez conforme HACCP — le tout dans un seul outil à partir de 39€/mois."**
 
 Les 3 piliers de l'USP :
 1. **IA vocale** — Dictez une recette et l'IA crée la fiche technique complète (ingrédients, quantités, coûts, allergènes). Aucun concurrent ne le fait.
@@ -698,7 +698,7 @@ Les 3 piliers de l'USP :
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  RestoSuite AI                       │
+│                  RestoSuite                       │
 ├──────────┬──────────┬──────────┬────────────────────┤
 │ Découverte│   Pro    │ Business │    Enterprise      │
 │   0€     │  39€/mois│ 79€/mois │    Sur devis       │

@@ -45,7 +45,7 @@ class LoginView {
           <div class="login-logo">
             <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 80px; width: auto;">
           </div>
-          <h1 class="login-title">Resto<span class="text-accent">Suite</span> AI</h1>
+          <h1 class="login-title">Resto<span class="text-accent">Suite</span></h1>
           <p class="login-tagline">Votre cuisine tourne. Vos chiffres suivent.</p>
 
           <div class="auth-tabs" style="display:flex;gap:0;margin-bottom:var(--space-5);border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--border-primary)">
@@ -144,7 +144,7 @@ class LoginView {
           <div class="login-logo">
             <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 80px; width: auto;">
           </div>
-          <h1 class="login-title">Resto<span class="text-accent">Suite</span> AI</h1>
+          <h1 class="login-title">Resto<span class="text-accent">Suite</span></h1>
           <p class="login-tagline">Créez votre compte — essai gratuit 60 jours</p>
 
           <div class="auth-tabs" style="display:flex;gap:0;margin-bottom:var(--space-5);border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--border-primary)">

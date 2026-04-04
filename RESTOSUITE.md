@@ -6,7 +6,7 @@ _Dernière mise à jour : 4 avril 2026_
 
 ## 1. Vision
 
-**RestoSuite AI** — Le premier assistant cuisine propulsé par l'IA.
+**RestoSuite** — Le premier assistant cuisine propulsé par l'IA.
 Tagline : « Votre cuisine tourne. Vos chiffres suivent. »
 
 Un logiciel SaaS tout-en-un pour les restaurateurs : fiches techniques avec food cost automatique, gestion des stocks, HACCP digital, commandes, suivi de lot, et intelligence artificielle (saisie vocale, scan de facture, suggestions menu).

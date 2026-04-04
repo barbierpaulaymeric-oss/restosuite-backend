@@ -155,7 +155,7 @@ class MoreView {
             <i data-lucide="log-out" style="width:18px;height:18px"></i> Se déconnecter
           </button>
           <p class="text-secondary text-sm">
-            RestoSuite AI v1.0 — Votre cuisine tourne. Vos chiffres suivent.
+            RestoSuite v1.0 — Votre cuisine tourne. Vos chiffres suivent.
           </p>
         </div>
       </div>

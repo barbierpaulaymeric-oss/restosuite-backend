@@ -1,4 +1,4 @@
-# QA Report — RestoSuite AI (localhost:3007)
+# QA Report — RestoSuite (localhost:3007)
 
 **Date :** 2026-04-03  
 **Testeur :** Alfred (QA sub-agent)  

@@ -1,4 +1,4 @@
-# RestoSuite AI — Revue UX/UI Exhaustive
+# RestoSuite — Revue UX/UI Exhaustive
 
 **Évaluateur :** Expert UX/UI & Product Designer Senior (SaaS B2B)  
 **Date :** 2 avril 2026  
@@ -397,7 +397,7 @@ Le tagline footer "Votre cuisine tourne. Vos chiffres suivent." est excellent �
 
 ### **Score global : 7.8 / 10**
 
-**Résumé :** RestoSuite AI est un produit remarquablement bien construit pour un SaaS B2B de niche. Le design system est solide, le dark mode est de très haute qualité, et les modules métier (HACCP, fiches techniques, commandes) couvrent les besoins réels avec une UX pensée pour le terrain. Les principaux axes d'amélioration sont l'accessibilité (le point le plus faible), la landing page (fix le reveal + retirer les faux témoignages), et quelques optimisations temps réel pour la cuisine (WebSocket, sons). Le produit est prêt pour une mise en marché — les 10 améliorations listées le pousseraient facilement au-dessus de 8.5/10.
+**Résumé :** RestoSuite est un produit remarquablement bien construit pour un SaaS B2B de niche. Le design system est solide, le dark mode est de très haute qualité, et les modules métier (HACCP, fiches techniques, commandes) couvrent les besoins réels avec une UX pensée pour le terrain. Les principaux axes d'amélioration sont l'accessibilité (le point le plus faible), la landing page (fix le reveal + retirer les faux témoignages), et quelques optimisations temps réel pour la cuisine (WebSocket, sons). Le produit est prêt pour une mise en marché — les 10 améliorations listées le pousseraient facilement au-dessus de 8.5/10.
 
 ---
 
