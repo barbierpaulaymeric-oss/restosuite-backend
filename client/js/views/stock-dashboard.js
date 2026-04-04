@@ -73,10 +73,12 @@ async function renderStockDashboard() {
 
 async function loadStock(query) {
   try {
-    const [stock, alerts] = await Promise.all([
+    const [stockData, alerts] = await Promise.all([
       API.getStock(query),
       API.getStockAlerts()
     ]);
+    const stock = stockData.items || stockData;
+    const productCount = stockData.product_count;
 
     // Alerts section
     const alertsSection = document.getElementById('stock-alerts-section');
@@ -87,7 +89,7 @@ async function loadStock(query) {
           <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
             ${alerts.map(a => `
               <span class="badge badge--danger" style="font-size:var(--text-sm)">
-                ${escapeHtml(a.ingredient_name)} : ${a.quantity} ${a.unit} (min: ${a.min_quantity})
+                ${escapeHtml(a.ingredient_name)} : ${formatQuantity(a.quantity, a.unit)} (min: ${formatQuantity(a.min_quantity, a.unit)})
               </span>
             `).join('')}
           </div>
@@ -113,6 +115,12 @@ async function loadStock(query) {
     };
 
     const content = document.getElementById('stock-content');
+    // Update product count in header
+    const headerP = document.querySelector('.view-header .text-secondary');
+    if (headerP && productCount != null) {
+      headerP.textContent = `${productCount} produit${productCount !== 1 ? 's' : ''} en stock`;
+    }
+
     if (stock.length === 0) {
       content.innerHTML = query ? `
         <div class="empty-state">
@@ -164,13 +172,12 @@ function renderStockCard(item) {
         ${isAlert ? '<span class="badge badge--danger" style="font-size:var(--text-xs)">Stock bas</span>' : ''}
       </div>
       <div style="display:flex;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-3)">
-        <span class="data-value" style="font-size:var(--text-xl);font-weight:700;color:${isAlert ? 'var(--color-danger)' : 'var(--text-primary)'}">${item.quantity}</span>
-        <span class="text-secondary">${escapeHtml(item.unit)}</span>
+        <span class="data-value" style="font-size:var(--text-xl);font-weight:700;color:${isAlert ? 'var(--color-danger)' : 'var(--text-primary)'}">${formatQuantity(item.quantity, item.unit)}</span>
       </div>
       ${item.min_quantity > 0 ? `
       <div style="margin-bottom:var(--space-2)">
         <div style="display:flex;justify-content:space-between;font-size:var(--text-xs);color:var(--text-tertiary);margin-bottom:4px">
-          <span>Seuil min : ${item.min_quantity} ${item.unit}</span>
+          <span>Seuil min : ${formatQuantity(item.min_quantity, item.unit)}</span>
           <span>${Math.round(pct)}%</span>
         </div>
         <div style="height:4px;background:var(--bg-sunken);border-radius:2px;overflow:hidden">
@@ -178,8 +185,9 @@ function renderStockCard(item) {
         </div>
       </div>
       ` : ''}
-      <div style="font-size:var(--text-xs);color:var(--text-tertiary)">
-        Màj : ${item.last_updated ? new Date(item.last_updated).toLocaleDateString('fr-FR') : '—'}
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:var(--text-xs);color:var(--text-tertiary)">
+        <span>Màj : ${item.last_updated ? new Date(item.last_updated).toLocaleDateString('fr-FR') : '—'}</span>
+        ${item.supplier_name ? `<span style="color:#8899aa;font-size:12px">${escapeHtml(item.supplier_name)}</span>` : ''}
       </div>
     </div>
   `;

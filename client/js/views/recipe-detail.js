@@ -71,15 +71,6 @@ async function renderRecipeDetail(id) {
       ${recipe.cooking_time_min ? `<span><i data-lucide="flame" style="width:16px;height:16px"></i> Cuisson : ${recipe.cooking_time_min} min</span>` : ''}
     </div>` : ''}
 
-    ${hasSubRecipes && perms.view_costs ? `
-    <div class="section-title">Arborescence des coûts</div>
-    <div class="recipe-tree">${renderIngredientTree(recipe.ingredients, perms)}</div>
-    <div class="recipe-tree-total">
-      <span style="font-weight:700">TOTAL MATIÈRE : ${formatCurrency(recipe.total_cost)}</span>
-      ${recipe.food_cost_percent != null ? ` <span class="margin-badge ${marginClass}" style="margin-left:8px">FOOD COST : ${formatPercent(recipe.food_cost_percent)}</span>` : ''}
-    </div>
-    ` : ''}
-
     <div class="section-title">Ingrédients</div>
     <div class="table-container">
       <table>
@@ -94,29 +85,7 @@ async function renderRecipeDetail(id) {
           </tr>
         </thead>
         <tbody>
-          ${recipe.ingredients.map(ing => {
-            if (ing.is_sub_recipe) {
-              return `
-              <tr style="background:var(--color-accent-light)">
-                <td>📋 <strong>${escapeHtml(ing.sub_recipe_name || 'Sous-recette')}</strong></td>
-                <td class="mono">${ing.gross_quantity} portion${ing.gross_quantity !== 1 ? 's' : ''}</td>
-                <td class="mono">—</td>
-                <td class="mono">—</td>
-                ${perms.view_costs ? `<td class="mono">${formatCurrency(ing.cost)}</td>` : ''}
-                <td style="font-size:var(--text-sm);color:var(--text-tertiary);font-style:italic">${escapeHtml(ing.notes || '')}</td>
-              </tr>`;
-            }
-            const waste = ing.custom_waste_percent ?? ing.default_waste_percent ?? 0;
-            return `
-            <tr>
-              <td>${escapeHtml(ing.ingredient_name)}</td>
-              <td class="mono">${ing.gross_quantity}${ing.unit}</td>
-              <td class="mono">${(ing.net_quantity || ing.gross_quantity).toFixed(1)}${ing.unit}</td>
-              <td class="mono">${waste}%</td>
-              ${perms.view_costs ? `<td class="mono">${formatCurrency(ing.cost)}</td>` : ''}
-              <td style="font-size:var(--text-sm);color:var(--text-tertiary);font-style:italic">${escapeHtml(ing.notes || '')}</td>
-            </tr>`;
-          }).join('')}
+          ${renderMergedIngredientRows(recipe.ingredients, perms, 0)}
           ${perms.view_costs ? `
           <tr class="total-row">
             <td colspan="4" style="font-weight:600">TOTAL</td>
@@ -147,6 +116,41 @@ async function renderRecipeDetail(id) {
   lucide.createIcons();
 }
 
+function renderMergedIngredientRows(ingredients, perms, depth) {
+  return ingredients.map(ing => {
+    const pad = depth * 24;
+    if (ing.is_sub_recipe) {
+      // Sub-recipe header row
+      let html = `
+        <tr style="background:${depth === 0 ? 'var(--color-accent-light)' : 'var(--bg-sunken)'}">
+          <td style="padding-left:${pad + 12}px">📋 <strong>${escapeHtml(ing.sub_recipe_name || 'Sous-recette')}</strong>
+            <span style="font-size:var(--text-xs);color:var(--text-tertiary);margin-left:4px">(×${ing.gross_quantity} portion${ing.gross_quantity !== 1 ? 's' : ''})</span>
+          </td>
+          <td class="mono">—</td>
+          <td class="mono">—</td>
+          <td class="mono">—</td>
+          ${perms.view_costs ? `<td class="mono">${formatCurrency(ing.cost)}</td>` : ''}
+          <td style="font-size:var(--text-sm);color:var(--text-tertiary);font-style:italic">${escapeHtml(ing.notes || '')}</td>
+        </tr>`;
+      // Sub-recipe children
+      if (ing.sub_recipe && ing.sub_recipe.ingredients && ing.sub_recipe.ingredients.length > 0) {
+        html += renderMergedIngredientRows(ing.sub_recipe.ingredients, perms, depth + 1);
+      }
+      return html;
+    }
+    const waste = ing.custom_waste_percent ?? ing.default_waste_percent ?? 0;
+    return `
+      <tr${depth > 0 ? ' style="color:var(--text-secondary)"' : ''}>
+        <td style="padding-left:${pad + 12}px">${depth > 0 ? '<span style="color:var(--text-tertiary);margin-right:4px">└</span>' : ''}${escapeHtml(ing.ingredient_name)}</td>
+        <td class="mono">${formatQuantity(ing.gross_quantity, ing.unit)}</td>
+        <td class="mono">${formatQuantity(ing.net_quantity || ing.gross_quantity, ing.unit)}</td>
+        <td class="mono">${waste}%</td>
+        ${perms.view_costs ? `<td class="mono">${formatCurrency(ing.cost)}</td>` : ''}
+        <td style="font-size:var(--text-sm);color:var(--text-tertiary);font-style:italic">${escapeHtml(ing.notes || '')}</td>
+      </tr>`;
+  }).join('');
+}
+
 function renderIngredientTree(ingredients, perms, indent = 0) {
   return ingredients.map(ing => {
     const prefix = indent > 0 ? '│   '.repeat(indent - 1) + '├── ' : '';
@@ -165,7 +169,7 @@ function renderIngredientTree(ingredients, perms, indent = 0) {
     } else {
       return `<div class="tree-line" style="padding-left:${indent * 20}px">
         <span class="tree-name">${escapeHtml(ing.ingredient_name || '')}</span>
-        <span class="tree-qty mono">× ${ing.gross_quantity}${ing.unit}</span>
+        <span class="tree-qty mono">× ${formatQuantity(ing.gross_quantity, ing.unit)}</span>
         ${perms.view_costs ? `<span class="tree-cost mono">— ${formatCurrency(ing.cost)}</span>` : ''}
       </div>`;
     }

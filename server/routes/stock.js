@@ -10,9 +10,14 @@ router.get('/', (req, res) => {
   const { q } = req.query;
   let sql = `
     SELECT s.*, i.name as ingredient_name, i.category, i.default_unit,
-           CASE WHEN s.quantity <= s.min_quantity AND s.min_quantity > 0 THEN 1 ELSE 0 END as is_alert
+           CASE WHEN s.quantity <= s.min_quantity AND s.min_quantity > 0 THEN 1 ELSE 0 END as is_alert,
+           sup.name as supplier_name
     FROM stock s
     JOIN ingredients i ON i.id = s.ingredient_id
+    LEFT JOIN suppliers sup ON sup.id = COALESCE(
+      i.preferred_supplier_id,
+      (SELECT sp.supplier_id FROM supplier_prices sp WHERE sp.ingredient_id = i.id ORDER BY sp.last_updated DESC LIMIT 1)
+    )
   `;
   const params = [];
   if (q) {
@@ -20,7 +25,11 @@ router.get('/', (req, res) => {
     params.push(`%${q}%`);
   }
   sql += ' ORDER BY is_alert DESC, i.category, i.name';
-  res.json(all(sql, params));
+
+  const items = all(sql, params);
+  const productCount = get('SELECT COUNT(*) as count FROM stock WHERE quantity > 0');
+
+  res.json({ items, product_count: productCount ? productCount.count : 0 });
 });
 
 // ═══════════════════════════════════════════

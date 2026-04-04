@@ -217,7 +217,7 @@ function renderDeliveryItemRow(item, isPending) {
   return `
     <tr style="border-bottom:1px solid var(--border-default)" data-item-id="${item.id}">
       <td style="padding:var(--space-3);font-weight:500">${escapeHtml(item.product_name)}</td>
-      <td style="padding:var(--space-3)">${item.quantity} ${escapeHtml(item.unit)}</td>
+      <td style="padding:var(--space-3)">${formatQuantity(item.quantity, item.unit)}</td>
       <td style="padding:var(--space-3);font-family:var(--font-mono,monospace);font-size:var(--text-xs)">${escapeHtml(item.batch_number || '—')}</td>
       <td style="padding:var(--space-3);${dlcWarning ? 'color:var(--color-warning);font-weight:700' : ''}">
         ${item.dlc || '—'}
