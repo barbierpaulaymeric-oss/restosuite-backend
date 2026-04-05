@@ -115,6 +115,7 @@ app.use('/api/purchase-orders', require('./routes/purchase-orders'));
 app.use('/api/qrcode', require('./routes/qrcode'));
 app.use('/api/menu', require('./routes/menu'));
 app.use('/api/alerts', require('./routes/alerts'));
+app.use('/api/service', require('./routes/service'));
 
 // Admin endpoints
 app.post('/api/admin/backup', (req, res) => {

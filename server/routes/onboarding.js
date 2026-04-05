@@ -129,18 +129,14 @@ router.put('/step/4', (req, res) => {
     return res.status(400).json({ error: 'Restaurant non trouvé' });
   }
 
-  const permissions = {
-    cuisinier: JSON.stringify({ view_recipes: true, view_costs: false, edit_recipes: false, view_suppliers: false, export_pdf: false }),
-    serveur: JSON.stringify({ view_recipes: true, view_costs: false, edit_recipes: false, view_suppliers: false, export_pdf: false }),
-    equipier: JSON.stringify({ view_recipes: true, view_costs: false, edit_recipes: false, view_suppliers: false, export_pdf: false })
-  };
+  const defaultPerms = JSON.stringify({ view_recipes: true, view_costs: false, edit_recipes: false, view_suppliers: false, export_pdf: false });
 
   if (Array.isArray(members)) {
     for (const m of members) {
       if (!m.name || !m.name.trim()) continue;
 
-      const role = m.role || 'equipier';
-      const perms = permissions[role] || permissions.equipier;
+      const role = m.role || 'cuisinier';
+      const perms = defaultPerms;
 
       run(
         `INSERT INTO accounts (name, pin, role, permissions, restaurant_id, trial_start)

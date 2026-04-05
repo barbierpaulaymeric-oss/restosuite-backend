@@ -651,7 +651,7 @@ function _getRoleLabel(role) {
     case 'cuisinier': return '👨‍🍳 Cuisinier';
     case 'salle': return '🍽️ Salle';
     case 'serveur': return '🍽️ Serveur';
-    default: return '👤 Équipier';
+    default: return role ? `👤 ${role.charAt(0).toUpperCase() + role.slice(1)}` : '👤 Membre';
   }
 }
 

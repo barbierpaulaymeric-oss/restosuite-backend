@@ -583,6 +583,101 @@ try {
   console.error('Migration supplier auth columns error:', e.message);
 }
 
+// ─── Migration: Make pin nullable in accounts (for staff who create PIN on first login) ───
+try {
+  const accPinCols = all("PRAGMA table_info(accounts)");
+  const pinCol = accPinCols.find(c => c.name === 'pin');
+  if (pinCol && pinCol.notnull === 1) {
+    // Get all current column names for the copy
+    const colNames = accPinCols.map(c => c.name).join(', ');
+    db.exec(`
+      CREATE TABLE accounts_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        pin TEXT,
+        role TEXT NOT NULL DEFAULT 'equipier',
+        permissions TEXT NOT NULL DEFAULT '{}',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_login DATETIME,
+        trial_start DATETIME,
+        email TEXT,
+        password_hash TEXT,
+        first_name TEXT,
+        last_name TEXT,
+        phone TEXT,
+        restaurant_id INTEGER REFERENCES restaurants(id),
+        onboarding_step INTEGER DEFAULT 0,
+        is_owner INTEGER DEFAULT 0,
+        referral_code TEXT,
+        referred_by TEXT,
+        referral_bonus_days INTEGER DEFAULT 0
+      );
+      INSERT INTO accounts_new (${colNames}) SELECT ${colNames} FROM accounts;
+      DROP TABLE accounts;
+      ALTER TABLE accounts_new RENAME TO accounts;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_email ON accounts(email) WHERE email IS NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_referral_code ON accounts(referral_code) WHERE referral_code IS NOT NULL;
+    `);
+    console.log('✅ Migration: made pin nullable in accounts');
+  }
+} catch (e) {
+  console.error('Migration nullable pin error:', e.message);
+}
+
+// ─── Migration: Add service_settings to restaurants ───
+try {
+  const restCols2 = all("PRAGMA table_info(restaurants)");
+  const restColNames = restCols2.map(c => c.name);
+  if (!restColNames.includes('service_start')) {
+    db.exec("ALTER TABLE restaurants ADD COLUMN service_start TEXT");
+    console.log('✅ Migration: added service_start to restaurants');
+  }
+  if (!restColNames.includes('service_end')) {
+    db.exec("ALTER TABLE restaurants ADD COLUMN service_end TEXT");
+    console.log('✅ Migration: added service_end to restaurants');
+  }
+  if (!restColNames.includes('service_active')) {
+    db.exec("ALTER TABLE restaurants ADD COLUMN service_active INTEGER DEFAULT 0");
+    console.log('✅ Migration: added service_active to restaurants');
+  }
+} catch (e) {
+  console.error('Migration service settings error:', e.message);
+}
+
+// ─── Migration: Service sessions table ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS service_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL REFERENCES restaurants(id),
+      started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      ended_at DATETIME,
+      scheduled_start TEXT,
+      scheduled_end TEXT,
+      total_orders INTEGER DEFAULT 0,
+      total_items INTEGER DEFAULT 0,
+      total_revenue REAL DEFAULT 0,
+      avg_ticket_time_min REAL,
+      peak_hour TEXT,
+      status TEXT DEFAULT 'active',
+      recap_sent INTEGER DEFAULT 0
+    );
+  `);
+} catch (e) {
+  // Table may already exist
+}
+
+// ─── Migration: Add custom_roles to restaurants ───
+try {
+  const restCols3 = all("PRAGMA table_info(restaurants)");
+  if (!restCols3.some(c => c.name === 'custom_roles')) {
+    db.exec("ALTER TABLE restaurants ADD COLUMN custom_roles TEXT");
+    console.log('✅ Migration: added custom_roles to restaurants');
+  }
+} catch (e) {
+  console.error('Migration custom_roles error:', e.message);
+}
+
 // ─── Seed: Common ingredients with prices ───
 try {
   const seedIngredients = require('./seed-ingredients');

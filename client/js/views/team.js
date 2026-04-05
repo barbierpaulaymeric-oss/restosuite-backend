@@ -22,11 +22,17 @@ async function renderTeam() {
     </div>
 
     <!-- Staff Password Section -->
-    <div style="background:var(--bg-card);border-radius:var(--border-radius);padding:var(--space-4);margin-bottom:var(--space-5);border:1px solid var(--border-color)">
-      <h3 style="margin-bottom:var(--space-2)">🔐 Mot de passe équipe</h3>
-      <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-3)">Code partagé avec votre staff pour se connecter au restaurant. Chaque membre crée ensuite son propre PIN personnel.</p>
-      <div style="display:flex;gap:var(--space-2)">
-        <input type="text" class="form-control" id="staff-password-input" placeholder="Nouveau code" autocomplete="off" style="max-width:200px;font-family:var(--font-mono);letter-spacing:0.05em">
+    <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-5);border:1px solid var(--border-color)">
+      <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+        <i data-lucide="lock" style="width:20px;height:20px;color:var(--color-accent)"></i>
+        <h3 style="margin:0;font-size:var(--text-lg)">Mot de passe équipe</h3>
+      </div>
+      <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-3)">Ce mot de passe est partagé avec votre staff pour accéder au restaurant. Chaque membre crée ensuite son propre PIN personnel.</p>
+      <div style="display:flex;gap:var(--space-2);align-items:center">
+        <input type="password" class="form-control" id="staff-password-input" placeholder="Nouveau mot de passe" autocomplete="new-password" style="max-width:280px">
+        <button class="btn btn-ghost" id="staff-password-toggle" style="padding:8px" title="Afficher/masquer">
+          <i data-lucide="eye" style="width:18px;height:18px" id="staff-password-eye"></i>
+        </button>
         <button class="btn btn-primary" id="staff-password-save-btn">Enregistrer</button>
       </div>
       <div id="staff-password-message" style="margin-top:var(--space-2);font-size:var(--text-sm)"></div>
@@ -34,16 +40,33 @@ async function renderTeam() {
 
     <div id="team-list"><div class="loading"><div class="spinner"></div></div></div>
 
-    <!-- Danger Zone -->
-    <div style="margin-top:var(--space-8);padding:var(--space-4);border:1px solid var(--color-danger);border-radius:var(--border-radius);background:var(--bg-card)">
-      <h3 style="color:var(--color-danger);margin-bottom:var(--space-2)">⚠️ Zone dangereuse</h3>
+    <!-- Danger Zone — styled to match site DA -->
+    <div style="margin-top:var(--space-8);padding:var(--space-4);border:1px solid rgba(217,48,37,0.3);border-radius:var(--radius-lg);background:linear-gradient(135deg, rgba(217,48,37,0.05), transparent)">
+      <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)">
+        <i data-lucide="alert-triangle" style="width:20px;height:20px;color:var(--color-danger)"></i>
+        <h3 style="color:var(--color-danger);margin:0;font-size:var(--text-base)">Zone dangereuse</h3>
+      </div>
       <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-3)">Supprimer votre compte et toutes les données du restaurant. Cette action est irréversible.</p>
-      <button class="btn btn-danger" id="delete-account-btn">
-        <i data-lucide="trash-2" style="width:16px;height:16px"></i> Supprimer mon compte
+      <button class="btn btn-sm" id="delete-account-btn" style="color:var(--color-danger);border:1px solid rgba(217,48,37,0.4);background:transparent;border-radius:var(--radius-md);padding:8px 16px;transition:var(--transition-base)">
+        <i data-lucide="trash-2" style="width:14px;height:14px"></i> Supprimer mon compte
       </button>
     </div>
   `;
   lucide.createIcons();
+
+  // Toggle password visibility
+  document.getElementById('staff-password-toggle').addEventListener('click', () => {
+    const input = document.getElementById('staff-password-input');
+    const icon = document.getElementById('staff-password-eye');
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.setAttribute('data-lucide', 'eye-off');
+    } else {
+      input.type = 'password';
+      icon.setAttribute('data-lucide', 'eye');
+    }
+    lucide.createIcons();
+  });
 
   // Delete own account handler
   document.getElementById('delete-account-btn').addEventListener('click', () => showDeleteAccountModal());
@@ -56,14 +79,14 @@ async function renderTeam() {
 
     if (!password || password.length < 4) {
       msg.style.color = 'var(--color-danger)';
-      msg.textContent = 'Le code doit faire au moins 4 caractères';
+      msg.textContent = 'Le mot de passe doit faire au moins 4 caractères';
       return;
     }
 
     try {
       await API.setStaffPassword(password);
       msg.style.color = 'var(--color-success)';
-      msg.textContent = 'Code enregistré ✓';
+      msg.textContent = 'Mot de passe enregistré ✓';
       input.value = '';
       setTimeout(() => msg.textContent = '', 3000);
     } catch (e) {
@@ -145,8 +168,8 @@ async function renderTeam() {
             <button class="btn btn-secondary btn-sm team-action" data-action="reset-pin" data-id="${m.id}" data-name="${escapeHtml(m.name)}" ${!m.has_pin ? 'disabled title="Pas de PIN à réinitialiser"' : ''}>
               <i data-lucide="key-round" style="width:14px;height:14px"></i> Reset PIN
             </button>
-            <button class="btn btn-danger btn-sm team-action" data-action="delete" data-id="${m.id}" data-name="${escapeHtml(m.name)}">
-              <i data-lucide="trash-2" style="width:14px;height:14px"></i> Supprimer
+            <button class="btn btn-sm team-action" data-action="delete" data-id="${m.id}" data-name="${escapeHtml(m.name)}" style="color:var(--color-danger);border:1px solid rgba(217,48,37,0.3);background:transparent">
+              <i data-lucide="trash-2" style="width:14px;height:14px"></i>
             </button>
           </div>
         </div>
@@ -199,11 +222,14 @@ function showAddMemberModal() {
       </div>
       <div class="form-group">
         <label>Rôle</label>
-        <select class="form-control" id="m-member-role">
-          <option value="cuisinier">👨‍🍳 Cuisinier — cuisine + stock + HACCP</option>
-          <option value="salle">🍽️ Salle — service + commandes</option>
-          <option value="equipier">👤 Équipier — accès limité</option>
-        </select>
+        <div style="display:flex;gap:var(--space-2)">
+          <select class="form-control" id="m-member-role" style="flex:1">
+            <option value="cuisinier">👨‍🍳 Cuisinier — cuisine + stock + HACCP</option>
+            <option value="salle">🍽️ Salle — service + commandes</option>
+            <option value="__custom__">✏️ Personnalisé…</option>
+          </select>
+          <input type="text" class="form-control" id="m-member-custom-role" placeholder="Ex: Pâtissier" style="flex:1;display:none">
+        </div>
       </div>
       <div id="m-member-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
       <div class="actions-row">
@@ -218,16 +244,25 @@ function showAddMemberModal() {
   document.body.appendChild(overlay);
   lucide.createIcons();
 
+  const roleSelect = overlay.querySelector('#m-member-role');
+  const customRoleInput = overlay.querySelector('#m-member-custom-role');
+  roleSelect.addEventListener('change', () => {
+    customRoleInput.style.display = roleSelect.value === '__custom__' ? '' : 'none';
+    if (roleSelect.value === '__custom__') customRoleInput.focus();
+  });
+
   overlay.querySelector('#m-member-cancel').onclick = () => overlay.remove();
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
   overlay.querySelector('#m-member-save').onclick = async () => {
     const name = document.getElementById('m-member-name').value.trim();
-    const role = document.getElementById('m-member-role').value;
+    let role = document.getElementById('m-member-role').value;
+    if (role === '__custom__') role = document.getElementById('m-member-custom-role').value.trim();
     const errorEl = document.getElementById('m-member-error');
     const caller = getAccount();
 
     if (!name) { errorEl.textContent = 'Le nom est requis'; return; }
+    if (!role) { errorEl.textContent = 'Le rôle est requis'; return; }
 
     try {
       await API.createAccount({ name, role, caller_id: caller.id });
@@ -244,6 +279,7 @@ function showAddMemberModal() {
 
 // ─── Edit Member Modal ───
 function showEditMemberModal(member) {
+  const isCustomRole = !['cuisinier', 'salle', 'serveur'].includes(member.role);
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
@@ -255,12 +291,17 @@ function showEditMemberModal(member) {
       </div>
       <div class="form-group">
         <label>Rôle</label>
-        <select class="form-control" id="m-edit-role">
-          <option value="cuisinier" ${member.role === 'cuisinier' ? 'selected' : ''}>👨‍🍳 Cuisinier</option>
-          <option value="salle" ${member.role === 'salle' ? 'selected' : ''}>🍽️ Salle</option>
-          <option value="serveur" ${member.role === 'serveur' ? 'selected' : ''}>🍽️ Serveur</option>
-          <option value="equipier" ${member.role === 'equipier' ? 'selected' : ''}>👤 Équipier</option>
-        </select>
+        <div style="display:flex;gap:var(--space-2)">
+          <select class="form-control" id="m-edit-role" style="flex:1">
+            <option value="cuisinier" ${member.role === 'cuisinier' ? 'selected' : ''}>👨‍🍳 Cuisinier</option>
+            <option value="salle" ${member.role === 'salle' ? 'selected' : ''}>🍽️ Salle</option>
+            <option value="serveur" ${member.role === 'serveur' ? 'selected' : ''}>🍽️ Serveur</option>
+            <option value="__custom__" ${isCustomRole ? 'selected' : ''}>✏️ Personnalisé…</option>
+          </select>
+          <input type="text" class="form-control" id="m-edit-custom-role" placeholder="Ex: Pâtissier"
+                 value="${escapeHtml(isCustomRole ? member.role : '')}"
+                 style="flex:1;${isCustomRole ? '' : 'display:none'}">
+        </div>
       </div>
       <div id="m-edit-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
       <div class="actions-row">
@@ -275,16 +316,25 @@ function showEditMemberModal(member) {
   document.body.appendChild(overlay);
   lucide.createIcons();
 
+  const roleSelect = overlay.querySelector('#m-edit-role');
+  const customInput = overlay.querySelector('#m-edit-custom-role');
+  roleSelect.addEventListener('change', () => {
+    customInput.style.display = roleSelect.value === '__custom__' ? '' : 'none';
+    if (roleSelect.value === '__custom__') customInput.focus();
+  });
+
   overlay.querySelector('#m-edit-cancel').onclick = () => overlay.remove();
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
   overlay.querySelector('#m-edit-save').onclick = async () => {
     const name = document.getElementById('m-edit-name').value.trim();
-    const role = document.getElementById('m-edit-role').value;
+    let role = document.getElementById('m-edit-role').value;
+    if (role === '__custom__') role = document.getElementById('m-edit-custom-role').value.trim();
     const errorEl = document.getElementById('m-edit-error');
     const caller = getAccount();
 
     if (!name) { errorEl.textContent = 'Le nom est requis'; return; }
+    if (!role) { errorEl.textContent = 'Le rôle est requis'; return; }
 
     try {
       await API.updateAccount(member.id, { name, role, caller_id: caller.id });
@@ -404,17 +454,11 @@ function showDeleteAccountModal() {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal">
-      <h2 style="color:var(--color-danger)">⚠️ Supprimer mon compte</h2>
-      <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-4)">
+      <h2 style="color:var(--color-danger)">Supprimer mon compte</h2>
+      <div style="background:rgba(217,48,37,0.06);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-4);border:1px solid rgba(217,48,37,0.15)">
         <p style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.6;margin:0">
-          Cette action va <strong style="color:var(--color-danger)">supprimer définitivement</strong> :
+          Cette action va <strong style="color:var(--color-danger)">supprimer définitivement</strong> votre compte gérant, tous les comptes équipe, le restaurant et toutes ses données (recettes, stocks, fournisseurs, commandes…).
         </p>
-        <ul style="font-size:var(--text-sm);color:var(--text-secondary);margin:var(--space-2) 0 0;padding-left:var(--space-4)">
-          <li>Votre compte gérant</li>
-          <li>Tous les comptes de votre équipe</li>
-          <li>Le restaurant et toutes ses données</li>
-          <li>Les recettes, stocks, fournisseurs, commandes...</li>
-        </ul>
       </div>
       <div class="form-group">
         <label style="font-weight:600">Tapez <span style="color:var(--color-danger);font-family:var(--font-mono)">SUPPRIMER</span> pour confirmer</label>
@@ -423,7 +467,7 @@ function showDeleteAccountModal() {
       </div>
       <div id="m-delete-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
       <div class="actions-row">
-        <button class="btn btn-danger" id="m-delete-submit" disabled>
+        <button class="btn" id="m-delete-submit" disabled style="color:white;background:var(--color-danger);border:none;border-radius:var(--radius-md);opacity:0.5;transition:var(--transition-base)">
           <i data-lucide="trash-2" style="width:18px;height:18px"></i> Supprimer définitivement
         </button>
         <button class="btn btn-secondary" id="m-delete-cancel">Annuler</button>
@@ -439,7 +483,9 @@ function showDeleteAccountModal() {
 
   // Enable button only when user types SUPPRIMER
   confirmInput.addEventListener('input', () => {
-    submitBtn.disabled = confirmInput.value.trim() !== 'SUPPRIMER';
+    const match = confirmInput.value.trim() === 'SUPPRIMER';
+    submitBtn.disabled = !match;
+    submitBtn.style.opacity = match ? '1' : '0.5';
   });
 
   overlay.querySelector('#m-delete-cancel').onclick = () => overlay.remove();
@@ -462,6 +508,7 @@ function showDeleteAccountModal() {
       errorEl.textContent = e.message || 'Erreur lors de la suppression';
       submitBtn.disabled = false;
       submitBtn.innerHTML = '<i data-lucide="trash-2" style="width:18px;height:18px"></i> Supprimer définitivement';
+      submitBtn.style.opacity = '1';
       if (window.lucide) lucide.createIcons();
     }
   });

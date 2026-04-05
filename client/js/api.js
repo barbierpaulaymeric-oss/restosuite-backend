@@ -169,9 +169,7 @@ const API = {
   deleteSelfAccount(confirmation) {
     return this.request('/accounts/self', { method: 'DELETE', body: { confirmation } });
   },
-  setStaffPassword(password) {
-    return this.request('/accounts/staff-password', { method: 'POST', body: { password } });
-  },
+  // setStaffPassword is defined in Staff Auth section above
 
   // ─── HACCP ───
   // Zones
@@ -380,6 +378,14 @@ const API = {
   receivePurchaseOrder(id, data) { return this.request(`/purchase-orders/${id}/receive`, { method: 'POST', body: data }); },
   deletePurchaseOrder(id) { return this.request(`/purchase-orders/${id}`, { method: 'DELETE' }); },
   getPurchaseOrderSuggestions() { return this.request('/purchase-orders/suggest'); },
+
+  // ─── Service Mode ───
+  getServiceConfig() { return this.request('/service/config'); },
+  updateServiceConfig(data) { return this.request('/service/config', { method: 'PUT', body: data }); },
+  startService() { return this.request('/service/start', { method: 'POST' }); },
+  stopService() { return this.request('/service/stop', { method: 'POST' }); },
+  getActiveService() { return this.request('/service/active'); },
+  getServiceRecap(id) { return this.request(`/service/recap/${id}`); },
 
   // AI
   parseVoice(text) {
