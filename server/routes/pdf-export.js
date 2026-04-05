@@ -53,7 +53,7 @@ function generatePDF(recipe, res) {
   // === HEADER ===
   // Title block
   doc.font('Helvetica-Bold').fontSize(HEADER_SIZE);
-  doc.text('RESTOSUITE AI', COL_LEFT_X, y, { width: LEFT_W });
+  doc.text('RESTOSUITE', COL_LEFT_X, y, { width: LEFT_W });
   doc.font('Helvetica').fontSize(8);
   doc.text('Fiche Technique Professionnelle', COL_LEFT_X, y + 14);
 

@@ -4,8 +4,12 @@
 
 const express = require('express');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { all, get, run } = require('../db');
 const router = express.Router();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'restosuite-dev-secret-2026';
 
 function hashPin(pin) {
   return crypto.createHash('sha256').update(pin).digest('hex');
@@ -33,14 +37,11 @@ function requireSupplierAuth(req, res, next) {
 // RESTAURANT SIDE (gérant)
 // ═════════════════════════════════════════
 
-// POST /invite — Create supplier access
+// POST /invite — Create supplier portal access
 router.post('/invite', (req, res) => {
-  const { supplier_id, pin, name, email } = req.body;
-  if (!supplier_id || !pin) {
-    return res.status(400).json({ error: 'supplier_id et pin requis' });
-  }
-  if (!/^\d{4,6}$/.test(pin)) {
-    return res.status(400).json({ error: 'Le PIN doit être entre 4 et 6 chiffres' });
+  const { supplier_id, pin, name, email, password } = req.body;
+  if (!supplier_id) {
+    return res.status(400).json({ error: 'supplier_id requis' });
   }
 
   const supplier = get('SELECT * FROM suppliers WHERE id = ?', [supplier_id]);
@@ -48,27 +49,39 @@ router.post('/invite', (req, res) => {
     return res.status(404).json({ error: 'Fournisseur introuvable' });
   }
 
-  // Check if supplier already has an account
-  const existing = get('SELECT id FROM supplier_accounts WHERE supplier_id = ?', [supplier_id]);
-  if (existing) {
-    return res.status(409).json({ error: 'Ce fournisseur a déjà un accès portail' });
+  // If email+password provided, set up company-level auth on the supplier
+  if (email && password) {
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Le mot de passe doit faire au moins 6 caractères' });
+    }
+    const emailLower = email.trim().toLowerCase();
+    const existingEmail = get('SELECT id FROM suppliers WHERE email = ? AND id != ?', [emailLower, supplier_id]);
+    if (existingEmail) {
+      return res.status(409).json({ error: 'Cet email est déjà utilisé par un autre fournisseur' });
+    }
+    const passwordHash = bcrypt.hashSync(password, 10);
+    run('UPDATE suppliers SET email = ?, password_hash = ?, contact_name = ? WHERE id = ?',
+      [emailLower, passwordHash, name || supplier.name, supplier_id]);
   }
 
-  const hashedPin = hashPin(pin);
-  const accountName = name || supplier.name;
+  // If PIN provided, create a member account within this supplier
+  if (pin) {
+    if (!/^\d{4,6}$/.test(pin)) {
+      return res.status(400).json({ error: 'Le PIN doit être entre 4 et 6 chiffres' });
+    }
+    const existing = get('SELECT id FROM supplier_accounts WHERE supplier_id = ?', [supplier_id]);
+    if (existing) {
+      return res.status(409).json({ error: 'Ce fournisseur a déjà un compte membre portail' });
+    }
+    const hashedPin = hashPin(pin);
+    const accountName = name || supplier.name;
+    run(
+      'INSERT INTO supplier_accounts (supplier_id, name, email, pin) VALUES (?, ?, ?, ?)',
+      [supplier_id, accountName, email || null, hashedPin]
+    );
+  }
 
-  const result = run(
-    'INSERT INTO supplier_accounts (supplier_id, name, email, pin) VALUES (?, ?, ?, ?)',
-    [supplier_id, accountName, email || supplier.email || null, hashedPin]
-  );
-
-  res.status(201).json({
-    id: result.lastInsertRowid,
-    supplier_id,
-    name: accountName,
-    email: email || supplier.email || null,
-    created_at: new Date().toISOString()
-  });
+  res.status(201).json({ success: true, supplier_id });
 });
 
 // GET /accounts — List supplier accounts
@@ -92,6 +105,41 @@ router.delete('/accounts/:id', (req, res) => {
   }
   run('DELETE FROM supplier_accounts WHERE id = ?', [id]);
   res.json({ success: true });
+});
+
+// POST /accounts/add-member — Add a member to a supplier company
+router.post('/accounts/add-member', (req, res) => {
+  const { supplier_id, name, pin, email } = req.body;
+  if (!supplier_id || !name || !pin) {
+    return res.status(400).json({ error: 'supplier_id, name et pin requis' });
+  }
+  if (!/^\d{4,6}$/.test(pin)) {
+    return res.status(400).json({ error: 'Le PIN doit être entre 4 et 6 chiffres' });
+  }
+
+  const supplier = get('SELECT * FROM suppliers WHERE id = ?', [supplier_id]);
+  if (!supplier) {
+    return res.status(404).json({ error: 'Fournisseur introuvable' });
+  }
+
+  // Check PIN uniqueness WITHIN this supplier only
+  const hashedPin = hashPin(pin);
+  const existingPin = get('SELECT id FROM supplier_accounts WHERE supplier_id = ? AND pin = ?', [supplier_id, hashedPin]);
+  if (existingPin) {
+    return res.status(409).json({ error: 'Ce PIN est déjà utilisé par un autre membre de votre entreprise' });
+  }
+
+  const result = run(
+    'INSERT INTO supplier_accounts (supplier_id, name, email, pin) VALUES (?, ?, ?, ?)',
+    [supplier_id, name, email || null, hashedPin]
+  );
+
+  res.status(201).json({
+    id: result.lastInsertRowid,
+    supplier_id,
+    name,
+    email: email || null
+  });
 });
 
 // GET /notifications — Price change notifications
@@ -129,22 +177,53 @@ router.put('/notifications/read-all', (req, res) => {
 // SUPPLIER SIDE (fournisseur)
 // ═════════════════════════════════════════
 
-// POST /login — Supplier login
-router.post('/login', (req, res) => {
-  const { supplier_id, pin } = req.body;
-  if (!supplier_id || !pin) {
-    return res.status(400).json({ error: 'Identifiant fournisseur et PIN requis' });
+// POST /company-login — Supplier company login with email + password
+// Returns supplier info + list of member accounts for the team picker
+router.post('/company-login', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email et mot de passe requis' });
   }
 
-  const account = get(`
-    SELECT sa.*, s.name as supplier_name
-    FROM supplier_accounts sa
-    JOIN suppliers s ON s.id = sa.supplier_id
-    WHERE sa.supplier_id = ?
-  `, [supplier_id]);
+  const supplier = get('SELECT * FROM suppliers WHERE email = ?', [email.trim().toLowerCase()]);
+  if (!supplier) {
+    return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+  }
+  if (!supplier.password_hash || !bcrypt.compareSync(password, supplier.password_hash)) {
+    return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+  }
 
+  // Get member accounts for this supplier company
+  const members = all(
+    'SELECT id, name, email FROM supplier_accounts WHERE supplier_id = ? ORDER BY name ASC',
+    [supplier.id]
+  );
+
+  res.json({
+    supplier_id: supplier.id,
+    supplier_name: supplier.name,
+    contact_name: supplier.contact_name,
+    members
+  });
+});
+
+// POST /member-pin — Supplier member PIN login (scoped to supplier company)
+router.post('/member-pin', (req, res) => {
+  const { supplier_id, account_id, pin } = req.body;
+  if (!supplier_id || !account_id || !pin) {
+    return res.status(400).json({ error: 'supplier_id, account_id et PIN requis' });
+  }
+  if (!/^\d{4,6}$/.test(pin.toString())) {
+    return res.status(400).json({ error: 'Le PIN doit être 4-6 chiffres' });
+  }
+
+  // Verify the account belongs to this supplier
+  const account = get(
+    'SELECT sa.*, s.name as supplier_name FROM supplier_accounts sa JOIN suppliers s ON s.id = sa.supplier_id WHERE sa.id = ? AND sa.supplier_id = ?',
+    [account_id, supplier_id]
+  );
   if (!account) {
-    return res.status(404).json({ error: 'Aucun accès portail pour ce fournisseur' });
+    return res.status(404).json({ error: 'Compte introuvable pour ce fournisseur' });
   }
 
   const hashedPin = hashPin(pin);
@@ -160,40 +239,49 @@ router.post('/login', (req, res) => {
     token,
     supplier_id: account.supplier_id,
     supplier_name: account.supplier_name,
+    account_id: account.id,
     name: account.name
   });
 });
 
-// POST /login-by-name — Supplier login by restaurant name
-router.post('/login-by-name', (req, res) => {
-  const { pin } = req.body;
-  if (!pin) {
-    return res.status(400).json({ error: 'PIN requis' });
+// POST /quick-login — Direct company login (no members, single-user supplier)
+// For suppliers with only one member account, skip the picker
+router.post('/quick-login', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email et mot de passe requis' });
   }
 
-  const hashedPin = hashPin(pin);
-
-  // Find supplier account matching this PIN
-  const account = get(`
-    SELECT sa.*, s.name as supplier_name
-    FROM supplier_accounts sa
-    JOIN suppliers s ON s.id = sa.supplier_id
-    WHERE sa.pin = ?
-  `, [hashedPin]);
-
-  if (!account) {
-    return res.status(401).json({ error: 'PIN incorrect ou aucun accès portail' });
+  const supplier = get('SELECT * FROM suppliers WHERE email = ?', [email.trim().toLowerCase()]);
+  if (!supplier) {
+    return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+  }
+  if (!supplier.password_hash || !bcrypt.compareSync(password, supplier.password_hash)) {
+    return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
   }
 
-  // Generate access token
-  const token = generateToken();
-  run('UPDATE supplier_accounts SET access_token = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?', [token, account.id]);
+  // If single member, auto-login
+  const members = all('SELECT * FROM supplier_accounts WHERE supplier_id = ?', [supplier.id]);
+  if (members.length === 1) {
+    const account = members[0];
+    const token = generateToken();
+    run('UPDATE supplier_accounts SET access_token = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?', [token, account.id]);
+    return res.json({
+      token,
+      supplier_id: supplier.id,
+      supplier_name: supplier.name,
+      account_id: account.id,
+      name: account.name,
+      auto_login: true
+    });
+  }
 
+  // Multiple members — return list for picker
   res.json({
-    token,
-    supplier_id: account.supplier_id,
-    supplier_name: account.supplier_name,
-    name: account.name
+    supplier_id: supplier.id,
+    supplier_name: supplier.name,
+    members: members.map(m => ({ id: m.id, name: m.name, email: m.email })),
+    auto_login: false
   });
 });
 

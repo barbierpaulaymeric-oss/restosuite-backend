@@ -1,6 +1,6 @@
-# RESTOSUITE AI — Document Maître
+# RESTOSUITE — Document Maître
 
-_Dernière mise à jour : 4 avril 2026_
+_Dernière mise à jour : 5 avril 2026_
 
 ---
 
@@ -56,17 +56,21 @@ www.restosuite.fr/demo-presentation.html → slides démo
 ## 4. Fonctionnalités
 
 ### ✅ Livrées
-- **Auth** — inscription email/mdp, JWT 30 jours, login PIN rapide pour équipiers
+- **Auth gérant** — inscription email/mdp, JWT 30 jours
+- **Auth staff** — mot de passe restaurant → sélection membre → PIN 4 chiffres → JWT
+- **Auth fournisseur** — email/mdp entreprise → sélection membre → PIN scopé par entreprise
 - **Onboarding** — wizard 7 étapes (profil, restaurant, salle, équipe, frigos, fournisseurs, première fiche)
 - **Fiches techniques** — recettes avec ingrédients, sous-recettes imbriquées, food cost cascade
 - **49 ingrédients seed** — prix marché France 2026
 - **Saisie vocale IA** — dicter une recette → fiche technique complète
 - **Gestion des stocks** — dashboard, réception, mouvements, alertes stock bas
-- **Commandes** — prise de commande par table, envoi cuisine, déduction stock automatique
-- **Interface salle** — login PIN, grille tables, prise de commande simplifiée
+- **Commandes fournisseurs** — bons de commande matières premières (brouillon → envoyée → confirmée → réceptionnée), suggestions automatiques basées sur stock bas, réception avec mise à jour stock/prix. Accessible depuis Fournisseurs ou Plus (pas dans la nav principale).
+- **Interface salle** — login PIN, grille tables, prise de commande tablette, suivi commandes temps réel, envoi en cuisine avec déduction stock
+- **Interface cuisine** — écran dédié plein écran (#/kitchen), tickets commandes temps réel, alerte sonore, marquage préparation/prêt. Rôle `cuisinier` auto-redirigé.
+- **Commandes QR (public)** — menu digital, commande client par QR code → validation serveur (utilise les anciennes tables orders/order_items)
 - **HACCP** — températures, nettoyage, traçabilité, alertes DLC, export PDF
 - **Suivi de lot** — bon de livraison fournisseur → réception → traçabilité lot → stock
-- **Portail fournisseur** — auth token, catalogue, notifications prix, bons de livraison
+- **Portail fournisseur** — auth email/mdp entreprise + PIN membre, catalogue, notifications prix, bons de livraison
 - **Scan facture IA** — photo → extraction produits/prix/lots via Gemini Vision
 - **Mercuriale** — suivi prix fournisseurs, alertes variation >10%, graphique SVG
 - **Suggestions menu IA** — plats rentables, plats à améliorer, suggestion du jour
@@ -74,6 +78,9 @@ www.restosuite.fr/demo-presentation.html → slides démo
 - **PWA** — installable iPhone/Android, icône écran d'accueil, cache offline
 - **Landing page** — site vitrine avec SEO, structured data, vidéo démo
 - **Blog SEO** — 3 articles (food cost, HACCP, stock)
+- **Command palette** — Ctrl+K pour navigation rapide entre modules
+- **Simulateur de prix** — slider interactif sur les fiches techniques
+- **Modales de confirmation** — remplacement de tous les `confirm()` natifs
 - **Light/dark mode**
 - **Export PDF** — fiches techniques, HACCP (fonctionne même après expiration trial)
 - **Import/Export CSV** — ingrédients
@@ -84,7 +91,6 @@ www.restosuite.fr/demo-presentation.html → slides démo
 - **Alertes proactives** — DLC, stock bas, températures hors seuil, livraisons en attente
 
 ### 🔜 À faire
-- Vidéo démo professionnelle (en cours)
 - Tests end-to-end complets
 - Emails transactionnels (J+1, J+15, J+25, J+30)
 - Multi-établissement réel (plan Business)
@@ -121,7 +127,7 @@ Détails complets dans `BRAND.md`.
 ## 7. Base de Données
 
 ### Tables principales
-`restaurants`, `accounts`, `subscriptions`, `ingredients`, `suppliers`, `supplier_prices`, `recipes`, `recipe_ingredients`, `recipe_steps`, `stock`, `stock_movements`, `orders`, `order_items`, `tables`
+`restaurants`, `accounts`, `subscriptions`, `ingredients`, `suppliers`, `supplier_prices`, `recipes`, `recipe_ingredients`, `recipe_steps`, `stock`, `stock_movements`, `orders`, `order_items`, `tables`, `purchase_orders`, `purchase_order_items`
 
 ### Tables HACCP
 `temperature_zones`, `temperature_logs`, `cleaning_tasks`, `cleaning_logs`, `traceability_logs`
@@ -136,10 +142,13 @@ Détails complets dans `BRAND.md`.
 
 ## 8. Routes API
 
-### Auth
-- `POST /api/auth/register` — inscription email/mdp
-- `POST /api/auth/login` — connexion email/mdp
-- `POST /api/auth/pin-login` — login rapide PIN
+### Auth (gérant + staff)
+- `POST /api/auth/register` — inscription email/mdp (gérant)
+- `POST /api/auth/login` — connexion email/mdp (gérant)
+- `POST /api/auth/pin-login` — login rapide PIN (legacy)
+- `POST /api/auth/staff-login` — mot de passe restaurant → liste équipiers
+- `POST /api/auth/staff-pin` — sélection équipier + PIN → JWT
+- `PUT /api/auth/staff-password` — gérant définit le mot de passe staff
 - `GET /api/auth/me` — infos utilisateur
 
 ### Onboarding
@@ -160,9 +169,15 @@ Détails complets dans `BRAND.md`.
 - `POST /api/stock/reception`
 - `GET /api/stock/movements`
 
-### Commandes
+### Commandes table (legacy, pour QR code)
 - `GET/POST /api/orders`
 - `POST /api/orders/:id/send` — envoi cuisine + déduction stock
+
+### Commandes fournisseurs
+- `GET/POST /api/purchase-orders` — CRUD bons de commande
+- `PUT /api/purchase-orders/:id` — mise à jour statut/items
+- `POST /api/purchase-orders/:id/receive` — réception → stock + prix
+- `GET /api/purchase-orders/suggest` — suggestions basées sur stock bas
 
 ### HACCP
 - `GET/POST /api/haccp/temperatures`
@@ -175,9 +190,16 @@ Détails complets dans `BRAND.md`.
 - `PUT /api/deliveries/:id/receive` — réception
 - `GET /api/deliveries/dlc-alerts`
 
-### Portail fournisseur (auth x-supplier-token)
-- `POST /api/supplier-portal/delivery-notes`
-- `GET /api/supplier-portal/delivery-notes`
+### Portail fournisseur
+- `POST /api/supplier-portal/company-login` — login entreprise email/mdp → liste membres
+- `POST /api/supplier-portal/quick-login` — login entreprise (auto-login si 1 membre)
+- `POST /api/supplier-portal/member-pin` — PIN scopé par entreprise → token
+- `POST /api/supplier-portal/invite` — créer accès fournisseur (email/mdp + PIN membre)
+- `POST /api/supplier-portal/accounts/add-member` — ajouter membre à une entreprise
+- `GET/DELETE /api/supplier-portal/accounts` — gérer comptes fournisseurs
+- `GET/POST/PUT/DELETE /api/supplier-portal/catalog` — catalogue produits
+- `POST /api/supplier-portal/delivery-notes` — créer bon de livraison
+- `GET /api/supplier-portal/delivery-notes` — lister bons de livraison
 
 ### IA
 - `POST /api/ai/voice-parse` — saisie vocale
@@ -225,6 +247,7 @@ STRIPE_WEBHOOK_SECRET
 | UX | 8.5/10 | 3 avril |
 | Business | ~55/100 | 3 avril |
 | Produit | 6.5/10 | 2 avril |
+| Audit code | 0 erreurs | 5 avril |
 
 Détails dans `UX_REVIEW.md`, `BUSINESS_REVIEW.md`, `PRODUCT_REVIEW.md`.
 
@@ -253,7 +276,22 @@ Détails dans `UX_REVIEW.md`, `BUSINESS_REVIEW.md`, `PRODUCT_REVIEW.md`.
 
 ---
 
-## 12. Git Commits (chronologique récent)
+## 12. Sessions de travail récentes
+
+### Session 5 avril 2026 (Claude Opus)
+- **Commandes fournisseurs** — Remplacement du module commandes table par un système de bons de commande matières premières (tables `purchase_orders` + `purchase_order_items`, route `purchase-orders.js`, workflow brouillon→envoyée→confirmée→réceptionnée)
+- **Séparation salle/cuisine** — Écran cuisine dédié (`kitchen.js`) à la route `#/kitchen`, plein écran avec tickets temps réel, alertes sonores, détection retards. Rôle `cuisinier` auto-redirigé.
+- **Auth staff 2 niveaux** — Mot de passe restaurant (bcrypt) → team picker → PIN 4 chiffres → JWT. Filtrage nav par `data-roles`, route guard dans router.js, modules invisibles si non autorisé.
+- **Auth fournisseur entreprise** — Remplacement du login par PIN global par un système email/mdp par entreprise fournisseur → sélection membre → PIN scopé. Colonnes `email`, `password_hash`, `contact_name` ajoutées à `suppliers`. Routes `company-login`, `quick-login`, `member-pin`, `accounts/add-member`. PIN unique par entreprise (plus de collision inter-fournisseurs).
+- **Vidéo démo** — Régénérée (67s, 1080p, musique ambient, 14 slides)
+- **Retrait badge AI** — Supprimé de tout le site (HTML, CSS, screenshots, vidéo, PDF), recentrage titres
+- **Logo outline** — Contour blanc épaissi (5-6px) pour lisibilité fond sombre
+- **Bugs fixés** — Typo `ingName` dans PUT recipes, CSV header ingredients, supplier DELETE manquant
+- **UX** — Command palette (Ctrl+K), simulateur prix, modales de confirmation custom, dashboard enrichi
+- **Validation serveur** — try-catch + validation input sur toutes les routes
+- **SEO** — Open Graph, structured data enrichi, FAQ schema, async font loading
+
+### Commits historiques
 
 ```
 124d9e0 fix: SIREN 930269063 in legal mentions

@@ -82,6 +82,9 @@ const API = {
   updateSupplier(id, data) {
     return this.request(`/suppliers/${id}`, { method: 'PUT', body: data });
   },
+  deleteSupplier(id) {
+    return this.request(`/suppliers/${id}`, { method: 'DELETE' });
+  },
   getSupplierPrices(id) {
     return this.request(`/suppliers/${id}/prices`);
   },
@@ -125,6 +128,17 @@ const API = {
     return this.request('/auth/me');
   },
 
+  // Staff Auth
+  staffLogin(password) {
+    return this.request('/auth/staff-login', { method: 'POST', body: { password } });
+  },
+  staffPinLogin(account_id, pin, is_creation = false) {
+    return this.request('/auth/staff-pin', { method: 'POST', body: { account_id, pin, is_creation } });
+  },
+  setStaffPassword(password) {
+    return this.request('/auth/staff-password', { method: 'PUT', body: { password } });
+  },
+
   // Onboarding
   getOnboardingStatus() {
     return this.request('/onboarding/status');
@@ -148,6 +162,15 @@ const API = {
   },
   deleteAccount(id, callerId) {
     return this.request(`/accounts/${id}?caller_id=${callerId}`, { method: 'DELETE' });
+  },
+  resetMemberPin(id, callerId) {
+    return this.request(`/accounts/${id}/reset-pin`, { method: 'PUT', body: { caller_id: callerId } });
+  },
+  deleteSelfAccount(confirmation) {
+    return this.request('/accounts/self', { method: 'DELETE', body: { confirmation } });
+  },
+  setStaffPassword(password) {
+    return this.request('/accounts/staff-password', { method: 'POST', body: { password } });
   },
 
   // ─── HACCP ───
@@ -246,8 +269,11 @@ const API = {
   },
 
   // ─── Supplier Portal (supplier side) ───
-  supplierLogin(pin) {
-    return this.request('/supplier-portal/login-by-name', { method: 'POST', body: { pin } });
+  supplierCompanyLogin(email, password) {
+    return this.request('/supplier-portal/quick-login', { method: 'POST', body: { email, password } });
+  },
+  supplierMemberPin(supplier_id, account_id, pin) {
+    return this.request('/supplier-portal/member-pin', { method: 'POST', body: { supplier_id, account_id, pin } });
   },
   supplierRequest(path, options = {}) {
     const token = getSupplierToken();
@@ -343,6 +369,18 @@ const API = {
   sendOrder(id) { return this.request(`/orders/${id}/send`, { method: 'POST' }); },
   cancelOrder(id) { return this.request(`/orders/${id}`, { method: 'DELETE' }); },
 
+  // ─── Purchase Orders ───
+  getPurchaseOrders(status) {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.request(`/purchase-orders${qs}`);
+  },
+  getPurchaseOrder(id) { return this.request(`/purchase-orders/${id}`); },
+  createPurchaseOrder(data) { return this.request('/purchase-orders', { method: 'POST', body: data }); },
+  updatePurchaseOrder(id, data) { return this.request(`/purchase-orders/${id}`, { method: 'PUT', body: data }); },
+  receivePurchaseOrder(id, data) { return this.request(`/purchase-orders/${id}/receive`, { method: 'POST', body: data }); },
+  deletePurchaseOrder(id) { return this.request(`/purchase-orders/${id}`, { method: 'DELETE' }); },
+  getPurchaseOrderSuggestions() { return this.request('/purchase-orders/suggest'); },
+
   // AI
   parseVoice(text) {
     return this.request('/ai/parse-voice', { method: 'POST', body: { text } });
@@ -381,6 +419,7 @@ function formatPercent(val) {
 
 function getMarginClass(foodCostPercent) {
   if (foodCostPercent == null) return '';
+  if (foodCostPercent === 0) return 'margin-undefined';
   if (foodCostPercent < 30) return 'margin-excellent';
   if (foodCostPercent <= 35) return 'margin-good';
   return 'margin-attention';

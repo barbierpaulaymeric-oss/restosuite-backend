@@ -87,27 +87,23 @@
       <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 28px; width: auto;">
     </div>
     <div class="nav-links">
-      <a href="#/" class="nav-link active" data-route="/">
+      <a href="#/" class="nav-link active" data-route="/" data-roles="gerant,cuisinier,equipier">
         <span class="nav-icon"><i data-lucide="clipboard-list"></i></span>
         <span class="nav-label">Fiches</span>
       </a>
-      <a href="#/stock" class="nav-link" data-route="/stock">
+      <a href="#/stock" class="nav-link" data-route="/stock" data-roles="gerant,cuisinier">
         <span class="nav-icon"><i data-lucide="warehouse"></i></span>
         <span class="nav-label">Stock</span>
       </a>
-      <a href="#/orders" class="nav-link" data-route="/orders">
-        <span class="nav-icon"><i data-lucide="clipboard-pen"></i></span>
-        <span class="nav-label">Commandes</span>
-      </a>
-      <a href="#/haccp" class="nav-link" data-route="/haccp">
+      <a href="#/haccp" class="nav-link" data-route="/haccp" data-roles="gerant,cuisinier">
         <span class="nav-icon"><i data-lucide="shield-check"></i></span>
         <span class="nav-label">HACCP</span>
       </a>
-      <a href="#/suppliers" class="nav-link" data-route="/suppliers">
+      <a href="#/suppliers" class="nav-link" data-route="/suppliers" data-roles="gerant">
         <span class="nav-icon"><i data-lucide="truck"></i></span>
         <span class="nav-label">Fournisseurs</span>
       </a>
-      <a href="#/more" class="nav-link" data-route="/more">
+      <a href="#/more" class="nav-link" data-route="/more" data-roles="gerant,cuisinier,equipier">
         <span class="nav-icon"><i data-lucide="menu"></i></span>
         <span class="nav-label">Plus</span>
       </a>
@@ -136,6 +132,7 @@
   <script src="js/views/haccp-traceability.js"></script>
   <script src="js/views/orders.js"></script>
   <script src="js/views/service.js"></script>
+  <script src="js/views/kitchen.js"></script>
   <script src="js/views/analytics.js"></script>
   <script src="js/views/more.js"></script>
   <script src="js/views/onboarding.js"></script>
@@ -150,6 +147,7 @@
   <script src="js/views/scan-invoice.js"></script>
   <script src="js/views/mercuriale.js"></script>
   <script src="js/views/qrcodes.js"></script>
+  <script src="js/views/command-palette.js"></script>
   <script src="js/router.js"></script>
   <script src="js/app.js"></script>
   <script>

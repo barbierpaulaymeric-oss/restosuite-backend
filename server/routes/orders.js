@@ -53,39 +53,52 @@ router.get('/:id', (req, res) => {
 // POST /api/orders — Créer une commande
 // ═══════════════════════════════════════════
 router.post('/', (req, res) => {
-  const { table_number, items, notes } = req.body;
-  if (!table_number) return res.status(400).json({ error: 'table_number requis' });
-  if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: 'Au moins un item requis' });
-  }
+  try {
+    const { table_number, items, notes } = req.body;
 
-  const transaction = db.transaction(() => {
-    // Calculate total
-    let totalCost = 0;
+    if (!table_number) return res.status(400).json({ error: 'table_number requis' });
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Au moins un item requis' });
+    }
+
+    // Validate items have required fields
     for (const item of items) {
-      const recipe = get('SELECT selling_price FROM recipes WHERE id = ?', [item.recipe_id]);
-      if (recipe && recipe.selling_price) {
-        totalCost += recipe.selling_price * (item.quantity || 1);
+      if (!item.recipe_id) {
+        return res.status(400).json({ error: 'recipe_id est requis pour chaque item' });
+      }
+      if (item.quantity !== undefined && item.quantity !== null) {
+        if (typeof item.quantity !== 'number' || item.quantity <= 0) {
+          return res.status(400).json({ error: 'quantity must be a positive number' });
+        }
       }
     }
 
-    const orderInfo = run(
-      'INSERT INTO orders (table_number, notes, total_cost) VALUES (?, ?, ?)',
-      [table_number, notes || null, Math.round(totalCost * 100) / 100]
-    );
-    const orderId = orderInfo.lastInsertRowid;
+    const transaction = db.transaction(() => {
+      // Calculate total
+      let totalCost = 0;
+      for (const item of items) {
+        const recipe = get('SELECT selling_price FROM recipes WHERE id = ?', [item.recipe_id]);
+        if (recipe && recipe.selling_price) {
+          totalCost += recipe.selling_price * (item.quantity || 1);
+        }
+      }
 
-    for (const item of items) {
-      run(
-        'INSERT INTO order_items (order_id, recipe_id, quantity, notes) VALUES (?, ?, ?, ?)',
-        [orderId, item.recipe_id, item.quantity || 1, item.notes || null]
+      const orderInfo = run(
+        'INSERT INTO orders (table_number, notes, total_cost) VALUES (?, ?, ?)',
+        [table_number, notes || null, Math.round(totalCost * 100) / 100]
       );
-    }
+      const orderId = orderInfo.lastInsertRowid;
 
-    return orderId;
-  });
+      for (const item of items) {
+        run(
+          'INSERT INTO order_items (order_id, recipe_id, quantity, notes) VALUES (?, ?, ?, ?)',
+          [orderId, item.recipe_id, item.quantity || 1, item.notes || null]
+        );
+      }
 
-  try {
+      return orderId;
+    });
+
     const orderId = transaction();
     const order = get('SELECT * FROM orders WHERE id = ?', [orderId]);
     const orderItems = all(`
@@ -96,7 +109,7 @@ router.post('/', (req, res) => {
     `, [orderId]);
     res.status(201).json({ ...order, items: orderItems });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

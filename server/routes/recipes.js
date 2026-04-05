@@ -222,126 +222,214 @@ router.get('/:id/ingredients-flat', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, ingredients, steps, recipe_type } = req.body;
-  if (!name) return res.status(400).json({ error: 'name is required' });
+  try {
+    const { name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, ingredients, steps, recipe_type } = req.body;
 
-  const info = run(
-    'INSERT INTO recipes (name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, recipe_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [name, category || null, portions || 1, prep_time_min || null, cooking_time_min || null, selling_price || null, notes || null, recipe_type || 'plat']
-  );
-  const recipeId = info.lastInsertRowid;
+    // Validate required fields
+    if (!name) return res.status(400).json({ error: 'name is required' });
 
-  if (ingredients && ingredients.length > 0) {
-    for (const ing of ingredients) {
-      if (ing.sub_recipe_id) {
-        // Sub-recipe ingredient
-        run(
-          'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, sub_recipe_id, gross_quantity, net_quantity, unit, notes) VALUES (?, NULL, ?, ?, ?, ?, ?)',
-          [recipeId, ing.sub_recipe_id, ing.gross_quantity || 1, ing.gross_quantity || 1, 'portion', ing.notes || null]
-        );
-        continue;
+    // Validate portions (must be positive integer)
+    if (portions !== undefined && portions !== null) {
+      if (!Number.isInteger(portions) || portions <= 0) {
+        return res.status(400).json({ error: 'portions must be a positive integer' });
       }
+    }
 
-      let ingredientId = ing.ingredient_id;
-      const ingName = ing.name || ing.ingredient_name;
-      if (!ingredientId && ingName) {
-        const existing = get('SELECT id FROM ingredients WHERE name = ?', [ingName.trim().toLowerCase()]);
-        if (existing) {
-          ingredientId = existing.id;
-        } else {
-          const newIng = run(
-            'INSERT INTO ingredients (name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?)',
-            [ingName.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
-          );
-          ingredientId = newIng.lastInsertRowid;
+    // Validate selling_price (must be positive number if provided)
+    if (selling_price !== undefined && selling_price !== null) {
+      if (typeof selling_price !== 'number' || selling_price < 0) {
+        return res.status(400).json({ error: 'selling_price must be a non-negative number' });
+      }
+    }
+
+    // Validate prep_time_min (must be positive integer if provided)
+    if (prep_time_min !== undefined && prep_time_min !== null) {
+      if (!Number.isInteger(prep_time_min) || prep_time_min < 0) {
+        return res.status(400).json({ error: 'prep_time_min must be a non-negative integer' });
+      }
+    }
+
+    // Validate cooking_time_min (must be positive integer if provided)
+    if (cooking_time_min !== undefined && cooking_time_min !== null) {
+      if (!Number.isInteger(cooking_time_min) || cooking_time_min < 0) {
+        return res.status(400).json({ error: 'cooking_time_min must be a non-negative integer' });
+      }
+    }
+
+    // Validate ingredients array items
+    if (ingredients && ingredients.length > 0) {
+      for (const ing of ingredients) {
+        if (ing.gross_quantity !== undefined && ing.gross_quantity !== null) {
+          if (typeof ing.gross_quantity !== 'number' || ing.gross_quantity <= 0) {
+            return res.status(400).json({ error: 'All ingredient gross_quantity values must be positive numbers' });
+          }
         }
       }
-      const wastePercent = ing.custom_waste_percent ?? ing.waste_percent ?? null;
-      const grossQty = ing.gross_quantity;
-      const netQty = ing.net_quantity ?? (wastePercent != null ? grossQty * (1 - wastePercent / 100) : grossQty);
-      run(
-        'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, gross_quantity, net_quantity, unit, custom_waste_percent, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [recipeId, ingredientId, grossQty, netQty, ing.unit || 'g', wastePercent, ing.notes || null]
-      );
     }
-  }
 
-  if (steps && steps.length > 0) {
-    steps.forEach((step, i) => {
-      const instruction = typeof step === 'string' ? step : step.instruction;
-      run('INSERT INTO recipe_steps (recipe_id, step_number, instruction) VALUES (?, ?, ?)', [recipeId, i + 1, instruction]);
-    });
-  }
+    const info = run(
+      'INSERT INTO recipes (name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, recipe_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, category || null, portions || 1, prep_time_min || null, cooking_time_min || null, selling_price || null, notes || null, recipe_type || 'plat']
+    );
+    const recipeId = info.lastInsertRowid;
 
-  res.status(201).json(getFullRecipe(recipeId));
+    if (ingredients && ingredients.length > 0) {
+      for (const ing of ingredients) {
+        if (ing.sub_recipe_id) {
+          // Sub-recipe ingredient
+          run(
+            'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, sub_recipe_id, gross_quantity, net_quantity, unit, notes) VALUES (?, NULL, ?, ?, ?, ?, ?)',
+            [recipeId, ing.sub_recipe_id, ing.gross_quantity || 1, ing.gross_quantity || 1, 'portion', ing.notes || null]
+          );
+          continue;
+        }
+
+        let ingredientId = ing.ingredient_id;
+        const ingName = ing.name || ing.ingredient_name;
+        if (!ingredientId && ingName) {
+          const existing = get('SELECT id FROM ingredients WHERE name = ?', [ingName.trim().toLowerCase()]);
+          if (existing) {
+            ingredientId = existing.id;
+          } else {
+            const newIng = run(
+              'INSERT INTO ingredients (name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?)',
+              [ingName.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
+            );
+            ingredientId = newIng.lastInsertRowid;
+          }
+        }
+        const wastePercent = ing.custom_waste_percent ?? ing.waste_percent ?? null;
+        const grossQty = ing.gross_quantity;
+        const netQty = ing.net_quantity ?? (wastePercent != null ? grossQty * (1 - wastePercent / 100) : grossQty);
+        run(
+          'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, gross_quantity, net_quantity, unit, custom_waste_percent, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [recipeId, ingredientId, grossQty, netQty, ing.unit || 'g', wastePercent, ing.notes || null]
+        );
+      }
+    }
+
+    if (steps && steps.length > 0) {
+      steps.forEach((step, i) => {
+        const instruction = typeof step === 'string' ? step : step.instruction;
+        run('INSERT INTO recipe_steps (recipe_id, step_number, instruction) VALUES (?, ?, ?)', [recipeId, i + 1, instruction]);
+      });
+    }
+
+    res.status(201).json(getFullRecipe(recipeId));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
 router.put('/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const existing = get('SELECT * FROM recipes WHERE id = ?', [id]);
-  if (!existing) return res.status(404).json({ error: 'not found' });
+  try {
+    const id = Number(req.params.id);
+    const existing = get('SELECT * FROM recipes WHERE id = ?', [id]);
+    if (!existing) return res.status(404).json({ error: 'not found' });
 
-  const { name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, ingredients, steps, recipe_type } = req.body;
+    const { name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, ingredients, steps, recipe_type } = req.body;
 
-  run(
-    'UPDATE recipes SET name = ?, category = ?, portions = ?, prep_time_min = ?, cooking_time_min = ?, selling_price = ?, notes = ?, recipe_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    [
-      name || existing.name,
-      category !== undefined ? category : existing.category,
-      portions || existing.portions,
-      prep_time_min !== undefined ? prep_time_min : existing.prep_time_min,
-      cooking_time_min !== undefined ? cooking_time_min : existing.cooking_time_min,
-      selling_price !== undefined ? selling_price : existing.selling_price,
-      notes !== undefined ? notes : existing.notes,
-      recipe_type !== undefined ? recipe_type : (existing.recipe_type || 'plat'),
-      id
-    ]
-  );
-
-  if (ingredients) {
-    run('DELETE FROM recipe_ingredients WHERE recipe_id = ?', [id]);
-    for (const ing of ingredients) {
-      if (ing.sub_recipe_id) {
-        run(
-          'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, sub_recipe_id, gross_quantity, net_quantity, unit, notes) VALUES (?, NULL, ?, ?, ?, ?, ?)',
-          [id, ing.sub_recipe_id, ing.gross_quantity || 1, ing.gross_quantity || 1, 'portion', ing.notes || null]
-        );
-        continue;
+    // Validate portions (must be positive integer if provided)
+    if (portions !== undefined && portions !== null) {
+      if (!Number.isInteger(portions) || portions <= 0) {
+        return res.status(400).json({ error: 'portions must be a positive integer' });
       }
+    }
 
-      let ingredientId = ing.ingredient_id;
-      const ingName2 = ing.name || ing.ingredient_name;
-      if (!ingredientId && ingName2) {
-        const ex = get('SELECT id FROM ingredients WHERE name = ?', [ingName2.trim().toLowerCase()]);
-        if (ex) {
-          ingredientId = ex.id;
-        } else {
-          const newIng = run(
-            'INSERT INTO ingredients (name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?)',
-            [ingName.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
-          );
-          ingredientId = newIng.lastInsertRowid;
+    // Validate selling_price (must be non-negative number if provided)
+    if (selling_price !== undefined && selling_price !== null) {
+      if (typeof selling_price !== 'number' || selling_price < 0) {
+        return res.status(400).json({ error: 'selling_price must be a non-negative number' });
+      }
+    }
+
+    // Validate prep_time_min (must be non-negative integer if provided)
+    if (prep_time_min !== undefined && prep_time_min !== null) {
+      if (!Number.isInteger(prep_time_min) || prep_time_min < 0) {
+        return res.status(400).json({ error: 'prep_time_min must be a non-negative integer' });
+      }
+    }
+
+    // Validate cooking_time_min (must be non-negative integer if provided)
+    if (cooking_time_min !== undefined && cooking_time_min !== null) {
+      if (!Number.isInteger(cooking_time_min) || cooking_time_min < 0) {
+        return res.status(400).json({ error: 'cooking_time_min must be a non-negative integer' });
+      }
+    }
+
+    // Validate ingredients array items
+    if (ingredients && ingredients.length > 0) {
+      for (const ing of ingredients) {
+        if (ing.gross_quantity !== undefined && ing.gross_quantity !== null) {
+          if (typeof ing.gross_quantity !== 'number' || ing.gross_quantity <= 0) {
+            return res.status(400).json({ error: 'All ingredient gross_quantity values must be positive numbers' });
+          }
         }
       }
-      const wastePercent = ing.custom_waste_percent ?? ing.waste_percent ?? null;
-      const grossQty = ing.gross_quantity;
-      const netQty = ing.net_quantity ?? (wastePercent != null ? grossQty * (1 - wastePercent / 100) : grossQty);
-      run(
-        'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, gross_quantity, net_quantity, unit, custom_waste_percent, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [id, ingredientId, grossQty, netQty, ing.unit || 'g', wastePercent, ing.notes || null]
-      );
     }
-  }
 
-  if (steps) {
-    run('DELETE FROM recipe_steps WHERE recipe_id = ?', [id]);
-    steps.forEach((step, i) => {
-      const instruction = typeof step === 'string' ? step : step.instruction;
-      run('INSERT INTO recipe_steps (recipe_id, step_number, instruction) VALUES (?, ?, ?)', [id, i + 1, instruction]);
-    });
-  }
+    run(
+      'UPDATE recipes SET name = ?, category = ?, portions = ?, prep_time_min = ?, cooking_time_min = ?, selling_price = ?, notes = ?, recipe_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [
+        name || existing.name,
+        category !== undefined ? category : existing.category,
+        portions || existing.portions,
+        prep_time_min !== undefined ? prep_time_min : existing.prep_time_min,
+        cooking_time_min !== undefined ? cooking_time_min : existing.cooking_time_min,
+        selling_price !== undefined ? selling_price : existing.selling_price,
+        notes !== undefined ? notes : existing.notes,
+        recipe_type !== undefined ? recipe_type : (existing.recipe_type || 'plat'),
+        id
+      ]
+    );
 
-  res.json(getFullRecipe(id));
+    if (ingredients) {
+      run('DELETE FROM recipe_ingredients WHERE recipe_id = ?', [id]);
+      for (const ing of ingredients) {
+        if (ing.sub_recipe_id) {
+          run(
+            'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, sub_recipe_id, gross_quantity, net_quantity, unit, notes) VALUES (?, NULL, ?, ?, ?, ?, ?)',
+            [id, ing.sub_recipe_id, ing.gross_quantity || 1, ing.gross_quantity || 1, 'portion', ing.notes || null]
+          );
+          continue;
+        }
+
+        let ingredientId = ing.ingredient_id;
+        const ingName2 = ing.name || ing.ingredient_name;
+        if (!ingredientId && ingName2) {
+          const ex = get('SELECT id FROM ingredients WHERE name = ?', [ingName2.trim().toLowerCase()]);
+          if (ex) {
+            ingredientId = ex.id;
+          } else {
+            const newIng = run(
+              'INSERT INTO ingredients (name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?)',
+              [ingName2.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
+            );
+            ingredientId = newIng.lastInsertRowid;
+          }
+        }
+        const wastePercent = ing.custom_waste_percent ?? ing.waste_percent ?? null;
+        const grossQty = ing.gross_quantity;
+        const netQty = ing.net_quantity ?? (wastePercent != null ? grossQty * (1 - wastePercent / 100) : grossQty);
+        run(
+          'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, gross_quantity, net_quantity, unit, custom_waste_percent, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [id, ingredientId, grossQty, netQty, ing.unit || 'g', wastePercent, ing.notes || null]
+        );
+      }
+    }
+
+    if (steps) {
+      run('DELETE FROM recipe_steps WHERE recipe_id = ?', [id]);
+      steps.forEach((step, i) => {
+        const instruction = typeof step === 'string' ? step : step.instruction;
+        run('INSERT INTO recipe_steps (recipe_id, step_number, instruction) VALUES (?, ?, ?)', [id, i + 1, instruction]);
+      });
+    }
+
+    res.json(getFullRecipe(id));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
 router.delete('/:id', (req, res) => {

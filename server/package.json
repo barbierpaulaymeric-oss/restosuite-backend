@@ -1,7 +1,7 @@
 {
   "name": "restosuite-server",
   "version": "1.0.0",
-  "description": "RestoSuite AI — Professional restaurant recipe & fiche technique management",
+  "description": "RestoSuite — Professional restaurant recipe & fiche technique management",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

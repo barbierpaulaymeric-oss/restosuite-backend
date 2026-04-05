@@ -4,7 +4,7 @@ const router = Router();
 
 router.get('/export-csv', (req, res) => {
   const rows = all('SELECT * FROM ingredients ORDER BY name');
-  const header = 'nom;catégorie;unité;prix_au_kg;pourcentage_perte';
+  const header = 'nom;catégorie;unité;prix_unitaire;pourcentage_perte';
   const lines = rows.map(r =>
     `${r.name};${r.category || ''};${r.default_unit || 'g'};${r.price_per_unit || 0};${r.waste_percent || 0}`
   );
@@ -23,36 +23,77 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, category, default_unit, waste_percent, allergens, price_per_unit, price_unit } = req.body;
-  if (!name) return res.status(400).json({ error: 'name is required' });
-  const normalized = name.trim().toLowerCase();
-  const existing = get('SELECT * FROM ingredients WHERE name = ?', [normalized]);
-  if (existing) return res.json(existing);
-  const info = run(
-    'INSERT INTO ingredients (name, category, default_unit, waste_percent, allergens, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [normalized, category || null, default_unit || 'g', waste_percent || 0, allergens || null, price_per_unit || 0, price_unit || 'kg']
-  );
-  res.status(201).json(get('SELECT * FROM ingredients WHERE id = ?', [info.lastInsertRowid]));
+  try {
+    const { name, category, default_unit, waste_percent, allergens, price_per_unit, price_unit } = req.body;
+
+    if (!name) return res.status(400).json({ error: 'name is required' });
+
+    // Validate waste_percent (must be 0-100 range)
+    if (waste_percent !== undefined && waste_percent !== null) {
+      if (typeof waste_percent !== 'number' || waste_percent < 0 || waste_percent > 100) {
+        return res.status(400).json({ error: 'waste_percent must be between 0 and 100' });
+      }
+    }
+
+    // Validate price_per_unit (must be non-negative)
+    if (price_per_unit !== undefined && price_per_unit !== null) {
+      if (typeof price_per_unit !== 'number' || price_per_unit < 0) {
+        return res.status(400).json({ error: 'price_per_unit must be a non-negative number' });
+      }
+    }
+
+    const normalized = name.trim().toLowerCase();
+    const existing = get('SELECT * FROM ingredients WHERE name = ?', [normalized]);
+    if (existing) return res.json(existing);
+
+    const info = run(
+      'INSERT INTO ingredients (name, category, default_unit, waste_percent, allergens, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [normalized, category || null, default_unit || 'g', waste_percent || 0, allergens || null, price_per_unit || 0, price_unit || 'kg']
+    );
+    res.status(201).json(get('SELECT * FROM ingredients WHERE id = ?', [info.lastInsertRowid]));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
 router.put('/:id', (req, res) => {
-  const existing = get('SELECT * FROM ingredients WHERE id = ?', [Number(req.params.id)]);
-  if (!existing) return res.status(404).json({ error: 'not found' });
-  const { name, category, default_unit, waste_percent, allergens, price_per_unit, price_unit } = req.body;
-  run(
-    'UPDATE ingredients SET name = ?, category = ?, default_unit = ?, waste_percent = ?, allergens = ?, price_per_unit = ?, price_unit = ? WHERE id = ?',
-    [
-      name ? name.trim().toLowerCase() : existing.name,
-      category !== undefined ? category : existing.category,
-      default_unit || existing.default_unit,
-      waste_percent !== undefined ? waste_percent : existing.waste_percent,
-      allergens !== undefined ? allergens : existing.allergens,
-      price_per_unit !== undefined ? price_per_unit : (existing.price_per_unit || 0),
-      price_unit !== undefined ? price_unit : (existing.price_unit || 'kg'),
-      Number(req.params.id)
-    ]
-  );
-  res.json(get('SELECT * FROM ingredients WHERE id = ?', [Number(req.params.id)]));
+  try {
+    const existing = get('SELECT * FROM ingredients WHERE id = ?', [Number(req.params.id)]);
+    if (!existing) return res.status(404).json({ error: 'not found' });
+
+    const { name, category, default_unit, waste_percent, allergens, price_per_unit, price_unit } = req.body;
+
+    // Validate waste_percent (must be 0-100 range if provided)
+    if (waste_percent !== undefined && waste_percent !== null) {
+      if (typeof waste_percent !== 'number' || waste_percent < 0 || waste_percent > 100) {
+        return res.status(400).json({ error: 'waste_percent must be between 0 and 100' });
+      }
+    }
+
+    // Validate price_per_unit (must be non-negative if provided)
+    if (price_per_unit !== undefined && price_per_unit !== null) {
+      if (typeof price_per_unit !== 'number' || price_per_unit < 0) {
+        return res.status(400).json({ error: 'price_per_unit must be a non-negative number' });
+      }
+    }
+
+    run(
+      'UPDATE ingredients SET name = ?, category = ?, default_unit = ?, waste_percent = ?, allergens = ?, price_per_unit = ?, price_unit = ? WHERE id = ?',
+      [
+        name ? name.trim().toLowerCase() : existing.name,
+        category !== undefined ? category : existing.category,
+        default_unit || existing.default_unit,
+        waste_percent !== undefined ? waste_percent : existing.waste_percent,
+        allergens !== undefined ? allergens : existing.allergens,
+        price_per_unit !== undefined ? price_per_unit : (existing.price_per_unit || 0),
+        price_unit !== undefined ? price_unit : (existing.price_unit || 'kg'),
+        Number(req.params.id)
+      ]
+    );
+    res.json(get('SELECT * FROM ingredients WHERE id = ?', [Number(req.params.id)]));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
 router.delete('/:id', (req, res) => {

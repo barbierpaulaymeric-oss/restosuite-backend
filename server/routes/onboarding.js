@@ -122,7 +122,7 @@ router.put('/step/3', (req, res) => {
 
 // ─── PUT /api/onboarding/step/4 — Équipe ───
 router.put('/step/4', (req, res) => {
-  const { members } = req.body;
+  const { members, staff_password } = req.body;
   const account = get('SELECT restaurant_id FROM accounts WHERE id = ?', [req.user.id]);
 
   if (!account || !account.restaurant_id) {
@@ -137,18 +137,24 @@ router.put('/step/4', (req, res) => {
 
   if (Array.isArray(members)) {
     for (const m of members) {
-      if (!m.name || !m.pin || !/^\d{4}$/.test(m.pin)) continue;
+      if (!m.name || !m.name.trim()) continue;
 
       const role = m.role || 'equipier';
       const perms = permissions[role] || permissions.equipier;
-      const hashedPin = hashPin(m.pin);
 
       run(
         `INSERT INTO accounts (name, pin, role, permissions, restaurant_id, trial_start)
          VALUES (?, ?, ?, ?, ?, datetime('now'))`,
-        [m.name.trim(), hashedPin, role, perms, account.restaurant_id]
+        [m.name.trim(), null, role, perms, account.restaurant_id]
       );
     }
+  }
+
+  // Set staff password if provided
+  if (staff_password && staff_password.trim()) {
+    const bcrypt = require('bcryptjs');
+    const staffHash = bcrypt.hashSync(staff_password.trim(), 10);
+    run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [staffHash, account.restaurant_id]);
   }
 
   run('UPDATE accounts SET onboarding_step = MAX(onboarding_step, 4) WHERE id = ?', [req.user.id]);

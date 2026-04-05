@@ -5,9 +5,24 @@
 async function renderDashboard() {
   const app = document.getElementById('app');
   const perms = getPermissions();
+  const account = getAccount();
+  const greeting = getGreeting(account ? account.name : 'Chef');
+  const todayDate = formatFrenchDate(new Date());
+
   app.innerHTML = `
+    <div id="dashboard-greeting" style="margin-bottom:var(--space-4)">
+      <div style="padding:var(--space-4);background:var(--color-accent-light);border-radius:var(--radius-lg);border-left:4px solid var(--color-accent)">
+        <h2 style="margin:0 0 2px 0;color:var(--text-primary);font-size:var(--text-xl)">${greeting}</h2>
+        <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)">${todayDate}</p>
+      </div>
+    </div>
+
+    <div id="dashboard-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
+
     <div id="dashboard-alerts"></div>
     <div id="ai-suggestions-container"></div>
+    <div id="daily-tip-container"></div>
+
     <div class="page-header">
       <h1>Fiches Techniques</h1>
       ${perms.edit_recipes ? `<a href="#/new" class="btn btn-primary"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle fiche</a>` : ''}
@@ -37,6 +52,9 @@ async function renderDashboard() {
   } catch (e) {
     showToast('Erreur de chargement', 'error');
   }
+
+  // Render summary section
+  renderDailySummary(recipes, perms);
 
   const listEl = document.getElementById('recipe-list');
   const searchInput = document.getElementById('recipe-search');
@@ -289,4 +307,96 @@ function renderAISuggestions(container, data) {
 async function refreshAISuggestions() {
   localStorage.removeItem('restosuite_suggestions_cache');
   await loadAISuggestions();
+}
+
+// ═══════════════════════════════════════════
+// Daily Summary & Tips
+// ═══════════════════════════════════════════
+
+function getGreeting(name) {
+  const hour = new Date().getHours();
+  if (hour < 12) return `Bonjour ${name} 👋`;
+  if (hour < 17) return `Bon après-midi ${name} ☀️`;
+  return `Bonsoir ${name} 🌙`;
+}
+
+function formatFrenchDate(date) {
+  const days = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+  const months = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+  const dayName = days[date.getDay()];
+  const dayNum = date.getDate();
+  const monthName = months[date.getMonth()];
+  const year = date.getFullYear();
+
+  return `${dayName.charAt(0).toUpperCase() + dayName.slice(1)} ${dayNum} ${monthName} ${year}`;
+}
+
+function renderDailySummary(recipes, perms) {
+  const summaryEl = document.getElementById('dashboard-summary');
+  if (!summaryEl) return;
+
+  let html = `
+    <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
+      <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recipes.length}</div>
+      <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Fiches techniques</div>
+    </div>
+  `;
+
+  if (perms.view_costs && recipes.length > 0) {
+    const totalCost = recipes.reduce((sum, r) => sum + (r.total_cost || 0), 0);
+    html += `
+      <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
+        <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-success)">${formatCurrency(totalCost)}</div>
+        <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Coût total matière</div>
+      </div>
+    `;
+  }
+
+  // Daily tip
+  const dailyTip = getDailyTip();
+  const tipEl = document.getElementById('daily-tip-container');
+  if (tipEl) {
+    tipEl.innerHTML = `
+      <div style="background:linear-gradient(135deg, var(--color-accent-light), var(--bg-elevated));border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
+        <div style="display:flex;gap:var(--space-3);align-items:flex-start">
+          <span style="font-size:24px">💡</span>
+          <div>
+            <h3 style="margin:0 0 4px 0;font-size:var(--text-sm);font-weight:600;color:var(--text-primary)">Conseil du jour</h3>
+            <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)">${dailyTip}</p>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  summaryEl.innerHTML = html;
+}
+
+function getDailyTip() {
+  const tips = [
+    'Vérifiez vos fiches techniques une fois par mois pour ajuster les coûts selon la mercuriale.',
+    'Un food cost entre 25-30% est la cible idéale pour les restaurants. Trop élevé ? Révisez vos recettes.',
+    'Utilisez les sous-recettes pour factoriser les préparations communes et simplifier votre gestion.',
+    'La HACCP n\'est pas juste une conformité : c\'est la base de la confiance clients et de la qualité.',
+    'Scannez vos factures avec le scanner de résumé pour indexer automatiquement vos achats dans la mercuriale.',
+    'Les pertes matière varient par saison. Adjustez-les dans vos fiches pour plus de précision.',
+    'Analysez vos marges par catégorie (plat, entrée, dessert) pour trouver vos meilleurs vendeurs.',
+    'La mercuriale vous donne les prix du marché en temps réel. Utilisez-la pour négocier avec vos fournisseurs.',
+    'Créez des fiches de bases (sauces, bouillons) réutilisables plutôt que de les reduplifier dans chaque recette.',
+    'Les alertes DLC vous avertissent avant la date d\'expiration. Travaillez avec vos stocks pour zéro gaspillage.',
+    'Documentez vos procédures de nettoyage dans HACCP pour garantir l\'hygiène et former votre équipe.',
+    'Les codes QR facilitent la traçabilité. Imprimez-les pour vos ingrédients critiques (allergènes, origines).',
+    'Le travail en équipe est plus simple si tout le monde utilise RestoSuite. Importez vos collègues !',
+    'Mettez à jour vos portions quand vous changerez de fournisseur, c\'est plus rapide que de recréer une fiche.',
+    'Les KPIs : food cost, marge brute, volume vendus. Suivez-les chaque semaine pour piloter votre resto.',
+    'Une recette complète inclut les temps de préparation et cuisson. Mettez à jour pour l\'optimisation du planning.',
+    'Les ingrédients génériques sont moins chers. Demandez à votre fournisseur une alternative premium/économique.',
+    'Exploitez les pics de saison : artichauts en printemps, champignons en automne, fraises en été.',
+    'Le gaspillage coûte. Diminuez les pertes matière en optimisant vos découpes et portions.',
+    'Testez vos recettes à l\'échelle avant de les lancer. RestoSuite vous aide à scaler les portions facilement.'
+  ];
+
+  const day = new Date().getDate();
+  return tips[day % tips.length];
 }

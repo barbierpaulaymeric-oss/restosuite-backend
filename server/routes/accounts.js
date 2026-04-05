@@ -57,7 +57,7 @@ function getPermissionsForRole(role) {
 
 // GET /api/accounts — list all accounts (no PIN)
 router.get('/', (req, res) => {
-  const accounts = all('SELECT id, name, role, permissions, created_at, last_login FROM accounts ORDER BY created_at ASC');
+  const accounts = all('SELECT id, name, role, permissions, created_at, last_login, CASE WHEN pin IS NOT NULL AND pin != \'\' THEN 1 ELSE 0 END as has_pin FROM accounts ORDER BY created_at ASC');
   res.json(accounts.map(a => ({
     ...a,
     permissions: JSON.parse(a.permissions)
@@ -66,28 +66,36 @@ router.get('/', (req, res) => {
 
 // POST /api/accounts — create account
 router.post('/', (req, res) => {
-  const { name, pin } = req.body;
-
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: 'Le nom est requis' });
-  }
-  if (!pin || !/^\d{4}$/.test(pin)) {
-    return res.status(400).json({ error: 'Le PIN doit être 4 chiffres' });
-  }
-
-  // Check if this is the first account → becomes gerant
-  const existing = all('SELECT id FROM accounts');
-  const isFirst = existing.length === 0;
-  const requestedRole = req.body.role;
-  const role = isFirst ? 'gerant' : (requestedRole && VALID_ROLES.includes(requestedRole) ? requestedRole : 'equipier');
-  const permissions = getPermissionsForRole(role);
-
-  const hashedPin = hashPin(pin);
-
   try {
+    const { name, pin } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Le nom est requis' });
+    }
+
+    // PIN is optional — member will create their own on first login
+    const pinValue = pin && /^\d{4}$/.test(pin.toString()) ? pin : null;
+
+    // Check if this is the first account → becomes gerant
+    const existing = all('SELECT id FROM accounts');
+    const isFirst = existing.length === 0;
+    const requestedRole = req.body.role;
+    const role = isFirst ? 'gerant' : (requestedRole && VALID_ROLES.includes(requestedRole) ? requestedRole : 'equipier');
+    const permissions = getPermissionsForRole(role);
+
+    const hashedPin = pinValue ? hashPin(pinValue) : null;
+
+    // Get restaurant_id from caller if available
+    let restaurantId = null;
+    const callerId = req.body.caller_id || req.headers['x-account-id'];
+    if (callerId) {
+      const caller = get('SELECT restaurant_id FROM accounts WHERE id = ?', [callerId]);
+      if (caller) restaurantId = caller.restaurant_id;
+    }
+
     const result = run(
-      'INSERT INTO accounts (name, pin, role, permissions, trial_start) VALUES (?, ?, ?, ?, datetime(\'now\'))',
-      [name.trim(), hashedPin, role, JSON.stringify(permissions)]
+      'INSERT INTO accounts (name, pin, role, permissions, restaurant_id, trial_start) VALUES (?, ?, ?, ?, ?, datetime(\'now\'))',
+      [name.trim(), hashedPin, role, JSON.stringify(permissions), restaurantId]
     );
 
     const newAccountId = result.lastInsertRowid;
@@ -99,37 +107,46 @@ router.post('/', (req, res) => {
       permissions
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur lors de la création du compte' });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
 // POST /api/accounts/login — verify PIN
 router.post('/login', (req, res) => {
-  const { id, pin } = req.body;
+  try {
+    const { id, pin } = req.body;
 
-  if (!id || !pin) {
-    return res.status(400).json({ error: 'ID et PIN requis' });
+    if (!id || !pin) {
+      return res.status(400).json({ error: 'ID et PIN requis' });
+    }
+
+    // Validate PIN format: must be exactly 4 digits
+    if (!/^\d{4}$/.test(pin.toString())) {
+      return res.status(400).json({ error: 'Le PIN doit être 4 chiffres' });
+    }
+
+    const account = get('SELECT * FROM accounts WHERE id = ?', [id]);
+    if (!account) {
+      return res.status(404).json({ error: 'Compte introuvable' });
+    }
+
+    const hashedPin = hashPin(pin);
+    if (account.pin !== hashedPin) {
+      return res.status(401).json({ error: 'PIN incorrect' });
+    }
+
+    // Update last_login
+    run('UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+
+    res.json({
+      id: account.id,
+      name: account.name,
+      role: account.role,
+      permissions: JSON.parse(account.permissions)
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
-
-  const account = get('SELECT * FROM accounts WHERE id = ?', [id]);
-  if (!account) {
-    return res.status(404).json({ error: 'Compte introuvable' });
-  }
-
-  const hashedPin = hashPin(pin);
-  if (account.pin !== hashedPin) {
-    return res.status(401).json({ error: 'PIN incorrect' });
-  }
-
-  // Update last_login
-  run('UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [id]);
-
-  res.json({
-    id: account.id,
-    name: account.name,
-    role: account.role,
-    permissions: JSON.parse(account.permissions)
-  });
 });
 
 // GET /api/accounts/:id/status — trial/subscription status
@@ -170,6 +187,11 @@ router.put('/:id', (req, res) => {
     params.push(name.trim());
   }
 
+  if (req.body.role && VALID_ROLES.includes(req.body.role) && req.body.role !== 'gerant') {
+    updates.push('role = ?');
+    params.push(req.body.role);
+  }
+
   if (permissions) {
     // Always keep view_recipes true
     const sanitized = {
@@ -195,6 +217,33 @@ router.put('/:id', (req, res) => {
     ...updated,
     permissions: JSON.parse(updated.permissions)
   });
+});
+
+// PUT /api/accounts/:id/reset-pin — reset member PIN (gérant only)
+// This forces the member to create a new PIN on next login
+router.put('/:id/reset-pin', (req, res) => {
+  const { id } = req.params;
+  const callerId = req.body.caller_id;
+
+  // Verify caller is gérant
+  if (callerId) {
+    const caller = get('SELECT role FROM accounts WHERE id = ?', [callerId]);
+    if (!caller || caller.role !== 'gerant') {
+      return res.status(403).json({ error: 'Accès refusé — gérant uniquement' });
+    }
+  }
+
+  const account = get('SELECT * FROM accounts WHERE id = ?', [id]);
+  if (!account) {
+    return res.status(404).json({ error: 'Compte introuvable' });
+  }
+
+  if (account.role === 'gerant') {
+    return res.status(403).json({ error: 'Impossible de réinitialiser le PIN du gérant' });
+  }
+
+  run('UPDATE accounts SET pin = NULL WHERE id = ?', [id]);
+  res.json({ success: true, message: 'PIN réinitialisé. Le membre devra créer un nouveau PIN à sa prochaine connexion.' });
 });
 
 // DELETE /api/accounts/:id — delete account (gerant only)
@@ -261,6 +310,125 @@ router.get('/:id/export', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Disposition', `attachment; filename="restosuite-export-${today}.json"`);
   res.json(exportData);
+});
+
+// DELETE /api/accounts/self — delete own account + restaurant (gérant full wipe)
+// Used for testing or when a gérant wants to delete everything
+router.delete('/self', (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'Token requis' });
+  }
+
+  let account = null;
+  try {
+    const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET || 'development');
+    account = get('SELECT * FROM accounts WHERE id = ?', [decoded.id]);
+  } catch (e) {
+    return res.status(401).json({ error: 'Token invalide' });
+  }
+
+  if (!account || account.role !== 'gerant') {
+    return res.status(403).json({ error: 'Réservé au gérant' });
+  }
+
+  const { confirmation } = req.body;
+  if (confirmation !== 'SUPPRIMER') {
+    return res.status(400).json({ error: 'Tapez SUPPRIMER pour confirmer' });
+  }
+
+  const { db } = require('../db');
+  const transaction = db.transaction(() => {
+    const restaurantId = account.restaurant_id;
+
+    // Delete all accounts for this restaurant
+    if (restaurantId) {
+      run('DELETE FROM accounts WHERE restaurant_id = ?', [restaurantId]);
+      run('DELETE FROM restaurants WHERE id = ?', [restaurantId]);
+    }
+
+    // Delete the gérant account itself (if no restaurant_id was set)
+    run('DELETE FROM accounts WHERE id = ? AND restaurant_id IS NULL', [account.id]);
+
+    // Clean up all data tables (single-tenant: all data belongs to this restaurant)
+    const tables = [
+      'recipes', 'recipe_ingredients', 'ingredients', 'stock', 'stock_movements',
+      'suppliers', 'supplier_prices', 'supplier_accounts', 'supplier_catalog',
+      'price_change_notifications', 'price_history',
+      'temperature_logs', 'cleaning_logs', 'traceability_logs',
+      'tables_config', 'orders', 'order_items',
+      'purchase_orders', 'purchase_order_items',
+      'delivery_notes', 'delivery_note_items',
+      'referrals'
+    ];
+    for (const table of tables) {
+      try { run(`DELETE FROM ${table}`); } catch (e) { /* table may not exist */ }
+    }
+  });
+
+  try {
+    transaction();
+    res.json({ success: true, message: 'Compte et données supprimés' });
+  } catch (e) {
+    console.error('Self-delete error:', e);
+    res.status(500).json({ error: 'Erreur lors de la suppression' });
+  }
+});
+
+// POST /api/accounts/staff-password — set staff password (gerant only)
+router.post('/staff-password', (req, res) => {
+  try {
+    const { password } = req.body;
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!password) {
+      return res.status(400).json({ error: 'Le code est requis' });
+    }
+
+    if (!/^\d{4,}$/.test(password)) {
+      return res.status(400).json({ error: 'Le code doit contenir 4 chiffres minimum' });
+    }
+
+    // Get current account from JWT token (if available)
+    let account = null;
+    if (token) {
+      try {
+        const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET || 'development');
+        account = get('SELECT * FROM accounts WHERE id = ?', [decoded.id]);
+      } catch (e) {
+        // Token invalid, fall back to header-based auth (legacy)
+      }
+    }
+
+    // Fall back to X-Account-Id header if token not available or invalid
+    if (!account) {
+      const accountId = req.headers['x-account-id'];
+      if (accountId) {
+        account = get('SELECT * FROM accounts WHERE id = ?', [accountId]);
+      }
+    }
+
+    // Verify account is gerant
+    if (!account || account.role !== 'gerant') {
+      return res.status(403).json({ error: 'Accès refusé — gérant uniquement' });
+    }
+
+    // Get restaurant associated with this account
+    if (!account.restaurant_id) {
+      return res.status(400).json({ error: 'Restaurant non associé' });
+    }
+
+    // Hash the password
+    const hashedPassword = hashPin(password);
+
+    // Update staff password
+    run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [hashedPassword, account.restaurant_id]);
+
+    res.json({ success: true, message: 'Code d\'accès enregistré' });
+  } catch (e) {
+    console.error('Error setting staff password:', e);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
 module.exports = router;

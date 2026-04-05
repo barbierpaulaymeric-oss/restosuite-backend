@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════
-// Login — Email/Password + PIN rapide
+// Login — Gérant (email/pwd) + Staff (restaurant pwd → team → PIN)
 // ═══════════════════════════════════════════
 
 const AVATAR_COLORS = [
@@ -23,7 +23,11 @@ function renderAvatar(name, size = 40) {
 
 class LoginView {
   constructor() {
-    this.mode = 'login'; // 'login' | 'register' | 'pin'
+    this.mode = 'choice'; // 'choice' | 'gerant' | 'register' | 'staff-password' | 'team-picker' | 'staff-pin' | 'create-pin'
+    this.staffMembers = [];
+    this.selectedMember = null;
+    this.restaurantName = '';
+    this.pinDigits = [];
   }
 
   async render() {
@@ -32,13 +36,18 @@ class LoginView {
     if (nav) nav.style.display = 'none';
 
     switch (this.mode) {
-      case 'login': this.renderLogin(app); break;
+      case 'choice': this.renderChoice(app); break;
+      case 'gerant': this.renderGerant(app); break;
       case 'register': this.renderRegister(app); break;
-      case 'pin': this.renderPinLogin(app); break;
+      case 'staff-password': this.renderStaffPassword(app); break;
+      case 'team-picker': this.renderTeamPicker(app); break;
+      case 'staff-pin': this.renderStaffPin(app); break;
+      case 'create-pin': this.renderCreatePin(app); break;
     }
   }
 
-  renderLogin(app) {
+  // ─── Choice Screen ───
+  renderChoice(app) {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">
@@ -48,12 +57,53 @@ class LoginView {
           <h1 class="login-title">Resto<span class="text-accent">Suite</span></h1>
           <p class="login-tagline">Votre cuisine tourne. Vos chiffres suivent.</p>
 
-          <div class="auth-tabs" style="display:flex;gap:0;margin-bottom:var(--space-5);border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--border-primary)">
-            <button class="auth-tab active" id="tab-login" style="flex:1;padding:10px;font-weight:600;font-size:var(--text-sm);border:none;cursor:pointer;background:var(--color-primary);color:#fff;transition:all 0.2s">Connexion</button>
-            <button class="auth-tab" id="tab-register" style="flex:1;padding:10px;font-weight:600;font-size:var(--text-sm);border:none;cursor:pointer;background:var(--bg-secondary);color:var(--text-secondary);transition:all 0.2s">Inscription</button>
+          <div style="display:flex;flex-direction:column;gap:16px;margin-top:var(--space-6);width:100%">
+            <button class="btn btn-primary" id="btn-gerant" style="padding:16px;font-size:var(--text-base);display:flex;align-items:center;justify-content:center;gap:10px">
+              <span style="font-size:1.4rem">👑</span> Gérant
+            </button>
+            <button class="btn btn-secondary" id="btn-staff" style="padding:16px;font-size:var(--text-base);display:flex;align-items:center;justify-content:center;gap:10px">
+              <span style="font-size:1.4rem">👥</span> Équipe
+            </button>
           </div>
 
-          <div style="text-align:left;width:100%">
+          <div style="margin-top:var(--space-6);text-align:center">
+            <a href="#" id="link-register" style="color:var(--text-tertiary);font-size:var(--text-sm);text-decoration:none">
+              Pas encore de compte ? <span style="color:var(--color-accent)">Essai gratuit 60 jours</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('btn-gerant').addEventListener('click', () => {
+      this.mode = 'gerant';
+      this.render();
+    });
+    document.getElementById('btn-staff').addEventListener('click', () => {
+      this.mode = 'staff-password';
+      this.render();
+    });
+    document.getElementById('link-register').addEventListener('click', (e) => {
+      e.preventDefault();
+      this.mode = 'register';
+      this.render();
+    });
+  }
+
+  // ─── Gérant Login ───
+  renderGerant(app) {
+    app.innerHTML = `
+      <div class="login-screen">
+        <div class="login-content" style="max-width:400px">
+          <button class="login-back" id="back-btn">
+            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          </button>
+          <div class="login-logo">
+            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 60px; width: auto;">
+          </div>
+          <h2 class="login-subtitle">Connexion gérant</h2>
+
+          <div style="text-align:left;width:100%;margin-top:var(--space-4)">
             <div class="form-group">
               <label>Email</label>
               <input type="email" class="form-control" id="login-email" placeholder="votre@email.com" autocomplete="email">
@@ -69,45 +119,29 @@ class LoginView {
           <button class="btn btn-primary" id="login-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             Se connecter
           </button>
-
-          <div style="margin-top:var(--space-4);text-align:center">
-            <a href="#" id="forgot-password" style="color:var(--text-tertiary);font-size:var(--text-sm);text-decoration:none;cursor:not-allowed;opacity:0.5">Mot de passe oublié ?</a>
-          </div>
-
-          <div style="margin-top:var(--space-6);padding-top:var(--space-4);border-top:1px solid var(--border-primary);text-align:center">
-            <a href="#" id="pin-login-link" style="color:var(--text-secondary);font-size:var(--text-sm);text-decoration:none">
-              🔢 Connexion rapide par PIN (équipiers)
-            </a>
-          </div>
         </div>
       </div>
     `;
+    if (window.lucide) lucide.createIcons();
 
-    document.getElementById('tab-register').addEventListener('click', () => {
-      this.mode = 'register';
+    document.getElementById('back-btn').addEventListener('click', () => {
+      this.mode = 'choice';
       this.render();
     });
-
-    document.getElementById('pin-login-link').addEventListener('click', (e) => {
-      e.preventDefault();
-      this.mode = 'pin';
-      this.render();
-    });
-
-    document.getElementById('login-submit').addEventListener('click', () => this.handleLogin());
+    document.getElementById('login-submit').addEventListener('click', () => this.handleGerantLogin());
     document.getElementById('login-password').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.handleLogin();
+      if (e.key === 'Enter') this.handleGerantLogin();
     });
   }
 
-  async handleLogin() {
+  async handleGerantLogin() {
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
     const errorEl = document.getElementById('login-error');
     const submitBtn = document.getElementById('login-submit');
 
     errorEl.textContent = '';
-    if (!email) { errorEl.textContent = 'L\'email est requis'; return; }
+    if (!email) { errorEl.textContent = "L'email est requis"; return; }
     if (!password) { errorEl.textContent = 'Le mot de passe est requis'; return; }
 
     submitBtn.disabled = true;
@@ -121,8 +155,7 @@ class LoginView {
       const nav = document.getElementById('nav');
       if (nav) nav.style.display = '';
 
-      if (result.account.onboarding_step < 7) {
-        // Go to onboarding
+      if (result.account.onboarding_step < 7 && result.account.is_owner) {
         const wizard = new OnboardingWizard(() => {
           bootApp(result.account.role, result.account);
         });
@@ -137,22 +170,21 @@ class LoginView {
     }
   }
 
+  // ─── Register ───
   renderRegister(app) {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">
+          <button class="login-back" id="back-btn">
+            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          </button>
           <div class="login-logo">
-            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 80px; width: auto;">
+            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 60px; width: auto;">
           </div>
-          <h1 class="login-title">Resto<span class="text-accent">Suite</span></h1>
-          <p class="login-tagline">Créez votre compte — essai gratuit 60 jours</p>
+          <h2 class="login-subtitle">Créer un compte</h2>
+          <p class="login-tagline">Essai gratuit 60 jours — aucun engagement</p>
 
-          <div class="auth-tabs" style="display:flex;gap:0;margin-bottom:var(--space-5);border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--border-primary)">
-            <button class="auth-tab" id="tab-login" style="flex:1;padding:10px;font-weight:600;font-size:var(--text-sm);border:none;cursor:pointer;background:var(--bg-secondary);color:var(--text-secondary);transition:all 0.2s">Connexion</button>
-            <button class="auth-tab active" id="tab-register" style="flex:1;padding:10px;font-weight:600;font-size:var(--text-sm);border:none;cursor:pointer;background:var(--color-primary);color:#fff;transition:all 0.2s">Inscription</button>
-          </div>
-
-          <div style="text-align:left;width:100%">
+          <div style="text-align:left;width:100%;margin-top:var(--space-4)">
             <div style="display:flex;gap:var(--space-3)">
               <div class="form-group" style="flex:1">
                 <label>Prénom</label>
@@ -175,6 +207,22 @@ class LoginView {
               <label>Confirmer le mot de passe</label>
               <input type="password" class="form-control" id="reg-password2" placeholder="••••••••" autocomplete="new-password">
             </div>
+            <div style="margin-top:var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--border-default)">
+              <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md)">
+                <span style="font-size:1.3rem;line-height:1">💡</span>
+                <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
+                  <strong>Deux mots de passe, deux accès :</strong><br>
+                  <strong style="color:var(--text-primary)">Votre mot de passe</strong> (ci-dessus) est personnel et donne accès complet au logiciel.<br>
+                  <strong style="color:var(--text-primary)">Le mot de passe équipe</strong> (ci-dessous) est un code simple que vous partagez avec votre staff pour qu'ils accèdent à leur espace limité.
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Mot de passe équipe (partagé avec le staff)</label>
+                <input type="text" class="form-control" id="reg-staff-password" placeholder="ex: resto2026" autocomplete="off"
+                       style="font-family:var(--font-mono);letter-spacing:0.05em">
+              </div>
+              <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-1)">Optionnel — vous pourrez le configurer plus tard dans Équipe.</p>
+            </div>
           </div>
 
           <div id="reg-error" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
@@ -182,27 +230,15 @@ class LoginView {
           <button class="btn btn-primary" id="reg-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             Créer mon compte
           </button>
-
-          <div style="margin-top:var(--space-6);padding-top:var(--space-4);border-top:1px solid var(--border-primary);text-align:center">
-            <a href="#" id="pin-login-link" style="color:var(--text-secondary);font-size:var(--text-sm);text-decoration:none">
-              🔢 Connexion rapide par PIN (équipiers)
-            </a>
-          </div>
         </div>
       </div>
     `;
+    if (window.lucide) lucide.createIcons();
 
-    document.getElementById('tab-login').addEventListener('click', () => {
-      this.mode = 'login';
+    document.getElementById('back-btn').addEventListener('click', () => {
+      this.mode = 'choice';
       this.render();
     });
-
-    document.getElementById('pin-login-link').addEventListener('click', (e) => {
-      e.preventDefault();
-      this.mode = 'pin';
-      this.render();
-    });
-
     document.getElementById('reg-submit').addEventListener('click', () => this.handleRegister());
     document.getElementById('reg-password2').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.handleRegister();
@@ -215,12 +251,12 @@ class LoginView {
     const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
     const password2 = document.getElementById('reg-password2').value;
+    const staffPassword = document.getElementById('reg-staff-password').value.trim();
     const errorEl = document.getElementById('reg-error');
     const submitBtn = document.getElementById('reg-submit');
 
     errorEl.textContent = '';
-
-    if (!email) { errorEl.textContent = 'L\'email est requis'; return; }
+    if (!email) { errorEl.textContent = "L'email est requis"; return; }
     if (!password || password.length < 6) { errorEl.textContent = 'Le mot de passe doit faire au moins 6 caractères'; return; }
     if (password !== password2) { errorEl.textContent = 'Les mots de passe ne correspondent pas'; return; }
 
@@ -228,46 +264,167 @@ class LoginView {
     submitBtn.textContent = 'Création...';
 
     try {
-      const result = await API.register({
-        email,
-        password,
-        first_name: firstName,
-        last_name: lastName
-      });
-
+      const result = await API.register({ email, password, first_name: firstName, last_name: lastName, staff_password: staffPassword || undefined });
       localStorage.setItem('restosuite_token', result.token);
       localStorage.setItem('restosuite_account', JSON.stringify(result.account));
 
-      // Go directly to onboarding
       const nav = document.getElementById('nav');
       if (nav) nav.style.display = 'none';
-
       const wizard = new OnboardingWizard(() => {
         if (nav) nav.style.display = '';
         bootApp(result.account.role, result.account);
       });
       wizard.show();
     } catch (e) {
-      errorEl.textContent = e.message || 'Erreur lors de l\'inscription';
+      errorEl.textContent = e.message || "Erreur lors de l'inscription";
       submitBtn.disabled = false;
       submitBtn.textContent = 'Créer mon compte';
     }
   }
 
-  renderPinLogin(app) {
+  // ─── Staff Password ───
+  renderStaffPassword(app) {
+    app.innerHTML = `
+      <div class="login-screen">
+        <div class="login-content" style="max-width:400px">
+          <button class="login-back" id="back-btn">
+            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          </button>
+          <div style="margin-bottom:var(--space-4)">
+            <span style="font-size:2.5rem">👥</span>
+          </div>
+          <h2 class="login-subtitle">Accès équipe</h2>
+          <p class="login-tagline">Entrez le mot de passe du restaurant</p>
+
+          <div style="text-align:left;width:100%;margin-top:var(--space-4)">
+            <div class="form-group">
+              <label>Mot de passe restaurant</label>
+              <input type="password" class="form-control" id="staff-password" placeholder="••••••••" autocomplete="off" style="text-align:center;font-size:1.2rem;letter-spacing:4px">
+            </div>
+          </div>
+
+          <div id="staff-error" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
+
+          <button class="btn btn-primary" id="staff-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
+            Continuer
+          </button>
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+
+    document.getElementById('back-btn').addEventListener('click', () => {
+      this.mode = 'choice';
+      this.render();
+    });
+    document.getElementById('staff-submit').addEventListener('click', () => this.handleStaffPassword());
+    document.getElementById('staff-password').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.handleStaffPassword();
+    });
+    // Auto-focus
+    document.getElementById('staff-password').focus();
+  }
+
+  async handleStaffPassword() {
+    const password = document.getElementById('staff-password').value;
+    const errorEl = document.getElementById('staff-error');
+    const submitBtn = document.getElementById('staff-submit');
+
+    errorEl.textContent = '';
+    if (!password) { errorEl.textContent = 'Le mot de passe est requis'; return; }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Vérification...';
+
+    try {
+      const result = await API.staffLogin(password);
+      this.staffMembers = result.members;
+      this.restaurantName = result.restaurant_name;
+
+      if (this.staffMembers.length === 0) {
+        errorEl.textContent = "Aucun membre d'équipe trouvé. Le gérant doit d'abord créer des comptes.";
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Continuer';
+        return;
+      }
+
+      this.mode = 'team-picker';
+      this.render();
+    } catch (e) {
+      errorEl.textContent = e.message || 'Mot de passe incorrect';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Continuer';
+    }
+  }
+
+  // ─── Team Picker ───
+  renderTeamPicker(app) {
+    app.innerHTML = `
+      <div class="login-screen">
+        <div class="login-content" style="max-width:500px">
+          <button class="login-back" id="back-btn">
+            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          </button>
+          <h2 class="login-subtitle">${escapeHtml(this.restaurantName)}</h2>
+          <p class="login-tagline">Qui êtes-vous ?</p>
+
+          <div class="team-picker-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:16px;margin-top:var(--space-5);width:100%">
+            ${this.staffMembers.map(m => `
+              <button class="team-picker-card" data-id="${m.id}" style="
+                display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px 12px;
+                border-radius:var(--radius-lg);border:2px solid var(--border-primary);
+                background:var(--bg-secondary);cursor:pointer;transition:all 0.2s;
+              ">
+                ${renderAvatar(m.name, 56)}
+                <span style="font-weight:600;font-size:var(--text-sm);color:var(--text-primary);text-align:center">${escapeHtml(m.name)}</span>
+                <span style="font-size:11px;color:var(--text-tertiary)">${_getRoleLabel(m.role)}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+
+    document.getElementById('back-btn').addEventListener('click', () => {
+      this.mode = 'staff-password';
+      this.render();
+    });
+
+    document.querySelectorAll('.team-picker-card').forEach(card => {
+      card.addEventListener('mouseenter', () => {
+        card.style.borderColor = 'var(--color-accent)';
+        card.style.background = 'var(--bg-tertiary)';
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.borderColor = 'var(--border-primary)';
+        card.style.background = 'var(--bg-secondary)';
+      });
+      card.addEventListener('click', () => {
+        const id = parseInt(card.dataset.id);
+        this.selectedMember = this.staffMembers.find(m => m.id === id);
+        // If member has no PIN yet, go to create-pin flow
+        this.mode = this.selectedMember.has_pin ? 'staff-pin' : 'create-pin';
+        this.render();
+      });
+    });
+  }
+
+  // ─── Staff PIN ───
+  renderStaffPin(app) {
+    const member = this.selectedMember;
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content pin-content">
           <button class="login-back" id="pin-back">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i>
-            Retour
+            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
           </button>
 
-          <div style="margin-bottom:var(--space-4)">
-            <span style="font-size:2.5rem">🔢</span>
+          <div style="margin-bottom:var(--space-3)">
+            ${renderAvatar(member.name, 64)}
           </div>
-          <h2 class="login-subtitle">Connexion rapide</h2>
-          <p class="login-tagline">Entrez votre PIN à 4 chiffres</p>
+          <h2 class="login-subtitle">${escapeHtml(member.name)}</h2>
+          <p class="login-tagline">Entrez votre PIN</p>
 
           <div class="pin-dots" id="pin-dots">
             <span class="pin-dot"></span>
@@ -302,7 +459,7 @@ class LoginView {
     this.pinDigits = [];
 
     document.getElementById('pin-back').addEventListener('click', () => {
-      this.mode = 'login';
+      this.mode = 'team-picker';
       this.render();
     });
 
@@ -312,7 +469,7 @@ class LoginView {
         if (this.pinDigits.length >= 4) return;
         this.pinDigits.push(key.dataset.digit);
         this.updatePinDots();
-        if (this.pinDigits.length === 4) this.handlePinLogin();
+        if (this.pinDigits.length === 4) this.handleStaffPinLogin();
       });
     });
 
@@ -324,6 +481,132 @@ class LoginView {
     });
   }
 
+  // ─── Create PIN (first-time) ───
+  renderCreatePin(app) {
+    const member = this.selectedMember;
+    app.innerHTML = `
+      <div class="login-screen">
+        <div class="login-content pin-content">
+          <button class="login-back" id="pin-back">
+            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          </button>
+
+          <div style="margin-bottom:var(--space-3)">
+            ${renderAvatar(member.name, 64)}
+          </div>
+          <h2 class="login-subtitle">${escapeHtml(member.name)}</h2>
+          <p class="login-tagline" id="create-pin-label">Créez votre code PIN (4 chiffres)</p>
+
+          <div class="pin-dots" id="pin-dots">
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+          </div>
+
+          <div class="pin-error" id="pin-error"></div>
+
+          <div class="pin-pad" id="pin-pad">
+            <button class="pin-key" data-digit="1">1</button>
+            <button class="pin-key" data-digit="2">2</button>
+            <button class="pin-key" data-digit="3">3</button>
+            <button class="pin-key" data-digit="4">4</button>
+            <button class="pin-key" data-digit="5">5</button>
+            <button class="pin-key" data-digit="6">6</button>
+            <button class="pin-key" data-digit="7">7</button>
+            <button class="pin-key" data-digit="8">8</button>
+            <button class="pin-key" data-digit="9">9</button>
+            <button class="pin-key pin-key--empty"></button>
+            <button class="pin-key" data-digit="0">0</button>
+            <button class="pin-key pin-key--delete" id="pin-delete">
+              <i data-lucide="delete" style="width:24px;height:24px"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (window.lucide) lucide.createIcons();
+    this.pinDigits = [];
+    this.createPinStep = 'choose'; // 'choose' | 'confirm'
+    this.chosenPin = '';
+
+    document.getElementById('pin-back').addEventListener('click', () => {
+      if (this.createPinStep === 'confirm') {
+        // Go back to choose step
+        this.createPinStep = 'choose';
+        this.chosenPin = '';
+        this.pinDigits = [];
+        this.updatePinDots();
+        document.getElementById('create-pin-label').textContent = 'Créez votre code PIN (4 chiffres)';
+        document.getElementById('pin-error').textContent = '';
+      } else {
+        this.mode = 'team-picker';
+        this.render();
+      }
+    });
+
+    const pad = document.getElementById('pin-pad');
+    pad.querySelectorAll('.pin-key[data-digit]').forEach(key => {
+      key.addEventListener('click', () => {
+        if (this.pinDigits.length >= 4) return;
+        this.pinDigits.push(key.dataset.digit);
+        this.updatePinDots();
+        if (this.pinDigits.length === 4) {
+          if (this.createPinStep === 'choose') {
+            // Store chosen PIN, move to confirm
+            this.chosenPin = this.pinDigits.join('');
+            this.pinDigits = [];
+            this.createPinStep = 'confirm';
+            setTimeout(() => {
+              this.updatePinDots();
+              document.getElementById('create-pin-label').textContent = 'Confirmez votre code PIN';
+              document.getElementById('pin-dots').querySelectorAll('.pin-dot').forEach(d => d.classList.remove('filled'));
+            }, 200);
+          } else {
+            // Confirm step — check match
+            const confirmPin = this.pinDigits.join('');
+            if (confirmPin === this.chosenPin) {
+              this.handleCreatePinSubmit(this.chosenPin);
+            } else {
+              this.pinDigits = [];
+              this.updatePinDots();
+              const dotsEl = document.getElementById('pin-dots');
+              dotsEl.classList.add('shake');
+              document.getElementById('pin-error').textContent = 'Les PIN ne correspondent pas. Réessayez.';
+              setTimeout(() => dotsEl.classList.remove('shake'), 600);
+            }
+          }
+        }
+      });
+    });
+
+    document.getElementById('pin-delete').addEventListener('click', () => {
+      this.pinDigits.pop();
+      this.updatePinDots();
+      document.getElementById('pin-error').textContent = '';
+      document.getElementById('pin-dots').classList.remove('shake');
+    });
+  }
+
+  async handleCreatePinSubmit(pin) {
+    try {
+      const result = await API.staffPinLogin(this.selectedMember.id, pin, true);
+
+      localStorage.setItem('restosuite_token', result.token);
+      localStorage.setItem('restosuite_account', JSON.stringify(result.account));
+
+      const nav = document.getElementById('nav');
+      if (nav) nav.style.display = '';
+      bootApp(result.account.role, result.account);
+    } catch (e) {
+      this.pinDigits = [];
+      this.updatePinDots();
+      const errorEl = document.getElementById('pin-error');
+      errorEl.textContent = e.message || 'Erreur de création du PIN';
+    }
+  }
+
   updatePinDots() {
     const dots = document.querySelectorAll('.pin-dot');
     dots.forEach((dot, i) => {
@@ -331,10 +614,10 @@ class LoginView {
     });
   }
 
-  async handlePinLogin() {
+  async handleStaffPinLogin() {
     const pin = this.pinDigits.join('');
     try {
-      const result = await API.pinLogin({ pin });
+      const result = await API.staffPinLogin(this.selectedMember.id, pin);
 
       localStorage.setItem('restosuite_token', result.token);
       localStorage.setItem('restosuite_account', JSON.stringify(result.account));

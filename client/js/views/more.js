@@ -2,7 +2,11 @@ class MoreView {
   render() {
     const app = document.getElementById('app');
     const account = getAccount();
-    const isGerant = account && account.role === 'gerant';
+    const role = account ? account.role : getRole();
+    const isGerant = role === 'gerant';
+
+    // Helper function to check if a role can access a module
+    const canAccess = (roles) => roles.includes(role);
 
     app.innerHTML = `
       <div class="view-header">
@@ -11,7 +15,7 @@ class MoreView {
           ${renderAvatar(account.name, 48)}
           <div>
             <h1>${escapeHtml(account.name)}</h1>
-            <p class="text-secondary text-sm">${account.role === 'gerant' ? '👑 Gérant — Accès complet' : '👤 Équipier'}</p>
+            <p class="text-secondary text-sm">${role === 'gerant' ? '👑 Gérant — Accès complet' : role === 'cuisinier' ? '👨‍🍳 Cuisinier — Accès cuisine' : role === 'salle' ? '🍽️ Salle — Commandes' : '👤 Équipier'}</p>
           </div>
         </div>
         ` : `
@@ -20,7 +24,7 @@ class MoreView {
         <p class="text-secondary">Modules et paramètres</p>
       </div>
 
-      ${isGerant ? `
+      ${canAccess(['gerant']) ? `
       <div style="margin-bottom:var(--space-5)">
         <a href="#/team" class="more-card more-card--active" style="text-decoration:none;cursor:pointer;display:flex;flex-direction:column">
           <div class="more-card__icon" style="background: var(--color-info)">
@@ -36,6 +40,7 @@ class MoreView {
       ` : ''}
 
       <div class="more-grid">
+        ${canAccess(['gerant', 'cuisinier', 'equipier']) ? `
         <div class="more-card more-card--active">
           <div class="more-card__icon" style="background: var(--color-accent)">
             <i data-lucide="clipboard-list"></i>
@@ -46,7 +51,9 @@ class MoreView {
           </div>
           <p class="text-secondary text-sm">Saisie vocale, calcul des coûts, export PDF</p>
         </div>
+        ` : ''}
 
+        ${canAccess(['gerant', 'cuisinier']) ? `
         <a href="#/stock" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
           <div class="more-card__icon" style="background: var(--color-accent)">
             <i data-lucide="warehouse"></i>
@@ -57,7 +64,9 @@ class MoreView {
           </div>
           <p class="text-secondary text-sm">Réception marchandise, suivi DLC, alertes stock bas</p>
         </a>
+        ` : ''}
 
+        ${canAccess(['gerant', 'cuisinier', 'equipier']) ? `
         <a href="#/ingredients" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
           <div class="more-card__icon" style="background: var(--color-info)">
             <i data-lucide="package"></i>
@@ -68,7 +77,22 @@ class MoreView {
           </div>
           <p class="text-secondary text-sm">Base de données ingrédients, allergènes, unités</p>
         </a>
+        ` : ''}
 
+        ${canAccess(['gerant']) ? `
+        <a href="#/orders" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+          <div class="more-card__icon" style="background: var(--color-accent)">
+            <i data-lucide="clipboard-pen"></i>
+          </div>
+          <div class="more-card__content">
+            <h3>Commandes fournisseurs</h3>
+            <span class="badge badge--success">Actif</span>
+          </div>
+          <p class="text-secondary text-sm">Bons de commande matières premières, suggestions, réception</p>
+        </a>
+        ` : ''}
+
+        ${canAccess(['gerant', 'salle']) ? `
         <a href="#/service" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
           <div class="more-card__icon" style="background: var(--color-accent)">
             <i data-lucide="concierge-bell"></i>
@@ -79,7 +103,22 @@ class MoreView {
           </div>
           <p class="text-secondary text-sm">Prise de commande tablette, plan de salle, suivi service</p>
         </a>
+        ` : ''}
 
+        ${canAccess(['gerant', 'cuisinier']) ? `
+        <a href="#/kitchen" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+          <div class="more-card__icon" style="background: var(--color-accent)">
+            <i data-lucide="chef-hat"></i>
+          </div>
+          <div class="more-card__content">
+            <h3>Cuisine</h3>
+            <span class="badge badge--success">Actif</span>
+          </div>
+          <p class="text-secondary text-sm">Écran cuisine, tickets commandes, suivi préparation</p>
+        </a>
+        ` : ''}
+
+        ${canAccess(['gerant']) ? `
         <a href="#/analytics" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
           <div class="more-card__icon" style="background: var(--color-accent)">
             <i data-lucide="bar-chart-3"></i>
@@ -90,7 +129,9 @@ class MoreView {
           </div>
           <p class="text-secondary text-sm">Food cost, marges, prédictions IA, insights fournisseurs</p>
         </a>
+        ` : ''}
 
+        ${canAccess(['gerant']) ? `
         <a href="#/mercuriale" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
           <div class="more-card__icon" style="background: var(--color-accent)">
             <i data-lucide="trending-up"></i>
@@ -101,7 +142,9 @@ class MoreView {
           </div>
           <p class="text-secondary text-sm">Suivi des prix fournisseurs, alertes variations, tendances</p>
         </a>
+        ` : ''}
 
+        ${canAccess(['gerant', 'cuisinier']) ? `
         <a href="#/haccp" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
           <div class="more-card__icon" style="background: var(--color-success)">
             <i data-lucide="shield-check"></i>
@@ -112,7 +155,9 @@ class MoreView {
           </div>
           <p class="text-secondary text-sm">Relevés températures, plan de nettoyage, traçabilité, export PDF</p>
         </a>
+        ` : ''}
 
+        ${canAccess(['gerant']) ? `
         <a href="#/qrcodes" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
           <div class="more-card__icon" style="background: var(--color-accent)">
             <i data-lucide="qr-code"></i>
@@ -123,7 +168,9 @@ class MoreView {
           </div>
           <p class="text-secondary text-sm">Menu digital, commande client par QR code, impression par table</p>
         </a>
+        ` : ''}
 
+        ${canAccess(['gerant']) ? `
         <div class="more-card more-card--coming">
           <div class="more-card__icon" style="background: var(--color-primary-light)">
             <i data-lucide="truck"></i>
@@ -134,6 +181,7 @@ class MoreView {
           </div>
           <p class="text-secondary text-sm">Vos fournisseurs mettent à jour leurs catalogues et prix directement</p>
         </div>
+        ` : ''}
       </div>
 
       <div class="section-title" style="margin-top: var(--space-6);">Préférences</div>

@@ -11,17 +11,29 @@
   <meta name="apple-mobile-web-app-title" content="RestoSuite">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <meta name="description" content="Dictez votre recette, l'IA calcule les coûts. Le premier assistant cuisine pensé par un chef. Essayez gratuitement.">
-  <meta name="robots" content="index, follow">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
   <link rel="canonical" href="https://www.restosuite.fr/">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.restosuite.fr/">
   <meta property="og:locale" content="fr_FR">
-  <meta property="og:image" content="/assets/logo.png">
+  <meta property="og:site_name" content="RestoSuite">
+  <meta property="og:image" content="https://www.restosuite.fr/assets/og-social-card.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="RestoSuite — Gestion restaurant intelligente avec IA. Fiches techniques, HACCP, stock, commandes.">
   <meta property="og:title" content="RestoSuite — Gestion restaurant intelligente">
   <meta property="og:description" content="Fiches techniques, HACCP, stock, commandes. Votre cuisine tourne. Vos chiffres suivent.">
+  <meta property="og:video" content="https://www.restosuite.fr/assets/demo/restosuite-demo.mp4">
+  <meta property="og:video:type" content="video/mp4">
+  <meta property="og:video:width" content="1280">
+  <meta property="og:video:height" content="720">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="RestoSuite — Gestion restaurant intelligente">
   <meta name="twitter:description" content="Fiches techniques, HACCP, stock, commandes. Saisie vocale IA. 60 jours gratuit.">
+  <meta name="twitter:image" content="https://www.restosuite.fr/assets/og-social-card.jpg">
+  <meta name="theme-color" content="#E8722A" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -31,23 +43,91 @@
     "operatingSystem": "Web, iOS, Android",
     "description": "Logiciel de gestion de restaurant tout-en-un : fiches techniques, HACCP, stock, commandes. Saisie vocale IA.",
     "url": "https://www.restosuite.fr",
-    "offers": {
-      "@type": "AggregateOffer",
-      "lowPrice": "0",
-      "highPrice": "79",
-      "priceCurrency": "EUR",
-      "offerCount": "3"
-    },
+    "offers": [
+      {
+        "@type": "Offer",
+        "name": "Essai gratuit",
+        "price": "0",
+        "priceCurrency": "EUR",
+        "description": "60 jours d'essai gratuit, accès complet"
+      },
+      {
+        "@type": "Offer",
+        "name": "Pro",
+        "price": "39",
+        "priceCurrency": "EUR",
+        "priceValidUntil": "2027-12-31",
+        "description": "1 établissement, toutes fonctionnalités",
+        "url": "https://www.restosuite.fr/app#/subscribe"
+      },
+      {
+        "@type": "Offer",
+        "name": "Fondateur",
+        "price": "29",
+        "priceCurrency": "EUR",
+        "description": "Offre limitée 200 premiers clients",
+        "availability": "https://schema.org/LimitedAvailability"
+      }
+    ],
     "author": {
       "@type": "Organization",
       "name": "RestoSuite"
     }
   }
   </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Est-ce que c'est vraiment gratuit ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Oui. 60 jours d'essai gratuit avec accès complet à toutes les fonctionnalités. Aucune carte bancaire requise. Après l'essai, vos données restent accessibles en lecture seule — rien n'est perdu."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Comment fonctionne la saisie vocale ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Vous parlez naturellement — « 250g de farine, 3 œufs, un demi-litre de lait ». L'IA transcrit, identifie les ingrédients, convertit les unités et structure la recette automatiquement."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Mes données sont-elles sécurisées ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Oui. Vos données sont chiffrées et ne sont jamais partagées avec des tiers. Les transferts vers nos sous-traitants sont conformes au Data Privacy Framework UE-US. Vos recettes restent les vôtres."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Puis-je annuler mon abonnement ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "À tout moment, en un clic. Sans engagement, sans frais cachés. Vous gardez l'accès jusqu'à la fin de la période payée, puis vos données passent en lecture seule."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Est-ce compatible mobile ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Oui. RestoSuite est conçu mobile-first — pensé pour être utilisé sur une tablette posée à côté du pass ou un smartphone dans la poche du tablier."
+        }
+      }
+    ]
+  }
+  </script>
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
   <style>
     /* ============================================
@@ -273,18 +353,6 @@
       font-weight: 700;
     }
     
-    .header__logo-ai {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--color-accent);
-      color: #fff;
-      font-size: 0.6875rem;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: var(--radius-sm);
-      margin-left: 2px;
-    }
     
     .header__nav {
       display: none;
@@ -535,6 +603,92 @@
     .mockup__ingredient-name { color: var(--text-secondary); }
     .mockup__ingredient-qty { font-family: var(--font-mono); color: var(--text-tertiary); }
     
+    /* Hero video player */
+    .hero__video-wrapper {
+      position: relative;
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      border: 1px solid var(--border-default);
+      box-shadow: var(--shadow-lg), 0 0 80px rgba(232,114,42,0.08);
+      background: var(--bg-sunken);
+      cursor: pointer;
+    }
+
+    .hero__video-wrapper video {
+      width: 100%;
+      display: block;
+      border-radius: var(--radius-xl);
+    }
+
+    .hero__video-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15,23,35,0.35);
+      transition: opacity var(--transition-base);
+      border-radius: var(--radius-xl);
+    }
+
+    .hero__video-wrapper:hover .hero__video-overlay,
+    .hero__video-wrapper.playing .hero__video-overlay {
+      opacity: 0;
+    }
+
+    .hero__video-play {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 0 12px rgba(232,114,42,0.15);
+      transition: transform var(--transition-base);
+    }
+
+    .hero__video-wrapper:hover .hero__video-play {
+      transform: scale(1.1);
+      box-shadow: 0 0 0 16px rgba(232,114,42,0.12);
+    }
+
+    .hero__video-play svg {
+      width: 24px;
+      height: 24px;
+      fill: #fff;
+      margin-left: 3px;
+    }
+
+    .hero__video-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--color-primary);
+      border-bottom: 1px solid var(--border-default);
+    }
+
+    .hero__video-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+    }
+    .hero__video-dot:nth-child(1) { background: var(--color-danger); }
+    .hero__video-dot:nth-child(2) { background: #E5A100; }
+    .hero__video-dot:nth-child(3) { background: var(--color-success); }
+
+    .hero__video-url {
+      flex: 1;
+      height: 22px;
+      background: var(--bg-sunken);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6875rem;
+      color: var(--text-tertiary);
+      font-family: var(--font-mono);
+    }
+
     /* Floating mic animation in hero */
     .mockup__mic {
       display: flex;
@@ -1223,52 +1377,22 @@
           </div>
         </div>
         <div class="hero__visual reveal">
-          <div class="mockup">
-            <div class="mockup__bar">
-              <div class="mockup__dot"></div>
-              <div class="mockup__dot"></div>
-              <div class="mockup__dot"></div>
+          <div class="hero__video-wrapper" id="hero-video-wrapper">
+            <div class="hero__video-bar">
+              <div class="hero__video-dot"></div>
+              <div class="hero__video-dot"></div>
+              <div class="hero__video-dot"></div>
+              <div class="hero__video-url">restosuite.fr/app</div>
             </div>
-            <div class="mockup__content">
-              <div class="mockup__recipe">
-                <div class="mockup__recipe-header">
-                  <div class="mockup__recipe-title">Tarte au citron meringuée</div>
-                  <div class="mockup__recipe-cost">3.20€</div>
-                </div>
-                <div class="mockup__row">
-                  <span class="mockup__row-label">Food cost</span>
-                  <span class="mockup__row-value accent">28%</span>
-                </div>
-                <div class="mockup__row">
-                  <span class="mockup__row-label">Marge brute</span>
-                  <span class="mockup__row-value green">8.30€</span>
-                </div>
-                <div class="mockup__row">
-                  <span class="mockup__row-label">Prix de vente TTC</span>
-                  <span class="mockup__row-value">11.50€</span>
-                </div>
-                <div class="mockup__ingredients">
-                  <div class="mockup__ingredient">
-                    <span class="mockup__ingredient-name">Beurre AOP</span>
-                    <span class="mockup__ingredient-qty">125g</span>
-                  </div>
-                  <div class="mockup__ingredient">
-                    <span class="mockup__ingredient-name">Citron jaune bio</span>
-                    <span class="mockup__ingredient-qty">3 pièces</span>
-                  </div>
-                  <div class="mockup__ingredient">
-                    <span class="mockup__ingredient-name">Sucre semoule</span>
-                    <span class="mockup__ingredient-qty">180g</span>
-                  </div>
-                </div>
-                <div class="mockup__mic">
-                  <div class="mockup__mic-icon">
-                    <i data-lucide="mic" width="14" height="14"></i>
-                  </div>
-                  <div class="mockup__mic-text">
-                    <span>« 3 citrons, 125g de beurre... »</span>
-                  </div>
-                </div>
+            <video id="hero-video" muted loop playsinline preload="none"
+              poster="assets/demo/video-poster.jpg">
+              <source src="assets/demo/restosuite-demo.mp4" type="video/mp4">
+            </video>
+            <div class="hero__video-overlay" id="hero-video-overlay">
+              <div class="hero__video-play">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
               </div>
             </div>
           </div>
@@ -1277,14 +1401,21 @@
     </div>
   </section>
 
-  <!-- ========== VIDEO DEMO ========== -->
+  <!-- ========== SCREENSHOTS ========== -->
   <section class="section section--base" id="demo" style="padding-top: 40px; padding-bottom: 60px;">
     <div class="container" style="text-align: center;">
-      <h2 style="font-size: 1.875rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px;">Voyez RestoSuite en action</h2>
-      <p style="font-size: 1.0625rem; color: var(--text-secondary); max-width: 560px; margin: 0 auto 32px;">Dictez votre recette. L'IA crée votre fiche technique en 30 secondes.</p>
-      <video controls autoplay muted loop playsinline style="width:100%;max-width:800px;border-radius:var(--radius-xl);border:1px solid var(--border-default);">
-        <source src="assets/demo/restosuite-demo.mp4" type="video/mp4">
-      </video>
+      <h2 style="font-size: 1.875rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px;">Conçu pour la cuisine, pas pour un bureau</h2>
+      <p style="font-size: 1.0625rem; color: var(--text-secondary); max-width: 560px; margin: 0 auto 36px;">Interface claire, navigation rapide — même avec les mains occupées.</p>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; max-width: 900px; margin: 0 auto;">
+        <img src="assets/demo/02-recipe-list.png" alt="Liste des fiches techniques RestoSuite" loading="lazy"
+          style="border-radius: var(--radius-lg); border: 1px solid var(--border-default); width: 100%;">
+        <img src="assets/demo/04-voice-input.png" alt="Saisie vocale IA RestoSuite" loading="lazy"
+          style="border-radius: var(--radius-lg); border: 1px solid var(--border-default); width: 100%;">
+        <img src="assets/demo/05-stock.png" alt="Gestion du stock RestoSuite" loading="lazy"
+          style="border-radius: var(--radius-lg); border: 1px solid var(--border-default); width: 100%;">
+        <img src="assets/demo/07-haccp.png" alt="HACCP RestoSuite" loading="lazy"
+          style="border-radius: var(--radius-lg); border: 1px solid var(--border-default); width: 100%;">
+      </div>
     </div>
   </section>
 
@@ -1674,6 +1805,42 @@
         header.style.background = 'rgba(15, 23, 35, 0.98)';
       }
     }, { passive: true });
+
+    // Hero video — click to play/pause
+    const heroVideoWrapper = document.getElementById('hero-video-wrapper');
+    const heroVideo = document.getElementById('hero-video');
+    const heroVideoOverlay = document.getElementById('hero-video-overlay');
+
+    if (heroVideoWrapper && heroVideo) {
+      // Auto-play when visible (IntersectionObserver)
+      const videoObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting && heroVideo.paused) {
+            heroVideo.play().then(() => {
+              heroVideoWrapper.classList.add('playing');
+            }).catch(() => {});
+          } else if (!entry.isIntersecting) {
+            heroVideo.pause();
+            heroVideoWrapper.classList.remove('playing');
+          }
+        });
+      }, { threshold: 0.4 });
+      videoObserver.observe(heroVideoWrapper);
+
+      heroVideoWrapper.addEventListener('click', () => {
+        if (heroVideo.paused) {
+          heroVideo.play().then(() => {
+            heroVideoWrapper.classList.add('playing');
+          }).catch(() => {});
+        } else {
+          heroVideo.pause();
+          heroVideoWrapper.classList.remove('playing');
+        }
+      });
+
+      heroVideo.addEventListener('play', () => { heroVideoWrapper.classList.add('playing'); });
+      heroVideo.addEventListener('pause', () => { heroVideoWrapper.classList.remove('playing'); });
+    }
   </script>
 </body>
 </html>

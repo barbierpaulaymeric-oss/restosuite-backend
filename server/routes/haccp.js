@@ -13,26 +13,64 @@ router.get('/zones', (req, res) => {
 });
 
 router.post('/zones', (req, res) => {
-  const { name, type, min_temp, max_temp } = req.body;
-  if (!name) return res.status(400).json({ error: 'Le nom est requis' });
-  const info = run(
-    'INSERT INTO temperature_zones (name, type, min_temp, max_temp) VALUES (?, ?, ?, ?)',
-    [name, type || 'fridge', min_temp ?? 0, max_temp ?? 4]
-  );
-  const zone = get('SELECT * FROM temperature_zones WHERE id = ?', [info.lastInsertRowid]);
-  res.status(201).json(zone);
+  try {
+    const { name, type, min_temp, max_temp } = req.body;
+
+    if (!name) return res.status(400).json({ error: 'Le nom est requis' });
+
+    // Validate temperature values (reasonable range: -50 to 300°C)
+    if (min_temp !== undefined && min_temp !== null) {
+      if (typeof min_temp !== 'number' || min_temp < -50 || min_temp > 300) {
+        return res.status(400).json({ error: 'min_temp must be a number between -50 and 300°C' });
+      }
+    }
+
+    if (max_temp !== undefined && max_temp !== null) {
+      if (typeof max_temp !== 'number' || max_temp < -50 || max_temp > 300) {
+        return res.status(400).json({ error: 'max_temp must be a number between -50 and 300°C' });
+      }
+    }
+
+    const info = run(
+      'INSERT INTO temperature_zones (name, type, min_temp, max_temp) VALUES (?, ?, ?, ?)',
+      [name, type || 'fridge', min_temp ?? 0, max_temp ?? 4]
+    );
+    const zone = get('SELECT * FROM temperature_zones WHERE id = ?', [info.lastInsertRowid]);
+    res.status(201).json(zone);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
 router.put('/zones/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const existing = get('SELECT * FROM temperature_zones WHERE id = ?', [id]);
-  if (!existing) return res.status(404).json({ error: 'Zone introuvable' });
-  const { name, type, min_temp, max_temp } = req.body;
-  run(
-    'UPDATE temperature_zones SET name = ?, type = ?, min_temp = ?, max_temp = ? WHERE id = ?',
-    [name || existing.name, type || existing.type, min_temp ?? existing.min_temp, max_temp ?? existing.max_temp, id]
-  );
-  res.json(get('SELECT * FROM temperature_zones WHERE id = ?', [id]));
+  try {
+    const id = Number(req.params.id);
+    const existing = get('SELECT * FROM temperature_zones WHERE id = ?', [id]);
+    if (!existing) return res.status(404).json({ error: 'Zone introuvable' });
+
+    const { name, type, min_temp, max_temp } = req.body;
+
+    // Validate temperature values (reasonable range: -50 to 300°C)
+    if (min_temp !== undefined && min_temp !== null) {
+      if (typeof min_temp !== 'number' || min_temp < -50 || min_temp > 300) {
+        return res.status(400).json({ error: 'min_temp must be a number between -50 and 300°C' });
+      }
+    }
+
+    if (max_temp !== undefined && max_temp !== null) {
+      if (typeof max_temp !== 'number' || max_temp < -50 || max_temp > 300) {
+        return res.status(400).json({ error: 'max_temp must be a number between -50 and 300°C' });
+      }
+    }
+
+    run(
+      'UPDATE temperature_zones SET name = ?, type = ?, min_temp = ?, max_temp = ? WHERE id = ?',
+      [name || existing.name, type || existing.type, min_temp ?? existing.min_temp, max_temp ?? existing.max_temp, id]
+    );
+    res.json(get('SELECT * FROM temperature_zones WHERE id = ?', [id]));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
 router.delete('/zones/:id', (req, res) => {
@@ -66,27 +104,38 @@ router.get('/temperatures', (req, res) => {
 });
 
 router.post('/temperatures', (req, res) => {
-  const { zone_id, temperature, notes, recorded_by } = req.body;
-  if (!zone_id || temperature == null) {
-    return res.status(400).json({ error: 'zone_id et temperature sont requis' });
-  }
-  const zone = get('SELECT * FROM temperature_zones WHERE id = ?', [zone_id]);
-  if (!zone) return res.status(404).json({ error: 'Zone introuvable' });
+  try {
+    const { zone_id, temperature, notes, recorded_by } = req.body;
 
-  const isAlert = (temperature < zone.min_temp || temperature > zone.max_temp) ? 1 : 0;
-  const info = run(
-    'INSERT INTO temperature_logs (zone_id, temperature, recorded_by, notes, is_alert) VALUES (?, ?, ?, ?, ?)',
-    [zone_id, temperature, recorded_by || null, notes || null, isAlert]
-  );
-  const log = get(`
-    SELECT tl.*, tz.name as zone_name, tz.min_temp, tz.max_temp,
-           a.name as recorded_by_name
-    FROM temperature_logs tl
-    JOIN temperature_zones tz ON tz.id = tl.zone_id
-    LEFT JOIN accounts a ON a.id = tl.recorded_by
-    WHERE tl.id = ?
-  `, [info.lastInsertRowid]);
-  res.status(201).json(log);
+    if (!zone_id || temperature == null) {
+      return res.status(400).json({ error: 'zone_id et temperature sont requis' });
+    }
+
+    // Validate temperature is a number in reasonable range (-50 to 300°C)
+    if (typeof temperature !== 'number' || temperature < -50 || temperature > 300) {
+      return res.status(400).json({ error: 'temperature must be a number between -50 and 300°C' });
+    }
+
+    const zone = get('SELECT * FROM temperature_zones WHERE id = ?', [zone_id]);
+    if (!zone) return res.status(404).json({ error: 'Zone introuvable' });
+
+    const isAlert = (temperature < zone.min_temp || temperature > zone.max_temp) ? 1 : 0;
+    const info = run(
+      'INSERT INTO temperature_logs (zone_id, temperature, recorded_by, notes, is_alert) VALUES (?, ?, ?, ?, ?)',
+      [zone_id, temperature, recorded_by || null, notes || null, isAlert]
+    );
+    const log = get(`
+      SELECT tl.*, tz.name as zone_name, tz.min_temp, tz.max_temp,
+             a.name as recorded_by_name
+      FROM temperature_logs tl
+      JOIN temperature_zones tz ON tz.id = tl.zone_id
+      LEFT JOIN accounts a ON a.id = tl.recorded_by
+      WHERE tl.id = ?
+    `, [info.lastInsertRowid]);
+    res.status(201).json(log);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
 router.get('/temperatures/today', (req, res) => {
@@ -294,7 +343,7 @@ const CONTENT_W = PAGE_W - 2 * MARGIN;
 function pdfHeader(doc, title, from, to) {
   let y = MARGIN;
   doc.font('Helvetica-Bold').fontSize(14).fillColor('#1B2A4A');
-  doc.text('RESTOSUITE AI — HACCP', MARGIN, y);
+  doc.text('RESTOSUITE — HACCP', MARGIN, y);
   y += 20;
   doc.font('Helvetica-Bold').fontSize(11).fillColor('#000');
   doc.text(title, MARGIN, y);

@@ -416,6 +416,40 @@ try {
   // Tables may already exist
 }
 
+// ─── Migration: Supplier Purchase Orders ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+      status TEXT DEFAULT 'brouillon',
+      reference TEXT,
+      notes TEXT,
+      total_amount REAL DEFAULT 0,
+      expected_delivery DATE,
+      created_by INTEGER REFERENCES accounts(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      sent_at DATETIME,
+      received_at DATETIME,
+      received_by INTEGER REFERENCES accounts(id)
+    );
+    CREATE TABLE IF NOT EXISTS purchase_order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+      ingredient_id INTEGER REFERENCES ingredients(id),
+      product_name TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      unit TEXT DEFAULT 'kg',
+      unit_price REAL DEFAULT 0,
+      total_price REAL DEFAULT 0,
+      notes TEXT
+    );
+  `);
+} catch (e) {
+  // Tables may already exist
+}
+
 // ─── Migration: Referral program ───
 try {
   db.exec(`
@@ -515,6 +549,38 @@ try {
   }
 } catch (e) {
   console.error('Migration auth columns error:', e.message);
+}
+
+// ─── Migration: Add staff_password to restaurants ───
+try {
+  const restCols = all("PRAGMA table_info(restaurants)");
+  if (!restCols.some(c => c.name === 'staff_password')) {
+    db.exec("ALTER TABLE restaurants ADD COLUMN staff_password TEXT");
+    console.log('✅ Migration: added staff_password to restaurants');
+  }
+} catch (e) {
+  console.error('Migration staff_password error:', e.message);
+}
+
+// ─── Migration: Add auth columns to suppliers (company-level login) ───
+try {
+  const suppCols = all("PRAGMA table_info(suppliers)");
+  const suppColNames = suppCols.map(c => c.name);
+  if (!suppColNames.includes('email')) {
+    db.exec("ALTER TABLE suppliers ADD COLUMN email TEXT");
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_suppliers_email ON suppliers(email) WHERE email IS NOT NULL");
+    console.log('✅ Migration: added email to suppliers');
+  }
+  if (!suppColNames.includes('password_hash')) {
+    db.exec("ALTER TABLE suppliers ADD COLUMN password_hash TEXT");
+    console.log('✅ Migration: added password_hash to suppliers');
+  }
+  if (!suppColNames.includes('contact_name')) {
+    db.exec("ALTER TABLE suppliers ADD COLUMN contact_name TEXT");
+    console.log('✅ Migration: added contact_name to suppliers');
+  }
+} catch (e) {
+  console.error('Migration supplier auth columns error:', e.message);
 }
 
 // ─── Seed: Common ingredients with prices ───

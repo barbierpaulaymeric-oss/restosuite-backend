@@ -176,14 +176,15 @@ function showIngredientModal(ingredient = null) {
   };
 
   if (isEdit) {
-    overlay.querySelector('#m-ing-delete').onclick = async () => {
-      if (!confirm('Supprimer cet ingrédient ?')) return;
-      try {
-        await API.deleteIngredient(ingredient.id);
-        showToast('Ingrédient supprimé', 'success');
-        overlay.remove();
-        renderIngredients();
-      } catch (e) { showToast(e.message, 'error'); }
+    overlay.querySelector('#m-ing-delete').onclick = () => {
+      showConfirmModal('Supprimer cet ingrédient ?', 'Cette action est irréversible. Les fiches techniques utilisant cet ingrédient seront affectées.', async () => {
+        try {
+          await API.deleteIngredient(ingredient.id);
+          showToast('Ingrédient supprimé', 'success');
+          overlay.remove();
+          renderIngredients();
+        } catch (e) { showToast(e.message, 'error'); }
+      });
     };
   }
 }
@@ -194,7 +195,7 @@ function showCSVImportModal() {
   overlay.innerHTML = `
     <div class="modal" style="max-width:600px">
       <h2>📥 Importer des ingrédients (CSV)</h2>
-      <p class="text-muted" style="font-size:var(--text-sm);margin-bottom:12px">Format attendu : <code>nom;catégorie;unité;prix_au_kg;pourcentage_perte</code><br>Séparateur : <code>;</code> ou <code>,</code></p>
+      <p class="text-muted" style="font-size:var(--text-sm);margin-bottom:12px">Format attendu : <code>nom;catégorie;unité;prix_unitaire;pourcentage_perte</code><br>Séparateur : <code>;</code> ou <code>,</code></p>
       <div class="form-group">
         <input type="file" id="csv-file-input" accept=".csv,.txt" class="form-control">
       </div>
@@ -238,7 +239,7 @@ function showCSVImportModal() {
             name: parts[0],
             category: parts[1] || null,
             default_unit: parts[2] || 'g',
-            price_per_kg: parseFloat(parts[3]) || 0,
+            price_per_unit: parseFloat(parts[3]) || 0,
             waste_percent: parseFloat(parts[4]) || 0
           });
         }
@@ -256,13 +257,13 @@ function showCSVImportModal() {
       const previewRows = parsedRows.slice(0, 5);
       content.innerHTML = `
         <table class="csv-preview-table">
-          <thead><tr><th>Nom</th><th>Catégorie</th><th>Unité</th><th>Prix/kg</th><th>Perte %</th></tr></thead>
+          <thead><tr><th>Nom</th><th>Catégorie</th><th>Unité</th><th>Prix unitaire</th><th>Perte %</th></tr></thead>
           <tbody>${previewRows.map(r => `
             <tr>
               <td>${escapeHtml(r.name)}</td>
               <td>${escapeHtml(r.category || '—')}</td>
               <td>${r.default_unit}</td>
-              <td>${r.price_per_kg}</td>
+              <td>${r.price_per_unit}</td>
               <td>${r.waste_percent}%</td>
             </tr>
           `).join('')}</tbody>
@@ -288,7 +289,8 @@ function showCSVImportModal() {
           name: row.name,
           category: row.category,
           default_unit: row.default_unit,
-          waste_percent: row.waste_percent
+          waste_percent: row.waste_percent,
+          price_per_unit: row.price_per_unit
         });
         success++;
       } catch (e) { errors++; }

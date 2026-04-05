@@ -16,6 +16,7 @@ class OnboardingWizard {
 
     // Local state for step 4
     this.members = [];
+    this.staffPassword = '';
 
     // Local state for step 5
     this.zones = [
@@ -297,7 +298,26 @@ class OnboardingWizard {
       <div class="ob-step">
         <div class="ob-icon">👥</div>
         <h2 class="ob-title">Mon équipe</h2>
-        <p class="ob-desc">Ajoutez les membres de votre équipe (optionnel)</p>
+        <p class="ob-desc">Configurez l'accès de votre staff</p>
+
+        <div style="padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md);margin-bottom:var(--space-4);text-align:left">
+          <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3)">
+            <span style="font-size:1.3rem;line-height:1">🔐</span>
+            <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
+              <strong style="color:var(--text-primary)">Comment ça marche ?</strong><br>
+              Votre staff se connecte avec un <strong>mot de passe commun</strong> au restaurant, puis sélectionne son nom et entre son <strong>code PIN personnel</strong>. Chaque membre ne voit que les modules autorisés pour son rôle.
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-weight:600">Mot de passe équipe</label>
+            <input type="text" class="form-control" id="ob-staff-password" value="${escapeHtml(this.staffPassword || '')}" placeholder="ex: resto2026"
+                   style="font-family:var(--font-mono);letter-spacing:0.05em">
+            <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:4px">Ce code sera donné à toute l'équipe pour se connecter au restaurant.</p>
+          </div>
+        </div>
+
+        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-2)">Membres de l'équipe</h3>
+        <p style="font-size:var(--text-sm);color:var(--text-tertiary);margin-bottom:var(--space-3)">Ajoutez vos équipiers avec leur nom, rôle et PIN personnel (optionnel, modifiable après).</p>
         <div id="ob-members-list"></div>
         <button class="btn btn-ghost" id="ob-add-member" style="margin-top:var(--space-3)">+ Ajouter un membre</button>
       </div>
@@ -306,7 +326,7 @@ class OnboardingWizard {
     this.renderMembersList();
 
     document.getElementById('ob-add-member').addEventListener('click', () => {
-      this.members.push({ name: '', role: 'equipier', pin: '' });
+      this.members.push({ name: '', role: 'equipier' });
       this.renderMembersList();
     });
 
@@ -331,13 +351,12 @@ class OnboardingWizard {
         <div class="form-group" style="margin-bottom:var(--space-2)">
           <input type="text" class="form-control" placeholder="Nom / surnom" value="${escapeHtml(m.name)}" data-index="${i}" data-field="name">
         </div>
-        <div style="display:flex;gap:var(--space-2)">
-          <select class="form-control" data-index="${i}" data-field="role" style="flex:1">
+        <div>
+          <select class="form-control" data-index="${i}" data-field="role">
             <option value="cuisinier" ${m.role === 'cuisinier' ? 'selected' : ''}>👨‍🍳 Cuisinier</option>
             <option value="serveur" ${m.role === 'serveur' ? 'selected' : ''}>🍽️ Serveur</option>
             <option value="equipier" ${m.role === 'equipier' ? 'selected' : ''}>👤 Équipier</option>
           </select>
-          <input type="tel" class="form-control" placeholder="PIN" maxlength="4" inputmode="numeric" value="${escapeHtml(m.pin)}" data-index="${i}" data-field="pin" style="width:80px;text-align:center;letter-spacing:0.3em">
         </div>
       </div>
     `).join('');
@@ -604,8 +623,10 @@ class OnboardingWizard {
             }
           });
         }
-        const validMembers = this.members.filter(m => m.name && m.pin && /^\d{4}$/.test(m.pin));
-        await API.saveOnboardingStep(4, { members: validMembers });
+        // Collect staff password
+        this.staffPassword = document.getElementById('ob-staff-password')?.value?.trim() || '';
+        const validMembers = this.members.filter(m => m.name && m.name.trim());
+        await API.saveOnboardingStep(4, { members: validMembers, staff_password: this.staffPassword || undefined });
         break;
       }
       case 5: {

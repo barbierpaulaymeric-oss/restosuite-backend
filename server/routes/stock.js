@@ -50,22 +50,36 @@ router.get('/alerts', (req, res) => {
 // POST /api/stock/reception — Réception marchandise
 // ═══════════════════════════════════════════
 router.post('/reception', (req, res) => {
-  const { lines, recorded_by } = req.body;
-  // lines = [{ ingredient_id, quantity, unit, unit_price, supplier_id, batch_number, dlc, temperature, notes }]
-  if (!lines || !Array.isArray(lines) || lines.length === 0) {
-    return res.status(400).json({ error: 'Au moins une ligne de réception est requise' });
-  }
+  try {
+    const { lines, recorded_by } = req.body;
+    // lines = [{ ingredient_id, quantity, unit, unit_price, supplier_id, batch_number, dlc, temperature, notes }]
+    if (!lines || !Array.isArray(lines) || lines.length === 0) {
+      return res.status(400).json({ error: 'Au moins une ligne de réception est requise' });
+    }
 
-  const transaction = db.transaction(() => {
-    const results = [];
+    // Validate all lines before transaction
     for (const line of lines) {
-      const { ingredient_id, quantity, unit, unit_price, supplier_id, batch_number, dlc, temperature, notes } = line;
+      const { ingredient_id, quantity, unit, unit_price } = line;
       if (!ingredient_id || !quantity || !unit) {
-        throw new Error('ingredient_id, quantity et unit sont requis pour chaque ligne');
+        return res.status(400).json({ error: 'ingredient_id, quantity et unit sont requis pour chaque ligne' });
       }
+      if (typeof quantity !== 'number' || quantity <= 0) {
+        return res.status(400).json({ error: 'quantity must be a positive number' });
+      }
+      if (unit_price !== undefined && unit_price !== null) {
+        if (typeof unit_price !== 'number' || unit_price < 0) {
+          return res.status(400).json({ error: 'unit_price must be a non-negative number' });
+        }
+      }
+    }
 
-      const ingredient = get('SELECT * FROM ingredients WHERE id = ?', [ingredient_id]);
-      if (!ingredient) throw new Error(`Ingrédient #${ingredient_id} introuvable`);
+    const transaction = db.transaction(() => {
+      const results = [];
+      for (const line of lines) {
+        const { ingredient_id, quantity, unit, unit_price, supplier_id, batch_number, dlc, temperature, notes } = line;
+
+        const ingredient = get('SELECT * FROM ingredients WHERE id = ?', [ingredient_id]);
+        if (!ingredient) throw new Error(`Ingrédient #${ingredient_id} introuvable`);
 
       // 1. Enregistrer le mouvement
       const mvInfo = run(
@@ -105,16 +119,15 @@ router.post('/reception', (req, res) => {
         );
       }
 
-      results.push({ movement_id: mvInfo.lastInsertRowid, ingredient_id, quantity });
-    }
-    return results;
-  });
+        results.push({ movement_id: mvInfo.lastInsertRowid, ingredient_id, quantity });
+      }
+      return results;
+    });
 
-  try {
     const results = transaction();
     res.status(201).json({ success: true, count: results.length, movements: results });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -122,93 +135,123 @@ router.post('/reception', (req, res) => {
 // POST /api/stock/loss — Perte / casse
 // ═══════════════════════════════════════════
 router.post('/loss', (req, res) => {
-  const { ingredient_id, quantity, unit, reason, recorded_by } = req.body;
-  if (!ingredient_id || !quantity || !unit) {
-    return res.status(400).json({ error: 'ingredient_id, quantity et unit sont requis' });
+  try {
+    const { ingredient_id, quantity, unit, reason, recorded_by } = req.body;
+
+    if (!ingredient_id || !quantity || !unit) {
+      return res.status(400).json({ error: 'ingredient_id, quantity et unit sont requis' });
+    }
+
+    // Validate quantity is positive
+    if (typeof quantity !== 'number' || quantity <= 0) {
+      return res.status(400).json({ error: 'quantity must be a positive number' });
+    }
+
+    const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredient_id]);
+    if (!existing) return res.status(404).json({ error: 'Cet ingrédient n\'est pas en stock' });
+
+    run(
+      `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, recorded_by)
+       VALUES (?, 'loss', ?, ?, ?, ?)`,
+      [ingredient_id, quantity, unit, reason || 'Perte / casse', recorded_by || null]
+    );
+
+    run(
+      'UPDATE stock SET quantity = MAX(0, quantity - ?), last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
+      [quantity, ingredient_id]
+    );
+
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
-
-  const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredient_id]);
-  if (!existing) return res.status(404).json({ error: 'Cet ingrédient n\'est pas en stock' });
-
-  run(
-    `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, recorded_by)
-     VALUES (?, 'loss', ?, ?, ?, ?)`,
-    [ingredient_id, quantity, unit, reason || 'Perte / casse', recorded_by || null]
-  );
-
-  run(
-    'UPDATE stock SET quantity = MAX(0, quantity - ?), last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
-    [quantity, ingredient_id]
-  );
-
-  res.json({ success: true });
 });
 
 // ═══════════════════════════════════════════
 // POST /api/stock/adjustment — Ajustement inventaire
 // ═══════════════════════════════════════════
 router.post('/adjustment', (req, res) => {
-  const { ingredient_id, quantity, unit, reason, recorded_by } = req.body;
-  if (!ingredient_id || quantity == null || !unit) {
-    return res.status(400).json({ error: 'ingredient_id, quantity et unit sont requis' });
-  }
+  try {
+    const { ingredient_id, quantity, unit, reason, recorded_by } = req.body;
 
-  const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredient_id]);
+    if (!ingredient_id || quantity == null || !unit) {
+      return res.status(400).json({ error: 'ingredient_id, quantity et unit sont requis' });
+    }
 
-  // quantity here is the adjustment delta (+/-)
-  run(
-    `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, recorded_by)
-     VALUES (?, 'adjustment', ?, ?, ?, ?)`,
-    [ingredient_id, quantity, unit, reason || 'Ajustement inventaire', recorded_by || null]
-  );
+    // Validate quantity is a number
+    if (typeof quantity !== 'number') {
+      return res.status(400).json({ error: 'quantity must be a number' });
+    }
 
-  if (existing) {
+    const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredient_id]);
+
+    // quantity here is the adjustment delta (+/-)
     run(
-      'UPDATE stock SET quantity = MAX(0, quantity + ?), last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
-      [quantity, ingredient_id]
+      `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, recorded_by)
+       VALUES (?, 'adjustment', ?, ?, ?, ?)`,
+      [ingredient_id, quantity, unit, reason || 'Ajustement inventaire', recorded_by || null]
     );
-  } else {
-    run(
-      'INSERT INTO stock (ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, 0)',
-      [ingredient_id, Math.max(0, quantity), unit]
-    );
-  }
 
-  res.json({ success: true });
+    if (existing) {
+      run(
+        'UPDATE stock SET quantity = MAX(0, quantity + ?), last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
+        [quantity, ingredient_id]
+      );
+    } else {
+      run(
+        'INSERT INTO stock (ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, 0)',
+        [ingredient_id, Math.max(0, quantity), unit]
+      );
+    }
+
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
 // ═══════════════════════════════════════════
 // POST /api/stock/inventory — Inventaire complet (reset)
 // ═══════════════════════════════════════════
 router.post('/inventory', (req, res) => {
-  const { ingredient_id, new_quantity, unit, recorded_by } = req.body;
-  if (!ingredient_id || new_quantity == null || !unit) {
-    return res.status(400).json({ error: 'ingredient_id, new_quantity et unit sont requis' });
-  }
+  try {
+    const { ingredient_id, new_quantity, unit, recorded_by } = req.body;
 
-  const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredient_id]);
-  const oldQty = existing ? existing.quantity : 0;
-  const delta = new_quantity - oldQty;
+    if (!ingredient_id || new_quantity == null || !unit) {
+      return res.status(400).json({ error: 'ingredient_id, new_quantity et unit sont requis' });
+    }
 
-  run(
-    `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, recorded_by)
-     VALUES (?, 'inventory', ?, ?, ?, ?)`,
-    [ingredient_id, delta, unit, `Inventaire : ${oldQty} → ${new_quantity}`, recorded_by || null]
-  );
+    // Validate new_quantity is non-negative
+    if (typeof new_quantity !== 'number' || new_quantity < 0) {
+      return res.status(400).json({ error: 'new_quantity must be a non-negative number' });
+    }
 
-  if (existing) {
+    const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredient_id]);
+    const oldQty = existing ? existing.quantity : 0;
+    const delta = new_quantity - oldQty;
+
     run(
-      'UPDATE stock SET quantity = ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
-      [new_quantity, ingredient_id]
+      `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, recorded_by)
+       VALUES (?, 'inventory', ?, ?, ?, ?)`,
+      [ingredient_id, delta, unit, `Inventaire : ${oldQty} → ${new_quantity}`, recorded_by || null]
     );
-  } else {
-    run(
-      'INSERT INTO stock (ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, 0)',
-      [ingredient_id, new_quantity, unit]
-    );
-  }
 
-  res.json({ success: true });
+    if (existing) {
+      run(
+        'UPDATE stock SET quantity = ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
+        [new_quantity, ingredient_id]
+      );
+    } else {
+      run(
+        'INSERT INTO stock (ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, 0)',
+        [ingredient_id, new_quantity, unit]
+      );
+    }
+
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
 // ═══════════════════════════════════════════
@@ -272,7 +315,7 @@ router.get('/export/pdf', (req, res) => {
   // Header
   let y = MARGIN;
   doc.font('Helvetica-Bold').fontSize(14).fillColor('#1B2A4A');
-  doc.text('RESTOSUITE AI — STOCK', MARGIN, y);
+  doc.text('RESTOSUITE — STOCK', MARGIN, y);
   y += 20;
   doc.font('Helvetica-Bold').fontSize(11).fillColor('#000');
   doc.text('HISTORIQUE DES MOUVEMENTS DE STOCK', MARGIN, y);
@@ -362,23 +405,33 @@ router.get('/export/pdf', (req, res) => {
 // PUT /api/stock/:ingredientId/min — Définir seuil minimum
 // ═══════════════════════════════════════════
 router.put('/:ingredientId/min', (req, res) => {
-  const ingredientId = Number(req.params.ingredientId);
-  const { min_quantity } = req.body;
-  if (min_quantity == null) return res.status(400).json({ error: 'min_quantity est requis' });
+  try {
+    const ingredientId = Number(req.params.ingredientId);
+    const { min_quantity } = req.body;
 
-  const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredientId]);
-  if (existing) {
-    run('UPDATE stock SET min_quantity = ? WHERE ingredient_id = ?', [min_quantity, ingredientId]);
-  } else {
-    const ingredient = get('SELECT * FROM ingredients WHERE id = ?', [ingredientId]);
-    if (!ingredient) return res.status(404).json({ error: 'Ingrédient introuvable' });
-    run(
-      'INSERT INTO stock (ingredient_id, quantity, unit, min_quantity) VALUES (?, 0, ?, ?)',
-      [ingredientId, ingredient.default_unit || 'kg', min_quantity]
-    );
+    if (min_quantity == null) return res.status(400).json({ error: 'min_quantity est requis' });
+
+    // Validate min_quantity is non-negative
+    if (typeof min_quantity !== 'number' || min_quantity < 0) {
+      return res.status(400).json({ error: 'min_quantity must be a non-negative number' });
+    }
+
+    const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredientId]);
+    if (existing) {
+      run('UPDATE stock SET min_quantity = ? WHERE ingredient_id = ?', [min_quantity, ingredientId]);
+    } else {
+      const ingredient = get('SELECT * FROM ingredients WHERE id = ?', [ingredientId]);
+      if (!ingredient) return res.status(404).json({ error: 'Ingrédient introuvable' });
+      run(
+        'INSERT INTO stock (ingredient_id, quantity, unit, min_quantity) VALUES (?, 0, ?, ?)',
+        [ingredientId, ingredient.default_unit || 'kg', min_quantity]
+      );
+    }
+
+    res.json({ success: true, ingredient_id: ingredientId, min_quantity });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
-
-  res.json({ success: true, ingredient_id: ingredientId, min_quantity });
 });
 
 module.exports = router;

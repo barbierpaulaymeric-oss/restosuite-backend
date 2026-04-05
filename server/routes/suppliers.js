@@ -35,6 +35,17 @@ router.put('/:id', (req, res) => {
   res.json(get('SELECT * FROM suppliers WHERE id = ?', [Number(req.params.id)]));
 });
 
+router.delete('/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const existing = get('SELECT * FROM suppliers WHERE id = ?', [id]);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  // Clean up related data
+  run('DELETE FROM supplier_prices WHERE supplier_id = ?', [id]);
+  run('DELETE FROM price_change_notifications WHERE supplier_id = ?', [id]);
+  run('DELETE FROM suppliers WHERE id = ?', [id]);
+  res.json({ deleted: true });
+});
+
 router.get('/:id/prices', (req, res) => {
   res.json(all(`
     SELECT sp.*, i.name as ingredient_name

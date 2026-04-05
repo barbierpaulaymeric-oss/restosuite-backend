@@ -28,3 +28,45 @@ function formatQuantity(qty, unit) {
   const display = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(rounded < 10 ? 1 : 0);
   return display + ' ' + unit;
 }
+
+// ─── Custom confirmation modal (replaces native confirm()) ───
+function showConfirmModal(title, message, onConfirm) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay confirm-modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:400px;text-align:center">
+      <div style="font-size:2rem;margin-bottom:12px">
+        <i data-lucide="alert-triangle" style="width:40px;height:40px;color:var(--color-danger)"></i>
+      </div>
+      <h3 style="margin-bottom:8px">${title}</h3>
+      <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:20px">${message}</p>
+      <div class="actions-row" style="justify-content:center">
+        <button class="btn btn-danger" id="confirm-yes">Supprimer</button>
+        <button class="btn btn-secondary" id="confirm-no">Annuler</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+
+  overlay.querySelector('#confirm-yes').onclick = () => {
+    overlay.remove();
+    onConfirm();
+  };
+  overlay.querySelector('#confirm-no').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+
+// ─── Format date in French locale ───
+function formatDateFR(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatDateTimeFR(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+    d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}

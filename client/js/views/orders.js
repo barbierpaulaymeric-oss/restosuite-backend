@@ -1,33 +1,34 @@
 // ═══════════════════════════════════════════
-// Orders — Dashboard / New Order / Kitchen View
+// Purchase Orders — Commandes fournisseurs
 // ═══════════════════════════════════════════
 
-// ─── Orders Dashboard ───
+// ─── Dashboard ───
 async function renderOrdersDashboard() {
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="page-header">
-      <h1>Commandes</h1>
+      <h1>Commandes fournisseurs</h1>
       <div style="display:flex;gap:8px">
-        <a href="#/orders/kitchen" class="btn btn-secondary btn-sm"><i data-lucide="chef-hat" style="width:16px;height:16px"></i> Cuisine</a>
-        <a href="#/orders/new" class="btn btn-primary"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle</a>
+        <button class="btn btn-secondary" id="btn-suggest-orders"><i data-lucide="lightbulb" style="width:16px;height:16px"></i> Suggestions</button>
+        <a href="#/orders/new" class="btn btn-primary"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle commande</a>
       </div>
     </div>
     <div class="orders-subnav" style="display:flex;gap:8px;margin-bottom:20px;overflow-x:auto">
       <button class="haccp-subnav__link active" data-filter="">Toutes</button>
-      <button class="haccp-subnav__link" data-filter="en_attente_validation">📱 QR</button>
-      <button class="haccp-subnav__link" data-filter="en_cours">En cours</button>
-      <button class="haccp-subnav__link" data-filter="envoyé">Envoyées</button>
-      <button class="haccp-subnav__link" data-filter="prêt">Prêtes</button>
-      <button class="haccp-subnav__link" data-filter="terminé">Terminées</button>
+      <button class="haccp-subnav__link" data-filter="brouillon">Brouillon</button>
+      <button class="haccp-subnav__link" data-filter="envoyée">Envoyées</button>
+      <button class="haccp-subnav__link" data-filter="confirmée">Confirmées</button>
+      <button class="haccp-subnav__link" data-filter="réceptionnée">Réceptionnées</button>
+      <button class="haccp-subnav__link" data-filter="annulée">Annulées</button>
     </div>
     <div id="orders-grid"><div class="loading"><div class="spinner"></div></div></div>
+    <div id="suggest-modal" class="hidden"></div>
   `;
   lucide.createIcons();
 
   let allOrders = [];
   try {
-    allOrders = await API.getOrders();
+    allOrders = await API.getPurchaseOrders();
   } catch (e) {
     showToast('Erreur chargement commandes', 'error');
   }
@@ -42,63 +43,60 @@ async function renderOrdersDashboard() {
     if (orders.length === 0) {
       gridEl.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">📝</div>
+          <div class="empty-icon">📦</div>
           <h3>Aucune commande</h3>
-          <p>Créez une nouvelle commande pour commencer.</p>
+          <p>Créez une nouvelle commande fournisseur pour commencer.</p>
           <a href="#/orders/new" class="btn btn-primary">Nouvelle commande</a>
         </div>
       `;
       return;
     }
 
-    // Group by table
-    const byTable = {};
-    for (const o of orders) {
-      if (!byTable[o.table_number]) byTable[o.table_number] = [];
-      byTable[o.table_number].push(o);
-    }
+    gridEl.innerHTML = `<div class="orders-table-grid">${orders.map(order => {
+      const statusBadgeClass = getPOStatusBadgeClass(order.status);
+      const statusLabel = getPOStatusLabel(order.status);
+      const elapsed = getElapsedTime(order.created_at);
+      const itemCount = (order.items || []).length;
+      const totalAmount = (order.items || []).reduce((sum, item) => sum + (item.unit_price * item.quantity || 0), 0);
 
-    gridEl.innerHTML = `<div class="orders-table-grid">${Object.entries(byTable).map(([table, tableOrders]) => {
-      return tableOrders.map(order => {
-        const statusClass = getOrderStatusClass(order.status);
-        const statusLabel = getOrderStatusLabel(order.status);
-        const elapsed = getElapsedTime(order.created_at);
-        const isQROrder = order.status === 'en_attente_validation' || (order.notes && order.notes.includes('QR'));
-        const itemsHtml = order.items.map(it =>
-          `<div class="order-item-line">
-            <span>${it.quantity > 1 ? it.quantity + '× ' : ''}${escapeHtml(it.recipe_name)}</span>
-            <span class="order-item-status order-item-status--${it.status}">${getItemStatusIcon(it.status)}</span>
-          </div>`
-        ).join('');
-
-        return `
-          <div class="order-card order-card--${statusClass}">
-            <div class="order-card__header">
-              <span class="order-card__table">Table ${table}</span>
-              ${isQROrder ? '<span class="badge" style="background:#E8722A;color:white;font-size:11px;padding:2px 6px;border-radius:4px">📱 QR</span>' : ''}
-              <span class="order-card__timer">${elapsed}</span>
-            </div>
-            <span class="badge order-badge--${statusClass}">${statusLabel}</span>
-            <div class="order-card__items">${itemsHtml}</div>
-            <div class="order-card__footer">
-              <span class="order-card__total mono">${formatCurrency(order.total_cost)}</span>
-              <div class="order-card__actions">
-                ${order.status === 'en_attente_validation' ? `
-                  <button class="btn btn-primary btn-sm" onclick="validateQROrder(${order.id})">✅ Valider</button>
-                  <button class="btn btn-danger btn-sm" onclick="rejectQROrder(${order.id})">❌ Refuser</button>
-                ` : ''}
-                ${order.status === 'en_cours' ? `
-                  <button class="btn btn-primary btn-sm" onclick="sendOrderFromDash(${order.id})">Envoyer</button>
-                  <button class="btn btn-danger btn-sm" aria-label="Annuler la commande" onclick="cancelOrderFromDash(${order.id})"><i data-lucide="x" style="width:14px;height:14px"></i></button>
-                ` : ''}
-                ${order.status === 'prêt' ? `
-                  <button class="btn btn-primary btn-sm" onclick="completeOrderFromDash(${order.id})">Terminé</button>
-                ` : ''}
-              </div>
-            </div>
-          </div>
+      let actionButtons = '';
+      if (order.status === 'brouillon') {
+        actionButtons = `
+          <button class="btn btn-sm btn-primary" onclick="sendPurchaseOrder(${order.id})">Envoyer</button>
+          <button class="btn btn-sm btn-secondary" onclick="editPurchaseOrder(${order.id})"><i data-lucide="edit" style="width:14px;height:14px"></i></button>
+          <button class="btn btn-sm btn-danger" aria-label="Supprimer" onclick="deletePurchaseOrderFromDash(${order.id})"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
         `;
-      }).join('');
+      } else if (order.status === 'envoyée') {
+        actionButtons = `
+          <button class="btn btn-sm btn-primary" onclick="confirmPurchaseOrder(${order.id})">Confirmer</button>
+          <button class="btn btn-sm btn-danger" aria-label="Annuler" onclick="cancelPurchaseOrderFromDash(${order.id})"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+        `;
+      } else if (order.status === 'confirmée') {
+        actionButtons = `
+          <button class="btn btn-sm btn-primary" onclick="receivePurchaseOrderFromDash(${order.id})">Réceptionner</button>
+        `;
+      }
+
+      return `
+        <div class="order-card" style="cursor:pointer" onclick="location.hash='#/orders/${order.id}'">
+          <div class="order-card__header">
+            <span class="order-card__table" style="font-weight:600">${escapeHtml(order.reference)}</span>
+            <span class="order-card__timer">${elapsed}</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span class="badge badge--info" style="background:#6366f1;color:white">${escapeHtml(order.supplier_name)}</span>
+          </div>
+          <span class="badge badge--${statusBadgeClass}">${statusLabel}</span>
+          <div style="margin-top:8px;font-size:var(--text-sm);color:var(--text-secondary)">
+            <div>${itemCount} article${itemCount > 1 ? 's' : ''}</div>
+            <div style="font-weight:600;color:var(--text-primary);margin-top:4px">${formatCurrency(totalAmount)}</div>
+          </div>
+          <div class="order-card__actions" style="margin-top:12px">
+            <a href="#/orders/${order.id}" class="btn btn-sm btn-secondary">Détail</a>
+            ${actionButtons}
+          </div>
+        </div>
+      `;
     }).join('')}</div>`;
     lucide.createIcons();
   }
@@ -113,25 +111,523 @@ async function renderOrdersDashboard() {
       renderOrders(btn.dataset.filter);
     });
   });
+
+  // Suggestions button
+  document.getElementById('btn-suggest-orders').addEventListener('click', showSuggestionsModal);
 }
 
-async function sendOrderFromDash(id) {
+// ─── Suggestions Modal ───
+async function showSuggestionsModal() {
+  const modalEl = document.getElementById('suggest-modal');
+  modalEl.innerHTML = `
+    <div class="modal-overlay">
+      <div class="modal" style="max-width:600px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <h2>Articles à réapprovisionner</h2>
+          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('suggest-modal').innerHTML=''"><i data-lucide="x" style="width:18px;height:18px"></i></button>
+        </div>
+        <div id="suggest-loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+  `;
+  modalEl.classList.remove('hidden');
+  lucide.createIcons();
+
   try {
-    const result = await API.sendOrder(id);
-    if (result.warnings && result.warnings.length > 0) {
-      showToast(`⚠️ Stock insuffisant pour ${result.warnings.length} ingrédient(s)`, 'info');
+    const suggestions = await API.getPurchaseOrderSuggestions();
+    const loadingEl = document.getElementById('suggest-loading');
+
+    if (!suggestions || suggestions.length === 0) {
+      loadingEl.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">✅</div>
+          <p>Tous les stocks sont corrects. Aucun réapprovisionnement nécessaire.</p>
+        </div>
+      `;
+      return;
     }
-    showToast('Commande envoyée en cuisine', 'success');
-    renderOrdersDashboard();
+
+    // Group by supplier
+    const bySupplier = {};
+    for (const item of suggestions) {
+      if (!bySupplier[item.supplier_id]) {
+        bySupplier[item.supplier_id] = { name: item.supplier_name, items: [] };
+      }
+      bySupplier[item.supplier_id].items.push(item);
+    }
+
+    loadingEl.innerHTML = `
+      ${Object.entries(bySupplier).map(([supplierId, group]) => `
+        <div style="margin-bottom:20px;border:1px solid var(--border-color);border-radius:6px;padding:12px">
+          <h4 style="margin-bottom:12px">${escapeHtml(group.name)}</h4>
+          <table style="width:100%;font-size:var(--text-sm);border-collapse:collapse">
+            <tbody>
+              ${group.items.map(item => `
+                <tr style="border-top:1px solid var(--border-color);padding:8px 0">
+                  <td style="padding:8px">${escapeHtml(item.ingredient_name)}</td>
+                  <td style="padding:8px;text-align:right">${item.current_quantity} ${escapeHtml(item.unit)} <span style="color:var(--text-secondary)">(min: ${item.min_quantity})</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="createPurchaseOrderFromSuggestions(${supplierId})">Créer la commande</button>
+        </div>
+      `).join('')}
+    `;
+  } catch (e) {
+    document.getElementById('suggest-loading').innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+  }
+}
+
+// ─── New Purchase Order ───
+let _poItems = [];
+let _poSelectedSupplierId = null;
+
+async function renderNewOrder() {
+  const app = document.getElementById('app');
+  _poItems = [];
+  _poSelectedSupplierId = null;
+
+  let suppliers = [];
+  let ingredients = [];
+  try {
+    suppliers = await API.getSuppliers();
+    ingredients = await API.getIngredients();
+  } catch (e) {
+    showToast('Erreur chargement données', 'error');
+  }
+
+  app.innerHTML = `
+    <div class="page-header">
+      <div>
+        <a href="#/orders" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px"></i> Commandes</a>
+        <h1 style="margin-top:4px">Nouvelle commande fournisseur</h1>
+      </div>
+    </div>
+
+    <div style="max-width:800px">
+      <div class="form-group">
+        <label>Fournisseur *</label>
+        <select class="form-control" id="po-supplier" required>
+          <option value="">— Sélectionner un fournisseur —</option>
+          ${suppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="section-title">Ingrédients</div>
+      <div id="ingredients-list">
+        <input type="text" class="form-control" id="ingredient-search" placeholder="Rechercher un ingrédient..." style="margin-bottom:12px">
+        <div id="ingredients-filtered" style="max-height:300px;overflow-y:auto;border:1px solid var(--border-color);border-radius:4px">
+          ${ingredients.map(ing => `
+            <div class="ingredient-item" data-id="${ing.id}" style="padding:8px 12px;border-bottom:1px solid var(--border-color);cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+              <span>${escapeHtml(ing.name)}</span>
+              <button type="button" class="btn btn-sm btn-primary">+</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top:20px">Articles de la commande</div>
+      <div id="po-items-table" style="overflow-x:auto">
+        <p class="text-muted">Aucun article pour le moment. Ajoutez des ingrédients ci-dessus.</p>
+      </div>
+
+      <div class="section-title" style="margin-top:20px">Total</div>
+      <div style="font-size:1.5rem;font-weight:600;color:var(--color-accent);margin-bottom:20px">
+        <span id="po-total">${formatCurrency(0)}</span>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn btn-primary" id="btn-send-po" disabled>
+          <i data-lucide="send" style="width:18px;height:18px"></i> Envoyer
+        </button>
+        <button class="btn btn-secondary" id="btn-save-po" disabled>
+          <i data-lucide="save" style="width:18px;height:18px"></i> Sauvegarder en brouillon
+        </button>
+        <a href="#/orders" class="btn btn-secondary">Annuler</a>
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+
+  const supplierSelect = document.getElementById('po-supplier');
+  const ingredientSearch = document.getElementById('ingredient-search');
+  const ingredientsFiltered = document.getElementById('ingredients-filtered');
+
+  // Supplier selection
+  supplierSelect.addEventListener('change', (e) => {
+    _poSelectedSupplierId = e.target.value ? parseInt(e.target.value) : null;
+    updatePOItemsDisplay();
+  });
+
+  // Ingredient search
+  ingredientSearch.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase();
+    const items = document.querySelectorAll('.ingredient-item');
+    items.forEach(item => {
+      const name = item.textContent.toLowerCase();
+      item.style.display = name.includes(query) ? '' : 'none';
+    });
+  });
+
+  // Add ingredient to order
+  ingredientsFiltered.addEventListener('click', (e) => {
+    const btn = e.target.closest('.ingredient-item button');
+    if (!btn) return;
+
+    const ingredientItem = e.target.closest('.ingredient-item');
+    const ingredientId = parseInt(ingredientItem.dataset.id);
+    const ingredientName = ingredientItem.textContent.trim();
+
+    const existing = _poItems.find(i => i.ingredient_id === ingredientId);
+    if (existing) {
+      existing.quantity++;
+    } else {
+      _poItems.push({
+        ingredient_id: ingredientId,
+        name: ingredientName,
+        quantity: 1,
+        unit: 'unité',
+        unit_price: 0
+      });
+    }
+
+    updatePOItemsDisplay();
+  });
+
+  // Send / Save buttons
+  document.getElementById('btn-send-po').addEventListener('click', async () => {
+    await submitPurchaseOrder(true);
+  });
+  document.getElementById('btn-save-po').addEventListener('click', async () => {
+    await submitPurchaseOrder(false);
+  });
+}
+
+function updatePOItemsDisplay() {
+  const itemsTableEl = document.getElementById('po-items-table');
+  const sendBtn = document.getElementById('btn-send-po');
+  const saveBtn = document.getElementById('btn-save-po');
+
+  if (_poItems.length === 0) {
+    itemsTableEl.innerHTML = '<p class="text-muted">Aucun article pour le moment. Ajoutez des ingrédients ci-dessus.</p>';
+    if (sendBtn) sendBtn.disabled = true;
+    if (saveBtn) saveBtn.disabled = true;
+    return;
+  }
+
+  if (sendBtn) sendBtn.disabled = !_poSelectedSupplierId || _poItems.length === 0;
+  if (saveBtn) saveBtn.disabled = !_poSelectedSupplierId || _poItems.length === 0;
+
+  let total = 0;
+  itemsTableEl.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:var(--text-sm)">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border-color)">
+          <th style="text-align:left;padding:8px">Article</th>
+          <th style="text-align:right;padding:8px">Quantité</th>
+          <th style="text-align:right;padding:8px">Unité</th>
+          <th style="text-align:right;padding:8px">Prix unitaire</th>
+          <th style="text-align:right;padding:8px">Total</th>
+          <th style="text-align:center;padding:8px">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${_poItems.map((item, idx) => {
+          const lineTotal = item.quantity * (item.unit_price || 0);
+          total += lineTotal;
+          return `
+            <tr style="border-bottom:1px solid var(--border-color)">
+              <td style="padding:8px">${escapeHtml(item.name)}</td>
+              <td style="padding:8px;text-align:right">
+                <input type="number" class="form-control" style="max-width:80px" value="${item.quantity}" min="1" onchange="updatePOItemQuantity(${idx}, this.value)">
+              </td>
+              <td style="padding:8px;text-align:right">
+                <input type="text" class="form-control" style="max-width:80px" value="${escapeHtml(item.unit)}" onchange="updatePOItemUnit(${idx}, this.value)">
+              </td>
+              <td style="padding:8px;text-align:right">
+                <input type="number" class="form-control" style="max-width:100px" step="0.01" value="${item.unit_price || ''}" placeholder="0.00" onchange="updatePOItemPrice(${idx}, this.value)">
+              </td>
+              <td style="padding:8px;text-align:right;font-weight:600">${formatCurrency(lineTotal)}</td>
+              <td style="padding:8px;text-align:center">
+                <button class="btn btn-sm btn-danger" onclick="removePOItem(${idx})"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
+              </td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+
+  const totalEl = document.getElementById('po-total');
+  if (totalEl) totalEl.textContent = formatCurrency(total);
+
+  lucide.createIcons();
+}
+
+function updatePOItemQuantity(idx, value) {
+  _poItems[idx].quantity = parseInt(value) || 1;
+  updatePOItemsDisplay();
+}
+
+function updatePOItemUnit(idx, value) {
+  _poItems[idx].unit = value.trim() || 'unité';
+  updatePOItemsDisplay();
+}
+
+function updatePOItemPrice(idx, value) {
+  _poItems[idx].unit_price = parseFloat(value) || 0;
+  updatePOItemsDisplay();
+}
+
+function removePOItem(idx) {
+  _poItems.splice(idx, 1);
+  updatePOItemsDisplay();
+}
+
+async function submitPurchaseOrder(sendImmediately) {
+  if (!_poSelectedSupplierId) {
+    showToast('Sélectionnez un fournisseur', 'error');
+    return;
+  }
+
+  if (_poItems.length === 0) {
+    showToast('Ajoutez au moins un article', 'error');
+    return;
+  }
+
+  try {
+    const po = await API.createPurchaseOrder({
+      supplier_id: _poSelectedSupplierId,
+      status: sendImmediately ? 'envoyée' : 'brouillon',
+      items: _poItems.map(i => ({
+        ingredient_id: i.ingredient_id,
+        quantity: i.quantity,
+        unit: i.unit,
+        unit_price: i.unit_price
+      }))
+    });
+
+    showToast(sendImmediately ? 'Commande envoyée' : 'Commande sauvegardée', 'success');
+    location.hash = '#/orders';
   } catch (e) {
     showToast('Erreur : ' + e.message, 'error');
   }
 }
 
-async function cancelOrderFromDash(id) {
+async function createPurchaseOrderFromSuggestions(supplierId) {
+  try {
+    const suggestions = await API.getPurchaseOrderSuggestions();
+    const supplierSuggestions = suggestions.filter(s => s.supplier_id == supplierId);
+
+    if (supplierSuggestions.length === 0) {
+      showToast('Aucune suggestion pour ce fournisseur', 'error');
+      return;
+    }
+
+    const items = supplierSuggestions.map(s => ({
+      ingredient_id: s.ingredient_id,
+      quantity: Math.max(s.min_quantity - s.current_quantity, 1),
+      unit: s.unit,
+      unit_price: s.supplier_price || 0
+    }));
+
+    const po = await API.createPurchaseOrder({
+      supplier_id: supplierId,
+      status: 'brouillon',
+      items
+    });
+
+    showToast('Commande créée', 'success');
+    document.getElementById('suggest-modal').innerHTML = '';
+    location.hash = '#/orders';
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+  }
+}
+
+async function editPurchaseOrder(id) {
+  try {
+    const po = await API.getPurchaseOrder(id);
+    if (po.status !== 'brouillon') {
+      showToast('Seules les brouillons peuvent être modifiés', 'error');
+      return;
+    }
+    // Redirect to new order with pre-filled data
+    // This would require a more complex implementation
+    location.hash = '#/orders/' + id;
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+  }
+}
+
+// ─── Order Detail ───
+async function renderOrderDetail(id) {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="page-header">
+      <div>
+        <a href="#/orders" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px"></i> Commandes</a>
+        <h1 style="margin-top:4px" id="po-title">Chargement...</h1>
+      </div>
+    </div>
+    <div id="po-detail"><div class="loading"><div class="spinner"></div></div></div>
+  `;
+  lucide.createIcons();
+
+  try {
+    const po = await API.getPurchaseOrder(id);
+    renderPODetail(po);
+  } catch (e) {
+    document.getElementById('po-detail').innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function renderPODetail(po) {
+  const detailEl = document.getElementById('po-detail');
+  const titleEl = document.getElementById('po-title');
+  const statusLabel = getPOStatusLabel(po.status);
+  const statusBadgeClass = getPOStatusBadgeClass(po.status);
+  const totalAmount = (po.items || []).reduce((sum, item) => sum + (item.unit_price * item.quantity || 0), 0);
+
+  titleEl.textContent = po.reference;
+
+  let actionButtons = '';
+  if (po.status === 'brouillon') {
+    actionButtons = `
+      <button class="btn btn-primary" onclick="sendPurchaseOrder(${po.id})"><i data-lucide="send" style="width:16px;height:16px"></i> Envoyer</button>
+      <button class="btn btn-secondary" onclick="editPurchaseOrder(${po.id})"><i data-lucide="edit" style="width:16px;height:16px"></i> Modifier</button>
+      <button class="btn btn-danger" onclick="deletePurchaseOrder(${po.id})"><i data-lucide="trash-2" style="width:16px;height:16px"></i> Supprimer</button>
+    `;
+  } else if (po.status === 'envoyée') {
+    actionButtons = `
+      <button class="btn btn-primary" onclick="confirmPurchaseOrder(${po.id})">Confirmer la réception</button>
+      <button class="btn btn-danger" onclick="cancelPurchaseOrder(${po.id})">Annuler</button>
+    `;
+  } else if (po.status === 'confirmée') {
+    actionButtons = `
+      <button class="btn btn-primary" onclick="receivePurchaseOrderFromDash(${po.id})">Réceptionner</button>
+    `;
+  }
+
+  detailEl.innerHTML = `
+    <div style="max-width:900px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+        <div>
+          <div class="text-muted" style="font-size:var(--text-sm)">Fournisseur</div>
+          <div style="font-size:1.1rem;font-weight:500">${escapeHtml(po.supplier_name)}</div>
+        </div>
+        <div>
+          <div class="text-muted" style="font-size:var(--text-sm)">Statut</div>
+          <div><span class="badge badge--${statusBadgeClass}">${statusLabel}</span></div>
+        </div>
+        <div>
+          <div class="text-muted" style="font-size:var(--text-sm)">Créée le</div>
+          <div>${formatDateFR(po.created_at)}</div>
+        </div>
+        <div>
+          <div class="text-muted" style="font-size:var(--text-sm)">Référence</div>
+          <div>${escapeHtml(po.reference)}</div>
+        </div>
+      </div>
+
+      <div class="section-title">Articles</div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:var(--text-sm)">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border-color)">
+            <th style="text-align:left;padding:8px">Article</th>
+            <th style="text-align:right;padding:8px">Quantité</th>
+            <th style="text-align:right;padding:8px">Unité</th>
+            <th style="text-align:right;padding:8px">Prix unitaire</th>
+            <th style="text-align:right;padding:8px">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(po.items || []).map(item => {
+            const lineTotal = item.quantity * (item.unit_price || 0);
+            return `
+              <tr style="border-bottom:1px solid var(--border-color)">
+                <td style="padding:8px">${escapeHtml(item.ingredient_name)}</td>
+                <td style="padding:8px;text-align:right">${item.quantity}</td>
+                <td style="padding:8px;text-align:right">${escapeHtml(item.unit || '—')}</td>
+                <td style="padding:8px;text-align:right">${formatCurrency(item.unit_price)}</td>
+                <td style="padding:8px;text-align:right;font-weight:600">${formatCurrency(lineTotal)}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+
+      <div style="display:flex;justify-content:flex-end;margin-bottom:20px;padding-top:12px;border-top:2px solid var(--border-color)">
+        <div style="font-size:1.3rem;font-weight:700">
+          Total : <span style="color:var(--color-accent)">${formatCurrency(totalAmount)}</span>
+        </div>
+      </div>
+
+      <div class="actions-row">
+        ${actionButtons}
+        <a href="#/orders" class="btn btn-secondary">Retour</a>
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+}
+
+// ─── Action handlers ───
+async function sendPurchaseOrder(id) {
+  if (!confirm('Envoyer cette commande au fournisseur ?')) return;
+  try {
+    await API.updatePurchaseOrder(id, { status: 'envoyée' });
+    showToast('Commande envoyée', 'success');
+    location.hash = '#/orders';
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+  }
+}
+
+async function confirmPurchaseOrder(id) {
+  if (!confirm('Confirmer la réception de cette commande ?')) return;
+  try {
+    await API.updatePurchaseOrder(id, { status: 'confirmée' });
+    showToast('Commande confirmée', 'success');
+    location.hash = '#/orders';
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+  }
+}
+
+async function receivePurchaseOrderFromDash(id) {
+  try {
+    const po = await API.getPurchaseOrder(id);
+    if (po.status !== 'confirmée') {
+      showToast('Seules les commandes confirmées peuvent être réceptionnées', 'error');
+      return;
+    }
+
+    // Create stock reception entries for each item
+    const receptionData = {
+      items: (po.items || []).map(item => ({
+        ingredient_id: item.ingredient_id,
+        quantity: item.quantity,
+        unit: item.unit,
+        batch_number: '',
+        dlc: null
+      }))
+    };
+
+    await API.receivePurchaseOrder(id, receptionData);
+    await API.updatePurchaseOrder(id, { status: 'réceptionnée' });
+    showToast('Commande réceptionnée et stock mis à jour', 'success');
+    location.hash = '#/orders';
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+  }
+}
+
+async function cancelPurchaseOrderFromDash(id) {
   if (!confirm('Annuler cette commande ?')) return;
   try {
-    await API.cancelOrder(id);
+    await API.updatePurchaseOrder(id, { status: 'annulée' });
     showToast('Commande annulée', 'success');
     renderOrdersDashboard();
   } catch (e) {
@@ -139,392 +635,74 @@ async function cancelOrderFromDash(id) {
   }
 }
 
-async function completeOrderFromDash(id) {
+async function deletePurchaseOrderFromDash(id) {
+  if (!confirm('Supprimer cette commande ?')) return;
   try {
-    await API.updateOrder(id, { status: 'terminé' });
-    showToast('Commande terminée', 'success');
+    await API.deletePurchaseOrder(id);
+    showToast('Commande supprimée', 'success');
     renderOrdersDashboard();
   } catch (e) {
     showToast('Erreur : ' + e.message, 'error');
   }
 }
 
-async function validateQROrder(id) {
+async function deletePurchaseOrder(id) {
+  if (!confirm('Supprimer cette commande ?')) return;
   try {
-    await API.sendOrder(id);
-    showToast('Commande QR validée et envoyée en cuisine', 'success');
-    renderOrdersDashboard();
-  } catch (e) {
-    showToast('Erreur : ' + e.message, 'error');
-  }
-}
-
-async function rejectQROrder(id) {
-  if (!confirm('Refuser cette commande QR ?')) return;
-  try {
-    await API.cancelOrder(id);
-    showToast('Commande QR refusée', 'success');
-    renderOrdersDashboard();
-  } catch (e) {
-    showToast('Erreur : ' + e.message, 'error');
-  }
-}
-
-// ─── New Order ───
-let orderItems = [];
-
-async function renderNewOrder() {
-  const app = document.getElementById('app');
-  orderItems = [];
-
-  app.innerHTML = `
-    <div class="page-header">
-      <div>
-        <a href="#/orders" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px"></i> Commandes</a>
-        <h1 style="margin-top:4px">Nouvelle commande</h1>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Numéro de table</label>
-      <input type="number" class="form-control" id="order-table" min="1" placeholder="1" style="max-width:120px">
-    </div>
-    <div class="section-title">Menu — Plats disponibles</div>
-    <div id="menu-list"><div class="loading"><div class="spinner"></div></div></div>
-    <div class="section-title">Commande</div>
-    <div id="order-summary">
-      <p class="text-muted" style="font-size:var(--text-sm)">Aucun plat sélectionné</p>
-    </div>
-    <div class="form-group" style="margin-top:16px">
-      <label>Notes</label>
-      <textarea class="form-control" id="order-notes" rows="2" placeholder="Allergies, demandes spéciales..."></textarea>
-    </div>
-    <div class="actions-row">
-      <button class="btn btn-primary" id="btn-send-order" disabled>
-        <i data-lucide="send" style="width:18px;height:18px"></i> Envoyer en cuisine
-      </button>
-      <button class="btn btn-secondary" id="btn-save-order" disabled>
-        <i data-lucide="save" style="width:18px;height:18px"></i> Sauvegarder
-      </button>
-    </div>
-  `;
-  lucide.createIcons();
-
-  // Load plats (only type 'plat')
-  let recipes = [];
-  try {
-    recipes = await API.getRecipes();
-    recipes = recipes.filter(r => (r.recipe_type || 'plat') === 'plat');
-  } catch (e) {
-    showToast('Erreur chargement menu', 'error');
-  }
-
-  const menuEl = document.getElementById('menu-list');
-  if (recipes.length === 0) {
-    menuEl.innerHTML = '<p class="text-muted">Aucun plat disponible. Créez des fiches techniques de type "Plat".</p>';
-  } else {
-    menuEl.innerHTML = `<div class="menu-grid">${recipes.map(r => `
-      <div class="menu-card" data-id="${r.id}">
-        <div class="menu-card__info">
-          <span class="menu-card__name">${escapeHtml(r.name)}</span>
-          <span class="menu-card__price mono">${r.selling_price ? formatCurrency(r.selling_price) : '—'}</span>
-        </div>
-        <div class="menu-card__actions">
-          <button class="btn btn-sm btn-secondary menu-minus" aria-label="Retirer" data-id="${r.id}" data-name="${escapeHtml(r.name)}" data-price="${r.selling_price || 0}">−</button>
-          <span class="menu-card__qty" id="menu-qty-${r.id}">0</span>
-          <button class="btn btn-sm btn-primary menu-plus" aria-label="Ajouter" data-id="${r.id}" data-name="${escapeHtml(r.name)}" data-price="${r.selling_price || 0}">+</button>
-        </div>
-      </div>
-    `).join('')}</div>`;
-  }
-
-  // Menu +/- handlers
-  menuEl.addEventListener('click', (e) => {
-    const btn = e.target.closest('.menu-plus, .menu-minus');
-    if (!btn) return;
-
-    const recipeId = Number(btn.dataset.id);
-    const name = btn.dataset.name;
-    const price = parseFloat(btn.dataset.price);
-    const isPlus = btn.classList.contains('menu-plus');
-
-    let existing = orderItems.find(i => i.recipe_id === recipeId);
-    if (isPlus) {
-      if (existing) {
-        existing.quantity++;
-      } else {
-        orderItems.push({ recipe_id: recipeId, name, price, quantity: 1, notes: '' });
-      }
-    } else if (existing && existing.quantity > 0) {
-      existing.quantity--;
-      if (existing.quantity === 0) {
-        orderItems = orderItems.filter(i => i.recipe_id !== recipeId);
-      }
-    }
-
-    // Update qty display
-    const qtyEl = document.getElementById(`menu-qty-${recipeId}`);
-    const item = orderItems.find(i => i.recipe_id === recipeId);
-    if (qtyEl) qtyEl.textContent = item ? item.quantity : '0';
-
-    renderOrderSummary();
-  });
-
-  // Send / Save buttons
-  document.getElementById('btn-send-order').addEventListener('click', async () => {
-    await submitOrder(true);
-  });
-  document.getElementById('btn-save-order').addEventListener('click', async () => {
-    await submitOrder(false);
-  });
-}
-
-function renderOrderSummary() {
-  const el = document.getElementById('order-summary');
-  const sendBtn = document.getElementById('btn-send-order');
-  const saveBtn = document.getElementById('btn-save-order');
-
-  const active = orderItems.filter(i => i.quantity > 0);
-  if (active.length === 0) {
-    el.innerHTML = '<p class="text-muted" style="font-size:var(--text-sm)">Aucun plat sélectionné</p>';
-    if (sendBtn) sendBtn.disabled = true;
-    if (saveBtn) saveBtn.disabled = true;
-    return;
-  }
-
-  if (sendBtn) sendBtn.disabled = false;
-  if (saveBtn) saveBtn.disabled = false;
-
-  let total = 0;
-  el.innerHTML = active.map(item => {
-    const subtotal = item.price * item.quantity;
-    total += subtotal;
-    return `
-      <div class="order-summary-line">
-        <span>${item.quantity}× ${escapeHtml(item.name)}</span>
-        <span class="mono">${formatCurrency(subtotal)}</span>
-      </div>
-    `;
-  }).join('') + `
-    <div class="order-summary-total">
-      <span style="font-weight:700">TOTAL</span>
-      <span class="mono" style="font-weight:700;color:var(--color-accent)">${formatCurrency(total)}</span>
-    </div>
-  `;
-}
-
-async function submitOrder(sendImmediately) {
-  const tableNumber = parseInt(document.getElementById('order-table').value);
-  if (!tableNumber || tableNumber < 1) {
-    showToast('Numéro de table requis', 'error');
-    return;
-  }
-
-  const active = orderItems.filter(i => i.quantity > 0);
-  if (active.length === 0) {
-    showToast('Ajoutez au moins un plat', 'error');
-    return;
-  }
-
-  try {
-    const order = await API.createOrder({
-      table_number: tableNumber,
-      notes: document.getElementById('order-notes').value.trim() || null,
-      items: active.map(i => ({
-        recipe_id: i.recipe_id,
-        quantity: i.quantity,
-        notes: i.notes || null
-      }))
-    });
-
-    if (sendImmediately) {
-      const result = await API.sendOrder(order.id);
-      if (result.warnings && result.warnings.length > 0) {
-        showToast(`⚠️ Stock insuffisant pour ${result.warnings.length} ingrédient(s)`, 'info');
-      }
-      showToast('Commande envoyée en cuisine !', 'success');
-    } else {
-      showToast('Commande sauvegardée', 'success');
-    }
-
+    await API.deletePurchaseOrder(id);
+    showToast('Commande supprimée', 'success');
     location.hash = '#/orders';
   } catch (e) {
     showToast('Erreur : ' + e.message, 'error');
   }
 }
 
-// ─── Kitchen View ───
-let kitchenRefreshInterval = null;
-let _kitchenPrevOrderIds = null;
-
-async function renderKitchenView() {
-  const app = document.getElementById('app');
-  app.innerHTML = `
-    <div class="page-header">
-      <div>
-        <a href="#/orders" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px"></i> Commandes</a>
-        <h1 style="margin-top:4px">🍳 Cuisine</h1>
-      </div>
-      <button class="btn btn-secondary btn-sm" aria-label="Rafraîchir" onclick="renderKitchenView()"><i data-lucide="refresh-cw" style="width:16px;height:16px"></i></button>
-    </div>
-    <div id="kitchen-tickets"><div class="loading"><div class="spinner"></div></div></div>
-  `;
-  lucide.createIcons();
-
-  // Clear previous interval
-  if (kitchenRefreshInterval) {
-    clearInterval(kitchenRefreshInterval);
-    kitchenRefreshInterval = null;
-  }
-
-  _kitchenPrevOrderIds = null;
-  await loadKitchenTickets();
-
-  // Auto-refresh every 15s
-  kitchenRefreshInterval = setInterval(async () => {
-    // Only refresh if still on kitchen view
-    if (location.hash === '#/orders/kitchen') {
-      await loadKitchenTickets();
-    } else {
-      clearInterval(kitchenRefreshInterval);
-      kitchenRefreshInterval = null;
-    }
-  }, 15000);
-}
-
-async function loadKitchenTickets() {
-  let orders = [];
+async function cancelPurchaseOrder(id) {
+  if (!confirm('Annuler cette commande ?')) return;
   try {
-    orders = await API.getOrders();
-    // Show only envoyé and prêt orders
-    orders = orders.filter(o => o.status === 'envoyé' || o.status === 'prêt');
-    orders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  } catch (e) {
-    return;
-  }
-
-  // Detect new orders for notification sound
-  const currentIds = new Set(orders.map(o => o.id));
-  if (_kitchenPrevOrderIds !== null) {
-    const hasNewOrders = orders.some(o => !_kitchenPrevOrderIds.has(o.id));
-    if (hasNewOrders) {
-      playKitchenNotificationSound();
-    }
-  }
-  _kitchenPrevOrderIds = currentIds;
-
-  const el = document.getElementById('kitchen-tickets');
-  if (!el) return;
-
-  if (orders.length === 0) {
-    el.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">✅</div>
-        <h3>Pas de commande en attente</h3>
-        <p>Les nouvelles commandes apparaîtront ici automatiquement.</p>
-      </div>
-    `;
-    return;
-  }
-
-  el.innerHTML = `<div class="kitchen-grid">${orders.map(order => {
-    const elapsed = getElapsedTime(order.created_at);
-    const isReady = order.status === 'prêt';
-
-    return `
-      <div class="kitchen-ticket ${isReady ? 'kitchen-ticket--ready' : ''}">
-        <div class="kitchen-ticket__header">
-          <span class="kitchen-ticket__table">Table ${order.table_number}</span>
-          <span class="kitchen-ticket__id">#${order.id}</span>
-          <span class="kitchen-ticket__timer">${elapsed}</span>
-        </div>
-        ${order.notes ? `<div class="kitchen-ticket__notes">📌 ${escapeHtml(order.notes)}</div>` : ''}
-        <div class="kitchen-ticket__items">
-          ${order.items.map(item => {
-            const itemStatusClass = item.status === 'prêt' ? 'kitchen-item--ready' :
-              item.status === 'en_préparation' ? 'kitchen-item--cooking' : '';
-            return `
-              <div class="kitchen-item ${itemStatusClass}">
-                <span class="kitchen-item__qty">${item.quantity}×</span>
-                <span class="kitchen-item__name">${escapeHtml(item.recipe_name)}</span>
-                ${item.notes ? `<span class="kitchen-item__notes">(${escapeHtml(item.notes)})</span>` : ''}
-                <div class="kitchen-item__actions">
-                  ${item.status === 'en_attente' ?
-                    `<button class="btn btn-sm btn-secondary" onclick="updateKitchenItem(${order.id}, ${item.id}, 'en_préparation')">🔥 Prép.</button>` : ''}
-                  ${item.status === 'en_préparation' ?
-                    `<button class="btn btn-sm btn-primary" onclick="updateKitchenItem(${order.id}, ${item.id}, 'prêt')">✅ Prêt</button>` : ''}
-                  ${item.status === 'prêt' ?
-                    `<span class="badge badge-success">✅ Prêt</span>` : ''}
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-    `;
-  }).join('')}</div>`;
-}
-
-async function updateKitchenItem(orderId, itemId, status) {
-  try {
-    await API.updateOrderItem(orderId, itemId, { status });
-    await loadKitchenTickets();
+    await API.updatePurchaseOrder(id, { status: 'annulée' });
+    showToast('Commande annulée', 'success');
+    location.hash = '#/orders';
   } catch (e) {
     showToast('Erreur : ' + e.message, 'error');
   }
 }
 
-// ─── Kitchen notification sound ───
-function playKitchenNotificationSound() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 800;
-    gain.gain.value = 0.3;
-    osc.start();
-    osc.stop(ctx.currentTime + 0.15);
-    setTimeout(() => {
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.frequency.value = 1000;
-      gain2.gain.value = 0.3;
-      osc2.start();
-      osc2.stop(ctx.currentTime + 0.15);
-    }, 200);
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-  } catch (e) { /* Web Audio not available */ }
-}
-
 // ─── Helpers ───
-function getOrderStatusClass(status) {
+function getPOStatusBadgeClass(status) {
   switch (status) {
-    case 'en_attente_validation': return 'qr-pending';
-    case 'en_cours': return 'pending';
-    case 'envoyé': return 'sent';
-    case 'prêt': return 'ready';
-    case 'terminé': return 'done';
-    case 'annulé': return 'cancelled';
-    default: return 'pending';
+    case 'brouillon': return 'secondary';
+    case 'envoyée': return 'info';
+    case 'confirmée': return 'warning';
+    case 'réceptionnée': return 'success';
+    case 'annulée': return 'danger';
+    default: return 'secondary';
   }
 }
 
-function getOrderStatusLabel(status) {
+function getPOStatusLabel(status) {
   switch (status) {
-    case 'en_attente_validation': return '📱 À valider';
-    case 'en_cours': return 'En cours';
-    case 'envoyé': return 'Envoyée';
-    case 'prêt': return 'Prête';
-    case 'terminé': return 'Terminée';
-    case 'annulé': return 'Annulée';
+    case 'brouillon': return 'Brouillon';
+    case 'envoyée': return 'Envoyée';
+    case 'confirmée': return 'Confirmée';
+    case 'réceptionnée': return 'Réceptionnée';
+    case 'annulée': return 'Annulée';
     default: return status;
   }
 }
 
+function getOrderStatusClass(status) {
+  // Kept for backward compatibility with service.js
+  return getPOStatusBadgeClass(status);
+}
+
+function getOrderStatusLabel(status) {
+  // Kept for backward compatibility with service.js
+  return getPOStatusLabel(status);
+}
+
 function getItemStatusIcon(status) {
+  // Kept for backward compatibility with service.js
   switch (status) {
     case 'en_attente': return '⏳';
     case 'en_préparation': return '🔥';

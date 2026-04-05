@@ -8,6 +8,14 @@
   document.documentElement.setAttribute('data-theme', savedTheme);
 })();
 
+// ─── Command Palette shortcut ───
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    toggleCommandPalette();
+  }
+});
+
 // ─── PWA Install Prompt ───
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -171,7 +179,8 @@ function registerRoutes() {
   Router.add(/^\/stock\/movements$/, renderStockMovements);
   Router.add(/^\/orders$/, renderOrdersDashboard);
   Router.add(/^\/orders\/new$/, renderNewOrder);
-  Router.add(/^\/orders\/kitchen$/, renderKitchenView);
+  Router.add(/^\/orders\/(\d+)$/, (id) => renderOrderDetail(parseInt(id)));
+  Router.add(/^\/kitchen$/, renderKitchenView);
   Router.add(/^\/suppliers$/, renderSuppliers);
   Router.add(/^\/haccp$/, renderHACCPDashboard);
   Router.add(/^\/haccp\/temperatures$/, renderHACCPTemperatures);
@@ -193,11 +202,26 @@ function bootApp(role, account, opts = {}) {
   updateNavUser(account);
   registerRoutes();
 
-  // Role-based redirect: salle goes to service view, hide nav
+  // Filter nav items based on role — hide links user cannot access
+  const navLinks = document.querySelectorAll('.nav-link[data-roles]');
+  navLinks.forEach(link => {
+    const allowedRoles = link.dataset.roles.split(',').map(r => r.trim());
+    if (!allowedRoles.includes(role)) {
+      link.style.display = 'none';
+    } else {
+      link.style.display = '';
+    }
+  });
+
+  // Role-based redirect: salle goes to service view, cuisine goes to kitchen
   if (role === 'salle') {
     const nav = document.getElementById('nav');
     if (nav) nav.style.display = 'none';
     location.hash = '#/service';
+  } else if (role === 'cuisinier') {
+    const nav = document.getElementById('nav');
+    if (nav) nav.style.display = 'none';
+    location.hash = '#/kitchen';
   } else {
     location.hash = '#/';
   }
@@ -208,6 +232,9 @@ function bootApp(role, account, opts = {}) {
 
   // Fetch trial status and render banner
   fetchTrialStatus().then(() => renderTrialBanner());
+
+  // Refresh trial status every 5 minutes
+  setInterval(() => fetchTrialStatus().then(() => renderTrialBanner()), 5 * 60 * 1000);
 }
 
 function updateNavUser(account) {

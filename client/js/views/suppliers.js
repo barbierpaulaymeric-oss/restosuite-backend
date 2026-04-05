@@ -10,6 +10,9 @@ async function renderSuppliers() {
     <div class="page-header">
       <h1>Fournisseurs</h1>
       <div style="display:flex;gap:var(--space-2)">
+        <a href="#/orders" class="btn btn-secondary">
+          <i data-lucide="clipboard-pen" style="width:18px;height:18px"></i> <span class="btn-label-desktop">Commandes</span>
+        </a>
         ${isGerant ? `<button class="btn btn-secondary" onclick="location.hash='#/supplier-portal'" id="btn-portal">
           <i data-lucide="link" style="width:18px;height:18px"></i> <span class="btn-label-desktop">Portail</span>
           <span class="portal-badge" id="portal-badge" style="display:none"></span>
@@ -65,6 +68,10 @@ async function renderSuppliers() {
 }
 
 function showSupplierModal(supplier = null) {
+  // Clean up any existing modal
+  const existing = document.querySelector('.modal-overlay');
+  if (existing) existing.remove();
+
   const isEdit = !!supplier;
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -106,6 +113,7 @@ function showSupplierModal(supplier = null) {
           ${isEdit ? 'Enregistrer' : 'Créer'}
         </button>
         <button class="btn btn-secondary" id="m-sup-cancel">Annuler</button>
+        ${isEdit ? '<button class="btn btn-danger" id="m-sup-delete"><i data-lucide="trash-2" style="width:18px;height:18px"></i> Supprimer</button>' : ''}
       </div>
     </div>
   `;
@@ -151,6 +159,19 @@ function showSupplierModal(supplier = null) {
       renderSuppliers();
     } catch (e) { showToast(e.message, 'error'); }
   };
+
+  if (isEdit) {
+    overlay.querySelector('#m-sup-delete').onclick = () => {
+      showConfirmModal('Supprimer ce fournisseur ?', 'Cette action est irréversible.', async () => {
+        try {
+          await API.deleteSupplier(supplier.id);
+          showToast('Fournisseur supprimé', 'success');
+          overlay.remove();
+          renderSuppliers();
+        } catch (e) { showToast(e.message, 'error'); }
+      });
+    };
+  }
 }
 
 async function showSupplierDetail(id) {
