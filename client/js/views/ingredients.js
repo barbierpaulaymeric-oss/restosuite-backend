@@ -69,7 +69,7 @@ async function renderIngredients() {
           </div>
           ${ing.allergens ? `<div>
             <span class="stat-value" style="font-size:var(--text-xs)">${escapeHtml(ing.allergens)}</span>
-            <span class="stat-label">Allergènes</span>
+            <span class="stat-label">Allergènes INCO</span>
           </div>` : ''}
         </div>
       </div>
@@ -115,9 +115,12 @@ function showIngredientModal(ingredient = null) {
           <label>Perte (%)</label>
           <input type="number" class="form-control" id="m-ing-waste" value="${ingredient?.waste_percent || 0}" min="0" max="100" step="0.5">
         </div>
-        <div class="form-group">
-          <label>Allergènes</label>
-          <input type="text" class="form-control" id="m-ing-allergens" value="${escapeHtml(ingredient?.allergens || '')}" placeholder="gluten, lait...">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Allergènes INCO</label>
+          <div id="m-ing-allergens-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;margin-top:4px">
+            ${getAllergenCheckboxes(ingredient?.allergens || '')}
+          </div>
+          <input type="hidden" id="m-ing-allergens" value="${escapeHtml(ingredient?.allergens || '')}">
         </div>
       </div>
       <div class="form-row">
@@ -157,7 +160,7 @@ function showIngredientModal(ingredient = null) {
       category: document.getElementById('m-ing-cat').value || null,
       default_unit: document.getElementById('m-ing-unit').value,
       waste_percent: parseFloat(document.getElementById('m-ing-waste').value) || 0,
-      allergens: document.getElementById('m-ing-allergens').value.trim() || null,
+      allergens: getSelectedAllergens() || null,
       price_per_unit: parseFloat(document.getElementById('m-ing-price').value) || 0,
       price_unit: document.getElementById('m-ing-price-unit').value || 'kg'
     };
@@ -308,4 +311,41 @@ async function showIngredientDetail(id) {
   const ing = ingredients.find(i => i.id === id);
   if (!ing) return;
   showIngredientModal(ing);
+}
+
+// ═══════════════════════════════════════════
+// INCO Allergens (14 categories)
+// ═══════════════════════════════════════════
+const INCO_ALLERGENS = [
+  { code: 'gluten',       name: 'Gluten',         icon: '\u{1F33E}' },
+  { code: 'crustaces',    name: 'Crustaces',       icon: '\u{1F990}' },
+  { code: 'oeufs',        name: 'Oeufs',           icon: '\u{1F95A}' },
+  { code: 'poissons',     name: 'Poissons',        icon: '\u{1F41F}' },
+  { code: 'arachides',    name: 'Arachides',       icon: '\u{1F95C}' },
+  { code: 'soja',         name: 'Soja',            icon: '\u{1FAD8}' },
+  { code: 'lait',         name: 'Lait',            icon: '\u{1F95B}' },
+  { code: 'fruits_coque', name: 'Fruits a coque',  icon: '\u{1F330}' },
+  { code: 'celeri',       name: 'Celeri',          icon: '\u{1F96C}' },
+  { code: 'moutarde',     name: 'Moutarde',        icon: '\u{1F7E1}' },
+  { code: 'sesame',       name: 'Sesame',          icon: '\u26AA' },
+  { code: 'sulfites',     name: 'Sulfites',        icon: '\u{1F377}' },
+  { code: 'lupin',        name: 'Lupin',           icon: '\u{1F33F}' },
+  { code: 'mollusques',   name: 'Mollusques',      icon: '\u{1F9AA}' }
+];
+
+function getAllergenCheckboxes(currentValue) {
+  const current = (currentValue || '').toLowerCase();
+  return INCO_ALLERGENS.map(a => {
+    const checked = current.includes(a.name.toLowerCase()) || current.includes(a.code) ? 'checked' : '';
+    return `<label style="display:flex;align-items:center;gap:4px;font-size:var(--text-sm);cursor:pointer;padding:4px 6px;border-radius:6px;background:var(--bg-card);border:1px solid var(--border-color)">
+      <input type="checkbox" class="allergen-cb" value="${a.code}" data-name="${a.name}" ${checked} style="margin:0">
+      <span>${a.icon} ${a.name}</span>
+    </label>`;
+  }).join('');
+}
+
+function getSelectedAllergens() {
+  const checked = document.querySelectorAll('.allergen-cb:checked');
+  if (checked.length === 0) return null;
+  return Array.from(checked).map(cb => cb.dataset.name).join(', ');
 }

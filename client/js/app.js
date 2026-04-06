@@ -177,6 +177,7 @@ function registerRoutes() {
   Router.add(/^\/deliveries\/(\d+)$/, (id) => renderDeliveryDetail(parseInt(id)));
   Router.add(/^\/stock\/reception$/, renderStockReception);
   Router.add(/^\/stock\/movements$/, renderStockMovements);
+  Router.add(/^\/stock\/variance$/, renderStockVariance);
   Router.add(/^\/orders$/, renderOrdersDashboard);
   Router.add(/^\/orders\/new$/, renderNewOrder);
   Router.add(/^\/orders\/(\d+)$/, (id) => renderOrderDetail(parseInt(id)));

@@ -106,6 +106,8 @@ async function renderRecipeDetail(id) {
     <div class="section-title">Notes</div>
     <p style="color:var(--text-secondary);font-size:var(--text-sm)">${escapeHtml(recipe.notes)}</p>` : ''}
 
+    <div id="recipe-allergens-section"></div>
+
     <div class="actions-row">
       ${perms.view_costs ? `<button class="btn btn-secondary" onclick="openPriceSimulator(${recipe.id}, ${recipe.cost_per_portion}, ${recipe.selling_price})"><i data-lucide="sliders" style="width:18px;height:18px"></i> Simuler</button>` : ''}
       ${perms.edit_recipes ? `<a href="#/edit/${recipe.id}" class="btn btn-primary"><i data-lucide="pencil" style="width:18px;height:18px"></i> Modifier</a>` : ''}
@@ -115,6 +117,39 @@ async function renderRecipeDetail(id) {
   `;
 
   lucide.createIcons();
+
+  // Load allergens asynchronously
+  loadRecipeAllergens(id);
+}
+
+async function loadRecipeAllergens(recipeId) {
+  try {
+    const data = await API.getRecipeAllergens(recipeId);
+    const section = document.getElementById('recipe-allergens-section');
+    if (!section) return;
+    if (data.allergens && data.allergens.length > 0) {
+      section.innerHTML = `
+        <div class="section-title">Allergenes INCO</div>
+        <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+          ${data.allergens.map(a => `
+            <span class="badge" style="font-size:var(--text-sm);padding:6px 12px;background:var(--color-warning-light);border:1px solid var(--color-warning);border-radius:var(--radius-md)">
+              ${a.icon} ${escapeHtml(a.name)}
+            </span>
+          `).join('')}
+        </div>
+        <p style="margin-top:var(--space-2);font-size:var(--text-xs);color:var(--text-tertiary)">
+          Calcul automatique a partir des ingredients de la recette
+        </p>
+      `;
+    } else {
+      section.innerHTML = `
+        <div class="section-title">Allergenes INCO</div>
+        <p style="font-size:var(--text-sm);color:var(--text-tertiary)">Aucun allergene detecte dans cette recette</p>
+      `;
+    }
+  } catch (e) {
+    // Silent fail — allergens are informational
+  }
 }
 
 function renderMergedIngredientRows(ingredients, perms, depth) {

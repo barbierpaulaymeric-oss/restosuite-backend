@@ -117,6 +117,8 @@ app.use('/api/qrcode', require('./routes/qrcode'));
 app.use('/api/menu', require('./routes/menu'));
 app.use('/api/alerts', require('./routes/alerts'));
 app.use('/api/service', require('./routes/service'));
+app.use('/api/allergens', require('./routes/allergens'));
+app.use('/api/variance', require('./routes/variance'));
 
 // Admin endpoints — JWT required (gérant only)
 app.post('/api/admin/backup', requireAuth, (req, res) => {

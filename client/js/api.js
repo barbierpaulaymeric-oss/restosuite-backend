@@ -387,6 +387,20 @@ const API = {
   getActiveService() { return this.request('/service/active'); },
   getServiceRecap(id) { return this.request(`/service/recap/${id}`); },
 
+  // ─── Variance ───
+  getVarianceAnalysis(from, to) {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const qs = params.toString() ? `?${params}` : '';
+    return this.request(`/variance/analysis${qs}`);
+  },
+  getVarianceSummary() { return this.request('/variance/summary'); },
+
+  // ─── Allergens ───
+  getAllergens() { return this.request('/allergens'); },
+  getRecipeAllergens(recipeId) { return this.request(`/allergens/recipes/${recipeId}`); },
+
   // AI
   parseVoice(text) {
     return this.request('/ai/parse-voice', { method: 'POST', body: { text } });

@@ -31,6 +31,11 @@ async function renderStockDashboard() {
       <a href="#/stock/movements" class="btn btn-secondary" style="min-width:120px;text-decoration:none;text-align:center">
         📊 Historique
       </a>
+      ${isGerant ? `
+      <a href="#/stock/variance" class="btn btn-secondary" style="min-width:140px;text-decoration:none;text-align:center">
+        📉 Écarts
+      </a>
+      ` : ''}
     </div>
     <div class="search-bar" style="margin-bottom:var(--space-5)">
       <input type="text" id="stock-search" placeholder="Rechercher un ingrédient..." class="input" style="width:100%">
