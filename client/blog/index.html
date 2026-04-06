@@ -4,17 +4,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Blog RestoSuite — Conseils gestion de restaurant</title>
-  <meta name="description" content="Guides pratiques pour restaurateurs : food cost, HACCP, gestion des stocks, fiches techniques. Conseils d'un chef professionnel.">
+  <meta name="description" content="Guides pratiques pour restaurateurs : food cost, HACCP, gestion des stocks, fiches techniques, IA en cuisine. Conseils d'experts pour votre restaurant.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://www.restosuite.fr/blog/">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.restosuite.fr/blog/">
   <meta property="og:locale" content="fr_FR">
   <meta property="og:title" content="Blog RestoSuite — Conseils gestion de restaurant">
-  <meta property="og:description" content="Guides pratiques pour restaurateurs : food cost, HACCP, gestion des stocks. Par un chef professionnel.">
+  <meta property="og:description" content="Guides pratiques pour restaurateurs : food cost, HACCP, gestion des stocks, fiches techniques, IA en cuisine.">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Blog RestoSuite — Conseils gestion de restaurant">
-  <meta name="twitter:description" content="Guides pratiques pour restaurateurs : food cost, HACCP, gestion des stocks.">
+  <meta name="twitter:description" content="Guides pratiques pour restaurateurs : food cost, HACCP, gestion des stocks, IA en cuisine.">
+  <link rel="alternate" hreflang="fr" href="https://www.restosuite.fr/blog/">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Accueil", "item": "https://www.restosuite.fr/" },
+      { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.restosuite.fr/blog/" }
+    ]
+  }
+  </script>
   <link rel="icon" type="image/png" href="../favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,6 +55,33 @@
     html { scroll-behavior: smooth; }
     body { font-family: var(--font-sans); color: var(--text-primary); background: var(--bg-base); -webkit-font-smoothing: antialiased; }
     a { color: inherit; text-decoration: none; }
+
+    .blog-category-filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+    .blog-category-filter a {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-light);
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .blog-category-filter a:hover,
+    .blog-category-filter a.active {
+      background: var(--color-accent-light);
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
   </style>
 </head>
 <body class="blog-body">
@@ -69,8 +107,96 @@
     <h1 class="blog-index__title">Le blog RestoSuite</h1>
     <p class="blog-index__subtitle">Guides pratiques pour gérer votre restaurant plus efficacement.</p>
 
+    <div class="blog-category-filter">
+      <a href="/blog/" class="active">Tous les articles</a>
+      <a href="#">Gestion & Finance</a>
+      <a href="#">Cuisine & Recettes</a>
+      <a href="#">Innovation & IA</a>
+      <a href="#">Hygiène & HACCP</a>
+      <a href="#">Comparatifs</a>
+    </div>
+
     <div class="blog-grid">
-      <!-- Card 1 -->
+
+      <!-- Fiche technique cuisine -->
+      <a href="/blog/fiche-technique-cuisine.html" class="blog-card">
+        <div class="blog-card__emoji">📋</div>
+        <h2 class="blog-card__title">Comment créer une fiche technique cuisine : le guide complet 2026</h2>
+        <p class="blog-card__desc">Structure, calcul food cost, erreurs fréquentes et exemple concret avec un filet de saumon. Tout ce qu'un restaurateur doit savoir.</p>
+        <div class="blog-card__meta">
+          <span>📅 6 avril 2026</span>
+          <span>·</span>
+          <span>8 min de lecture</span>
+        </div>
+        <div class="blog-card__read">Lire l'article →</div>
+      </a>
+
+      <!-- Food cost calcul -->
+      <a href="/blog/calcul-food-cost.html" class="blog-card">
+        <div class="blog-card__emoji">🧮</div>
+        <h2 class="blog-card__title">Calculer son food cost : formules, astuces et outils 2026</h2>
+        <p class="blog-card__desc">Les 3 formules essentielles, le coefficient multiplicateur, le tableau de bord food cost et comment l'automatiser.</p>
+        <div class="blog-card__meta">
+          <span>📅 6 avril 2026</span>
+          <span>·</span>
+          <span>7 min de lecture</span>
+        </div>
+        <div class="blog-card__read">Lire l'article →</div>
+      </a>
+
+      <!-- Saisie vocale -->
+      <a href="/blog/saisie-vocale-cuisine.html" class="blog-card">
+        <div class="blog-card__emoji">🎙️</div>
+        <h2 class="blog-card__title">Saisie vocale en cuisine : la révolution IA pour les restaurateurs</h2>
+        <p class="blog-card__desc">Comment dicter une recette en cuisinant, générer une fiche technique en 3 minutes et gagner 2h par semaine sur la documentation.</p>
+        <div class="blog-card__meta">
+          <span>📅 6 avril 2026</span>
+          <span>·</span>
+          <span>6 min de lecture</span>
+        </div>
+        <div class="blog-card__read">Lire l'article →</div>
+      </a>
+
+      <!-- Gestion IA -->
+      <a href="/blog/gestion-restaurant-ia.html" class="blog-card">
+        <div class="blog-card__emoji">🤖</div>
+        <h2 class="blog-card__title">Gestion de restaurant par IA : guide complet 2026</h2>
+        <p class="blog-card__desc">Les 6 domaines où l'IA transforme la restauration : fiches techniques, food cost, stock, HACCP, commandes, rentabilité.</p>
+        <div class="blog-card__meta">
+          <span>📅 6 avril 2026</span>
+          <span>·</span>
+          <span>9 min de lecture</span>
+        </div>
+        <div class="blog-card__read">Lire l'article →</div>
+      </a>
+
+      <!-- Logiciel gratuit -->
+      <a href="/blog/logiciel-restaurant-gratuit.html" class="blog-card">
+        <div class="blog-card__emoji">💻</div>
+        <h2 class="blog-card__title">Les meilleurs logiciels de gestion restaurant gratuits en 2026</h2>
+        <p class="blog-card__desc">Excel, Notion, freemium : comparatif honnête des options gratuites et le vrai coût du gratuit. Avec l'alternative essai 60 jours.</p>
+        <div class="blog-card__meta">
+          <span>📅 6 avril 2026</span>
+          <span>·</span>
+          <span>7 min de lecture</span>
+        </div>
+        <div class="blog-card__read">Lire l'article →</div>
+      </a>
+
+      <!-- Alternative RestoSuite -->
+      <a href="/blog/alternative-restosuite.html" class="blog-card">
+        <div class="blog-card__emoji">⚖️</div>
+        <h2 class="blog-card__title">RestoSuite vs les alternatives : comparatif logiciels restaurant 2026</h2>
+        <p class="blog-card__desc">Zenchef, L'Addition, Zelty, Koust vs RestoSuite : tableau comparatif complet, cas d'usage et recommandations par profil.</p>
+        <div class="blog-card__meta">
+          <span>📅 6 avril 2026</span>
+          <span>·</span>
+          <span>9 min de lecture</span>
+        </div>
+        <div class="blog-card__read">Lire l'article →</div>
+      </a>
+
+      <!-- Food cost restaurant (existant) -->
       <a href="/blog/food-cost-restaurant.html" class="blog-card">
         <div class="blog-card__emoji">📊</div>
         <h2 class="blog-card__title">Comment calculer le food cost de votre restaurant</h2>
@@ -83,7 +209,7 @@
         <div class="blog-card__read">Lire l'article →</div>
       </a>
 
-      <!-- Card 2 -->
+      <!-- HACCP (existant) -->
       <a href="/blog/haccp-restaurant-guide.html" class="blog-card">
         <div class="blog-card__emoji">🛡️</div>
         <h2 class="blog-card__title">HACCP restaurant : tout ce que vous devez savoir</h2>
@@ -96,7 +222,7 @@
         <div class="blog-card__read">Lire l'article →</div>
       </a>
 
-      <!-- Card 3 -->
+      <!-- Gestion stock (existant) -->
       <a href="/blog/gestion-stock-restaurant.html" class="blog-card">
         <div class="blog-card__emoji">📦</div>
         <h2 class="blog-card__title">Comment gérer les stocks de votre restaurant efficacement</h2>
@@ -108,8 +234,30 @@
         </div>
         <div class="blog-card__read">Lire l'article →</div>
       </a>
+
+      <!-- Glossaire -->
+      <a href="/blog/glossaire-restauration.html" class="blog-card">
+        <div class="blog-card__emoji">📚</div>
+        <h2 class="blog-card__title">Glossaire de la restauration : 50+ termes essentiels</h2>
+        <p class="blog-card__desc">Food cost, HACCP, mercuriale, mise en place, coefficient multiplicateur… tous les termes clés de la restauration professionnelle définis.</p>
+        <div class="blog-card__meta">
+          <span>📅 6 avril 2026</span>
+          <span>·</span>
+          <span>10 min de lecture</span>
+        </div>
+        <div class="blog-card__read">Lire l'article →</div>
+      </a>
+
     </div>
   </main>
+
+  <!-- CTA -->
+  <section style="text-align:center; padding: 48px 24px 64px; max-width:600px; margin:0 auto;">
+    <h2 style="font-size:1.5rem; font-weight:700; margin-bottom:12px; color:var(--text-primary);">Passez de la théorie à la pratique</h2>
+    <p style="font-size:1rem; color:var(--text-secondary); margin-bottom:24px; line-height:1.6;">RestoSuite automatise le food cost, le stock, l'HACCP et les fiches techniques pour vous. Essayez gratuitement pendant 60 jours.</p>
+    <a href="/app" style="display:inline-flex; align-items:center; gap:8px; padding:14px 28px; background:var(--color-accent); color:#fff; border-radius:10px; font-weight:600; font-family:var(--font-sans); font-size:1rem; text-decoration:none; transition:background 0.15s;">Démarrer gratuitement</a>
+    <p style="font-size:0.8125rem; color:var(--text-tertiary); margin-top:12px;">Aucune carte bancaire requise</p>
+  </section>
 
   <!-- Footer -->
   <footer class="blog-footer">

@@ -123,12 +123,34 @@
     ]
   }
   </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Accueil",
+        "item": "https://www.restosuite.fr/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Blog",
+        "item": "https://www.restosuite.fr/blog/"
+      }
+    ]
+  }
+  </script>
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <link rel="alternate" hreflang="fr" href="https://www.restosuite.fr/">
+  <link rel="alternate" hreflang="x-default" href="https://www.restosuite.fr/">
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
   <style>
     /* ============================================
        RESET & BASE
@@ -732,6 +754,34 @@
       font-weight: 500;
     }
     
+    /* ============================================
+       SCREENSHOTS
+       ============================================ */
+    .screenshots-section {
+      padding-top: 40px;
+      padding-bottom: 60px;
+    }
+
+    .screenshots-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .screenshot-img {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-default);
+      width: 100%;
+      transition: transform var(--transition-base), box-shadow var(--transition-base);
+    }
+
+    .screenshot-img:hover {
+      transform: scale(1.03);
+      box-shadow: var(--shadow-lg);
+    }
+
     /* ============================================
        FEATURES
        ============================================ */
@@ -1339,23 +1389,25 @@
         <a href="#fonctionnalites">Fonctionnalités</a>
         <a href="#tarifs">Tarifs</a>
         <a href="#faq">FAQ</a>
+        <a href="/blog/">Blog</a>
       </nav>
       <div class="header__cta">
         <a href="/app" class="btn btn--primary">Essayer gratuitement</a>
       </div>
-      <button class="header__mobile-toggle" id="mobile-toggle" aria-label="Menu">
+      <button class="header__mobile-toggle" id="mobile-toggle" aria-label="Ouvrir le menu de navigation" aria-expanded="false" aria-controls="mobile-menu">
         <i data-lucide="menu" width="24" height="24"></i>
       </button>
     </div>
   </header>
   
   <!-- Mobile menu -->
-  <div class="mobile-menu" id="mobile-menu">
+  <nav class="mobile-menu" id="mobile-menu" role="navigation" aria-label="Menu mobile">
     <a href="#fonctionnalites" onclick="closeMobile()">Fonctionnalités</a>
     <a href="#tarifs" onclick="closeMobile()">Tarifs</a>
     <a href="#faq" onclick="closeMobile()">FAQ</a>
+    <a href="/blog/" onclick="closeMobile()">Blog</a>
     <a href="/app" class="btn btn--primary" onclick="closeMobile()">Essayer gratuitement</a>
-  </div>
+  </nav>
 
   <!-- ========== HERO ========== -->
   <section class="hero">
@@ -1373,7 +1425,11 @@
           </div>
           <div class="hero__trust">
             <i data-lucide="shield-check"></i>
-            <span>Aucune carte bancaire requise • Données sécurisées, hébergement professionnel avec transfert conforme au Data Privacy Framework UE-US</span>
+            <span>Aucune carte bancaire requise</span>
+          </div>
+          <div class="hero__trust" style="margin-top: 4px;">
+            <i data-lucide="lock"></i>
+            <span>Données chiffrées · Conforme RGPD</span>
           </div>
         </div>
         <div class="hero__visual reveal">
@@ -1402,19 +1458,17 @@
   </section>
 
   <!-- ========== SCREENSHOTS ========== -->
-  <section class="section section--base" id="demo" style="padding-top: 40px; padding-bottom: 60px;">
-    <div class="container" style="text-align: center;">
-      <h2 style="font-size: 1.875rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px;">Conçu pour la cuisine, pas pour un bureau</h2>
-      <p style="font-size: 1.0625rem; color: var(--text-secondary); max-width: 560px; margin: 0 auto 36px;">Interface claire, navigation rapide — même avec les mains occupées.</p>
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; max-width: 900px; margin: 0 auto;">
-        <img src="assets/demo/02-recipe-list.png" alt="Liste des fiches techniques RestoSuite" loading="lazy"
-          style="border-radius: var(--radius-lg); border: 1px solid var(--border-default); width: 100%;">
-        <img src="assets/demo/04-voice-input.png" alt="Saisie vocale IA RestoSuite" loading="lazy"
-          style="border-radius: var(--radius-lg); border: 1px solid var(--border-default); width: 100%;">
-        <img src="assets/demo/05-stock.png" alt="Gestion du stock RestoSuite" loading="lazy"
-          style="border-radius: var(--radius-lg); border: 1px solid var(--border-default); width: 100%;">
-        <img src="assets/demo/07-haccp.png" alt="HACCP RestoSuite" loading="lazy"
-          style="border-radius: var(--radius-lg); border: 1px solid var(--border-default); width: 100%;">
+  <section class="section section--base screenshots-section" id="demo">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>Conçu pour la cuisine, pas pour un bureau</h2>
+        <p>Interface claire, navigation rapide — même avec les mains occupées.</p>
+      </div>
+      <div class="screenshots-grid reveal">
+        <img src="assets/demo/02-recipe-list.png" alt="Liste des fiches techniques RestoSuite" loading="lazy" class="screenshot-img">
+        <img src="assets/demo/04-voice-input.png" alt="Saisie vocale IA RestoSuite" loading="lazy" class="screenshot-img">
+        <img src="assets/demo/05-stock.png" alt="Gestion du stock RestoSuite" loading="lazy" class="screenshot-img">
+        <img src="assets/demo/07-haccp.png" alt="HACCP RestoSuite" loading="lazy" class="screenshot-img">
       </div>
     </div>
   </section>
@@ -1603,7 +1657,7 @@
       </div>
       <div class="faq__list">
         <div class="faq-item reveal">
-          <button class="faq-item__question" onclick="toggleFaq(this)">
+          <button class="faq-item__question" onclick="toggleFaq(this)" aria-expanded="false">
             Est-ce que c'est vraiment gratuit ?
             <i data-lucide="chevron-down" class="faq-item__icon"></i>
           </button>
@@ -1614,7 +1668,7 @@
           </div>
         </div>
         <div class="faq-item reveal reveal-delay-1">
-          <button class="faq-item__question" onclick="toggleFaq(this)">
+          <button class="faq-item__question" onclick="toggleFaq(this)" aria-expanded="false">
             Comment fonctionne la saisie vocale ?
             <i data-lucide="chevron-down" class="faq-item__icon"></i>
           </button>
@@ -1625,7 +1679,7 @@
           </div>
         </div>
         <div class="faq-item reveal reveal-delay-2">
-          <button class="faq-item__question" onclick="toggleFaq(this)">
+          <button class="faq-item__question" onclick="toggleFaq(this)" aria-expanded="false">
             Mes données sont-elles sécurisées ?
             <i data-lucide="chevron-down" class="faq-item__icon"></i>
           </button>
@@ -1636,7 +1690,7 @@
           </div>
         </div>
         <div class="faq-item reveal reveal-delay-3">
-          <button class="faq-item__question" onclick="toggleFaq(this)">
+          <button class="faq-item__question" onclick="toggleFaq(this)" aria-expanded="false">
             Puis-je annuler mon abonnement ?
             <i data-lucide="chevron-down" class="faq-item__icon"></i>
           </button>
@@ -1647,7 +1701,7 @@
           </div>
         </div>
         <div class="faq-item reveal reveal-delay-4">
-          <button class="faq-item__question" onclick="toggleFaq(this)">
+          <button class="faq-item__question" onclick="toggleFaq(this)" aria-expanded="false">
             Est-ce compatible mobile ?
             <i data-lucide="chevron-down" class="faq-item__icon"></i>
           </button>
@@ -1662,6 +1716,51 @@
   </section>
 
   <!-- ========== CTA FINAL ========== -->
+  <!-- ========== NOS GUIDES ========== -->
+  <section class="section section--elevated" id="blog">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2 class="section-title">Nos guides pour restaurateurs</h2>
+        <p class="section-subtitle">Ressources pratiques pour optimiser votre cuisine et vos marges.</p>
+      </div>
+      <div class="reveal" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; margin-top:32px;">
+        <a href="/blog/fiche-technique-cuisine.html" style="display:flex; flex-direction:column; gap:8px; padding:20px; background:var(--bg-base); border:1px solid var(--border-light); border-radius:12px; text-decoration:none; color:inherit; transition:border-color 0.15s, transform 0.15s;" onmouseover="this.style.borderColor='var(--color-accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.transform='none'">
+          <span style="font-size:1.5rem;">📋</span>
+          <span style="font-size:0.9375rem; font-weight:600; color:var(--text-primary); line-height:1.35;">Créer une fiche technique cuisine</span>
+          <span style="font-size:0.8125rem; color:var(--text-tertiary);">Guide complet 2026 →</span>
+        </a>
+        <a href="/blog/calcul-food-cost.html" style="display:flex; flex-direction:column; gap:8px; padding:20px; background:var(--bg-base); border:1px solid var(--border-light); border-radius:12px; text-decoration:none; color:inherit; transition:border-color 0.15s, transform 0.15s;" onmouseover="this.style.borderColor='var(--color-accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.transform='none'">
+          <span style="font-size:1.5rem;">🧮</span>
+          <span style="font-size:0.9375rem; font-weight:600; color:var(--text-primary); line-height:1.35;">Calculer son food cost</span>
+          <span style="font-size:0.8125rem; color:var(--text-tertiary);">Formules & outils →</span>
+        </a>
+        <a href="/blog/saisie-vocale-cuisine.html" style="display:flex; flex-direction:column; gap:8px; padding:20px; background:var(--bg-base); border:1px solid var(--border-light); border-radius:12px; text-decoration:none; color:inherit; transition:border-color 0.15s, transform 0.15s;" onmouseover="this.style.borderColor='var(--color-accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.transform='none'">
+          <span style="font-size:1.5rem;">🎙️</span>
+          <span style="font-size:0.9375rem; font-weight:600; color:var(--text-primary); line-height:1.35;">Saisie vocale en cuisine</span>
+          <span style="font-size:0.8125rem; color:var(--text-tertiary);">Révolution IA →</span>
+        </a>
+        <a href="/blog/gestion-restaurant-ia.html" style="display:flex; flex-direction:column; gap:8px; padding:20px; background:var(--bg-base); border:1px solid var(--border-light); border-radius:12px; text-decoration:none; color:inherit; transition:border-color 0.15s, transform 0.15s;" onmouseover="this.style.borderColor='var(--color-accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.transform='none'">
+          <span style="font-size:1.5rem;">🤖</span>
+          <span style="font-size:0.9375rem; font-weight:600; color:var(--text-primary); line-height:1.35;">Gestion restaurant par IA</span>
+          <span style="font-size:0.8125rem; color:var(--text-tertiary);">Guide 2026 →</span>
+        </a>
+        <a href="/blog/logiciel-restaurant-gratuit.html" style="display:flex; flex-direction:column; gap:8px; padding:20px; background:var(--bg-base); border:1px solid var(--border-light); border-radius:12px; text-decoration:none; color:inherit; transition:border-color 0.15s, transform 0.15s;" onmouseover="this.style.borderColor='var(--color-accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.transform='none'">
+          <span style="font-size:1.5rem;">💻</span>
+          <span style="font-size:0.9375rem; font-weight:600; color:var(--text-primary); line-height:1.35;">Logiciels restaurant gratuits</span>
+          <span style="font-size:0.8125rem; color:var(--text-tertiary);">Comparatif honnête →</span>
+        </a>
+        <a href="/blog/alternative-restosuite.html" style="display:flex; flex-direction:column; gap:8px; padding:20px; background:var(--bg-base); border:1px solid var(--border-light); border-radius:12px; text-decoration:none; color:inherit; transition:border-color 0.15s, transform 0.15s;" onmouseover="this.style.borderColor='var(--color-accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.transform='none'">
+          <span style="font-size:1.5rem;">⚖️</span>
+          <span style="font-size:0.9375rem; font-weight:600; color:var(--text-primary); line-height:1.35;">RestoSuite vs alternatives</span>
+          <span style="font-size:0.8125rem; color:var(--text-tertiary);">Comparatif 2026 →</span>
+        </a>
+      </div>
+      <div style="text-align:center; margin-top:28px;">
+        <a href="/blog/" style="font-size:0.9375rem; color:var(--color-accent); font-weight:500; text-decoration:none;">Voir tous les guides →</a>
+      </div>
+    </div>
+  </section>
+
   <section class="cta-section section--base">
     <div class="container reveal">
       <h2>Prêt à simplifier votre cuisine ?</h2>
@@ -1688,6 +1787,7 @@
           <span class="footer__tagline">Votre cuisine tourne. Vos chiffres suivent.</span>
         </div>
         <div class="footer__links">
+          <a href="/blog/">Blog</a>
           <a href="/cgv">CGV</a>
           <a href="/mentions-legales">Mentions légales</a>
           <a href="/privacy">Confidentialité</a>
@@ -1715,12 +1815,14 @@
     const mobileMenu = document.getElementById('mobile-menu');
     
     mobileToggle.addEventListener('click', () => {
-      mobileMenu.classList.toggle('open');
-      document.body.style.overflow = mobileMenu.classList.contains('open') ? 'hidden' : '';
+      const isOpen = mobileMenu.classList.toggle('open');
+      mobileToggle.setAttribute('aria-expanded', isOpen);
+      document.body.style.overflow = isOpen ? 'hidden' : '';
     });
-    
+
     function closeMobile() {
       mobileMenu.classList.remove('open');
+      mobileToggle.setAttribute('aria-expanded', 'false');
       document.body.style.overflow = '';
     }
 
@@ -1729,9 +1831,15 @@
       const item = btn.parentElement;
       const wasOpen = item.classList.contains('open');
       // Close all
-      document.querySelectorAll('.faq-item.open').forEach(el => el.classList.remove('open'));
+      document.querySelectorAll('.faq-item.open').forEach(el => {
+        el.classList.remove('open');
+        el.querySelector('.faq-item__question').setAttribute('aria-expanded', 'false');
+      });
       // Open clicked (if it was closed)
-      if (!wasOpen) item.classList.add('open');
+      if (!wasOpen) {
+        item.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+      }
     }
 
     // Scroll reveal (IntersectionObserver)
