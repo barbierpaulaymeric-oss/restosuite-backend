@@ -5,6 +5,7 @@ const path = require('path');
 const rateLimit = require('express-rate-limit');
 require('./db'); // initializes tables synchronously
 const { requireWriteAccess } = require('./middleware/trial');
+const { requireAuth } = require('./routes/auth');
 const { backupDatabase } = require('./backup');
 
 const app = express();
@@ -117,13 +118,15 @@ app.use('/api/menu', require('./routes/menu'));
 app.use('/api/alerts', require('./routes/alerts'));
 app.use('/api/service', require('./routes/service'));
 
-// Admin endpoints
-app.post('/api/admin/backup', (req, res) => {
+// Admin endpoints — JWT required (gérant only)
+app.post('/api/admin/backup', requireAuth, (req, res) => {
+  if (req.user.role !== 'gerant') return res.status(403).json({ error: 'Réservé au gérant' });
   backupDatabase();
   res.json({ ok: true, message: 'Backup effectué' });
 });
 
-app.get('/api/admin/export-db', (req, res) => {
+app.get('/api/admin/export-db', requireAuth, (req, res) => {
+  if (req.user.role !== 'gerant') return res.status(403).json({ error: 'Réservé au gérant' });
   const dbPath = path.join(__dirname, 'data', 'restosuite.db');
   if (!require('fs').existsSync(dbPath)) {
     return res.status(404).json({ error: 'No database found' });

@@ -13,9 +13,11 @@
   <meta property="og:title" content="Glossaire de la restauration : 50+ termes essentiels">
   <meta property="og:description" content="Tous les termes clés de la restauration professionnelle définis clairement : gestion, cuisine, hygiène, finances.">
   <meta property="og:site_name" content="RestoSuite">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="https://www.restosuite.fr/assets/og-restosuite.png">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Glossaire de la restauration : 50+ termes essentiels">
   <meta name="twitter:description" content="50+ termes clés de la restauration professionnelle définis clairement.">
+  <meta name="twitter:image" content="https://www.restosuite.fr/assets/og-restosuite.png">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -27,7 +29,19 @@
     "author": { "@type": "Organization", "name": "RestoSuite", "url": "https://www.restosuite.fr" },
     "publisher": { "@type": "Organization", "name": "RestoSuite", "url": "https://www.restosuite.fr" },
     "mainEntityOfPage": "https://www.restosuite.fr/blog/glossaire-restauration.html",
+    "image": "https://www.restosuite.fr/assets/og-restosuite.png",
     "keywords": ["glossaire restauration", "vocabulaire restaurant", "termes restauration", "lexique cuisine professionnelle"]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Accueil", "item": "https://www.restosuite.fr/" },
+      { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.restosuite.fr/blog/" },
+      { "@type": "ListItem", "position": 3, "name": "Glossaire de la restauration", "item": "https://www.restosuite.fr/blog/glossaire-restauration.html" }
+    ]
   }
   </script>
   <link rel="icon" type="image/png" href="../favicon.png">
@@ -137,6 +151,17 @@
       <a href="/app" class="blog-header__cta">Essai gratuit</a>
     </div>
   </header>
+
+  <!-- Breadcrumb -->
+  <nav aria-label="Fil d'Ariane" style="padding: 0.5rem 2rem; max-width: 900px; margin: 0 auto;">
+    <ol style="display: flex; align-items: center; gap: 0.5rem; list-style: none; padding: 0; margin: 0; font-size: 0.8125rem; color: var(--text-tertiary);">
+      <li><a href="/" style="color: var(--text-secondary); text-decoration: none;">Accueil</a></li>
+      <li aria-hidden="true">/</li>
+      <li><a href="/blog/" style="color: var(--text-secondary); text-decoration: none;">Blog</a></li>
+      <li aria-hidden="true">/</li>
+      <li style="color: var(--text-primary);" aria-current="page">Glossaire de la restauration</li>
+    </ol>
+  </nav>
 
   <article class="blog-article">
     <h1>Glossaire de la restauration : les termes essentiels</h1>
@@ -659,6 +684,21 @@
           </div>
 
         </dl>
+      </div>
+
+      <!-- Pour aller plus loin -->
+      <div class="blog-callout" style="margin-bottom: 2rem;">
+        <span class="blog-callout__emoji">📖</span>
+        <div class="blog-callout__text">
+          <strong>Pour aller plus loin sur ces concepts :</strong>
+          <ul style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; padding-left: 1.25rem;">
+            <li><a href="/blog/fiche-technique-cuisine.html" style="color: var(--color-accent);">Comment créer une fiche technique cuisine</a> — le guide complet avec modèle</li>
+            <li><a href="/blog/calcul-food-cost.html" style="color: var(--color-accent);">Calculer son food cost</a> — formules, coefficients et tableaux de bord</li>
+            <li><a href="/blog/saisie-vocale-cuisine.html" style="color: var(--color-accent);">Saisie vocale en cuisine</a> — dicter ses recettes par IA en 5 minutes</li>
+            <li><a href="/blog/gestion-restaurant-ia.html" style="color: var(--color-accent);">Gestion de restaurant par IA</a> — les 6 domaines transformés</li>
+            <li><a href="/blog/logiciel-restaurant-gratuit.html" style="color: var(--color-accent);">Logiciels restaurant gratuits</a> — comparatif honnête 2026</li>
+          </ul>
+        </div>
       </div>
 
       <!-- CTA final -->

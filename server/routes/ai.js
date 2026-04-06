@@ -1,17 +1,21 @@
 const { Router } = require('express');
 const { all, get } = require('../db');
+const { requireAuth } = require('./auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const router = Router();
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyCx2uPzQjARvLHiQhA2qin26R6M0OqEhe4';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 // ─── Multer config for invoice uploads ───
 const uploadDir = '/tmp/restosuite-uploads';
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const upload = multer({ dest: uploadDir, limits: { fileSize: 10 * 1024 * 1024 } });
+
+// All AI routes require a valid JWT
+router.use(requireAuth);
 
 const VOICE_PARSE_SYSTEM = `Tu es un assistant culinaire professionnel spécialisé dans les fiches techniques de restaurant français.
 À partir d'une transcription vocale d'un chef, tu dois extraire une fiche technique structurée en JSON.
