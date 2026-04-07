@@ -15,9 +15,10 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/png" href="favicon.png">
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide@0.344.0"></script>
 </head>
 <body>
+  <a href="#app" class="skip-link">Aller au contenu principal</a>
 
   <!-- Loading screen (shown during cold start / slow API) -->
   <div id="loading-screen" style="display:none; position:fixed; inset:0; z-index:9999; background:#0F1923; align-items:center; justify-content:center; flex-direction:column;">
@@ -116,41 +117,7 @@
   <!-- Toast notifications -->
   <div id="toast-container"></div>
 
-  <script src="js/api.js"></script>
-  <script src="js/utils.js"></script>
-  <script src="js/views/dashboard.js"></script>
-  <script src="js/views/recipe-detail.js"></script>
-  <script src="js/views/recipe-form.js"></script>
-  <script src="js/views/ingredients.js"></script>
-  <script src="js/views/stock-dashboard.js"></script>
-  <script src="js/views/stock-reception.js"></script>
-  <script src="js/views/stock-movements.js"></script>
-  <script src="js/views/stock-variance.js"></script>
-  <script src="js/views/suppliers.js"></script>
-  <script src="js/views/haccp-dashboard.js"></script>
-  <script src="js/views/haccp-temperatures.js"></script>
-  <script src="js/views/haccp-cleaning.js"></script>
-  <script src="js/views/haccp-traceability.js"></script>
-  <script src="js/views/orders.js"></script>
-  <script src="js/views/service.js"></script>
-  <script src="js/views/kitchen.js"></script>
-  <script src="js/views/analytics.js"></script>
-  <script src="js/views/more.js"></script>
-  <script src="js/views/onboarding.js"></script>
-  <script src="js/views/login.js"></script>
-  <script src="js/views/supplier-login.js"></script>
-  <script src="js/views/supplier-catalog.js"></script>
-  <script src="js/views/supplier-delivery.js"></script>
-  <script src="js/views/deliveries.js"></script>
-  <script src="js/views/supplier-portal-manage.js"></script>
-  <script src="js/views/team.js"></script>
-  <script src="js/views/subscribe.js"></script>
-  <script src="js/views/scan-invoice.js"></script>
-  <script src="js/views/mercuriale.js"></script>
-  <script src="js/views/qrcodes.js"></script>
-  <script src="js/views/command-palette.js"></script>
-  <script src="js/router.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/app.bundle.js"></script>
   <script>
     // Initialize Lucide icons after DOM load
     document.addEventListener('DOMContentLoaded', () => {
