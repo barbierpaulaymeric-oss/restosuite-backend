@@ -1,6 +1,21 @@
 const { Router } = require('express');
 const { all, get, run } = require('../db');
+const { requireAuth } = require('./auth');
+const { getRecipeAllergens, INCO_ALLERGENS } = require('./allergens');
 const router = Router();
+
+// Returns { hasPrice: bool, source: 'supplier'|'ingredient'|null }
+function getIngredientPriceSource(ingredientId) {
+  const supplierPrice = get(`
+    SELECT price FROM supplier_prices WHERE ingredient_id = ? ORDER BY price ASC LIMIT 1
+  `, [ingredientId]);
+  if (supplierPrice && supplierPrice.price > 0) return { hasPrice: true, source: 'supplier' };
+
+  const ingredient = get(`SELECT price_per_unit FROM ingredients WHERE id = ?`, [ingredientId]);
+  if (ingredient && ingredient.price_per_unit > 0) return { hasPrice: true, source: 'ingredient' };
+
+  return { hasPrice: false, source: null };
+}
 
 function calcIngredientCost(ingredientId, grossQty, unit) {
   // 1. Try supplier_prices first (best price)
@@ -130,6 +145,7 @@ function getFullRecipe(id, depth = 0, visited = new Set()) {
   `, [id]);
 
   let totalCost = 0;
+  let missingPriceCount = 0;
   const enrichedIngredients = rawIngredients.map(ing => {
     if (ing.sub_recipe_id) {
       // This is a sub-recipe ingredient
@@ -138,6 +154,8 @@ function getFullRecipe(id, depth = 0, visited = new Set()) {
       if (subRecipe) {
         const costPerPortion = subRecipe.portions > 0 ? subRecipe.total_cost / subRecipe.portions : subRecipe.total_cost;
         cost = costPerPortion * ing.gross_quantity;
+        // Count missing prices from sub-recipe (only at top level to avoid double-counting)
+        if (depth === 0) missingPriceCount += subRecipe.missing_price_count || 0;
       }
       totalCost += cost;
       return {
@@ -148,9 +166,17 @@ function getFullRecipe(id, depth = 0, visited = new Set()) {
         cost: Math.round(cost * 100) / 100
       };
     } else {
+      const priceSource = getIngredientPriceSource(ing.ingredient_id);
       const cost = calcIngredientCost(ing.ingredient_id, ing.gross_quantity, ing.unit);
       totalCost += cost;
-      return { ...ing, is_sub_recipe: false, cost: Math.round(cost * 100) / 100 };
+      if (!priceSource.hasPrice) missingPriceCount++;
+      return {
+        ...ing,
+        is_sub_recipe: false,
+        cost: Math.round(cost * 100) / 100,
+        missing_price: !priceSource.hasPrice,
+        price_source: priceSource.source
+      };
     }
   });
 
@@ -168,12 +194,16 @@ function getFullRecipe(id, depth = 0, visited = new Set()) {
     total_cost: totalCost,
     cost_per_portion: costPerPortion,
     food_cost_percent: foodCostPercent,
-    margin
+    margin,
+    missing_price_count: missingPriceCount
   };
 }
 
 router.get('/', (req, res) => {
-  const { type } = req.query;
+  const { type, limit: limStr, offset: offsetStr } = req.query;
+  const limit = Math.min(parseInt(limStr) || 50, 200);
+  const offset = Math.max(parseInt(offsetStr) || 0, 0);
+
   let sql = 'SELECT * FROM recipes';
   const params = [];
   if (type) {
@@ -181,6 +211,21 @@ router.get('/', (req, res) => {
     params.push(type);
   }
   sql += ' ORDER BY updated_at DESC';
+
+  // Get total count
+  let countSql = 'SELECT COUNT(*) as total FROM recipes';
+  const countParams = [];
+  if (type) {
+    countSql += ' WHERE recipe_type = ?';
+    countParams.push(type);
+  }
+  const countResult = get(countSql, countParams);
+  const total = countResult ? countResult.total : 0;
+
+  // Apply pagination
+  sql += ' LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+
   const recipes = all(sql, params);
   const enriched = recipes.map(r => {
     const full = getFullRecipe(r.id);
@@ -193,7 +238,102 @@ router.get('/', (req, res) => {
       recipe_type: r.recipe_type || 'plat'
     };
   });
-  res.json(enriched);
+  res.json({ recipes: enriched, total, limit, offset });
+});
+
+// ═══════════════════════════════════════════
+// GET /api/recipes/availability — Disponibilité des plats en fonction du stock
+// Calcule combien de portions de chaque plat sont réalisables
+// Utilisé par l'interface salle pour indiquer les plats disponibles
+// IMPORTANT: Must be declared BEFORE /:id to avoid Express matching 'availability' as an id
+// ═══════════════════════════════════════════
+router.get('/availability', (req, res) => {
+  try {
+    const { convertUnit } = require('../utils/units');
+
+    // Get all sellable recipes (plats with a selling price)
+    const recipes = all(`
+      SELECT id, name, category, selling_price, portions
+      FROM recipes
+      WHERE selling_price > 0 AND recipe_type = 'plat'
+      ORDER BY category, name
+    `);
+
+    // Get current stock
+    const stockData = all('SELECT ingredient_id, quantity, unit FROM stock');
+    const stockMap = {};
+    for (const s of stockData) {
+      stockMap[s.ingredient_id] = s;
+    }
+
+    const availability = recipes.map(recipe => {
+      const flatIngredients = getFlatIngredients(recipe.id, 1);
+
+      if (flatIngredients.length === 0) {
+        return {
+          recipe_id: recipe.id,
+          name: recipe.name,
+          category: recipe.category,
+          selling_price: recipe.selling_price,
+          portions_available: null,
+          status: 'unknown'
+        };
+      }
+
+      // For each ingredient, calculate how many portions we can make
+      let minPortions = Infinity;
+      let limitingIngredient = null;
+
+      for (const fi of flatIngredients) {
+        const stock = stockMap[fi.ingredient_id];
+        if (!stock || stock.quantity <= 0) {
+          minPortions = 0;
+          const ing = get('SELECT name FROM ingredients WHERE id = ?', [fi.ingredient_id]);
+          limitingIngredient = ing ? ing.name : `#${fi.ingredient_id}`;
+          break;
+        }
+
+        // Convert recipe quantity to stock unit
+        const neededInStockUnit = convertUnit(fi.quantity, fi.unit, stock.unit);
+        if (neededInStockUnit <= 0) continue;
+
+        const possiblePortions = Math.floor(stock.quantity / neededInStockUnit);
+        if (possiblePortions < minPortions) {
+          minPortions = possiblePortions;
+          const ing = get('SELECT name FROM ingredients WHERE id = ?', [fi.ingredient_id]);
+          limitingIngredient = ing ? ing.name : `#${fi.ingredient_id}`;
+        }
+      }
+
+      if (minPortions === Infinity) minPortions = null;
+
+      // Status: available (5+), low (1-4), unavailable (0)
+      let status = 'available';
+      if (minPortions === 0) status = 'unavailable';
+      else if (minPortions !== null && minPortions <= 4) status = 'low';
+
+      return {
+        recipe_id: recipe.id,
+        name: recipe.name,
+        category: recipe.category,
+        selling_price: recipe.selling_price,
+        portions_available: minPortions,
+        limiting_ingredient: limitingIngredient,
+        status
+      };
+    });
+
+    const summary = {
+      total: availability.length,
+      available: availability.filter(a => a.status === 'available').length,
+      low: availability.filter(a => a.status === 'low').length,
+      unavailable: availability.filter(a => a.status === 'unavailable').length
+    };
+
+    res.json({ summary, items: availability });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur calcul disponibilité', details: e.message });
+  }
 });
 
 router.get('/:id', (req, res) => {
@@ -446,6 +586,26 @@ router.get('/:id/pdf', (req, res) => {
   if (!recipe) return res.status(404).json({ error: 'not found' });
   const { generatePDF } = require('./pdf-export');
   generatePDF(recipe, res);
+});
+
+// GET /api/recipes/:id/allergens — Allergènes calculés automatiquement (INCO)
+router.get('/:id/allergens', requireAuth, (req, res) => {
+  try {
+    const recipeId = Number(req.params.id);
+    const recipe = get('SELECT * FROM recipes WHERE id = ?', [recipeId]);
+    if (!recipe) return res.status(404).json({ error: 'Recette non trouvée' });
+
+    const allergens = getRecipeAllergens(recipeId);
+    res.json({
+      recipe_id: recipeId,
+      recipe_name: recipe.name,
+      allergens,
+      inco_display: allergens.map(a => `${a.icon} ${a.name}`).join(', '),
+      allergen_count: allergens.length
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;

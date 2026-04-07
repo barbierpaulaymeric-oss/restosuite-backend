@@ -65,13 +65,30 @@ async function renderRecipeDetail(id) {
       ` : ''}
     </div>
 
+    ${perms.view_costs && recipe.missing_price_count > 0 ? `
+    <div class="alert alert-warning" style="display:flex;align-items:center;gap:var(--space-3);background:var(--color-warning-light,#fff8e1);border:1px solid var(--color-warning,#f59e0b);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-3)">
+      <i data-lucide="alert-triangle" style="width:18px;height:18px;color:var(--color-warning,#f59e0b);flex-shrink:0"></i>
+      <span style="font-size:var(--text-sm)">
+        <strong>${recipe.missing_price_count} ingrédient${recipe.missing_price_count > 1 ? 's' : ''} sans prix</strong> — coût estimé incomplet.
+        <a href="#/ingredients" style="color:inherit;text-decoration:underline;margin-left:4px">Renseigner les prix →</a>
+      </span>
+    </div>` : ''}
+
     ${recipe.prep_time_min || recipe.cooking_time_min ? `
     <div class="recipe-meta">
       ${recipe.prep_time_min ? `<span><i data-lucide="clock" style="width:16px;height:16px"></i> Préparation : ${recipe.prep_time_min} min</span>` : ''}
       ${recipe.cooking_time_min ? `<span><i data-lucide="flame" style="width:16px;height:16px"></i> Cuisson : ${recipe.cooking_time_min} min</span>` : ''}
     </div>` : ''}
 
-    <div class="section-title">Ingrédients</div>
+    <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap">
+      <div class="section-title" style="margin:0">Ingrédients</div>
+      <div style="display:flex;align-items:center;gap:var(--space-2);background:var(--bg-sunken);padding:4px 12px;border-radius:var(--radius-md)">
+        <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:16px;min-width:28px" onclick="scaleRecipe(${recipe.id}, -1)">−</button>
+        <span style="font-weight:600;min-width:40px;text-align:center" id="scale-display">${recipe.portions || 1} p.</span>
+        <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:16px;min-width:28px" onclick="scaleRecipe(${recipe.id}, 1)">+</button>
+        <button class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:var(--text-xs)" onclick="resetRecipeScale(${recipe.id})" title="Réinitialiser">↺</button>
+      </div>
+    </div>
     <div class="table-container">
       <table>
         <thead>
@@ -89,7 +106,7 @@ async function renderRecipeDetail(id) {
           ${perms.view_costs ? `
           <tr class="total-row">
             <td colspan="4" style="font-weight:600">TOTAL</td>
-            <td class="mono" style="font-weight:600">${formatCurrency(recipe.total_cost)}</td>
+            <td class="mono" style="font-weight:600" data-base-total="${recipe.total_cost}">${formatCurrency(recipe.total_cost)}</td>
             <td></td>
           </tr>` : ''}
         </tbody>
@@ -112,6 +129,7 @@ async function renderRecipeDetail(id) {
       ${perms.view_costs ? `<button class="btn btn-secondary" onclick="openPriceSimulator(${recipe.id}, ${recipe.cost_per_portion}, ${recipe.selling_price})"><i data-lucide="sliders" style="width:18px;height:18px"></i> Simuler</button>` : ''}
       ${perms.edit_recipes ? `<a href="#/edit/${recipe.id}" class="btn btn-primary"><i data-lucide="pencil" style="width:18px;height:18px"></i> Modifier</a>` : ''}
       ${perms.export_pdf ? `<button class="btn btn-secondary" onclick="exportRecipe(${recipe.id})"><i data-lucide="download" style="width:18px;height:18px"></i> Exporter</button>` : ''}
+      <button class="btn btn-secondary" onclick="printAllergenSheet(${recipe.id}, '${escapeHtml(recipe.name).replace(/'/g, "\\'")}')"><i data-lucide="printer" style="width:18px;height:18px"></i> Fiche allergènes</button>
       ${perms.edit_recipes ? `<button class="btn btn-danger" onclick="deleteRecipe(${recipe.id})"><i data-lucide="trash-2" style="width:18px;height:18px"></i> Supprimer</button>` : ''}
     </div>
   `;
@@ -129,7 +147,7 @@ async function loadRecipeAllergens(recipeId) {
     if (!section) return;
     if (data.allergens && data.allergens.length > 0) {
       section.innerHTML = `
-        <div class="section-title">Allergenes INCO</div>
+        <div class="section-title">Allergènes INCO</div>
         <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
           ${data.allergens.map(a => `
             <span class="badge" style="font-size:var(--text-sm);padding:6px 12px;background:var(--color-warning-light);border:1px solid var(--color-warning);border-radius:var(--radius-md)">
@@ -138,13 +156,13 @@ async function loadRecipeAllergens(recipeId) {
           `).join('')}
         </div>
         <p style="margin-top:var(--space-2);font-size:var(--text-xs);color:var(--text-tertiary)">
-          Calcul automatique a partir des ingredients de la recette
+          Calcul automatique à partir des ingrédients de la recette
         </p>
       `;
     } else {
       section.innerHTML = `
-        <div class="section-title">Allergenes INCO</div>
-        <p style="font-size:var(--text-sm);color:var(--text-tertiary)">Aucun allergene detecte dans cette recette</p>
+        <div class="section-title">Allergènes INCO</div>
+        <p style="font-size:var(--text-sm);color:var(--text-tertiary)">Aucun allergène détecté dans cette recette</p>
       `;
     }
   } catch (e) {
@@ -175,13 +193,16 @@ function renderMergedIngredientRows(ingredients, perms, depth) {
       return html;
     }
     const waste = ing.custom_waste_percent ?? ing.default_waste_percent ?? 0;
+    const missingPriceTag = perms.view_costs && ing.missing_price
+      ? `<span title="Prix manquant" style="display:inline-block;background:var(--color-warning,#f59e0b);color:#fff;font-size:10px;font-weight:700;border-radius:3px;padding:1px 5px;margin-left:6px;vertical-align:middle">?</span>`
+      : '';
     return `
       <tr${depth > 0 ? ' style="color:var(--text-secondary)"' : ''}>
-        <td style="padding-left:${pad + 12}px">${depth > 0 ? '<span style="color:var(--text-tertiary);margin-right:4px">└</span>' : ''}${escapeHtml(ing.ingredient_name)}</td>
-        <td class="mono">${formatQuantity(ing.gross_quantity, ing.unit)}</td>
-        <td class="mono">${formatQuantity(ing.net_quantity || ing.gross_quantity, ing.unit)}</td>
+        <td style="padding-left:${pad + 12}px">${depth > 0 ? '<span style="color:var(--text-tertiary);margin-right:4px">└</span>' : ''}${escapeHtml(ing.ingredient_name)}${missingPriceTag}</td>
+        <td class="mono" data-base-qty="${ing.gross_quantity}" data-unit="${ing.unit || ''}">${formatQuantity(ing.gross_quantity, ing.unit)}</td>
+        <td class="mono" data-base-qty="${ing.net_quantity || ing.gross_quantity}" data-unit="${ing.unit || ''}">${formatQuantity(ing.net_quantity || ing.gross_quantity, ing.unit)}</td>
         <td class="mono">${waste}%</td>
-        ${perms.view_costs ? `<td class="mono">${formatCurrency(ing.cost)}</td>` : ''}
+        ${perms.view_costs ? `<td class="mono">${ing.missing_price ? '<span style="color:var(--color-warning,#f59e0b)" title="Prix manquant">—</span>' : formatCurrency(ing.cost)}</td>` : ''}
         <td style="font-size:var(--text-sm);color:var(--text-tertiary);font-style:italic">${escapeHtml(ing.notes || '')}</td>
       </tr>`;
   }).join('');
@@ -230,6 +251,58 @@ function deleteRecipe(id) {
       showToast('Erreur : ' + e.message, 'error');
     }
   });
+}
+
+async function printAllergenSheet(recipeId, recipeName) {
+  try {
+    const data = await API.getRecipeAllergens(recipeId);
+    const allergens = data.allergens || [];
+    const today = new Date().toLocaleDateString('fr-FR');
+
+    const allergensHtml = allergens.length > 0
+      ? allergens.map(a => `
+          <div class="allergen-item">
+            <span class="allergen-icon">${a.icon}</span>
+            <div>
+              <strong>${a.name}</strong>
+              <small>${a.description || ''}</small>
+            </div>
+          </div>`).join('')
+      : '<p class="none">Aucun allergène détecté dans cette recette.</p>';
+
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Fiche allergènes — ${recipeName}</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; color: #1a1a1a; }
+    h1 { font-size: 22px; margin-bottom: 4px; }
+    .subtitle { color: #666; font-size: 13px; margin-bottom: 24px; }
+    .inco-badge { display: inline-block; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 4px 12px; font-size: 12px; font-weight: 600; margin-bottom: 20px; }
+    .allergen-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 8px; background: #fffbf0; }
+    .allergen-icon { font-size: 28px; line-height: 1; }
+    .allergen-item strong { display: block; font-size: 15px; }
+    .allergen-item small { color: #555; font-size: 12px; }
+    .none { color: #666; font-style: italic; padding: 16px; background: #f5f5f5; border-radius: 8px; }
+    .footer { margin-top: 32px; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 12px; }
+    @media print { body { margin: 20px; } }
+  </style>
+</head>
+<body>
+  <h1>🍽️ ${recipeName}</h1>
+  <p class="subtitle">Fiche allergènes — Imprimée le ${today}</p>
+  <div class="inco-badge">📋 Règlement INCO (UE) — 14 allergènes réglementaires</div>
+  <div>${allergensHtml}</div>
+  <div class="footer">Généré par RestoSuite · Conformité règlement (UE) n°1169/2011 (INCO) · ${allergens.length} allergène(s) présent(s)</div>
+  <script>window.onload = function() { window.print(); }<\/script>
+</body>
+</html>`);
+    win.document.close();
+  } catch (e) {
+    showToast('Erreur chargement allergènes', 'error');
+  }
 }
 
 async function exportRecipe(id) {
@@ -394,4 +467,47 @@ function getZoneColor(zoneClass) {
     case 'zone-red': return '#D93025';
     default: return '#2D8B55';
   }
+}
+
+// ═══════════════════════════════════════════
+// Portion Scaler
+// ═══════════════════════════════════════════
+let _currentScale = {};
+
+function scaleRecipe(recipeId, delta) {
+  if (!_currentScale[recipeId]) _currentScale[recipeId] = { original: 0, current: 0 };
+  const s = _currentScale[recipeId];
+
+  // Read original from display if not set
+  if (s.original === 0) {
+    const display = document.getElementById('scale-display');
+    s.original = parseInt(display?.textContent) || 1;
+    s.current = s.original;
+  }
+
+  s.current = Math.max(1, s.current + delta);
+  const multiplier = s.current / s.original;
+
+  document.getElementById('scale-display').textContent = `${s.current} p.`;
+
+  // Scale all quantities in the table
+  document.querySelectorAll('[data-base-qty]').forEach(cell => {
+    const baseQty = parseFloat(cell.dataset.baseQty);
+    const unit = cell.dataset.unit || '';
+    cell.textContent = formatQuantity(baseQty * multiplier, unit);
+  });
+
+  // Scale total cost
+  const totalCell = document.querySelector('[data-base-total]');
+  if (totalCell) {
+    const baseTotal = parseFloat(totalCell.dataset.baseTotal);
+    totalCell.textContent = formatCurrency(baseTotal * multiplier);
+  }
+}
+
+function resetRecipeScale(recipeId) {
+  if (_currentScale[recipeId]) {
+    _currentScale[recipeId].current = _currentScale[recipeId].original;
+  }
+  renderRecipeDetail(recipeId);
 }
