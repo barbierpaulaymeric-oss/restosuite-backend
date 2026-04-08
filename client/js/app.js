@@ -4,9 +4,22 @@
 
 // ─── Theme Init (before paint) ───
 (function() {
-  const savedTheme = localStorage.getItem('restosuite_theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', savedTheme);
+  const savedTheme = localStorage.getItem('restosuite_theme');
+  if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  } else {
+    // Auto-detect from system preference
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+  }
 })();
+
+// Listen for system preference changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  if (!localStorage.getItem('restosuite_theme')) {
+    document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+  }
+});
 
 // ─── Command Palette shortcut ───
 document.addEventListener('keydown', (e) => {
@@ -61,8 +74,16 @@ function showInstallBanner() {
 
 // ─── Trial status cache ───
 let _trialStatus = null;
+let _trialStatusIntervalId = null;
 
 function getTrialStatus() { return _trialStatus; }
+
+function clearTrialStatusInterval() {
+  if (_trialStatusIntervalId) {
+    clearInterval(_trialStatusIntervalId);
+    _trialStatusIntervalId = null;
+  }
+}
 
 async function fetchTrialStatus() {
   const account = getAccount();
@@ -188,6 +209,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/cleaning$/, renderHACCPCleaning);
   Router.add(/^\/haccp\/traceability$/, renderHACCPTraceability);
   Router.add(/^\/analytics$/, renderAnalytics);
+  Router.add(/^\/health$/, renderHealthDashboard);
   Router.add(/^\/more$/, () => new MoreView().render());
   Router.add(/^\/team$/, renderTeam);
   Router.add(/^\/subscribe$/, renderSubscribe);
@@ -195,7 +217,17 @@ function registerRoutes() {
   Router.add(/^\/service$/, renderServiceView);
   Router.add(/^\/scan-invoice$/, renderScanInvoice);
   Router.add(/^\/mercuriale$/, renderMercuriale);
+  Router.add(/^\/import-mercuriale$/, renderImportMercuriale);
+  Router.add(/^\/chef$/, renderAIChef);
+  Router.add(/^\/menu-engineering$/, renderMenuEngineering);
+  Router.add(/^\/carbon$/, renderCarbon);
+  Router.add(/^\/integrations$/, renderIntegrations);
+  Router.add(/^\/multi-site$/, renderMultiSite);
+  Router.add(/^\/predictions$/, renderPredictions);
+  Router.add(/^\/crm$/, renderCRM);
+  Router.add(/^\/api-keys$/, renderAPIKeys);
   Router.add(/^\/qrcodes$/, renderQRCodes);
+  Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
 }
 
 function bootApp(role, account, opts = {}) {
@@ -234,8 +266,9 @@ function bootApp(role, account, opts = {}) {
   // Fetch trial status and render banner
   fetchTrialStatus().then(() => renderTrialBanner());
 
-  // Refresh trial status every 5 minutes
-  setInterval(() => fetchTrialStatus().then(() => renderTrialBanner()), 5 * 60 * 1000);
+  // Refresh trial status every 5 minutes (store interval ID for cleanup on logout)
+  clearTrialStatusInterval();
+  _trialStatusIntervalId = setInterval(() => fetchTrialStatus().then(() => renderTrialBanner()), 5 * 60 * 1000);
 }
 
 function updateNavUser(account) {
@@ -343,4 +376,61 @@ function updateNavUser(account) {
   // No auth → show login
   const login = new LoginView();
   login.render();
+})();
+
+// ─── Client-side error monitoring ───
+(function() {
+  let _errorBuffer = [];
+  let _flushTimer = null;
+
+  function reportErrors() {
+    if (!_errorBuffer.length) return;
+    const token = localStorage.getItem('restosuite_token');
+    if (!token) { _errorBuffer = []; return; }
+
+    const batch = _errorBuffer.splice(0);
+    batch.forEach(entry => {
+      fetch('/api/errors/report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token,
+        },
+        body: JSON.stringify(entry),
+      }).catch(() => {}); // silent fail — monitoring ne doit pas casser l'app
+    });
+  }
+
+  function scheduleFlush() {
+    if (_flushTimer) return;
+    _flushTimer = setTimeout(() => {
+      _flushTimer = null;
+      reportErrors();
+    }, 2000);
+  }
+
+  function captureError(opts) {
+    _errorBuffer.push(opts);
+    scheduleFlush();
+  }
+
+  window.onerror = function(message, source, lineno, colno, error) {
+    captureError({
+      type: 'onerror',
+      message: String(message),
+      source,
+      lineno,
+      colno,
+      stack: error && error.stack ? error.stack : undefined,
+    });
+  };
+
+  window.onunhandledrejection = function(event) {
+    const reason = event.reason;
+    captureError({
+      type: 'unhandledrejection',
+      message: reason instanceof Error ? reason.message : String(reason),
+      stack: reason instanceof Error && reason.stack ? reason.stack : undefined,
+    });
+  };
 })();

@@ -7013,6 +7013,19 @@ class MoreView {
           <p class="text-secondary text-sm">Vos fournisseurs mettent \xE0 jour leurs catalogues et prix directement</p>
         </div>
         ` : ""}
+
+        ${canAccess(["gerant"]) ? `
+        <a href="#/errors-log" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+          <div class="more-card__icon" style="background: #DC2626">
+            <i data-lucide="bug"></i>
+          </div>
+          <div class="more-card__content">
+            <h3>Journal d'erreurs</h3>
+            <span class="badge badge--error">Tech</span>
+          </div>
+          <p class="text-secondary text-sm">50 derni\xE8res erreurs serveur et client en temps r\xE9el</p>
+        </a>
+        ` : ""}
       </div>
 
       <div class="section-title" style="margin-top: var(--space-6);">Pr\xE9f\xE9rences</div>
@@ -13129,6 +13142,113 @@ function getLucideIconPath(icon) {
   };
   return paths[icon] || '<circle cx="12" cy="12" r="10"></circle>';
 }
+class ErrorsLogView {
+  async render() {
+    const app = document.getElementById("app");
+    app.innerHTML = `
+      <div class="view-header">
+        <h1>Journal d'erreurs</h1>
+        <p class="text-secondary">50 derni\xE8res erreurs \u2014 serveur & client</p>
+      </div>
+      <div id="errors-log-content">
+        <div class="loading-spinner"></div>
+      </div>
+    `;
+    try {
+      const token = localStorage.getItem("restosuite_token");
+      const res = await fetch("/api/errors/recent", {
+        headers: { "Authorization": "Bearer " + token }
+      });
+      if (!res.ok) throw new Error("Acc\xE8s refus\xE9");
+      const { errors } = await res.json();
+      this._renderList(errors);
+    } catch (e) {
+      document.getElementById("errors-log-content").innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">\u26A0\uFE0F</div>
+          <p>Impossible de charger les erreurs : ${escapeHtml(e.message)}</p>
+        </div>
+      `;
+    }
+  }
+  _renderList(errors) {
+    const container = document.getElementById("errors-log-content");
+    if (!errors.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">\u2705</div>
+          <p>Aucune erreur enregistr\xE9e.</p>
+        </div>
+      `;
+      return;
+    }
+    const rows = errors.map((e) => {
+      const badge = e.origin === "server" ? '<span class="badge badge--error">Serveur</span>' : '<span class="badge badge--warning">Client</span>';
+      const date = new Date(e.ts).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "medium" });
+      const context = e.route ? `<span class="text-secondary text-sm">${escapeHtml(e.route)}</span>` : e.source ? `<span class="text-secondary text-sm">${escapeHtml(e.source)}${e.lineno ? ":" + e.lineno : ""}</span>` : "";
+      const stackHtml = e.stack ? `<pre class="error-stack">${escapeHtml(e.stack)}</pre>` : "";
+      return `
+        <div class="error-entry" onclick="this.classList.toggle('error-entry--open')">
+          <div class="error-entry__header">
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+              ${badge}
+              <span class="text-sm">${escapeHtml(e.message)}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+              ${context}
+              <span class="text-secondary text-sm">${date}</span>
+              <i data-lucide="chevron-down" style="width:14px;height:14px;opacity:.5"></i>
+            </div>
+          </div>
+          ${stackHtml ? `<div class="error-entry__body">${stackHtml}</div>` : ""}
+        </div>
+      `;
+    }).join("");
+    container.innerHTML = `
+      <div style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">
+        <span class="text-secondary text-sm">${errors.length} erreur(s)</span>
+        <button class="btn btn-secondary btn-sm" onclick="new ErrorsLogView().render()">
+          <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualiser
+        </button>
+      </div>
+      <div class="errors-list">${rows}</div>
+      <style>
+        .error-entry {
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-md);
+          margin-bottom: .5rem;
+          overflow: hidden;
+          cursor: pointer;
+        }
+        .error-entry__header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: .5rem;
+          padding: .75rem 1rem;
+          flex-wrap: wrap;
+        }
+        .error-entry__body {
+          display: none;
+          border-top: 1px solid var(--color-border);
+          padding: .75rem 1rem;
+          background: var(--color-bg-subtle, #0d0d0d);
+        }
+        .error-entry--open .error-entry__body {
+          display: block;
+        }
+        .error-stack {
+          font-size: .75rem;
+          white-space: pre-wrap;
+          word-break: break-all;
+          margin: 0;
+          color: var(--color-text-secondary);
+        }
+      </style>
+    `;
+    if (window.lucide) lucide.createIcons();
+  }
+}
 const ROUTE_ROLES = {
   "/": ["gerant", "cuisinier", "equipier"],
   "/new": ["gerant"],
@@ -13153,7 +13273,8 @@ const ROUTE_ROLES = {
   "/supplier-portal": ["gerant"],
   "/scan-invoice": ["gerant"],
   "/mercuriale": ["gerant"],
-  "/qrcodes": ["gerant"]
+  "/qrcodes": ["gerant"],
+  "/errors-log": ["gerant"]
 };
 function isRouteAllowed(path, role) {
   if (ROUTE_ROLES[path]) {
@@ -13402,6 +13523,7 @@ function registerRoutes() {
   Router.add(/^\/crm$/, renderCRM);
   Router.add(/^\/api-keys$/, renderAPIKeys);
   Router.add(/^\/qrcodes$/, renderQRCodes);
+  Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
 }
 function bootApp(role, account, opts = {}) {
   applyRole(role);
@@ -13511,4 +13633,57 @@ function updateNavUser(account) {
   }
   const login = new LoginView();
   login.render();
+})();
+(function() {
+  let _errorBuffer = [];
+  let _flushTimer = null;
+  function reportErrors() {
+    if (!_errorBuffer.length) return;
+    const token = localStorage.getItem("restosuite_token");
+    if (!token) {
+      _errorBuffer = [];
+      return;
+    }
+    const batch = _errorBuffer.splice(0);
+    batch.forEach((entry) => {
+      fetch("/api/errors/report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify(entry)
+      }).catch(() => {
+      });
+    });
+  }
+  function scheduleFlush() {
+    if (_flushTimer) return;
+    _flushTimer = setTimeout(() => {
+      _flushTimer = null;
+      reportErrors();
+    }, 2e3);
+  }
+  function captureError(opts) {
+    _errorBuffer.push(opts);
+    scheduleFlush();
+  }
+  window.onerror = function(message, source, lineno, colno, error) {
+    captureError({
+      type: "onerror",
+      message: String(message),
+      source,
+      lineno,
+      colno,
+      stack: error && error.stack ? error.stack : void 0
+    });
+  };
+  window.onunhandledrejection = function(event) {
+    const reason = event.reason;
+    captureError({
+      type: "unhandledrejection",
+      message: reason instanceof Error ? reason.message : String(reason),
+      stack: reason instanceof Error && reason.stack ? reason.stack : void 0
+    });
+  };
 })();

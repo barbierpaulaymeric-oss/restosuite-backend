@@ -56,6 +56,7 @@ const JS_FILES = [
   'js/views/api-keys.js',
   'js/views/qrcodes.js',
   'js/views/command-palette.js',
+  'js/views/errors-log.js',
   'js/router.js',
   'js/app.js',
 ];

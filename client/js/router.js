@@ -28,6 +28,7 @@ const ROUTE_ROLES = {
   '/scan-invoice': ['gerant'],
   '/mercuriale': ['gerant'],
   '/qrcodes': ['gerant'],
+  '/errors-log': ['gerant'],
 };
 
 function isRouteAllowed(path, role) {

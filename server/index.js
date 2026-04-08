@@ -2,16 +2,35 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 require('./db'); // initializes tables synchronously
 const { requireWriteAccess } = require('./middleware/trial');
 const { requireAuth } = require('./routes/auth');
 const { backupDatabase } = require('./backup');
+const { appendError, LOG_PATH, MAX_LINES } = require('./routes/errors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Validate JWT_SECRET on startup
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.warn('⚠️  WARNING: JWT_SECRET not set or too short. Using default (NOT SAFE FOR PRODUCTION).');
+}
+
 app.use(cors());
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
 
 // ─── Rate Limiting ───
 const globalLimiter = rateLimit({
@@ -45,6 +64,31 @@ app.use('/api/auth/pin-login', authLimiter);
 // ─── DB Backup ───
 backupDatabase(); // on startup
 setInterval(backupDatabase, 6 * 60 * 60 * 1000); // every 6 hours
+
+// ─── Error log rotation (max 1000 lines) ───
+try {
+  if (fs.existsSync(LOG_PATH)) {
+    const lines = fs.readFileSync(LOG_PATH, 'utf8').split('\n').filter(l => l.trim());
+    if (lines.length > MAX_LINES) {
+      fs.writeFileSync(LOG_PATH, lines.slice(-MAX_LINES).join('\n') + '\n', 'utf8');
+      console.log(`🗂️  errors.log tronqué à ${MAX_LINES} lignes`);
+    }
+  }
+} catch (e) {
+  console.error('Rotation errors.log:', e.message);
+}
+
+// ─── Cleanup old upload files on startup ───
+const uploadDir = path.join(__dirname, '..', 'tmp', 'restosuite-uploads');
+if (fs.existsSync(uploadDir)) {
+  const now = Date.now();
+  fs.readdirSync(uploadDir).forEach(f => {
+    const fp = path.join(uploadDir, f);
+    try {
+      if (now - fs.statSync(fp).mtimeMs > 24 * 60 * 60 * 1000) fs.unlinkSync(fp);
+    } catch {}
+  });
+}
 
 // Stripe webhook needs raw body — mount BEFORE json parser
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
@@ -82,7 +126,7 @@ app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
 
 // Trial write-protection middleware for write operations
 // Excludes: accounts (create/login), stripe, and GET requests
-const trialProtectedPaths = ['/api/ingredients', '/api/suppliers', '/api/prices', '/api/recipes', '/api/ai', '/api/haccp', '/api/stock', '/api/orders', '/api/deliveries', '/api/purchase-orders'];
+const trialProtectedPaths = ['/api/ingredients', '/api/suppliers', '/api/prices', '/api/recipes', '/api/ai', '/api/haccp', '/api/stock', '/api/orders', '/api/deliveries', '/api/purchase-orders', '/api/allergens'];
 app.use(trialProtectedPaths, (req, res, next) => {
   if (req.method === 'GET') return next();
   // Allow HACCP PDF exports (GET only anyway) and pdf-export routes
@@ -119,6 +163,13 @@ app.use('/api/alerts', require('./routes/alerts'));
 app.use('/api/service', require('./routes/service'));
 app.use('/api/allergens', require('./routes/allergens'));
 app.use('/api/variance', require('./routes/variance'));
+app.use('/api/carbon', require('./routes/carbon'));
+app.use('/api/integrations', require('./routes/integrations'));
+app.use('/api/sites', require('./routes/multi-site'));
+app.use('/api/predictions', require('./routes/predictions'));
+app.use('/api/public', require('./routes/public-api'));
+app.use('/api/crm', require('./routes/crm'));
+app.use('/api/errors', require('./routes/errors').router);
 
 // Admin endpoints — JWT required (gérant only)
 app.post('/api/admin/backup', requireAuth, (req, res) => {
@@ -137,12 +188,26 @@ app.get('/api/admin/export-db', requireAuth, (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'RestoSuite',
-    version: '1.1.0',
-    timestamp: new Date().toISOString()
-  });
+  try {
+    const { get } = require('./db');
+    const dbCheck = get('SELECT COUNT(*) as c FROM ingredients');
+    res.json({
+      status: 'ok',
+      service: 'RestoSuite',
+      version: '1.2.0',
+      db: 'connected',
+      ingredients: dbCheck.c,
+      timestamp: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(503).json({
+      status: 'error',
+      service: 'RestoSuite',
+      db: 'disconnected',
+      error: e.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Legal pages
@@ -176,7 +241,16 @@ app.get('*', (req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
+  const entry = {
+    ts: new Date().toISOString(),
+    origin: 'server',
+    type: 'unhandled',
+    route: `${req.method} ${req.path}`,
+    message: err.message || String(err),
+    stack: err.stack ? err.stack.slice(0, 2000) : undefined,
+  };
+  console.error('Unhandled error:', entry.route, err.message);
+  try { appendError(entry); } catch {}
   res.status(500).json({ error: 'Internal server error' });
 });
 
