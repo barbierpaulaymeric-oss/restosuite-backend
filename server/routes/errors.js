@@ -10,6 +10,8 @@ const MAX_LINES = 1000;
 // ─── Helpers ───
 
 function appendError(entry) {
+  const dir = path.dirname(LOG_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   const line = JSON.stringify(entry) + '\n';
   fs.appendFileSync(LOG_PATH, line, 'utf8');
 }
