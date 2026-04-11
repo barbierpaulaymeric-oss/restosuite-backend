@@ -175,6 +175,7 @@ app.use('/api/carbon', require('./routes/carbon'));
 app.use('/api/integrations', require('./routes/integrations'));
 app.use('/api/sites', require('./routes/multi-site'));
 app.use('/api/predictions', require('./routes/predictions'));
+app.use('/api/health', require('./routes/health'));
 app.use('/api/public', require('./routes/public-api'));
 app.use('/api/crm', require('./routes/crm'));
 app.use('/api/errors', require('./routes/errors').router);

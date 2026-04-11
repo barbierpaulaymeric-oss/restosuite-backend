@@ -1,6 +1,10 @@
 const { Router } = require('express');
 const { all, get, run } = require('../db');
+const { requireAuth } = require('./auth');
+const { INCO_ALLERGENS } = require('./allergens');
+const { validate, ingredientValidation } = require('../middleware/validate');
 const router = Router();
+router.use(requireAuth);
 
 router.get('/export-csv', (req, res) => {
   const rows = all('SELECT * FROM ingredients ORDER BY name');
@@ -15,14 +19,35 @@ router.get('/export-csv', (req, res) => {
 });
 
 router.get('/', (req, res) => {
-  const { q } = req.query;
-  const rows = q
-    ? all('SELECT * FROM ingredients WHERE name LIKE ? ORDER BY name', [`%${q}%`])
-    : all('SELECT * FROM ingredients ORDER BY name');
-  res.json(rows);
+  const { q, limit: limStr, offset: offsetStr } = req.query;
+  const limit = Math.min(parseInt(limStr) || 50, 200);
+  const offset = Math.max(parseInt(offsetStr) || 0, 0);
+
+  let sql = 'SELECT * FROM ingredients';
+  const params = [];
+  if (q) {
+    sql += ' WHERE name LIKE ?';
+    params.push(`%${q}%`);
+  }
+
+  // Get total count
+  let countSql = 'SELECT COUNT(*) as total FROM ingredients';
+  const countParams = [];
+  if (q) {
+    countSql += ' WHERE name LIKE ?';
+    countParams.push(`%${q}%`);
+  }
+  const countResult = get(countSql, countParams);
+  const total = countResult ? countResult.total : 0;
+
+  sql += ' ORDER BY name LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+
+  const rows = all(sql, params);
+  res.json({ ingredients: rows, total, limit, offset });
 });
 
-router.post('/', (req, res) => {
+router.post('/', validate(ingredientValidation), (req, res) => {
   try {
     const { name, category, default_unit, waste_percent, allergens, price_per_unit, price_unit } = req.body;
 
@@ -100,6 +125,34 @@ router.delete('/:id', (req, res) => {
   const info = run('DELETE FROM ingredients WHERE id = ?', [Number(req.params.id)]);
   if (info.changes === 0) return res.status(404).json({ error: 'not found' });
   res.json({ deleted: true });
+});
+
+// PUT /api/ingredients/:id/allergens — Associer allergènes à un ingrédient (INCO)
+router.put('/:id/allergens', requireAuth, (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const ingredient = get('SELECT * FROM ingredients WHERE id = ?', [id]);
+    if (!ingredient) return res.status(404).json({ error: 'Ingrédient non trouvé' });
+
+    const { allergen_codes } = req.body;
+    if (!Array.isArray(allergen_codes)) {
+      return res.status(400).json({ error: 'allergen_codes must be an array' });
+    }
+
+    const validCodes = INCO_ALLERGENS.map(a => a.code);
+    const invalid = allergen_codes.filter(c => !validCodes.includes(c));
+    if (invalid.length > 0) {
+      return res.status(400).json({ error: `Codes invalides: ${invalid.join(', ')}` });
+    }
+
+    const allergenNames = allergen_codes.map(code => INCO_ALLERGENS.find(x => x.code === code)?.name).filter(Boolean);
+    const allergenText = allergenNames.length > 0 ? allergenNames.join(', ') : null;
+
+    run('UPDATE ingredients SET allergens = ? WHERE id = ?', [allergenText, id]);
+    res.json({ ingredient_id: id, allergens: allergenText, allergen_codes });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.get('/:id/prices', (req, res) => {

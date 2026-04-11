@@ -36,7 +36,7 @@ const API = {
         window.location.hash = '#/login';
         window.location.reload();
       }
-      throw new Error('Session expirée');
+      throw new Error('Session expirée. Reconnectez-vous.');
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -45,7 +45,18 @@ const API = {
         showToast('Passez en Pro pour continuer à utiliser RestoSuite', 'error');
         throw new Error(err.error);
       }
-      throw new Error(err.error || err.details || 'Erreur serveur');
+      // Generate descriptive error message based on HTTP status
+      let errorMessage = err.error || err.details || 'Erreur serveur';
+      if (res.status === 403) {
+        errorMessage = 'Accès non autorisé.';
+      } else if (res.status === 404) {
+        errorMessage = 'Ressource non trouvée.';
+      } else if (res.status === 429) {
+        errorMessage = 'Trop de requêtes. Réessayez dans quelques minutes.';
+      } else if (res.status >= 500) {
+        errorMessage = 'Erreur serveur. Réessayez ou contactez le support.';
+      }
+      throw new Error(errorMessage);
     }
     const contentType = res.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
@@ -97,6 +108,9 @@ const API = {
   // Recipes
   getRecipes() {
     return this.request('/recipes');
+  },
+  getRecipeAvailability() {
+    return this.request('/recipes/availability');
   },
   getRecipe(id) {
     return this.request(`/recipes/${id}`);
@@ -365,6 +379,7 @@ const API = {
     return this.request(`/orders/${orderId}/items/${itemId}`, { method: 'PUT', body: data });
   },
   sendOrder(id) { return this.request(`/orders/${id}/send`, { method: 'POST' }); },
+  closeOrder(id) { return this.request(`/orders/${id}/close`, { method: 'POST' }); },
   cancelOrder(id) { return this.request(`/orders/${id}`, { method: 'DELETE' }); },
 
   // ─── Purchase Orders ───
@@ -378,6 +393,11 @@ const API = {
   receivePurchaseOrder(id, data) { return this.request(`/purchase-orders/${id}/receive`, { method: 'POST', body: data }); },
   deletePurchaseOrder(id) { return this.request(`/purchase-orders/${id}`, { method: 'DELETE' }); },
   getPurchaseOrderSuggestions() { return this.request('/purchase-orders/suggest'); },
+  getPurchaseOrderAnalytics(period) {
+    const qs = period ? `?period=${period}` : '';
+    return this.request(`/purchase-orders/analytics${qs}`);
+  },
+  clonePurchaseOrder(id) { return this.request(`/purchase-orders/${id}/clone`, { method: 'POST' }); },
 
   // ─── Service Mode ───
   getServiceConfig() { return this.request('/service/config'); },
@@ -396,10 +416,59 @@ const API = {
     return this.request(`/variance/analysis${qs}`);
   },
   getVarianceSummary() { return this.request('/variance/summary'); },
+  getVarianceTopLosses(days) { return this.request(`/variance/top-losses${days ? '?days=' + days : ''}`); },
+  getVarianceTrends(days) { return this.request(`/variance/trends${days ? '?days=' + days : ''}`); },
 
   // ─── Allergens ───
   getAllergens() { return this.request('/allergens'); },
   getRecipeAllergens(recipeId) { return this.request(`/allergens/recipes/${recipeId}`); },
+  updateIngredientAllergens(id, allergenCodes) {
+    return this.request(`/ingredients/${id}/allergens`, { method: 'PUT', body: { allergen_codes: allergenCodes } });
+  },
+
+  // ─── Carbon ───
+  getCarbonRecipes() { return this.request('/carbon/recipes'); },
+  getCarbonGlobal(days) {
+    const qs = days ? `?days=${days}` : '';
+    return this.request(`/carbon/global${qs}`);
+  },
+  getCarbonTargets() { return this.request('/carbon/targets'); },
+  saveCarbonTarget(data) { return this.request('/carbon/targets', { method: 'POST', body: data }); },
+
+  // ─── Multi-Site ───
+  getSites() { return this.request('/sites'); },
+  getSite(id) { return this.request(`/sites/${id}`); },
+  createSite(data) { return this.request('/sites', { method: 'POST', body: data }); },
+  updateSite(id, data) { return this.request(`/sites/${id}`, { method: 'PUT', body: data }); },
+  deleteSite(id) { return this.request(`/sites/${id}`, { method: 'DELETE' }); },
+  compareSites(days) {
+    const qs = days ? `?days=${days}` : '';
+    return this.request(`/sites/compare/all${qs}`);
+  },
+
+  // ─── Deliveries (extra) ───
+  createDelivery(data) { return this.request('/deliveries', { method: 'POST', body: data }); },
+
+  // ─── Alerts ───
+  getAlertsDailySummary() { return this.request('/alerts/daily-summary'); },
+
+  // ─── Predictions ───
+  getDemandPredictions(refresh) {
+    const qs = refresh ? '?refresh=true' : '';
+    return this.request(`/predictions/demand${qs}`);
+  },
+  savePredictionAccuracy(data) { return this.request('/predictions/accuracy', { method: 'POST', body: data }); },
+  getPredictionAccuracy(days) {
+    const qs = days ? `?days=${days}` : '';
+    return this.request(`/predictions/accuracy${qs}`);
+  },
+
+  // ─── Health History ───
+  saveHealthScore(score) { return this.request('/health/score', { method: 'POST', body: { score } }); },
+  getHealthHistory(days) {
+    const qs = days ? `?days=${days}` : '';
+    return this.request(`/health/history${qs}`);
+  },
 
   // AI
   parseVoice(text) {
@@ -407,6 +476,24 @@ const API = {
   },
   suggestSuppliers(ingredientIds) {
     return this.request('/ai/suggest-suppliers', { method: 'POST', body: { ingredient_ids: ingredientIds } });
+  },
+  async scanMercuriale(file) {
+    const formData = new FormData();
+    formData.append('mercuriale', file);
+    const token = localStorage.getItem('restosuite_token');
+    const res = await fetch(this.base + '/ai/scan-mercuriale', {
+      method: 'POST',
+      headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+      body: formData
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || 'Erreur scan');
+    }
+    return res.json();
+  },
+  importMercuriale(data) {
+    return this.request('/ai/import-mercuriale', { method: 'POST', body: data });
   },
 };
 

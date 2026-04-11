@@ -2,7 +2,9 @@ const { Router } = require('express');
 const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
 const { getRecipeAllergens, INCO_ALLERGENS } = require('./allergens');
+const { validate, recipeValidation } = require('../middleware/validate');
 const router = Router();
+router.use(requireAuth);
 
 // Returns { hasPrice: bool, source: 'supplier'|'ingredient'|null }
 function getIngredientPriceSource(ingredientId) {
@@ -361,7 +363,7 @@ router.get('/:id/ingredients-flat', (req, res) => {
   res.json(enriched);
 });
 
-router.post('/', (req, res) => {
+router.post('/', validate(recipeValidation), (req, res) => {
   try {
     const { name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, ingredients, steps, recipe_type } = req.body;
 
@@ -461,7 +463,7 @@ router.post('/', (req, res) => {
   }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', validate(recipeValidation), (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = get('SELECT * FROM recipes WHERE id = ?', [id]);

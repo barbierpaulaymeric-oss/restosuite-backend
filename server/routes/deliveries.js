@@ -4,7 +4,10 @@
 
 const { Router } = require('express');
 const { all, get, run, db } = require('../db');
+const { requireAuth } = require('./auth');
 const router = Router();
+
+router.use(requireAuth);
 
 // ═══════════════════════════════════════════
 // GET /api/deliveries/dlc-alerts — DLC < 3 days
@@ -70,6 +73,53 @@ router.get('/:id', (req, res) => {
   `, [id]);
 
   res.json({ ...note, items });
+});
+
+// ═══════════════════════════════════════════
+// POST /api/deliveries — Créer un bon de livraison manuellement
+// ═══════════════════════════════════════════
+router.post('/', (req, res) => {
+  const { supplier_id, expected_date, notes, items } = req.body;
+
+  if (!supplier_id) return res.status(400).json({ error: 'Fournisseur requis' });
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Au moins un article requis' });
+  }
+
+  const supplier = get('SELECT * FROM suppliers WHERE id = ?', [Number(supplier_id)]);
+  if (!supplier) return res.status(404).json({ error: 'Fournisseur introuvable' });
+
+  const transaction = db.transaction(() => {
+    const result = run(
+      `INSERT INTO delivery_notes (supplier_id, status, expected_date, notes)
+       VALUES (?, 'pending', ?, ?)`,
+      [Number(supplier_id), expected_date || null, notes || null]
+    );
+    const noteId = Number(result.lastInsertRowid);
+
+    for (const item of items) {
+      const { product_name, ingredient_id, quantity, unit, price_per_unit, batch_number, dlc, temperature_required, notes: itemNotes } = item;
+      if (!product_name || !quantity || !unit) continue;
+
+      run(
+        `INSERT INTO delivery_note_items
+           (delivery_note_id, ingredient_id, product_name, quantity, unit, price_per_unit, batch_number, dlc, temperature_required, notes, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        [noteId, ingredient_id || null, product_name, quantity, unit,
+         price_per_unit || null, batch_number || null, dlc || null,
+         temperature_required || null, itemNotes || null]
+      );
+    }
+
+    return noteId;
+  });
+
+  try {
+    const noteId = transaction();
+    res.json({ ok: true, id: noteId });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 // ═══════════════════════════════════════════

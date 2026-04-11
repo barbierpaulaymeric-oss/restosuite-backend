@@ -1,14 +1,21 @@
 const { Router } = require('express');
 const { all, get, run, db } = require('../db');
 const PDFDocument = require('pdfkit');
+const { requireAuth } = require('./auth');
+const { validate, stockReceptionValidation } = require('../middleware/validate');
 const router = Router();
+
+router.use(requireAuth);
 
 // ═══════════════════════════════════════════
 // GET /api/stock — Stock actuel avec alertes
 // ═══════════════════════════════════════════
 router.get('/', (req, res) => {
-  const { q } = req.query;
-  let sql = `
+  const { q, limit: limStr, offset: offsetStr } = req.query;
+  const limit = Math.min(parseInt(limStr) || 50, 200);
+  const offset = Math.max(parseInt(offsetStr) || 0, 0);
+
+  let baseSql = `
     SELECT s.*, i.name as ingredient_name, i.category, i.default_unit,
            CASE WHEN s.quantity <= s.min_quantity AND s.min_quantity > 0 THEN 1 ELSE 0 END as is_alert,
            sup.name as supplier_name
@@ -21,15 +28,27 @@ router.get('/', (req, res) => {
   `;
   const params = [];
   if (q) {
-    sql += ' WHERE i.name LIKE ?';
+    baseSql += ' WHERE i.name LIKE ?';
     params.push(`%${q}%`);
   }
-  sql += ' ORDER BY is_alert DESC, i.category, i.name';
+
+  // Get total count
+  let countSql = 'SELECT COUNT(*) as total FROM stock s JOIN ingredients i ON i.id = s.ingredient_id';
+  const countParams = [];
+  if (q) {
+    countSql += ' WHERE i.name LIKE ?';
+    countParams.push(`%${q}%`);
+  }
+  const countResult = get(countSql, countParams);
+  const total = countResult ? countResult.total : 0;
+
+  let sql = baseSql + ' ORDER BY is_alert DESC, i.category, i.name LIMIT ? OFFSET ?';
+  params.push(limit, offset);
 
   const items = all(sql, params);
   const productCount = get('SELECT COUNT(*) as count FROM stock WHERE quantity > 0');
 
-  res.json({ items, product_count: productCount ? productCount.count : 0 });
+  res.json({ items, total, limit, offset, product_count: productCount ? productCount.count : 0 });
 });
 
 // ═══════════════════════════════════════════
@@ -49,7 +68,7 @@ router.get('/alerts', (req, res) => {
 // ═══════════════════════════════════════════
 // POST /api/stock/reception — Réception marchandise
 // ═══════════════════════════════════════════
-router.post('/reception', (req, res) => {
+router.post('/reception', validate(stockReceptionValidation), (req, res) => {
   try {
     const { lines, recorded_by } = req.body;
     // lines = [{ ingredient_id, quantity, unit, unit_price, supplier_id, batch_number, dlc, temperature, notes }]
