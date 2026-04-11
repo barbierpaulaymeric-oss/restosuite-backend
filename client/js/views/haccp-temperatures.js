@@ -169,14 +169,17 @@ function setupTemperatureEvents(zones) {
 
   document.querySelectorAll('.btn-delete-zone').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm(`Supprimer la zone "${btn.dataset.name}" et tous ses relevés ?`)) return;
-      try {
-        await API.deleteHACCPZone(Number(btn.dataset.id));
-        showToast('Zone supprimée', 'success');
-        renderHACCPTemperatures();
-      } catch (err) {
-        showToast('Erreur : ' + err.message, 'error');
-      }
+      const zoneName = btn.dataset.name;
+      showConfirmModal('Supprimer la zone', `Êtes-vous sûr de vouloir supprimer la zone "${zoneName}" et tous ses relevés ?`, async () => {
+        try {
+          await API.deleteHACCPZone(Number(btn.dataset.id));
+          showToast('Zone supprimée', 'success');
+          renderHACCPTemperatures();
+        } catch (err) {
+          showToast('Erreur : ' + err.message, 'error');
+        }
+      }, { confirmText: 'Supprimer', confirmClass: 'btn btn-danger' });
+      return;
     });
   });
 

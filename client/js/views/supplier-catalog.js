@@ -163,14 +163,16 @@ async function renderSupplierCatalogTab() {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.deleteId;
         const name = btn.dataset.deleteName;
-        if (!confirm(`Retirer "${name}" du catalogue ?`)) return;
-        try {
-          await API.deleteSupplierProduct(id);
-          showToast('Produit retiré', 'success');
-          renderSupplierCatalogTab();
-        } catch (e) {
-          showToast(e.message, 'error');
-        }
+        showConfirmModal('Retirer le produit', `Êtes-vous sûr de vouloir retirer "${name}" du catalogue ?`, async () => {
+          try {
+            await API.deleteSupplierProduct(id);
+            showToast('Produit retiré', 'success');
+            renderSupplierCatalogTab();
+          } catch (e) {
+            showToast(e.message, 'error');
+          }
+        }, { confirmText: 'Retirer', confirmClass: 'btn btn-danger' });
+        return;
       });
     });
   } catch (e) {

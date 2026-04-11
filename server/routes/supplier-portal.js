@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { all, get, run } = require('../db');
+const { requireAuth } = require('./auth');
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'restosuite-dev-secret-2026';
@@ -38,7 +39,7 @@ function requireSupplierAuth(req, res, next) {
 // ═════════════════════════════════════════
 
 // POST /invite — Create supplier portal access
-router.post('/invite', (req, res) => {
+router.post('/invite', requireAuth, (req, res) => {
   const { supplier_id, pin, name, email, password } = req.body;
   if (!supplier_id) {
     return res.status(400).json({ error: 'supplier_id requis' });
@@ -85,7 +86,7 @@ router.post('/invite', (req, res) => {
 });
 
 // GET /accounts — List supplier accounts
-router.get('/accounts', (req, res) => {
+router.get('/accounts', requireAuth, (req, res) => {
   const accounts = all(`
     SELECT sa.id, sa.supplier_id, sa.name, sa.email, sa.last_login, sa.created_at,
            s.name as supplier_name
@@ -97,7 +98,7 @@ router.get('/accounts', (req, res) => {
 });
 
 // DELETE /accounts/:id — Revoke supplier access
-router.delete('/accounts/:id', (req, res) => {
+router.delete('/accounts/:id', requireAuth, (req, res) => {
   const id = Number(req.params.id);
   const account = get('SELECT * FROM supplier_accounts WHERE id = ?', [id]);
   if (!account) {
@@ -108,7 +109,7 @@ router.delete('/accounts/:id', (req, res) => {
 });
 
 // POST /accounts/add-member — Add a member to a supplier company
-router.post('/accounts/add-member', (req, res) => {
+router.post('/accounts/add-member', requireAuth, (req, res) => {
   const { supplier_id, name, pin, email } = req.body;
   if (!supplier_id || !name || !pin) {
     return res.status(400).json({ error: 'supplier_id, name et pin requis' });
@@ -143,7 +144,7 @@ router.post('/accounts/add-member', (req, res) => {
 });
 
 // GET /notifications — Price change notifications
-router.get('/notifications', (req, res) => {
+router.get('/notifications', requireAuth, (req, res) => {
   const notifications = all(`
     SELECT pcn.*, s.name as supplier_name
     FROM price_change_notifications pcn
@@ -155,20 +156,20 @@ router.get('/notifications', (req, res) => {
 });
 
 // GET /notifications/unread-count — Badge count
-router.get('/notifications/unread-count', (req, res) => {
+router.get('/notifications/unread-count', requireAuth, (req, res) => {
   const result = get('SELECT COUNT(*) as count FROM price_change_notifications WHERE read = 0');
   res.json({ count: result.count });
 });
 
 // PUT /notifications/:id/read — Mark as read
-router.put('/notifications/:id/read', (req, res) => {
+router.put('/notifications/:id/read', requireAuth, (req, res) => {
   const id = Number(req.params.id);
   run('UPDATE price_change_notifications SET read = 1 WHERE id = ?', [id]);
   res.json({ success: true });
 });
 
 // PUT /notifications/read-all — Mark all as read
-router.put('/notifications/read-all', (req, res) => {
+router.put('/notifications/read-all', requireAuth, (req, res) => {
   run('UPDATE price_change_notifications SET read = 1 WHERE read = 0');
   res.json({ success: true });
 });

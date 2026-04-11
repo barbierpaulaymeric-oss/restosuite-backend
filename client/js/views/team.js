@@ -351,15 +351,17 @@ function showEditMemberModal(member) {
 
 // ─── Reset PIN ───
 async function handleResetPin(accountId, name) {
-  if (!confirm(`Réinitialiser le PIN de ${name} ?\n\nIl devra créer un nouveau PIN à sa prochaine connexion.`)) return;
-  const caller = getAccount();
-  try {
-    await API.resetMemberPin(accountId, caller.id);
-    showToast(`PIN de ${name} réinitialisé`, 'success');
-    renderTeam();
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
+  showConfirmModal('Réinitialiser le PIN', `Êtes-vous sûr de vouloir réinitialiser le PIN de ${name} ?\n\nIl devra créer un nouveau PIN à sa prochaine connexion.`, async () => {
+    const caller = getAccount();
+    try {
+      await API.resetMemberPin(accountId, caller.id);
+      showToast(`PIN de ${name} réinitialisé`, 'success');
+      renderTeam();
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }, { confirmText: 'Réinitialiser', confirmClass: 'btn btn-primary' });
+  return;
 }
 
 // ─── Permissions Modal ───
@@ -437,15 +439,17 @@ async function showPermissionsModal(accountId) {
 
 // ─── Delete Member ───
 async function deleteTeamMember(accountId, name) {
-  if (!confirm(`Supprimer définitivement le compte de ${name} ?\n\nCette action est irréversible.`)) return;
-  const caller = getAccount();
-  try {
-    await API.deleteAccount(accountId, caller.id);
-    showToast('Compte supprimé', 'success');
-    renderTeam();
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
+  showConfirmModal('Supprimer le compte', `Êtes-vous sûr de vouloir supprimer définitivement le compte de ${name} ?\n\nCette action est irréversible.`, async () => {
+    const caller = getAccount();
+    try {
+      await API.deleteAccount(accountId, caller.id);
+      showToast('Compte supprimé', 'success');
+      renderTeam();
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }, { confirmText: 'Supprimer', confirmClass: 'btn btn-danger' });
+  return;
 }
 
 // ─── Delete Own Account (gérant full wipe) ───

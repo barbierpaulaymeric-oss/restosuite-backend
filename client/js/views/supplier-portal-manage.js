@@ -252,12 +252,14 @@ async function showInviteSupplierModal() {
 }
 
 async function revokeSupplierAccess(id, name) {
-  if (!confirm(`Révoquer l'accès portail de "${name}" ?`)) return;
-  try {
-    await API.revokeSupplierAccess(id);
-    showToast('Accès révoqué', 'success');
-    loadPortalAccounts();
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
+  showConfirmModal('Révoquer l\'accès', `Êtes-vous sûr de vouloir révoquer l'accès portail de "${name}" ?`, async () => {
+    try {
+      await API.revokeSupplierAccess(id);
+      showToast('Accès révoqué', 'success');
+      loadPortalAccounts();
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }, { confirmText: 'Révoquer', confirmClass: 'btn btn-danger' });
+  return;
 }

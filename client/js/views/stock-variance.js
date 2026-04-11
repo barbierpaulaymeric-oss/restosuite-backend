@@ -9,8 +9,8 @@ async function renderStockVariance() {
       <a href="#/stock" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-2);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)">
         <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Retour stock
       </a>
-      <h1>Analyse des ecarts</h1>
-      <p class="text-secondary">Consommation theorique vs reelle</p>
+      <h1>Analyse des écarts</h1>
+      <p class="text-secondary">Consommation théorique vs réelle</p>
     </div>
     <div class="variance-controls" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5);flex-wrap:wrap;align-items:flex-end">
       <div class="form-group" style="margin:0">
@@ -65,11 +65,11 @@ async function loadVariance() {
           <div style="font-size:var(--text-2xl);font-weight:700;color:${healthColor}">
             ${data.total_variance_value > 0 ? '+' : ''}${formatCurrency(data.total_variance_value)}
           </div>
-          <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Ecart total (valeur)</div>
+          <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Écart total (valeur)</div>
         </div>
         <div class="card" style="padding:var(--space-4);text-align:center">
           <div style="font-size:var(--text-2xl);font-weight:700">${data.total_items}</div>
-          <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Ingredients analyses</div>
+          <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Ingrédients analysés</div>
         </div>
         <div class="card" style="padding:var(--space-4);text-align:center">
           <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-danger)">${data.critical_count}</div>
@@ -86,8 +86,8 @@ async function loadVariance() {
       contentEl.innerHTML = `
         <div class="empty-state" style="text-align:center;padding:var(--space-8)">
           <div class="empty-icon" style="font-size:48px;margin-bottom:var(--space-3)">--</div>
-          <h3>Aucun ecart detecte</h3>
-          <p style="color:var(--text-secondary)">Pas de mouvements ou de ventes sur cette periode.</p>
+          <h3>Aucun écart détecté</h3>
+          <p style="color:var(--text-secondary)">Pas de mouvements ou de ventes sur cette période.</p>
         </div>
       `;
       return;
@@ -98,11 +98,11 @@ async function loadVariance() {
         <table>
           <thead>
             <tr>
-              <th>Ingredient</th>
-              <th class="numeric">Theorique</th>
-              <th class="numeric">Reel</th>
-              <th class="numeric">Ecart</th>
-              <th class="numeric">Ecart %</th>
+              <th>Ingrédient</th>
+              <th class="numeric">Théorique</th>
+              <th class="numeric">Réel</th>
+              <th class="numeric">Écart</th>
+              <th class="numeric">Écart %</th>
               <th class="numeric">Valeur</th>
               <th class="numeric">Pertes</th>
               <th>Statut</th>
@@ -139,8 +139,8 @@ async function loadVariance() {
         </table>
       </div>
       <div style="margin-top:var(--space-4);padding:var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-md);font-size:var(--text-sm);color:var(--text-tertiary)">
-        <strong>Lecture :</strong> Un ecart positif = surconsommation reelle par rapport au theorique (pertes, vol, surdosage).
-        Un ecart negatif = consommation inferieure au prevu (sous-dosage ou stock non mis a jour).
+        <strong>Lecture :</strong> Un écart positif = surconsommation réelle par rapport au théorique (pertes, vol, surdosage).
+        Un écart négatif = consommation inférieure au prévu (sous-dosage ou stock non mis à jour).
       </div>
     `;
   } catch (e) {

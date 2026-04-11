@@ -6,8 +6,11 @@ async function renderMercuriale() {
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="page-header">
-      <a href="#/analytics" class="btn btn-secondary btn-sm">← Analytics</a>
-      <h1>📊 Mercuriale</h1>
+      <div>
+        <a href="#/analytics" class="btn btn-secondary btn-sm">← Analytics</a>
+        <h1 style="margin-top:4px">📊 Mercuriale</h1>
+      </div>
+      <a href="#/import-mercuriale" class="btn btn-primary"><i data-lucide="camera" style="width:16px;height:16px"></i> Scanner une mercuriale</a>
     </div>
 
     <div id="price-alerts-section">

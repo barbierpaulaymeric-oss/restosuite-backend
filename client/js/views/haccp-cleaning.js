@@ -129,14 +129,17 @@ function setupCleaningEvents(tasks) {
   // Delete tasks
   document.querySelectorAll('.btn-delete-task').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm(`Supprimer la tâche "${btn.dataset.name}" ?`)) return;
-      try {
-        await API.deleteCleaningTask(Number(btn.dataset.id));
-        showToast('Tâche supprimée', 'success');
-        renderHACCPCleaning();
-      } catch (err) {
-        showToast('Erreur : ' + err.message, 'error');
-      }
+      const taskName = btn.dataset.name;
+      showConfirmModal('Supprimer la tâche', `Êtes-vous sûr de vouloir supprimer la tâche "${taskName}" ?`, async () => {
+        try {
+          await API.deleteCleaningTask(Number(btn.dataset.id));
+          showToast('Tâche supprimée', 'success');
+          renderHACCPCleaning();
+        } catch (err) {
+          showToast('Erreur : ' + err.message, 'error');
+        }
+      }, { confirmText: 'Supprimer', confirmClass: 'btn btn-danger' });
+      return;
     });
   });
 

@@ -258,21 +258,23 @@ function _svcRenderServiceUI(app, tableCount) {
 
 // ═══ STOP SERVICE + RECAP ═══
 async function _svcStopService() {
-  // Check if there are pending orders
   const activeOrders = _serviceState.allOrders.filter(o => ['envoyé', 'en_cours'].includes(o.status));
-  if (activeOrders.length > 0) {
-    if (!confirm(`Il reste ${activeOrders.length} commande(s) en cours. Voulez-vous vraiment arrêter le service ?`)) return;
-  } else {
-    if (!confirm('Terminer le service ?')) return;
-  }
+  const title = activeOrders.length > 0
+    ? `Il reste ${activeOrders.length} commande(s) en cours`
+    : 'Terminer le service ?';
+  const message = activeOrders.length > 0
+    ? 'Voulez-vous vraiment arrêter le service avec des commandes en cours ?'
+    : 'Le récapitulatif du service sera affiché.';
 
-  try {
-    const result = await API.stopService();
-    _serviceState.serviceActive = false;
-    _svcShowRecap(result.recap);
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
+  showConfirmModal(title, message, async () => {
+    try {
+      const result = await API.stopService();
+      _serviceState.serviceActive = false;
+      _svcShowRecap(result.recap);
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }, { confirmText: 'Terminer le service', confirmClass: 'btn btn-danger' });
 }
 
 function _svcShowRecap(recap) {
@@ -399,15 +401,33 @@ async function _svcCheckAutoStop(tableCount) {
   const config = _serviceState.serviceConfig;
   if (!config || !config.service_end) return;
 
+  // Don't auto-stop within the first 15 minutes of service
+  const session = _serviceState.serviceSession;
+  if (session && session.started_at) {
+    const startedAt = new Date(session.started_at);
+    const minRuntime = 15 * 60 * 1000; // 15 minutes minimum
+    if (Date.now() - startedAt.getTime() < minRuntime) return;
+  }
+
   const now = new Date();
   const [endH, endM] = config.service_end.split(':').map(Number);
   const endTime = new Date();
   endTime.setHours(endH, endM, 0, 0);
 
+  // If end time is before start time (e.g. service_end=02:00 for night service),
+  // it means the end is the next day — don't stop prematurely
+  if (config.service_start) {
+    const [startH, startM] = config.service_start.split(':').map(Number);
+    if (endH < startH || (endH === startH && endM < startM)) {
+      // Night service: end time is next day
+      endTime.setDate(endTime.getDate() + 1);
+    }
+  }
+
   // If past end time, check for active orders
   if (now > endTime) {
     const activeOrders = _serviceState.allOrders.filter(o =>
-      ['envoyé', 'en_cours', 'prêt'].includes(o.status)
+      ['envoyé', 'en_cours', 'prêt', 'reçu'].includes(o.status)
     );
     if (activeOrders.length === 0) {
       // Auto-stop
@@ -768,17 +788,18 @@ async function _svcCloseTable() {
   if (activeOrders.length === 0 && (!td._localDraft || td._localDraft.length === 0)) {
     showToast('Cette table est déjà libre', 'info'); return;
   }
-  if (!confirm(`Terminer la table ${tn} ?`)) return;
 
-  try {
-    for (const order of activeOrders) await API.updateOrder(order.id, { status: 'terminé' });
-    _serviceState.tables[tn]._localDraft = [];
-    showToast(`Table ${tn} terminée`, 'success');
-    _serviceState.selectedTable = null;
-    document.getElementById('svc-no-table')?.classList.remove('hidden');
-    document.getElementById('svc-order-content')?.classList.add('hidden');
-    await _svcRefreshOrders(Object.keys(_serviceState.tables).length);
-  } catch (e) { showToast('Erreur : ' + e.message, 'error'); }
+  showConfirmModal(`Terminer la table ${tn} ?`, `${activeOrders.length} commande(s) seront marquées comme terminées.`, async () => {
+    try {
+      for (const order of activeOrders) await API.closeOrder(order.id);
+      _serviceState.tables[tn]._localDraft = [];
+      showToast(`Table ${tn} terminée`, 'success');
+      _serviceState.selectedTable = null;
+      document.getElementById('svc-no-table')?.classList.remove('hidden');
+      document.getElementById('svc-order-content')?.classList.add('hidden');
+      await _svcRefreshOrders(Object.keys(_serviceState.tables).length);
+    } catch (e) { showToast('Erreur : ' + e.message, 'error'); }
+  }, { confirmText: 'Terminer', confirmClass: 'btn btn-primary' });
 }
 
 // ═══ TABLE ORDERS / TRACKING ═══
@@ -814,7 +835,7 @@ function _svcRenderTableOrders() {
 
 async function _svcMarkServed(orderId) {
   try {
-    await API.updateOrder(orderId, { status: 'terminé' });
+    await API.closeOrder(orderId);
     showToast('Commande marquée comme servie', 'success');
     await _svcRefreshOrders(Object.keys(_serviceState.tables).length);
     if (_serviceState.selectedTable) _svcRenderTableOrders();

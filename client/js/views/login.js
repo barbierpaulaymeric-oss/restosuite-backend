@@ -683,6 +683,8 @@ function applyRole(role) {
 }
 
 function logout() {
+  // Clear trial status polling interval
+  clearTrialStatusInterval();
   localStorage.removeItem('restosuite_account');
   localStorage.removeItem('restosuite_token');
   localStorage.removeItem('restosuite_role');

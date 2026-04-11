@@ -9,6 +9,7 @@ async function renderOrdersDashboard() {
     <div class="page-header">
       <h1>Commandes fournisseurs</h1>
       <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" id="btn-po-analytics"><i data-lucide="bar-chart-3" style="width:16px;height:16px"></i> Statistiques</button>
         <button class="btn btn-secondary" id="btn-suggest-orders"><i data-lucide="lightbulb" style="width:16px;height:16px"></i> Suggestions</button>
         <a href="#/orders/new" class="btn btn-primary"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle commande</a>
       </div>
@@ -114,6 +115,8 @@ async function renderOrdersDashboard() {
 
   // Suggestions button
   document.getElementById('btn-suggest-orders').addEventListener('click', showSuggestionsModal);
+  // Analytics button
+  document.getElementById('btn-po-analytics').addEventListener('click', showPOAnalyticsModal);
 }
 
 // ─── Suggestions Modal ───
@@ -566,6 +569,7 @@ function renderPODetail(po) {
 
       <div class="actions-row">
         ${actionButtons}
+        <button class="btn btn-secondary" onclick="clonePurchaseOrder(${po.id})"><i data-lucide="copy" style="width:16px;height:16px"></i> Dupliquer</button>
         <a href="#/orders" class="btn btn-secondary">Retour</a>
       </div>
     </div>
@@ -575,25 +579,29 @@ function renderPODetail(po) {
 
 // ─── Action handlers ───
 async function sendPurchaseOrder(id) {
-  if (!confirm('Envoyer cette commande au fournisseur ?')) return;
-  try {
-    await API.updatePurchaseOrder(id, { status: 'envoyée' });
-    showToast('Commande envoyée', 'success');
-    location.hash = '#/orders';
-  } catch (e) {
-    showToast('Erreur : ' + e.message, 'error');
-  }
+  showConfirmModal('Envoyer la commande', 'Êtes-vous sûr de vouloir envoyer cette commande au fournisseur ?', async () => {
+    try {
+      await API.updatePurchaseOrder(id, { status: 'envoyée' });
+      showToast('Commande envoyée', 'success');
+      location.hash = '#/orders';
+    } catch (e) {
+      showToast('Erreur : ' + e.message, 'error');
+    }
+  }, { confirmText: 'Envoyer', confirmClass: 'btn btn-primary' });
+  return;
 }
 
 async function confirmPurchaseOrder(id) {
-  if (!confirm('Confirmer la réception de cette commande ?')) return;
-  try {
-    await API.updatePurchaseOrder(id, { status: 'confirmée' });
-    showToast('Commande confirmée', 'success');
-    location.hash = '#/orders';
-  } catch (e) {
-    showToast('Erreur : ' + e.message, 'error');
-  }
+  showConfirmModal('Confirmer la réception', 'Êtes-vous sûr de vouloir confirmer la réception de cette commande ?', async () => {
+    try {
+      await API.updatePurchaseOrder(id, { status: 'confirmée' });
+      showToast('Commande confirmée', 'success');
+      location.hash = '#/orders';
+    } catch (e) {
+      showToast('Erreur : ' + e.message, 'error');
+    }
+  }, { confirmText: 'Confirmer', confirmClass: 'btn btn-primary' });
+  return;
 }
 
 async function receivePurchaseOrderFromDash(id) {
@@ -625,47 +633,55 @@ async function receivePurchaseOrderFromDash(id) {
 }
 
 async function cancelPurchaseOrderFromDash(id) {
-  if (!confirm('Annuler cette commande ?')) return;
-  try {
-    await API.updatePurchaseOrder(id, { status: 'annulée' });
-    showToast('Commande annulée', 'success');
-    renderOrdersDashboard();
-  } catch (e) {
-    showToast('Erreur : ' + e.message, 'error');
-  }
+  showConfirmModal('Annuler la commande', 'Êtes-vous sûr de vouloir annuler cette commande ?', async () => {
+    try {
+      await API.updatePurchaseOrder(id, { status: 'annulée' });
+      showToast('Commande annulée', 'success');
+      renderOrdersDashboard();
+    } catch (e) {
+      showToast('Erreur : ' + e.message, 'error');
+    }
+  }, { confirmText: 'Annuler', confirmClass: 'btn btn-danger' });
+  return;
 }
 
 async function deletePurchaseOrderFromDash(id) {
-  if (!confirm('Supprimer cette commande ?')) return;
-  try {
-    await API.deletePurchaseOrder(id);
-    showToast('Commande supprimée', 'success');
-    renderOrdersDashboard();
-  } catch (e) {
-    showToast('Erreur : ' + e.message, 'error');
-  }
+  showConfirmModal('Supprimer la commande', 'Êtes-vous sûr de vouloir supprimer cette commande ?', async () => {
+    try {
+      await API.deletePurchaseOrder(id);
+      showToast('Commande supprimée', 'success');
+      renderOrdersDashboard();
+    } catch (e) {
+      showToast('Erreur : ' + e.message, 'error');
+    }
+  }, { confirmText: 'Supprimer', confirmClass: 'btn btn-danger' });
+  return;
 }
 
 async function deletePurchaseOrder(id) {
-  if (!confirm('Supprimer cette commande ?')) return;
-  try {
-    await API.deletePurchaseOrder(id);
-    showToast('Commande supprimée', 'success');
-    location.hash = '#/orders';
-  } catch (e) {
-    showToast('Erreur : ' + e.message, 'error');
-  }
+  showConfirmModal('Supprimer la commande', 'Êtes-vous sûr de vouloir supprimer cette commande ?', async () => {
+    try {
+      await API.deletePurchaseOrder(id);
+      showToast('Commande supprimée', 'success');
+      location.hash = '#/orders';
+    } catch (e) {
+      showToast('Erreur : ' + e.message, 'error');
+    }
+  }, { confirmText: 'Supprimer', confirmClass: 'btn btn-danger' });
+  return;
 }
 
 async function cancelPurchaseOrder(id) {
-  if (!confirm('Annuler cette commande ?')) return;
-  try {
-    await API.updatePurchaseOrder(id, { status: 'annulée' });
-    showToast('Commande annulée', 'success');
-    location.hash = '#/orders';
-  } catch (e) {
-    showToast('Erreur : ' + e.message, 'error');
-  }
+  showConfirmModal('Annuler la commande', 'Êtes-vous sûr de vouloir annuler cette commande ?', async () => {
+    try {
+      await API.updatePurchaseOrder(id, { status: 'annulée' });
+      showToast('Commande annulée', 'success');
+      location.hash = '#/orders';
+    } catch (e) {
+      showToast('Erreur : ' + e.message, 'error');
+    }
+  }, { confirmText: 'Annuler', confirmClass: 'btn btn-danger' });
+  return;
 }
 
 // ─── Helpers ───
@@ -723,4 +739,105 @@ function getElapsedTime(createdAt) {
   const hours = Math.floor(diffMin / 60);
   const mins = diffMin % 60;
   return `${hours}h${mins > 0 ? String(mins).padStart(2, '0') : ''}`;
+}
+
+// ═══════════════════════════════════════════
+// Clone Purchase Order
+// ═══════════════════════════════════════════
+async function clonePurchaseOrder(id) {
+  try {
+    const cloned = await API.clonePurchaseOrder(id);
+    showToast('Commande dupliquée — brouillon créé', 'success');
+    location.hash = `#/orders/${cloned.id}`;
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════
+// Purchase Order Analytics Modal
+// ═══════════════════════════════════════════
+async function showPOAnalyticsModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:700px;max-height:80vh;overflow-y:auto;padding:var(--space-5)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-4)">
+        <h2 style="margin:0">📊 Statistiques d'achat</h2>
+        <button class="btn btn-ghost btn-sm" onclick="this.closest('.modal-overlay').remove()">✕</button>
+      </div>
+      <div id="po-analytics-content"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  try {
+    const data = await API.getPurchaseOrderAnalytics(60);
+    const el = document.getElementById('po-analytics-content');
+    if (!el) return;
+
+    el.innerHTML = `
+      <!-- KPIs -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)">
+        <div style="text-align:center;padding:var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-md)">
+          <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-accent)">${data.overall.total_orders}</div>
+          <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Commandes</div>
+        </div>
+        <div style="text-align:center;padding:var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-md)">
+          <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-accent)">${formatCurrency(data.overall.total_spent)}</div>
+          <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Total achats</div>
+        </div>
+        <div style="text-align:center;padding:var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-md)">
+          <div style="font-size:var(--text-xl);font-weight:700">${formatCurrency(data.overall.avg_order)}</div>
+          <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Panier moyen</div>
+        </div>
+        <div style="text-align:center;padding:var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-md)">
+          <div style="font-size:var(--text-xl);font-weight:700">${data.overall.avg_lead_time_days ? data.overall.avg_lead_time_days + 'j' : '—'}</div>
+          <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Délai moyen</div>
+        </div>
+      </div>
+
+      <!-- By supplier -->
+      ${data.by_supplier.length > 0 ? `
+      <h3 style="font-size:var(--text-sm);margin-bottom:var(--space-2)">Dépenses par fournisseur</h3>
+      <div style="margin-bottom:var(--space-4)">
+        ${data.by_supplier.map(s => {
+          const pct = data.overall.total_spent > 0 ? Math.round(s.total_spent / data.overall.total_spent * 100) : 0;
+          return `
+            <div style="display:flex;align-items:center;gap:var(--space-2);padding:8px 0;border-bottom:1px solid var(--border-light)">
+              <span style="flex:1;font-weight:500;font-size:var(--text-sm)">${escapeHtml(s.supplier_name)}</span>
+              <span style="font-size:var(--text-sm);color:var(--text-secondary)">${s.order_count} cmd</span>
+              <div style="width:100px;height:8px;background:var(--bg-sunken);border-radius:4px;overflow:hidden">
+                <div style="width:${pct}%;height:100%;background:var(--color-accent);border-radius:4px"></div>
+              </div>
+              <span style="font-weight:600;font-size:var(--text-sm);min-width:80px;text-align:right">${formatCurrency(s.total_spent)}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      ` : ''}
+
+      <!-- Top items -->
+      ${data.top_items.length > 0 ? `
+      <h3 style="font-size:var(--text-sm);margin-bottom:var(--space-2)">Top articles achetés</h3>
+      <div style="max-height:200px;overflow-y:auto;margin-bottom:var(--space-4)">
+        ${data.top_items.slice(0, 10).map(item => `
+          <div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:var(--text-sm)">
+            <span style="flex:1;font-weight:500">${escapeHtml(item.ingredient_name || 'Inconnu')}</span>
+            <span style="color:var(--text-secondary);margin-right:12px">${item.total_qty} ${item.unit || ''}</span>
+            <span style="font-weight:600">${formatCurrency(item.total_spent)}</span>
+          </div>
+        `).join('')}
+      </div>
+      ` : ''}
+
+      <div style="font-size:var(--text-xs);color:var(--text-tertiary);text-align:center;margin-top:var(--space-3)">
+        Période : ${data.period_days} derniers jours · ${data.overall.supplier_count} fournisseur(s) actif(s)
+      </div>
+    `;
+  } catch (e) {
+    const el = document.getElementById('po-analytics-content');
+    if (el) el.innerHTML = `<p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>`;
+  }
 }
