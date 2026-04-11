@@ -1,6 +1,9 @@
 const { Router } = require('express');
 const { all, get, run } = require('../db');
+const { requireAuth } = require('./auth');
 const router = Router();
+
+router.use(requireAuth);
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
@@ -673,6 +676,185 @@ router.get('/price-alerts', (req, res) => {
   } catch (e) {
     console.error('Price alerts error:', e);
     res.status(500).json({ error: 'Erreur alertes prix' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// GET /api/analytics/menu-engineering
+// Matrice BCG adaptée restauration :
+// Star (haute marge + populaire), Puzzle (haute marge + peu vendu),
+// Plowhorse (faible marge + populaire), Dog (faible marge + peu vendu)
+// ═══════════════════════════════════════════
+router.get('/menu-engineering', (req, res) => {
+  try {
+    const days = Number(req.query.days) || 30;
+    const dateFrom = new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
+
+    // 1. Get all recipes with cost data
+    const recipes = all(`
+      SELECT r.id, r.name, r.category, r.selling_price, r.recipe_type,
+        COALESCE((
+          SELECT SUM(
+            ri.gross_quantity * COALESCE(
+              (SELECT sp.price / CASE
+                WHEN sp.unit = 'kg' THEN 1000
+                WHEN sp.unit = 'L' THEN 1000
+                ELSE 1
+              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1),
+              0
+            )
+          )
+          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id
+        ), 0) as cost
+      FROM recipes r
+      WHERE r.selling_price > 0
+    `);
+
+    // 2. Get sales data per recipe
+    let salesData = {};
+    try {
+      const sales = all(`
+        SELECT oi.recipe_id, SUM(oi.quantity) as qty_sold, COUNT(DISTINCT o.id) as order_count
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.status NOT IN ('annulé', 'cancelled')
+          AND date(o.created_at) >= ?
+        GROUP BY oi.recipe_id
+      `, [dateFrom]);
+      for (const s of sales) {
+        salesData[s.recipe_id] = { qty_sold: s.qty_sold, order_count: s.order_count };
+      }
+    } catch { salesData = {}; }
+
+    // 3. Calculate metrics per recipe
+    const items = [];
+    let totalQtySold = 0;
+    let totalMarginWeighted = 0;
+
+    for (const r of recipes) {
+      const sales = salesData[r.id] || { qty_sold: 0, order_count: 0 };
+      const cost = r.cost || 0;
+      const margin = r.selling_price - cost;
+      const marginPct = r.selling_price > 0 ? (margin / r.selling_price) * 100 : 0;
+      const foodCostPct = r.selling_price > 0 ? (cost / r.selling_price) * 100 : 0;
+      const totalRevenue = sales.qty_sold * r.selling_price;
+      const totalProfit = sales.qty_sold * margin;
+
+      totalQtySold += sales.qty_sold;
+      totalMarginWeighted += margin * sales.qty_sold;
+
+      items.push({
+        id: r.id,
+        name: r.name,
+        category: r.category || 'Non classé',
+        recipe_type: r.recipe_type,
+        selling_price: r.selling_price,
+        cost: Math.round(cost * 100) / 100,
+        margin: Math.round(margin * 100) / 100,
+        margin_pct: Math.round(marginPct * 10) / 10,
+        food_cost_pct: Math.round(foodCostPct * 10) / 10,
+        qty_sold: sales.qty_sold,
+        order_count: sales.order_count,
+        total_revenue: Math.round(totalRevenue * 100) / 100,
+        total_profit: Math.round(totalProfit * 100) / 100
+      });
+    }
+
+    // 4. Calculate averages for classification
+    const avgMargin = totalQtySold > 0 ? totalMarginWeighted / totalQtySold : 0;
+    const avgQtySold = items.length > 0 ? totalQtySold / items.length : 0;
+
+    // 5. Classify each item in the BCG matrix
+    for (const item of items) {
+      const highMargin = item.margin >= avgMargin;
+      const highPopularity = item.qty_sold >= avgQtySold * 0.7; // 70% threshold
+
+      if (highMargin && highPopularity) {
+        item.classification = 'star';
+        item.label = 'Star';
+        item.emoji = '⭐';
+        item.advice = 'Mettre en avant sur la carte, maintenir la qualité';
+      } else if (highMargin && !highPopularity) {
+        item.classification = 'puzzle';
+        item.label = 'Puzzle';
+        item.emoji = '🧩';
+        item.advice = 'Promouvoir davantage, repositionner sur la carte';
+      } else if (!highMargin && highPopularity) {
+        item.classification = 'plowhorse';
+        item.label = 'Plowhorse';
+        item.emoji = '🐴';
+        item.advice = 'Réduire le coût matière ou augmenter le prix';
+      } else {
+        item.classification = 'dog';
+        item.label = 'Dog';
+        item.emoji = '🐕';
+        item.advice = 'Envisager de retirer ou refondre complètement';
+      }
+    }
+
+    // Sort by total profit descending
+    items.sort((a, b) => b.total_profit - a.total_profit);
+
+    // 6. Category breakdown
+    const categories = {};
+    for (const item of items) {
+      const cat = item.category;
+      if (!categories[cat]) {
+        categories[cat] = { star: 0, puzzle: 0, plowhorse: 0, dog: 0, total_revenue: 0, total_profit: 0 };
+      }
+      categories[cat][item.classification]++;
+      categories[cat].total_revenue += item.total_revenue;
+      categories[cat].total_profit += item.total_profit;
+    }
+
+    // 7. Summary stats
+    const summary = {
+      period_days: days,
+      total_recipes: items.length,
+      stars: items.filter(i => i.classification === 'star').length,
+      puzzles: items.filter(i => i.classification === 'puzzle').length,
+      plowhorses: items.filter(i => i.classification === 'plowhorse').length,
+      dogs: items.filter(i => i.classification === 'dog').length,
+      avg_margin: Math.round(avgMargin * 100) / 100,
+      avg_qty_sold: Math.round(avgQtySold * 10) / 10,
+      total_revenue: Math.round(items.reduce((s, i) => s + i.total_revenue, 0) * 100) / 100,
+      total_profit: Math.round(items.reduce((s, i) => s + i.total_profit, 0) * 100) / 100
+    };
+
+    // 8. AI recommendations (quick rules-based)
+    const recommendations = [];
+
+    const topDogs = items.filter(i => i.classification === 'dog').slice(0, 3);
+    if (topDogs.length > 0) {
+      recommendations.push({
+        type: 'remove',
+        severity: 'warning',
+        message: `${topDogs.map(d => d.name).join(', ')} : faible marge ET faible popularité. Envisager de les retirer ou de les refondre.`
+      });
+    }
+
+    const topPlowhorses = items.filter(i => i.classification === 'plowhorse' && i.food_cost_pct > 35).slice(0, 3);
+    if (topPlowhorses.length > 0) {
+      recommendations.push({
+        type: 'optimize',
+        severity: 'info',
+        message: `${topPlowhorses.map(p => `${p.name} (FC: ${p.food_cost_pct}%)`).join(', ')} : populaires mais trop coûteux. Négocier les prix matières ou ajuster les portions.`
+      });
+    }
+
+    const topPuzzles = items.filter(i => i.classification === 'puzzle').slice(0, 3);
+    if (topPuzzles.length > 0) {
+      recommendations.push({
+        type: 'promote',
+        severity: 'info',
+        message: `${topPuzzles.map(p => p.name).join(', ')} : excellente marge mais peu vendus. Les mettre en suggestion du jour ou les repositionner sur la carte.`
+      });
+    }
+
+    res.json({ summary, items, categories, recommendations });
+  } catch (e) {
+    console.error('Menu engineering error:', e);
+    res.status(500).json({ error: 'Erreur analyse menu engineering' });
   }
 });
 

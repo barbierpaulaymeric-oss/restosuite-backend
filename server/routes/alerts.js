@@ -1,6 +1,9 @@
 const { Router } = require('express');
 const { all, get } = require('../db');
+const { requireAuth } = require('./auth');
 const router = Router();
+
+router.use(requireAuth);
 
 router.get('/daily-summary', (req, res) => {
   // 1. DLC alerts (≤ 3 days)

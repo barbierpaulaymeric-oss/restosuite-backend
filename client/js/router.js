@@ -101,7 +101,7 @@ const Router = {
     // 404 fallback
     document.getElementById('app').innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">🤷</div>
+        <div class="empty-icon"><i data-lucide="search-x" style="width:48px;height:48px;color:var(--text-tertiary)"></i></div>
         <p>Page introuvable</p>
         <a href="#/" class="btn btn-primary">Retour aux fiches</a>
       </div>

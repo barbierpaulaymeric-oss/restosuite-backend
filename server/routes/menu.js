@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const { all, get, run, db } = require('../db');
+const { requireAuth } = require('./auth');
 const router = Router();
 
 // ═══════════════════════════════════════════
@@ -95,6 +96,9 @@ router.post('/order', (req, res) => {
     res.status(500).json({ error: 'Erreur création commande' });
   }
 });
+
+// ─── Auth middleware: all routes below require authentication ───
+router.use(requireAuth);
 
 // ═══════════════════════════════════════════
 // GET /api/menu/pending-orders — Commandes QR en attente

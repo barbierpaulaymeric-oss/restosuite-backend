@@ -298,6 +298,32 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe_id ON recipe_ingredients(recipe_id);
+  CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_ingredient_id ON recipe_ingredients(ingredient_id);
+  CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_sub_recipe_id ON recipe_ingredients(sub_recipe_id);
+  CREATE INDEX IF NOT EXISTS idx_supplier_prices_ingredient_id ON supplier_prices(ingredient_id);
+  CREATE INDEX IF NOT EXISTS idx_supplier_prices_supplier_id ON supplier_prices(supplier_id);
+  CREATE INDEX IF NOT EXISTS idx_supplier_prices_last_updated ON supplier_prices(last_updated);
+  CREATE INDEX IF NOT EXISTS idx_stock_ingredient_id ON stock(ingredient_id);
+  CREATE INDEX IF NOT EXISTS idx_stock_movements_ingredient_id ON stock_movements(ingredient_id);
+  CREATE INDEX IF NOT EXISTS idx_stock_movements_recorded_at ON stock_movements(recorded_at);
+  CREATE INDEX IF NOT EXISTS idx_stock_movements_type ON stock_movements(movement_type);
+  CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+  CREATE INDEX IF NOT EXISTS idx_order_items_recipe_id ON order_items(recipe_id);
+  CREATE INDEX IF NOT EXISTS idx_orders_restaurant_id ON orders(restaurant_id);
+  CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
+  CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+  CREATE INDEX IF NOT EXISTS idx_price_history_ingredient_id ON price_history(ingredient_id);
+  CREATE INDEX IF NOT EXISTS idx_price_history_recorded_at ON price_history(recorded_at);
+  CREATE INDEX IF NOT EXISTS idx_temperature_logs_zone_id ON temperature_logs(zone_id);
+  CREATE INDEX IF NOT EXISTS idx_temperature_logs_recorded_at ON temperature_logs(recorded_at);
+  CREATE INDEX IF NOT EXISTS idx_cleaning_logs_task_id ON cleaning_logs(task_id);
+  CREATE INDEX IF NOT EXISTS idx_accounts_restaurant_id ON accounts(restaurant_id);
+  CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(reservation_date);
+  CREATE INDEX IF NOT EXISTS idx_customers_restaurant_id ON customers(restaurant_id);
+`);
+
 // ─── HACCP: Seed default zones & cleaning tasks ───
 const zoneCount = get('SELECT COUNT(*) as c FROM temperature_zones');
 if (zoneCount && zoneCount.c === 0) {
@@ -676,6 +702,22 @@ try {
   }
 } catch (e) {
   console.error('Migration custom_roles error:', e.message);
+}
+
+// ─── Migration: Add restaurant_id to orders (required for multi-site & analytics) ───
+try {
+  const orderCols = all("PRAGMA table_info(orders)");
+  if (!orderCols.some(c => c.name === 'restaurant_id')) {
+    db.exec("ALTER TABLE orders ADD COLUMN restaurant_id INTEGER REFERENCES restaurants(id)");
+    // Backfill existing orders: assign to first restaurant if exists
+    const firstRestaurant = get('SELECT id FROM restaurants LIMIT 1');
+    if (firstRestaurant) {
+      db.exec(`UPDATE orders SET restaurant_id = ${firstRestaurant.id} WHERE restaurant_id IS NULL`);
+    }
+    console.log('✅ Migration: added restaurant_id to orders');
+  }
+} catch (e) {
+  console.error('Migration orders restaurant_id error:', e.message);
 }
 
 // ─── Seed: Common ingredients with prices ───

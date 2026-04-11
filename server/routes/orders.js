@@ -1,7 +1,11 @@
 const { Router } = require('express');
 const { all, get, run, db } = require('../db');
 const { getFlatIngredients } = require('./recipes');
+const { convertUnit } = require('../utils/units');
+const { requireAuth } = require('./auth');
 const router = Router();
+
+router.use(requireAuth);
 
 // ═══════════════════════════════════════════
 // GET /api/orders — Liste des commandes
@@ -54,7 +58,21 @@ router.get('/:id', (req, res) => {
 // ═══════════════════════════════════════════
 router.post('/', (req, res) => {
   try {
-    const { table_number, items, notes } = req.body;
+    const { table_number, items, notes, restaurant_id } = req.body;
+
+    // Resolve restaurant_id: from body, or from auth token if available
+    let resolvedRestaurantId = restaurant_id || null;
+    if (!resolvedRestaurantId && req.headers.authorization) {
+      try {
+        const jwt = require('jsonwebtoken');
+        const token = req.headers.authorization.replace('Bearer ', '');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'restosuite-dev-secret-2026');
+        if (decoded.id) {
+          const account = get('SELECT restaurant_id FROM accounts WHERE id = ?', [decoded.id]);
+          if (account) resolvedRestaurantId = account.restaurant_id;
+        }
+      } catch { /* token invalid or missing — ok, restaurant_id stays null */ }
+    }
 
     if (!table_number) return res.status(400).json({ error: 'table_number requis' });
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -84,8 +102,8 @@ router.post('/', (req, res) => {
       }
 
       const orderInfo = run(
-        'INSERT INTO orders (table_number, notes, total_cost) VALUES (?, ?, ?)',
-        [table_number, notes || null, Math.round(totalCost * 100) / 100]
+        'INSERT INTO orders (table_number, notes, total_cost, restaurant_id) VALUES (?, ?, ?, ?)',
+        [table_number, notes || null, Math.round(totalCost * 100) / 100, resolvedRestaurantId]
       );
       const orderId = orderInfo.lastInsertRowid;
 
@@ -152,11 +170,21 @@ router.put('/:id/items/:itemId', (req, res) => {
 
   run('UPDATE order_items SET status = ? WHERE id = ?', [status, itemId]);
 
-  // Auto-update order status: if all items are 'prêt', order becomes 'prêt'
+  // Auto-update order status based on item statuses
   const allItems = all('SELECT status FROM order_items WHERE order_id = ?', [orderId]);
-  const allReady = allItems.every(i => i.status === 'prêt' || i.status === 'servi' || i.status === 'annulé');
-  if (allReady && allItems.some(i => i.status === 'prêt')) {
-    run("UPDATE orders SET status = 'prêt', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [orderId]);
+  const activeItems = allItems.filter(i => i.status !== 'annulé');
+
+  if (activeItems.length > 0) {
+    const allServi = activeItems.every(i => i.status === 'servi');
+    const allReadyOrServi = activeItems.every(i => i.status === 'prêt' || i.status === 'servi');
+
+    if (allServi) {
+      // All items served → order is 'servi'
+      run("UPDATE orders SET status = 'servi', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [orderId]);
+    } else if (allReadyOrServi && activeItems.some(i => i.status === 'prêt')) {
+      // All items ready (some prêt, some servi) → order is 'prêt'
+      run("UPDATE orders SET status = 'prêt', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [orderId]);
+    }
   }
 
   const order = get('SELECT * FROM orders WHERE id = ?', [orderId]);
@@ -199,29 +227,33 @@ router.post('/:id/send', (req, res) => {
         const stock = get('SELECT * FROM stock WHERE ingredient_id = ?', [fi.ingredient_id]);
         const currentQty = stock ? stock.quantity : 0;
 
-        if (currentQty < fi.quantity) {
+        // Convert recipe unit to stock unit if needed (e.g., recipe in g, stock in kg)
+        const stockUnit = stock ? stock.unit : fi.unit;
+        const deductQty = convertUnit(fi.quantity, fi.unit, stockUnit);
+
+        if (currentQty < deductQty) {
           const ingName = get('SELECT name FROM ingredients WHERE id = ?', [fi.ingredient_id]);
           warnings.push({
             ingredient_id: fi.ingredient_id,
             ingredient_name: ingName ? ingName.name : `#${fi.ingredient_id}`,
-            needed: Math.round(fi.quantity * 1000) / 1000,
+            needed: Math.round(deductQty * 1000) / 1000,
             available: Math.round(currentQty * 1000) / 1000,
-            unit: fi.unit
+            unit: stockUnit
           });
         }
 
-        // Record movement
+        // Record movement (in stock unit for consistency)
         run(
           `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, recorded_at)
            VALUES (?, 'consumption', ?, ?, ?, CURRENT_TIMESTAMP)`,
-          [fi.ingredient_id, fi.quantity, fi.unit, `Commande #${id} - Table ${order.table_number}`]
+          [fi.ingredient_id, deductQty, stockUnit, `Commande #${id} - Table ${order.table_number}`]
         );
 
         // Deduct from stock
         if (stock) {
           run(
             'UPDATE stock SET quantity = MAX(0, quantity - ?), last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
-            [fi.quantity, fi.ingredient_id]
+            [deductQty, fi.ingredient_id]
           );
         }
       }
@@ -249,17 +281,101 @@ router.post('/:id/send', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
+// POST /api/orders/:id/close — Fermer/terminer une commande (table payée)
+// ═══════════════════════════════════════════
+router.post('/:id/close', (req, res) => {
+  const id = Number(req.params.id);
+  const order = get('SELECT * FROM orders WHERE id = ?', [id]);
+  if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+
+  if (order.status === 'annulé') {
+    return res.status(400).json({ error: 'Commande déjà annulée' });
+  }
+  if (order.status === 'terminé') {
+    return res.status(400).json({ error: 'Commande déjà terminée' });
+  }
+
+  run("UPDATE orders SET status = 'terminé', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [id]);
+
+  // Mark all non-cancelled items as 'servi' if not already
+  run("UPDATE order_items SET status = 'servi' WHERE order_id = ? AND status NOT IN ('annulé', 'servi')", [id]);
+
+  const updated = get('SELECT * FROM orders WHERE id = ?', [id]);
+  const items = all(`
+    SELECT oi.*, r.name as recipe_name, r.selling_price
+    FROM order_items oi
+    JOIN recipes r ON r.id = oi.recipe_id
+    WHERE oi.order_id = ?
+  `, [id]);
+
+  res.json({ ...updated, items });
+});
+
+// ═══════════════════════════════════════════
 // DELETE /api/orders/:id — Annuler une commande
+// Restaure le stock si la commande avait déjà été envoyée en cuisine
 // ═══════════════════════════════════════════
 router.delete('/:id', (req, res) => {
   const id = Number(req.params.id);
   const order = get('SELECT * FROM orders WHERE id = ?', [id]);
   if (!order) return res.status(404).json({ error: 'Commande introuvable' });
 
-  run("UPDATE orders SET status = 'annulé', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [id]);
-  run("UPDATE order_items SET status = 'annulé' WHERE order_id = ?", [id]);
+  const stockRestored = [];
 
-  res.json({ success: true, cancelled: true });
+  const transaction = db.transaction(() => {
+    // If order was already sent to kitchen, stock was deducted — restore it
+    if (order.status === 'envoyé' || order.status === 'prêt' || order.status === 'servi') {
+      const items = all('SELECT * FROM order_items WHERE order_id = ? AND status != ?', [id, 'annulé']);
+
+      for (const item of items) {
+        const flatIngredients = getFlatIngredients(item.recipe_id, item.quantity);
+
+        for (const fi of flatIngredients) {
+          // Restore stock (convert to stock unit)
+          const stock = get('SELECT * FROM stock WHERE ingredient_id = ?', [fi.ingredient_id]);
+          const stockUnit = stock ? stock.unit : fi.unit;
+          const restoreQty = convertUnit(fi.quantity, fi.unit, stockUnit);
+
+          if (stock) {
+            run(
+              'UPDATE stock SET quantity = quantity + ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
+              [restoreQty, fi.ingredient_id]
+            );
+          }
+
+          // Record correction movement for traceability
+          run(
+            `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, recorded_at)
+             VALUES (?, 'correction', ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [fi.ingredient_id, restoreQty, stockUnit, `Annulation commande #${id} - Table ${order.table_number}`]
+          );
+
+          const ingName = get('SELECT name FROM ingredients WHERE id = ?', [fi.ingredient_id]);
+          stockRestored.push({
+            ingredient_id: fi.ingredient_id,
+            ingredient_name: ingName ? ingName.name : `#${fi.ingredient_id}`,
+            quantity_restored: Math.round(restoreQty * 1000) / 1000,
+            unit: stockUnit
+          });
+        }
+      }
+    }
+
+    // Mark order and items as cancelled
+    run("UPDATE orders SET status = 'annulé', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [id]);
+    run("UPDATE order_items SET status = 'annulé' WHERE order_id = ?", [id]);
+  });
+
+  try {
+    transaction();
+    res.json({
+      success: true,
+      cancelled: true,
+      stock_restored: stockRestored.length > 0 ? stockRestored : undefined
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur lors de l\'annulation', details: e.message });
+  }
 });
 
 module.exports = router;

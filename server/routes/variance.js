@@ -1,6 +1,9 @@
 const { Router } = require('express');
 const { all, get, run } = require('../db');
+const { requireAuth } = require('./auth');
 const router = Router();
+
+router.use(requireAuth);
 
 // ═══════════════════════════════════════════
 // Analyse de variance (théorique vs réel)
@@ -27,26 +30,22 @@ router.get('/analysis', (req, res) => {
       ORDER BY sm.ingredient_id
     `, [dateFrom, dateTo]);
 
-    // 2. Get all orders served in the period (if orders table tracks this)
-    const ordersServed = all(`
-      SELECT oi.recipe_id, SUM(oi.quantity) as qty_served
-      FROM order_items oi
-      JOIN orders o ON o.id = oi.order_id
-      WHERE o.status = 'completed' AND date(o.created_at) BETWEEN ? AND ?
-      GROUP BY oi.recipe_id
-    `, [dateFrom, dateTo]).catch ? [] : (() => {
-      try {
-        return all(`
-          SELECT oi.recipe_id, SUM(oi.quantity) as qty_served
-          FROM order_items oi
-          JOIN orders o ON o.id = oi.order_id
-          WHERE o.status = 'completed' AND date(o.created_at) BETWEEN ? AND ?
-          GROUP BY oi.recipe_id
-        `, [dateFrom, dateTo]);
-      } catch {
-        return [];
-      }
-    })();
+    // 2. Get all orders served in the period
+    // Orders that were sent to kitchen (stock was deducted at 'envoyé' status)
+    // Exclude cancelled orders since their stock is restored (see orders.js)
+    let ordersServed = [];
+    try {
+      ordersServed = all(`
+        SELECT oi.recipe_id, SUM(oi.quantity) as qty_served
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.status IN ('envoyé', 'prêt', 'servi', 'terminé')
+          AND date(o.created_at) BETWEEN ? AND ?
+        GROUP BY oi.recipe_id
+      `, [dateFrom, dateTo]);
+    } catch {
+      ordersServed = [];
+    }
 
     // 3. Calculate theoretical consumption per ingredient
     const theoreticalConsumption = {};
@@ -73,7 +72,7 @@ router.get('/analysis', (req, res) => {
 
     for (const m of movements) {
       const key = m.ingredient_id;
-      if (m.movement_type === 'sortie' || m.movement_type === 'vente' || m.movement_type === 'perte') {
+      if (m.movement_type === 'sortie' || m.movement_type === 'vente' || m.movement_type === 'perte' || m.movement_type === 'consumption') {
         if (!actualConsumption[key]) {
           actualConsumption[key] = {
             ingredient_id: key,
@@ -87,6 +86,11 @@ router.get('/analysis', (req, res) => {
           actualConsumption[key].losses += Math.abs(m.quantity);
         }
         actualConsumption[key].actual_qty += Math.abs(m.quantity);
+      } else if (m.movement_type === 'correction') {
+        // Corrections from cancelled orders — reduce actual consumption
+        if (actualConsumption[key]) {
+          actualConsumption[key].actual_qty = Math.max(0, actualConsumption[key].actual_qty - Math.abs(m.quantity));
+        }
       } else if (m.movement_type === 'entree' || m.movement_type === 'reception') {
         if (!entries[key]) {
           entries[key] = { total_qty: 0, total_value: 0 };
@@ -248,5 +252,86 @@ function getRecipeFlatIngredients(recipeId, multiplier = 1, visited = new Set())
 
   return result;
 }
+
+// GET /api/variance/top-losses — Top pertes pour le dashboard
+router.get('/top-losses', (req, res) => {
+  try {
+    const days = Number(req.query.days) || 30;
+    const dateFrom = new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
+
+    const topLosses = all(`
+      SELECT sm.ingredient_id, i.name as ingredient_name,
+             SUM(ABS(sm.quantity)) as total_lost_qty, sm.unit,
+             COALESCE(i.price_per_unit, 0) as price_per_unit,
+             SUM(ABS(sm.quantity) * COALESCE(i.price_per_unit, 0)) as total_loss_value,
+             COUNT(*) as loss_events
+      FROM stock_movements sm
+      LEFT JOIN ingredients i ON i.id = sm.ingredient_id
+      WHERE sm.movement_type = 'perte' AND date(sm.recorded_at) >= ?
+      GROUP BY sm.ingredient_id
+      ORDER BY total_loss_value DESC
+      LIMIT 10
+    `, [dateFrom]);
+
+    res.json({
+      period_days: days,
+      items: topLosses.map(l => ({
+        ...l,
+        total_lost_qty: Math.round(l.total_lost_qty * 1000) / 1000,
+        total_loss_value: Math.round(l.total_loss_value * 100) / 100
+      }))
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/variance/trends — Évolution des pertes dans le temps
+router.get('/trends', (req, res) => {
+  try {
+    const days = Number(req.query.days) || 90;
+    const dateFrom = new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
+
+    const weeklyLosses = all(`
+      SELECT strftime('%Y-W%W', sm.recorded_at) as week,
+             SUM(ABS(sm.quantity) * COALESCE(i.price_per_unit, 0)) as loss_value,
+             COUNT(DISTINCT sm.ingredient_id) as ingredients_impacted,
+             COUNT(*) as events
+      FROM stock_movements sm
+      LEFT JOIN ingredients i ON i.id = sm.ingredient_id
+      WHERE sm.movement_type = 'perte' AND date(sm.recorded_at) >= ?
+      GROUP BY week
+      ORDER BY week
+    `, [dateFrom]);
+
+    const weeklyPurchases = all(`
+      SELECT strftime('%Y-W%W', sm.recorded_at) as week,
+             SUM(sm.quantity * COALESCE(sm.unit_price, 0)) as purchase_value
+      FROM stock_movements sm
+      WHERE sm.movement_type IN ('entree', 'reception') AND date(sm.recorded_at) >= ?
+      GROUP BY week
+      ORDER BY week
+    `, [dateFrom]);
+
+    // Merge data
+    const purchaseMap = {};
+    for (const p of weeklyPurchases) purchaseMap[p.week] = p.purchase_value;
+
+    const trends = weeklyLosses.map(w => ({
+      week: w.week,
+      loss_value: Math.round(w.loss_value * 100) / 100,
+      purchase_value: Math.round((purchaseMap[w.week] || 0) * 100) / 100,
+      loss_ratio: purchaseMap[w.week] > 0
+        ? Math.round(w.loss_value / purchaseMap[w.week] * 10000) / 100
+        : 0,
+      ingredients_impacted: w.ingredients_impacted,
+      events: w.events
+    }));
+
+    res.json({ period_days: days, trends });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 module.exports = router;

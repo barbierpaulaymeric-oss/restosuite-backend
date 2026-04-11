@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const { all, get, run } = require('../db');
+const { requireAuth } = require('./auth');
 const router = Router();
 
 // ═══════════════════════════════════════════
@@ -28,7 +29,7 @@ router.get('/', (req, res) => {
 });
 
 // GET /api/allergens/ingredients/:id — Allergènes d'un ingrédient (parsed from text field)
-router.get('/ingredients/:id', (req, res) => {
+router.get('/ingredients/:id', requireAuth, (req, res) => {
   try {
     const ingredient = get('SELECT allergens FROM ingredients WHERE id = ?', [Number(req.params.id)]);
     if (!ingredient) return res.status(404).json({ error: 'Ingrédient non trouvé' });
@@ -41,7 +42,7 @@ router.get('/ingredients/:id', (req, res) => {
 });
 
 // PUT /api/allergens/ingredients/:id — Mettre à jour les allergènes d'un ingrédient
-router.put('/ingredients/:id', (req, res) => {
+router.put('/ingredients/:id', requireAuth, (req, res) => {
   try {
     const id = Number(req.params.id);
     const ingredient = get('SELECT * FROM ingredients WHERE id = ?', [id]);
@@ -79,7 +80,7 @@ router.put('/ingredients/:id', (req, res) => {
 });
 
 // GET /api/allergens/recipes/:id — Allergènes calculés automatiquement pour une recette
-router.get('/recipes/:id', (req, res) => {
+router.get('/recipes/:id', requireAuth, (req, res) => {
   try {
     const recipeId = Number(req.params.id);
     const recipe = get('SELECT * FROM recipes WHERE id = ?', [recipeId]);
@@ -179,3 +180,5 @@ function getRecipeAllergens(recipeId, visited = new Set()) {
 }
 
 module.exports = router;
+module.exports.INCO_ALLERGENS = INCO_ALLERGENS;
+module.exports.getRecipeAllergens = getRecipeAllergens;

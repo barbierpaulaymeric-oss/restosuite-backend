@@ -3,7 +3,7 @@
    Dark mode par défaut · Mobile-first · Touch-optimized
    ═══════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ─── Design Tokens ─── */
 :root {
@@ -35,12 +35,12 @@
   --bg-sunken: #0A1019;
   --text-primary: #F7F5F2;
   --text-secondary: #9CA3AF;
-  --text-tertiary: #6B7280;
+  --text-tertiary: #8B95A7;
   --border-default: #2A3F6B;
   --border-light: #1E3055;
 
   /* Font families */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 
   /* Scale — Mobile first */
@@ -82,15 +82,15 @@
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.15);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 35, 0.2);
+  --shadow-md: 0 4px 12px rgba(15, 23, 35, 0.25);
+  --shadow-lg: 0 8px 24px rgba(15, 23, 35, 0.35);
   --shadow-accent: 0 4px 16px rgba(232, 114, 42, 0.3);
 
   /* Transitions */
-  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-base: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Z-index */
   --z-dropdown: 10;
@@ -462,8 +462,8 @@ h3 {
 }
 
 .card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(27, 42, 74, 0.3);
+  transform: translateY(-2px);
 }
 
 .card:active {
@@ -563,7 +563,8 @@ h3 {
   transition: all var(--transition-fast);
   text-decoration: none;
   white-space: nowrap;
-  min-height: 44px;
+  min-height: 48px;
+  min-width: 48px;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -582,7 +583,7 @@ h3 {
   transform: translateY(-1px);
 }
 .btn-primary:active {
-  transform: translateY(0) scale(0.97);
+  transform: translateY(0) scale(0.98);
   box-shadow: var(--shadow-sm);
 }
 
@@ -1140,7 +1141,8 @@ tr:has(td[colspan]) td {
   width: 100%;
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 12px 40px rgba(15, 23, 35, 0.5);
+  box-shadow: 0 12px 40px rgba(15, 23, 35, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .modal h2 {
@@ -3812,8 +3814,8 @@ tr:has(td[colspan]) td {
   flex-shrink: 0;
 }
 .svc-qty-btn {
-  width: 40px;
-  height: 40px;
+  min-width: 48px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5030,4 +5032,53 @@ body.role-salle { padding-top: 0 !important; padding-bottom: 0 !important; }
 
 .svc-table-orders {
   margin-top: 8px;
+}
+
+/* ─── Accessibility: Touch Targets ─── */
+.kitchen-item__actions button,
+.kitchen-ticket button,
+.svc-shell button {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+/* Quantity controls in service mode */
+.svc-qty-btn,
+.qty-btn {
+  min-height: 48px;
+  min-width: 48px;
+  font-size: var(--text-lg);
+}
+
+/* ─── Accessibility: Focus Visible ─── */
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(232, 114, 42, 0.2);
+}
+
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 0;
+  background: var(--color-accent);
+  color: white;
+  padding: 8px 16px;
+  z-index: 10000;
+  font-weight: 600;
+  border-radius: 0 0 8px 0;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 0;
 }

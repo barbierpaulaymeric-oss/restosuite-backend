@@ -13322,7 +13322,7 @@ const Router = {
     }
     document.getElementById("app").innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">\u{1F937}</div>
+        <div class="empty-icon"><i data-lucide="search-x" style="width:48px;height:48px;color:var(--text-tertiary)"></i></div>
         <p>Page introuvable</p>
         <a href="#/" class="btn btn-primary">Retour aux fiches</a>
       </div>
@@ -13464,10 +13464,10 @@ function renderTrialHeaderBadge() {
   let badgeClass, label;
   if (daysLeft <= 3) {
     badgeClass = "trial-header-badge--red";
-    label = `\u{1F534} Essai : ${daysLeft}j \u2014 Passer en Pro`;
+    label = `Essai : ${daysLeft}j \u2014 Passer en Pro`;
   } else if (daysLeft <= 14) {
     badgeClass = "trial-header-badge--yellow";
-    label = `\u26A0\uFE0F Essai : ${daysLeft}j`;
+    label = `Essai : ${daysLeft}j`;
   } else {
     badgeClass = "trial-header-badge--green";
     label = `Essai : ${daysLeft}j restants`;

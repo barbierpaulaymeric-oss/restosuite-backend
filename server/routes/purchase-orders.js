@@ -1,6 +1,9 @@
 const { Router } = require('express');
 const { all, get, run, db } = require('../db');
+const { requireAuth } = require('./auth');
 const router = Router();
+
+router.use(requireAuth);
 
 // GET /api/purchase-orders — List all purchase orders
 router.get('/', (req, res) => {
@@ -80,6 +83,114 @@ router.get('/suggest', (req, res) => {
     }
 
     res.json(Object.values(bySupplier));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════
+// GET /api/purchase-orders/analytics — Statistiques d'achat
+// IMPORTANT: Must be BEFORE /:id
+// ═══════════════════════════════════════════
+router.get('/analytics', (req, res) => {
+  try {
+    const { period } = req.query;
+    const days = period === '90' ? 90 : period === '30' ? 30 : 60;
+    const dateFrom = new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
+
+    // Total spending by supplier
+    const bySupplier = all(`
+      SELECT s.id as supplier_id, s.name as supplier_name,
+             COUNT(po.id) as order_count,
+             COALESCE(SUM(po.total_amount), 0) as total_spent,
+             AVG(po.total_amount) as avg_order
+      FROM purchase_orders po
+      JOIN suppliers s ON s.id = po.supplier_id
+      WHERE po.status = 'réceptionnée' AND date(po.created_at) >= ?
+      GROUP BY s.id
+      ORDER BY total_spent DESC
+    `, [dateFrom]);
+
+    // Monthly trend
+    const monthlyTrend = all(`
+      SELECT strftime('%Y-%m', created_at) as month,
+             COUNT(*) as order_count,
+             SUM(total_amount) as total_amount
+      FROM purchase_orders
+      WHERE status = 'réceptionnée' AND date(created_at) >= ?
+      GROUP BY month
+      ORDER BY month
+    `, [dateFrom]);
+
+    // Top purchased items
+    const topItems = all(`
+      SELECT poi.ingredient_id, i.name as ingredient_name,
+             SUM(poi.quantity) as total_qty, poi.unit,
+             AVG(poi.unit_price) as avg_price,
+             SUM(poi.total_price) as total_spent,
+             COUNT(DISTINCT po.id) as order_count
+      FROM purchase_order_items poi
+      JOIN purchase_orders po ON po.id = poi.purchase_order_id
+      LEFT JOIN ingredients i ON i.id = poi.ingredient_id
+      WHERE po.status = 'réceptionnée' AND date(po.created_at) >= ?
+      GROUP BY poi.ingredient_id
+      ORDER BY total_spent DESC
+      LIMIT 20
+    `, [dateFrom]);
+
+    // Overall stats
+    const overall = get(`
+      SELECT COUNT(*) as total_orders,
+             COALESCE(SUM(total_amount), 0) as total_spent,
+             COALESCE(AVG(total_amount), 0) as avg_order,
+             COUNT(DISTINCT supplier_id) as supplier_count
+      FROM purchase_orders
+      WHERE status = 'réceptionnée' AND date(created_at) >= ?
+    `, [dateFrom]);
+
+    // Average lead time (sent → received)
+    const leadTime = get(`
+      SELECT AVG(julianday(received_at) - julianday(sent_at)) as avg_days
+      FROM purchase_orders
+      WHERE status = 'réceptionnée' AND sent_at IS NOT NULL AND received_at IS NOT NULL AND date(created_at) >= ?
+    `, [dateFrom]);
+
+    // Price trends for key items (last 3 prices)
+    const priceChanges = all(`
+      SELECT ph.ingredient_id, i.name as ingredient_name,
+             ph.price as current_price, ph.recorded_at,
+             (SELECT ph2.price FROM price_history ph2
+              WHERE ph2.ingredient_id = ph.ingredient_id
+              ORDER BY ph2.recorded_at DESC LIMIT 1 OFFSET 1) as previous_price
+      FROM price_history ph
+      JOIN ingredients i ON i.id = ph.ingredient_id
+      WHERE date(ph.recorded_at) >= ?
+      GROUP BY ph.ingredient_id
+      HAVING COUNT(*) >= 2
+      ORDER BY ABS(ph.price - COALESCE((SELECT ph2.price FROM price_history ph2
+        WHERE ph2.ingredient_id = ph.ingredient_id
+        ORDER BY ph2.recorded_at DESC LIMIT 1 OFFSET 1), ph.price)) DESC
+      LIMIT 10
+    `, [dateFrom]);
+
+    res.json({
+      period_days: days,
+      overall: {
+        total_orders: overall.total_orders,
+        total_spent: Math.round(overall.total_spent * 100) / 100,
+        avg_order: Math.round(overall.avg_order * 100) / 100,
+        supplier_count: overall.supplier_count,
+        avg_lead_time_days: leadTime.avg_days ? Math.round(leadTime.avg_days * 10) / 10 : null
+      },
+      by_supplier: bySupplier.map(s => ({
+        ...s,
+        total_spent: Math.round(s.total_spent * 100) / 100,
+        avg_order: Math.round(s.avg_order * 100) / 100
+      })),
+      monthly_trend: monthlyTrend,
+      top_items: topItems,
+      price_changes: priceChanges
+    });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur', details: e.message });
   }
@@ -338,6 +449,65 @@ router.delete('/:id', (req, res) => {
     run('DELETE FROM purchase_order_items WHERE purchase_order_id = ?', [id]);
     run('DELETE FROM purchase_orders WHERE id = ?', [id]);
     res.json({ deleted: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════
+// POST /api/purchase-orders/:id/clone — Dupliquer une commande
+// Crée un brouillon à partir d'une commande existante
+// ═══════════════════════════════════════════
+router.post('/:id/clone', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const po = get('SELECT * FROM purchase_orders WHERE id = ?', [id]);
+    if (!po) return res.status(404).json({ error: 'Commande introuvable' });
+
+    const items = all('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?', [id]);
+
+    const transaction = db.transaction(() => {
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const countToday = get("SELECT COUNT(*) as c FROM purchase_orders WHERE date(created_at) = date('now')");
+      const seq = String((countToday?.c || 0) + 1).padStart(3, '0');
+      const ref = `PO-${today}-${seq}`;
+
+      const result = run(
+        `INSERT INTO purchase_orders (supplier_id, reference, notes, total_amount, status)
+         VALUES (?, ?, ?, ?, 'brouillon')`,
+        [po.supplier_id, ref, `Dupliqué de ${po.reference}`, po.total_amount]
+      );
+      const newId = result.lastInsertRowid;
+
+      for (const item of items) {
+        // Fetch latest price for each ingredient
+        let latestPrice = item.unit_price;
+        if (item.ingredient_id) {
+          const sp = get('SELECT price FROM supplier_prices WHERE ingredient_id = ? AND supplier_id = ? ORDER BY last_updated DESC LIMIT 1',
+            [item.ingredient_id, po.supplier_id]);
+          if (sp) latestPrice = sp.price;
+        }
+
+        run(
+          `INSERT INTO purchase_order_items (purchase_order_id, ingredient_id, product_name, quantity, unit, unit_price, total_price, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [newId, item.ingredient_id, item.product_name, item.quantity, item.unit, latestPrice,
+           Math.round(latestPrice * item.quantity * 100) / 100, item.notes]
+        );
+      }
+
+      // Recalculate total
+      const totalResult = get('SELECT SUM(total_price) as total FROM purchase_order_items WHERE purchase_order_id = ?', [newId]);
+      run('UPDATE purchase_orders SET total_amount = ? WHERE id = ?', [totalResult.total || 0, newId]);
+
+      return newId;
+    });
+
+    const newId = transaction();
+    const newPo = get('SELECT po.*, s.name as supplier_name FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id WHERE po.id = ?', [newId]);
+    const newItems = all(`SELECT poi.*, i.name as ingredient_name FROM purchase_order_items poi LEFT JOIN ingredients i ON i.id = poi.ingredient_id WHERE poi.purchase_order_id = ?`, [newId]);
+
+    res.status(201).json({ ...newPo, items: newItems });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur', details: e.message });
   }

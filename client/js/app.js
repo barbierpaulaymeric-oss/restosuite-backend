@@ -163,10 +163,10 @@ function renderTrialHeaderBadge() {
   let badgeClass, label;
   if (daysLeft <= 3) {
     badgeClass = 'trial-header-badge--red';
-    label = `🔴 Essai : ${daysLeft}j — Passer en Pro`;
+    label = `Essai : ${daysLeft}j — Passer en Pro`;
   } else if (daysLeft <= 14) {
     badgeClass = 'trial-header-badge--yellow';
-    label = `⚠️ Essai : ${daysLeft}j`;
+    label = `Essai : ${daysLeft}j`;
   } else {
     badgeClass = 'trial-header-badge--green';
     label = `Essai : ${daysLeft}j restants`;

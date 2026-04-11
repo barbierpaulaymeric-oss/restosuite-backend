@@ -6,6 +6,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { all, get, run } = require('../db');
 const { getAccountStatusById } = require('../middleware/trial');
+const { requireAuth } = require('./auth');
 const router = express.Router();
 
 function hashPin(pin) {
@@ -55,63 +56,9 @@ function getPermissionsForRole(role) {
   }
 }
 
-// GET /api/accounts — list all accounts (no PIN)
-router.get('/', (req, res) => {
-  const accounts = all('SELECT id, name, role, permissions, created_at, last_login, CASE WHEN pin IS NOT NULL AND pin != \'\' THEN 1 ELSE 0 END as has_pin FROM accounts ORDER BY created_at ASC');
-  res.json(accounts.map(a => ({
-    ...a,
-    permissions: JSON.parse(a.permissions)
-  })));
-});
+// ─── Public routes (before auth middleware) ───
 
-// POST /api/accounts — create account
-router.post('/', (req, res) => {
-  try {
-    const { name, pin } = req.body;
-
-    if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'Le nom est requis' });
-    }
-
-    // PIN is optional — member will create their own on first login
-    const pinValue = pin && /^\d{4}$/.test(pin.toString()) ? pin : null;
-
-    // Check if this is the first account → becomes gerant
-    const existing = all('SELECT id FROM accounts');
-    const isFirst = existing.length === 0;
-    const requestedRole = req.body.role;
-    const role = isFirst ? 'gerant' : (requestedRole && VALID_ROLES.includes(requestedRole) ? requestedRole : 'equipier');
-    const permissions = getPermissionsForRole(role);
-
-    const hashedPin = pinValue ? hashPin(pinValue) : null;
-
-    // Get restaurant_id from caller if available
-    let restaurantId = null;
-    const callerId = req.body.caller_id || req.headers['x-account-id'];
-    if (callerId) {
-      const caller = get('SELECT restaurant_id FROM accounts WHERE id = ?', [callerId]);
-      if (caller) restaurantId = caller.restaurant_id;
-    }
-
-    const result = run(
-      'INSERT INTO accounts (name, pin, role, permissions, restaurant_id, trial_start) VALUES (?, ?, ?, ?, ?, datetime(\'now\'))',
-      [name.trim(), hashedPin, role, JSON.stringify(permissions), restaurantId]
-    );
-
-    const newAccountId = result.lastInsertRowid;
-
-    res.json({
-      id: newAccountId,
-      name: name.trim(),
-      role,
-      permissions
-    });
-  } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// POST /api/accounts/login — verify PIN
+// POST /api/accounts/login — verify PIN (public — legacy PIN login)
 router.post('/login', (req, res) => {
   try {
     const { id, pin } = req.body;
@@ -149,6 +96,64 @@ router.post('/login', (req, res) => {
   }
 });
 
+// ─── Auth middleware — all routes below require authentication ───
+router.use(requireAuth);
+
+// GET /api/accounts — list all accounts (no PIN)
+router.get('/', (req, res) => {
+  const accounts = all('SELECT id, name, role, permissions, created_at, last_login, CASE WHEN pin IS NOT NULL AND pin != \'\' THEN 1 ELSE 0 END as has_pin FROM accounts ORDER BY created_at ASC');
+  res.json(accounts.map(a => ({
+    ...a,
+    permissions: JSON.parse(a.permissions)
+  })));
+});
+
+// POST /api/accounts — create account
+router.post('/', (req, res) => {
+  try {
+    const { name, pin } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Le nom est requis' });
+    }
+
+    // PIN is optional — member will create their own on first login
+    const pinValue = pin && /^\d{4}$/.test(pin.toString()) ? pin : null;
+
+    // Check if this is the first account → becomes gerant
+    const existing = all('SELECT id FROM accounts');
+    const isFirst = existing.length === 0;
+    const requestedRole = req.body.role;
+    const role = isFirst ? 'gerant' : (requestedRole && VALID_ROLES.includes(requestedRole) ? requestedRole : 'equipier');
+    const permissions = getPermissionsForRole(role);
+
+    const hashedPin = pinValue ? hashPin(pinValue) : null;
+
+    // Get restaurant_id from authenticated user
+    let restaurantId = null;
+    if (req.user && req.user.id) {
+      const caller = get('SELECT restaurant_id FROM accounts WHERE id = ?', [req.user.id]);
+      if (caller) restaurantId = caller.restaurant_id;
+    }
+
+    const result = run(
+      'INSERT INTO accounts (name, pin, role, permissions, restaurant_id, trial_start) VALUES (?, ?, ?, ?, ?, datetime(\'now\'))',
+      [name.trim(), hashedPin, role, JSON.stringify(permissions), restaurantId]
+    );
+
+    const newAccountId = result.lastInsertRowid;
+
+    res.json({
+      id: newAccountId,
+      name: name.trim(),
+      role,
+      permissions
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // GET /api/accounts/:id/status — trial/subscription status
 router.get('/:id/status', (req, res) => {
   const { id } = req.params;
@@ -159,14 +164,12 @@ router.get('/:id/status', (req, res) => {
 // PUT /api/accounts/:id — update account (gerant only)
 router.put('/:id', (req, res) => {
   const { id } = req.params;
-  const { name, permissions, caller_id } = req.body;
+  const { name, permissions } = req.body;
 
-  // Verify caller is gerant
-  if (caller_id) {
-    const caller = get('SELECT role FROM accounts WHERE id = ?', [caller_id]);
-    if (!caller || caller.role !== 'gerant') {
-      return res.status(403).json({ error: 'Accès refusé — gérant uniquement' });
-    }
+  // Verify caller is gerant (using authenticated user from requireAuth)
+  const caller = get('SELECT role FROM accounts WHERE id = ?', [req.user.id]);
+  if (!caller || caller.role !== 'gerant') {
+    return res.status(403).json({ error: 'Accès refusé — gérant uniquement' });
   }
 
   const account = get('SELECT * FROM accounts WHERE id = ?', [id]);
@@ -223,14 +226,11 @@ router.put('/:id', (req, res) => {
 // This forces the member to create a new PIN on next login
 router.put('/:id/reset-pin', (req, res) => {
   const { id } = req.params;
-  const callerId = req.body.caller_id;
 
-  // Verify caller is gérant
-  if (callerId) {
-    const caller = get('SELECT role FROM accounts WHERE id = ?', [callerId]);
-    if (!caller || caller.role !== 'gerant') {
-      return res.status(403).json({ error: 'Accès refusé — gérant uniquement' });
-    }
+  // Verify caller is gérant (using authenticated user from requireAuth)
+  const caller = get('SELECT role FROM accounts WHERE id = ?', [req.user.id]);
+  if (!caller || caller.role !== 'gerant') {
+    return res.status(403).json({ error: 'Accès refusé — gérant uniquement' });
   }
 
   const account = get('SELECT * FROM accounts WHERE id = ?', [id]);
@@ -249,19 +249,16 @@ router.put('/:id/reset-pin', (req, res) => {
 // DELETE /api/accounts/:id — delete account (gerant only)
 router.delete('/:id', (req, res) => {
   const { id } = req.params;
-  const callerId = req.query.caller_id || req.body?.caller_id;
 
-  // Verify caller is gerant
-  if (callerId) {
-    const caller = get('SELECT role FROM accounts WHERE id = ?', [callerId]);
-    if (!caller || caller.role !== 'gerant') {
-      return res.status(403).json({ error: 'Accès refusé — gérant uniquement' });
-    }
+  // Verify caller is gerant (using authenticated user from requireAuth)
+  const caller = get('SELECT role FROM accounts WHERE id = ?', [req.user.id]);
+  if (!caller || caller.role !== 'gerant') {
+    return res.status(403).json({ error: 'Accès refusé — gérant uniquement' });
+  }
 
-    // Cannot delete own account
-    if (parseInt(callerId) === parseInt(id)) {
-      return res.status(400).json({ error: 'Impossible de supprimer votre propre compte' });
-    }
+  // Cannot delete own account
+  if (parseInt(req.user.id) === parseInt(id)) {
+    return res.status(400).json({ error: 'Impossible de supprimer votre propre compte' });
   }
 
   const account = get('SELECT * FROM accounts WHERE id = ?', [id]);
@@ -379,7 +376,6 @@ router.delete('/self', (req, res) => {
 router.post('/staff-password', (req, res) => {
   try {
     const { password } = req.body;
-    const token = req.headers.authorization?.split(' ')[1];
 
     if (!password) {
       return res.status(400).json({ error: 'Le code est requis' });
@@ -389,24 +385,8 @@ router.post('/staff-password', (req, res) => {
       return res.status(400).json({ error: 'Le code doit contenir 4 chiffres minimum' });
     }
 
-    // Get current account from JWT token (if available)
-    let account = null;
-    if (token) {
-      try {
-        const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET || 'development');
-        account = get('SELECT * FROM accounts WHERE id = ?', [decoded.id]);
-      } catch (e) {
-        // Token invalid, fall back to header-based auth (legacy)
-      }
-    }
-
-    // Fall back to X-Account-Id header if token not available or invalid
-    if (!account) {
-      const accountId = req.headers['x-account-id'];
-      if (accountId) {
-        account = get('SELECT * FROM accounts WHERE id = ?', [accountId]);
-      }
-    }
+    // Get account from authenticated user (requireAuth ensures valid JWT)
+    const account = get('SELECT * FROM accounts WHERE id = ?', [req.user.id]);
 
     // Verify account is gerant
     if (!account || account.role !== 'gerant') {

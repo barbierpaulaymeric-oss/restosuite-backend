@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { get, run } = require('../db');
+const { requireAuth } = require('./auth');
 
 // Stripe is lazy-loaded to avoid crash if not installed yet
 let stripe;
@@ -12,88 +13,7 @@ function getStripe() {
 }
 
 // ─────────────────────────────────────────────
-// POST /api/stripe/create-checkout
-// Creates a Stripe Checkout session for subscription
-// ─────────────────────────────────────────────
-router.post('/create-checkout', async (req, res) => {
-  try {
-    const s = getStripe();
-    if (!s || !process.env.STRIPE_PRICE_ID) {
-      return res.status(503).json({ 
-        error: 'Stripe not configured',
-        message: 'Stripe keys are not set up yet. Please configure STRIPE_SECRET_KEY and STRIPE_PRICE_ID in .env'
-      });
-    }
-
-    const { accountId } = req.body;
-    
-    if (!accountId) {
-      // If no account, redirect to app for login first
-      return res.json({ url: '/app' });
-    }
-
-    // Check if account exists
-    const account = get('SELECT * FROM accounts WHERE id = ?', [accountId]);
-    if (!account) {
-      return res.status(404).json({ error: 'Account not found' });
-    }
-
-    // Check if already subscribed
-    const sub = get('SELECT * FROM subscriptions WHERE account_id = ?', [accountId]);
-    if (sub && sub.status === 'active') {
-      return res.json({ 
-        message: 'Already subscribed',
-        status: 'active'
-      });
-    }
-
-    // Create or get Stripe customer
-    let customerId = sub?.stripe_customer_id;
-    if (!customerId) {
-      const customer = await s.customers.create({
-        name: account.name,
-        metadata: { account_id: String(accountId) }
-      });
-      customerId = customer.id;
-    }
-
-    // Create checkout session
-    const origin = `${req.protocol}://${req.get('host')}`;
-    const session = await s.checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      line_items: [{
-        price: process.env.STRIPE_PRICE_ID,
-        quantity: 1,
-      }],
-      success_url: `${origin}/app?subscription=success`,
-      cancel_url: `${origin}/app?subscription=cancelled`,
-      metadata: { account_id: String(accountId) },
-      subscription_data: {
-        metadata: { account_id: String(accountId) }
-      }
-    });
-
-    // Upsert subscription record with customer id
-    const existing = get('SELECT id FROM subscriptions WHERE account_id = ?', [accountId]);
-    if (existing) {
-      run('UPDATE subscriptions SET stripe_customer_id = ? WHERE account_id = ?', [customerId, accountId]);
-    } else {
-      run(
-        'INSERT INTO subscriptions (account_id, stripe_customer_id, status, plan) VALUES (?, ?, ?, ?)',
-        [accountId, customerId, 'free', 'free']
-      );
-    }
-
-    res.json({ url: session.url });
-  } catch (err) {
-    console.error('Stripe checkout error:', err);
-    res.status(500).json({ error: 'Failed to create checkout session' });
-  }
-});
-
-// ─────────────────────────────────────────────
-// POST /api/stripe/webhook
+// POST /api/stripe/webhook (PUBLIC — Stripe signature verification)
 // Stripe webhook to handle subscription events
 // ─────────────────────────────────────────────
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -161,6 +81,90 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   res.json({ received: true });
 });
 
+// ─── Auth middleware: all routes below require authentication ───
+router.use(requireAuth);
+
+// ─────────────────────────────────────────────
+// POST /api/stripe/create-checkout
+// Creates a Stripe Checkout session for subscription
+// ─────────────────────────────────────────────
+router.post('/create-checkout', async (req, res) => {
+  try {
+    const s = getStripe();
+    if (!s || !process.env.STRIPE_PRICE_ID) {
+      return res.status(503).json({
+        error: 'Stripe not configured',
+        message: 'Stripe keys are not set up yet. Please configure STRIPE_SECRET_KEY and STRIPE_PRICE_ID in .env'
+      });
+    }
+
+    const { accountId } = req.body;
+
+    if (!accountId) {
+      // If no account, redirect to app for login first
+      return res.json({ url: '/app' });
+    }
+
+    // Check if account exists
+    const account = get('SELECT * FROM accounts WHERE id = ?', [accountId]);
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    // Check if already subscribed
+    const sub = get('SELECT * FROM subscriptions WHERE account_id = ?', [accountId]);
+    if (sub && sub.status === 'active') {
+      return res.json({
+        message: 'Already subscribed',
+        status: 'active'
+      });
+    }
+
+    // Create or get Stripe customer
+    let customerId = sub?.stripe_customer_id;
+    if (!customerId) {
+      const customer = await s.customers.create({
+        name: account.name,
+        metadata: { account_id: String(accountId) }
+      });
+      customerId = customer.id;
+    }
+
+    // Create checkout session
+    const origin = `${req.protocol}://${req.get('host')}`;
+    const session = await s.checkout.sessions.create({
+      customer: customerId,
+      mode: 'subscription',
+      line_items: [{
+        price: process.env.STRIPE_PRICE_ID,
+        quantity: 1,
+      }],
+      success_url: `${origin}/app?subscription=success`,
+      cancel_url: `${origin}/app?subscription=cancelled`,
+      metadata: { account_id: String(accountId) },
+      subscription_data: {
+        metadata: { account_id: String(accountId) }
+      }
+    });
+
+    // Upsert subscription record with customer id
+    const existing = get('SELECT id FROM subscriptions WHERE account_id = ?', [accountId]);
+    if (existing) {
+      run('UPDATE subscriptions SET stripe_customer_id = ? WHERE account_id = ?', [customerId, accountId]);
+    } else {
+      run(
+        'INSERT INTO subscriptions (account_id, stripe_customer_id, status, plan) VALUES (?, ?, ?, ?)',
+        [accountId, customerId, 'free', 'free']
+      );
+    }
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Stripe checkout error:', err);
+    res.status(500).json({ error: 'Failed to create checkout session' });
+  }
+});
+
 // ─────────────────────────────────────────────
 // GET /api/stripe/status/:accountId
 // Check subscription status for an account
@@ -168,7 +172,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 router.get('/status/:accountId', (req, res) => {
   const { accountId } = req.params;
   const sub = get('SELECT * FROM subscriptions WHERE account_id = ?', [accountId]);
-  
+
   if (!sub) {
     return res.json({
       plan: 'free',
@@ -207,7 +211,7 @@ function upsertSubscription(accountId, customerId, subscriptionId, subscription)
   const existing = get('SELECT id FROM subscriptions WHERE account_id = ?', [accountId]);
   if (existing) {
     run(
-      `UPDATE subscriptions 
+      `UPDATE subscriptions
        SET stripe_customer_id = ?, stripe_subscription_id = ?, status = ?, plan = ?, current_period_end = ?
        WHERE account_id = ?`,
       [customerId, subscriptionId, status, plan, periodEnd, accountId]
@@ -219,7 +223,7 @@ function upsertSubscription(accountId, customerId, subscriptionId, subscription)
       [accountId, customerId, subscriptionId, status, plan, periodEnd]
     );
   }
-  
+
   console.log(`📦 Subscription updated: account=${accountId} plan=${plan} status=${status}`);
 }
 

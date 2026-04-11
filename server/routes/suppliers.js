@@ -1,6 +1,8 @@
 const { Router } = require('express');
 const { all, get, run } = require('../db');
+const { requireAuth } = require('./auth');
 const router = Router();
+router.use(requireAuth);
 
 router.get('/', (req, res) => {
   res.json(all('SELECT * FROM suppliers ORDER BY name'));

@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { all, get } = require('../db');
+const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
 const multer = require('multer');
 const path = require('path');
@@ -389,18 +389,22 @@ router.post('/scan-invoice', upload.single('invoice'), async (req, res) => {
   let mimeType = 'image/jpeg';
 
   // Support multipart file upload OR base64 in body
+  let filePath = null;
   if (req.file) {
-    const fileBuffer = fs.readFileSync(req.file.path);
+    filePath = req.file.path;
+    const fileBuffer = fs.readFileSync(filePath);
     imageBase64 = fileBuffer.toString('base64');
     mimeType = req.file.mimetype || 'image/jpeg';
-    // Cleanup temp file
-    fs.unlink(req.file.path, () => {});
   } else if (req.body && req.body.image_base64) {
     imageBase64 = req.body.image_base64.replace(/^data:image\/\w+;base64,/, '');
     mimeType = req.body.mime_type || 'image/jpeg';
   }
 
   if (!imageBase64) {
+    // Cleanup on early exit
+    if (filePath) {
+      try { fs.unlinkSync(filePath); } catch {}
+    }
     return res.status(400).json({ error: 'Image requise (fichier ou base64)' });
   }
 
@@ -424,12 +428,22 @@ router.post('/scan-invoice', upload.single('invoice'), async (req, res) => {
     if (!response.ok) {
       const err = await response.text();
       console.error('Gemini Vision error:', err);
+      // Cleanup on error
+      if (filePath) {
+        try { fs.unlinkSync(filePath); } catch {}
+      }
       return res.status(502).json({ error: 'Erreur service IA', details: err });
     }
 
     const data = await response.json();
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!content) return res.status(502).json({ error: 'Réponse IA vide' });
+    if (!content) {
+      // Cleanup on error
+      if (filePath) {
+        try { fs.unlinkSync(filePath); } catch {}
+      }
+      return res.status(502).json({ error: 'Réponse IA vide' });
+    }
 
     const parsed = JSON.parse(content);
 
@@ -452,7 +466,230 @@ router.post('/scan-invoice', upload.single('invoice'), async (req, res) => {
     res.json(parsed);
   } catch (e) {
     console.error('Invoice scan error:', e);
+    // Cleanup on error
+    if (filePath) {
+      try { fs.unlinkSync(filePath); } catch {}
+    }
     res.status(500).json({ error: 'Erreur scan facture', details: e.message });
+  } finally {
+    // Final cleanup to ensure file is always deleted
+    if (filePath) {
+      try { fs.unlinkSync(filePath); } catch {}
+    }
+  }
+});
+
+// ═══════════════════════════════════════════
+// POST /api/ai/scan-mercuriale — Import mercuriale fournisseur via IA
+// Scan une mercuriale (liste de prix) et met à jour les prix en masse
+// ═══════════════════════════════════════════
+router.post('/scan-mercuriale', upload.single('mercuriale'), async (req, res) => {
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+
+  let imageBase64 = null;
+  let mimeType = 'image/jpeg';
+  let filePath = null;
+
+  if (req.file) {
+    filePath = req.file.path;
+    const fileBuffer = fs.readFileSync(filePath);
+    imageBase64 = fileBuffer.toString('base64');
+    mimeType = req.file.mimetype || 'image/jpeg';
+  } else if (req.body && req.body.image_base64) {
+    imageBase64 = req.body.image_base64.replace(/^data:image\/\w+;base64,/, '');
+    mimeType = req.body.mime_type || 'image/jpeg';
+  }
+
+  if (!imageBase64) {
+    // Cleanup on early exit
+    if (filePath) {
+      try { fs.unlinkSync(filePath); } catch {}
+    }
+    return res.status(400).json({ error: 'Image ou document requis' });
+  }
+
+  const prompt = `Extrais les données de cette mercuriale (liste de prix) fournisseur pour un restaurant.
+Retourne un JSON avec :
+- supplier_name: nom du fournisseur (si visible)
+- date: date de la mercuriale (si visible)
+- items: array de {
+    product_name: nom du produit tel qu'écrit,
+    category: catégorie (fruits, légumes, viandes, poissons, épicerie, produits laitiers, boissons, etc.),
+    unit: unité de vente (kg, L, pièce, barquette, etc.),
+    conditioning: conditionnement si précisé (ex: "carton de 10kg", "lot de 6"),
+    price: prix unitaire HT en euros (nombre),
+    origin: origine/provenance si mentionnée,
+    organic: true si bio/organique
+  }
+Si un champ n'est pas visible, mets null. Extrais TOUS les produits listés, même les catégories.`;
+
+  try {
+    const response = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType, data: imageBase64 } }
+          ]
+        }],
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('Gemini mercuriale error:', err);
+      // Cleanup on error
+      if (filePath) {
+        try { fs.unlinkSync(filePath); } catch {}
+      }
+      return res.status(502).json({ error: 'Erreur service IA', details: err });
+    }
+
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!content) {
+      // Cleanup on error
+      if (filePath) {
+        try { fs.unlinkSync(filePath); } catch {}
+      }
+      return res.status(502).json({ error: 'Réponse IA vide' });
+    }
+
+    const parsed = JSON.parse(content);
+
+    // Fuzzy match products with existing ingredients
+    if (parsed.items && Array.isArray(parsed.items)) {
+      const allIngredients = all('SELECT id, name FROM ingredients');
+
+      for (const item of parsed.items) {
+        const name = (item.product_name || '').toLowerCase().trim();
+        if (!name) continue;
+
+        // Exact match
+        let match = allIngredients.find(i => i.name.toLowerCase() === name);
+
+        // Partial match (contains)
+        if (!match) {
+          match = allIngredients.find(i => i.name.toLowerCase().includes(name) || name.includes(i.name.toLowerCase()));
+        }
+
+        // Fuzzy: first word match
+        if (!match) {
+          const firstWord = name.split(/\s+/)[0];
+          if (firstWord.length >= 3) {
+            match = allIngredients.find(i => i.name.toLowerCase().startsWith(firstWord));
+          }
+        }
+
+        if (match) {
+          item.ingredient_id = match.id;
+          item.matched_ingredient = match.name;
+          item.match_confidence = item.product_name.toLowerCase() === match.name.toLowerCase() ? 'exact' : 'fuzzy';
+        }
+      }
+    }
+
+    // Try to match supplier
+    if (parsed.supplier_name) {
+      const supplierMatch = get('SELECT id, name FROM suppliers WHERE LOWER(name) LIKE ? ORDER BY LENGTH(name) LIMIT 1',
+        [`%${parsed.supplier_name.toLowerCase()}%`]);
+      if (supplierMatch) {
+        parsed.supplier_id = supplierMatch.id;
+        parsed.matched_supplier = supplierMatch.name;
+      }
+    }
+
+    const matched = (parsed.items || []).filter(i => i.ingredient_id).length;
+    const total = (parsed.items || []).length;
+
+    res.json({
+      ...parsed,
+      summary: {
+        total_items: total,
+        matched_items: matched,
+        unmatched_items: total - matched,
+        match_rate: total > 0 ? Math.round(matched / total * 100) : 0
+      }
+    });
+  } catch (e) {
+    console.error('Mercuriale scan error:', e);
+    // Cleanup on error
+    if (filePath) {
+      try { fs.unlinkSync(filePath); } catch {}
+    }
+    res.status(500).json({ error: 'Erreur scan mercuriale', details: e.message });
+  } finally {
+    // Final cleanup to ensure file is always deleted
+    if (filePath) {
+      try { fs.unlinkSync(filePath); } catch {}
+    }
+  }
+});
+
+// ═══════════════════════════════════════════
+// POST /api/ai/import-mercuriale — Confirmer l'import des prix
+// Après validation par l'utilisateur, met à jour les prix en masse
+// ═══════════════════════════════════════════
+router.post('/import-mercuriale', (req, res) => {
+  try {
+    const { supplier_id, items } = req.body;
+    if (!supplier_id) return res.status(400).json({ error: 'supplier_id requis' });
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Au moins un article à importer' });
+    }
+
+    const supplier = get('SELECT id, name FROM suppliers WHERE id = ?', [Number(supplier_id)]);
+    if (!supplier) return res.status(404).json({ error: 'Fournisseur introuvable' });
+
+    let updated = 0;
+    let created = 0;
+    let skipped = 0;
+
+    for (const item of items) {
+      if (!item.ingredient_id || !item.price || item.price <= 0) {
+        skipped++;
+        continue;
+      }
+
+      const unit = item.unit || 'kg';
+
+      // Upsert supplier_prices
+      const existing = get('SELECT id, price FROM supplier_prices WHERE ingredient_id = ? AND supplier_id = ?',
+        [item.ingredient_id, supplier_id]);
+
+      if (existing) {
+        if (existing.price !== item.price) {
+          run('UPDATE supplier_prices SET price = ?, unit = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
+            [item.price, unit, existing.id]);
+          updated++;
+        } else {
+          skipped++; // Same price, no update needed
+          continue;
+        }
+      } else {
+        run('INSERT INTO supplier_prices (ingredient_id, supplier_id, price, unit) VALUES (?, ?, ?, ?)',
+          [item.ingredient_id, supplier_id, item.price, unit]);
+        created++;
+      }
+
+      // Record in price_history
+      run('INSERT INTO price_history (ingredient_id, supplier_id, price, recorded_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
+        [item.ingredient_id, supplier_id, item.price]);
+    }
+
+    res.json({
+      success: true,
+      supplier_name: supplier.name,
+      updated,
+      created,
+      skipped,
+      total: items.length
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur import', details: e.message });
   }
 });
 
@@ -552,5 +789,168 @@ Réponds en JSON avec cette structure :
     res.status(500).json({ error: 'Erreur suggestions menu', details: e.message });
   }
 });
+
+// ═══════════════════════════════════════════
+// POST /api/ai/chef — Assistant IA "Chef" contextuel
+// Chat avec un assistant qui connaît les données du restaurant
+// ═══════════════════════════════════════════
+router.post('/chef', async (req, res) => {
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+
+  const { message, conversation_history } = req.body;
+  if (!message) return res.status(400).json({ error: 'Message requis' });
+
+  try {
+    // Build restaurant context from real data
+    const context = buildRestaurantContext();
+
+    const systemPrompt = `Tu es "Chef", l'assistant IA expert de RestoSuite. Tu connais parfaitement ce restaurant et ses données.
+
+CONTEXTE DU RESTAURANT :
+${context}
+
+RÈGLES :
+- Réponds en français, de manière concise et professionnelle
+- Base tes réponses sur les données réelles du restaurant ci-dessus
+- Pour les questions sur les coûts, utilise les prix et food cost réels
+- Pour les conseils, sois pratique et actionnable
+- Si tu ne connais pas une info spécifique, dis-le honnêtement
+- Tu peux suggérer des optimisations basées sur les données
+- Utilise les ratios standards de la restauration (food cost 25-30%, etc.)
+- Formate tes réponses de manière claire avec des paragraphes courts
+
+DOMAINES D'EXPERTISE :
+- Fiches techniques et costing
+- Gestion des stocks et approvisionnement
+- HACCP et hygiène alimentaire
+- Analyse de marge et food cost
+- Optimisation des pertes
+- Gestion fournisseurs
+- Réglementation restauration (allergènes INCO, traçabilité)
+- Conseils culinaires et techniques`;
+
+    // Build conversation
+    const contents = [];
+
+    // Add system context as first user message
+    contents.push({
+      role: 'user',
+      parts: [{ text: systemPrompt + '\n\nVoici ma première question : Bonjour !' }]
+    });
+    contents.push({
+      role: 'model',
+      parts: [{ text: 'Bonjour ! Je suis Chef, votre assistant IA RestoSuite. Je connais les données de votre restaurant et je suis prêt à vous aider. Que puis-je faire pour vous ?' }]
+    });
+
+    // Add conversation history
+    if (conversation_history && Array.isArray(conversation_history)) {
+      for (const msg of conversation_history.slice(-10)) { // Keep last 10 exchanges
+        contents.push({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }]
+        });
+      }
+    }
+
+    // Add current message
+    contents.push({
+      role: 'user',
+      parts: [{ text: message }]
+    });
+
+    const response = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents,
+        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('Gemini Chef error:', err);
+      return res.status(502).json({ error: 'Erreur service IA' });
+    }
+
+    const data = await response.json();
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!reply) return res.status(502).json({ error: 'Réponse IA vide' });
+
+    res.json({ reply });
+  } catch (e) {
+    console.error('Chef AI error:', e);
+    res.status(500).json({ error: 'Erreur assistant', details: e.message });
+  }
+});
+
+function buildRestaurantContext() {
+  try {
+    const parts = [];
+
+    // Recipe stats
+    const recipeStats = get(`
+      SELECT COUNT(*) as total,
+             COUNT(CASE WHEN recipe_type = 'plat' THEN 1 END) as plats,
+             COUNT(CASE WHEN recipe_type = 'sous_recette' THEN 1 END) as sous_recettes,
+             AVG(CASE WHEN selling_price > 0 THEN
+               (SELECT SUM(ri.gross_quantity * COALESCE(
+                 (SELECT sp.price / CASE WHEN sp.unit = 'kg' THEN 1000 WHEN sp.unit = 'L' THEN 1000 ELSE 1 END
+                  FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1), 0))
+               FROM recipe_ingredients ri WHERE ri.recipe_id = r.id) / selling_price * 100 END) as avg_food_cost
+      FROM recipes r
+    `);
+    parts.push(`FICHES : ${recipeStats.total} fiches techniques (${recipeStats.plats} plats, ${recipeStats.sous_recettes} sous-recettes). Food cost moyen : ${recipeStats.avg_food_cost ? recipeStats.avg_food_cost.toFixed(1) + '%' : 'non calculé'}.`);
+
+    // Top 5 recipes by food cost
+    const topRecipes = all(`
+      SELECT r.name, r.selling_price, r.category,
+        COALESCE((SELECT SUM(ri.gross_quantity * COALESCE(
+          (SELECT sp.price / CASE WHEN sp.unit = 'kg' THEN 1000 WHEN sp.unit = 'L' THEN 1000 ELSE 1 END
+           FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1), 0))
+        FROM recipe_ingredients ri WHERE ri.recipe_id = r.id), 0) as cost
+      FROM recipes r WHERE r.selling_price > 0 AND (r.recipe_type = 'plat' OR r.recipe_type IS NULL)
+      ORDER BY (cost / r.selling_price) DESC LIMIT 5
+    `);
+    if (topRecipes.length > 0) {
+      parts.push('TOP 5 FOOD COST (les plus chers) : ' + topRecipes.map(r =>
+        `${r.name} (coût: ${r.cost.toFixed(2)}€, vente: ${r.selling_price}€, FC: ${r.selling_price > 0 ? (r.cost / r.selling_price * 100).toFixed(1) : 0}%)`
+      ).join(', '));
+    }
+
+    // Stock summary
+    const stockSummary = get(`
+      SELECT COUNT(*) as total_items,
+             COALESCE(SUM(s.quantity * COALESCE(i.price_per_unit, 0)), 0) as total_value,
+             COUNT(CASE WHEN s.quantity <= s.min_quantity AND s.min_quantity > 0 THEN 1 END) as low_stock
+      FROM stock s JOIN ingredients i ON i.id = s.ingredient_id
+    `);
+    parts.push(`STOCK : ${stockSummary.total_items} ingrédients en stock, valeur totale ${stockSummary.total_value.toFixed(2)}€, ${stockSummary.low_stock} en stock bas.`);
+
+    // Suppliers
+    const supplierCount = get('SELECT COUNT(*) as c FROM suppliers').c;
+    parts.push(`FOURNISSEURS : ${supplierCount} fournisseurs référencés.`);
+
+    // Recent losses
+    const losses = get(`
+      SELECT COALESCE(SUM(ABS(sm.quantity) * COALESCE(i.price_per_unit, 0)), 0) as loss_value
+      FROM stock_movements sm LEFT JOIN ingredients i ON i.id = sm.ingredient_id
+      WHERE sm.movement_type = 'perte' AND date(sm.recorded_at) >= date('now', '-30 days')
+    `);
+    parts.push(`PERTES (30j) : ${losses.loss_value.toFixed(2)}€ de pertes déclarées.`);
+
+    // Ingredients list (categories)
+    const categories = all(`
+      SELECT category, COUNT(*) as c FROM ingredients WHERE category IS NOT NULL GROUP BY category ORDER BY c DESC LIMIT 8
+    `);
+    if (categories.length > 0) {
+      parts.push('CATÉGORIES INGRÉDIENTS : ' + categories.map(c => `${c.category} (${c.c})`).join(', '));
+    }
+
+    return parts.join('\n');
+  } catch (e) {
+    return 'Données du restaurant non disponibles: ' + e.message;
+  }
+}
 
 module.exports = router;

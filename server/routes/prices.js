@@ -1,6 +1,9 @@
 const { Router } = require('express');
 const { get, run } = require('../db');
+const { requireAuth } = require('./auth');
 const router = Router();
+
+router.use(requireAuth);
 
 router.post('/', (req, res) => {
   const { ingredient_id, supplier_id, price, unit } = req.body;

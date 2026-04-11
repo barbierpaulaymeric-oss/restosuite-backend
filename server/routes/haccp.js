@@ -1,7 +1,10 @@
 const { Router } = require('express');
 const { all, get, run } = require('../db');
 const PDFDocument = require('pdfkit');
+const { requireAuth } = require('./auth');
 const router = Router();
+
+router.use(requireAuth);
 
 // ═══════════════════════════════════════════
 // TEMPERATURE ZONES

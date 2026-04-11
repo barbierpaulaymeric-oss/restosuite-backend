@@ -1,7 +1,10 @@
 const { Router } = require('express');
 const QRCode = require('qrcode');
 const { all, get } = require('../db');
+const { requireAuth } = require('./auth');
 const router = Router();
+
+router.use(requireAuth);
 
 // ═══════════════════════════════════════════
 // GET /api/qrcode/table/:tableNumber — Génère QR code PNG
