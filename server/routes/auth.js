@@ -12,6 +12,43 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'restosuite-dev-secret-2026';
 const JWT_EXPIRY = '30d';
 
+// PIN brute-force protection
+const pinAttempts = new Map(); // restaurantId -> { count, lastAttempt }
+const PIN_MAX_ATTEMPTS = 5;
+const PIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkPinLockout(identifier) {
+  const attempt = pinAttempts.get(identifier);
+  if (!attempt) return { locked: false };
+
+  const now = Date.now();
+  const timeSinceLastAttempt = now - attempt.lastAttempt;
+
+  if (timeSinceLastAttempt > PIN_LOCKOUT_MS) {
+    pinAttempts.delete(identifier);
+    return { locked: false };
+  }
+
+  if (attempt.count >= PIN_MAX_ATTEMPTS) {
+    const remainingMs = PIN_LOCKOUT_MS - timeSinceLastAttempt;
+    return { locked: true, remainingMs };
+  }
+
+  return { locked: false };
+}
+
+function recordPinAttempt(identifier, success) {
+  if (success) {
+    pinAttempts.delete(identifier);
+    return;
+  }
+
+  const attempt = pinAttempts.get(identifier) || { count: 0, lastAttempt: Date.now() };
+  attempt.count += 1;
+  attempt.lastAttempt = Date.now();
+  pinAttempts.set(identifier, attempt);
+}
+
 function generateToken(account) {
   return jwt.sign(
     { id: account.id, email: account.email, role: account.role, restaurant_id: account.restaurant_id },
@@ -21,7 +58,11 @@ function generateToken(account) {
 }
 
 function hashPin(pin) {
-  return crypto.createHash('sha256').update(pin).digest('hex');
+  return bcrypt.hashSync(pin, 10);
+}
+
+function verifyPin(pin, hash) {
+  return bcrypt.compareSync(pin, hash);
 }
 
 // ─── Middleware: requireAuth ───
@@ -48,8 +89,14 @@ router.post('/register', (req, res) => {
   if (!email || !email.trim()) {
     return res.status(400).json({ error: 'L\'email est requis' });
   }
-  if (!password || password.length < 6) {
-    return res.status(400).json({ error: 'Le mot de passe doit faire au moins 6 caractères' });
+  if (!password || password.length < 8) {
+    return res.status(400).json({ error: 'Le mot de passe doit faire au moins 8 caractères' });
+  }
+  if (!/[A-Z]/.test(password)) {
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins une majuscule' });
+  }
+  if (!/[0-9]/.test(password)) {
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins un chiffre' });
   }
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email.trim())) {
@@ -86,7 +133,7 @@ router.post('/register', (req, res) => {
        VALUES (?, ?, 'gerant', ?, ?, ?, ?, ?, ?, 0, 1, datetime('now'))`,
       [
         (first_name || '').trim() + (last_name ? ' ' + last_name.trim() : '') || email.split('@')[0],
-        hashPin('0000'), // placeholder PIN
+        hashPin('0000'),
         permissions,
         email.trim().toLowerCase(),
         passwordHash,
@@ -174,11 +221,30 @@ router.post('/pin-login', (req, res) => {
     return res.status(400).json({ error: 'PIN à 4 chiffres requis' });
   }
 
-  const hashedPin = hashPin(pin);
-  const account = get('SELECT * FROM accounts WHERE pin = ?', [hashedPin]);
+  // Check for brute-force lockout using generic identifier
+  const lockoutCheck = checkPinLockout('pin_login');
+  if (lockoutCheck.locked) {
+    const minutesRemaining = Math.ceil(lockoutCheck.remainingMs / 60000);
+    return res.status(429).json({ error: `Trop de tentatives. Veuillez réessayer dans ${minutesRemaining} minutes.` });
+  }
+
+  // Find account by trying to verify against all accounts with PINs
+  const accounts = all('SELECT * FROM accounts WHERE pin IS NOT NULL AND pin != ?', ['']);
+  let account = null;
+  for (const acc of accounts) {
+    if (verifyPin(pin, acc.pin)) {
+      account = acc;
+      break;
+    }
+  }
+
   if (!account) {
+    recordPinAttempt('pin_login', false);
     return res.status(401).json({ error: 'PIN incorrect' });
   }
+
+  // Record successful attempt
+  recordPinAttempt('pin_login', true);
 
   // Update last_login
   run('UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [account.id]);
@@ -290,19 +356,18 @@ router.post('/staff-pin', (req, res) => {
     return res.status(404).json({ error: 'Compte introuvable' });
   }
 
-  const hashedPin = hashPin(pin);
-
   // First-time PIN creation
   if (is_creation) {
-    // Only allow creation if no PIN is set yet
-    if (account.pin && account.pin !== hashPin('0000')) {
+    // Only allow creation if no PIN is set yet or PIN is default
+    if (account.pin && !verifyPin('0000', account.pin)) {
       return res.status(400).json({ error: 'Un PIN existe déjà. Utilisez votre PIN actuel.' });
     }
     // Set the new PIN
+    const hashedPin = hashPin(pin);
     run('UPDATE accounts SET pin = ? WHERE id = ?', [hashedPin, account_id]);
   } else {
     // Normal PIN validation
-    if (account.pin !== hashedPin) {
+    if (!account.pin || !verifyPin(pin, account.pin)) {
       return res.status(401).json({ error: 'PIN incorrect' });
     }
   }

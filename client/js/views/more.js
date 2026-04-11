@@ -306,16 +306,16 @@ class MoreView {
         ` : ''}
 
         ${canAccess(['gerant']) ? `
-        <div class="more-card more-card--coming">
+        <a href="#/supplier-portal" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
           <div class="more-card__icon" style="background: var(--color-primary-light)">
             <i data-lucide="truck"></i>
           </div>
           <div class="more-card__content">
             <h3>Portail Fournisseur</h3>
-            <span class="badge badge--warning">Bientôt</span>
+            <span class="badge badge--success">Actif</span>
           </div>
           <p class="text-secondary text-sm">Vos fournisseurs mettent à jour leurs catalogues et prix directement</p>
-        </div>
+        </a>
         ` : ''}
 
         ${canAccess(['gerant']) ? `
