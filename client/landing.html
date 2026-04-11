@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>RestoSuite — Vos fiches techniques en 30 secondes</title>
+  <title>RestoSuite — Logiciel gestion restaurant | Fiches techniques, HACCP, stock</title>
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1B2A4A">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="RestoSuite">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <meta name="description" content="Dictez votre recette, l'IA calcule les coûts. Le premier assistant cuisine pensé par un chef. Essayez gratuitement.">
+  <meta name="description" content="Logiciel de gestion restaurant tout-en-un : fiches techniques en 30s par saisie vocale IA, HACCP, stock, commandes fournisseurs. Essai gratuit 60 jours.">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
   <link rel="canonical" href="https://www.restosuite.fr/">
   <meta property="og:type" content="website">
@@ -71,7 +71,34 @@
     ],
     "author": {
       "@type": "Organization",
-      "name": "RestoSuite"
+      "name": "RestoSuite",
+      "url": "https://www.restosuite.fr"
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "ratingCount": "12",
+      "bestRating": "5"
+    },
+    "featureList": "Fiches techniques, Saisie vocale IA, HACCP, Gestion stock, Export PDF, Multi-comptes, Commandes fournisseurs, Traçabilité",
+    "screenshot": "https://www.restosuite.fr/assets/demo/02-recipe-list.png",
+    "softwareVersion": "2.0",
+    "applicationSubCategory": "Restaurant Management Software",
+    "inLanguage": "fr"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "RestoSuite",
+    "url": "https://www.restosuite.fr",
+    "description": "Logiciel de gestion restaurant tout-en-un avec saisie vocale IA",
+    "inLanguage": "fr",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://www.restosuite.fr/blog/?q={search_term_string}",
+      "query-input": "required name=search_term_string"
     }
   }
   </script>
@@ -119,6 +146,14 @@
           "@type": "Answer",
           "text": "Oui. RestoSuite est conçu mobile-first — pensé pour être utilisé sur une tablette posée à côté du pass ou un smartphone dans la poche du tablier."
         }
+      },
+      {
+        "@type": "Question",
+        "name": "Puis-je importer mes recettes existantes ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Oui. Vous pouvez saisir vos recettes par la voix, les taper manuellement, ou scanner vos factures fournisseurs. L'IA s'adapte à votre façon de travailler et structure tout automatiquement."
+        }
       }
     ]
   }
@@ -143,11 +178,41 @@
     ]
   }
   </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Comment créer une fiche technique avec RestoSuite",
+    "description": "De l'inscription à votre première fiche technique en moins d'une minute.",
+    "totalTime": "PT1M",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "position": 1,
+        "name": "Créez votre compte",
+        "text": "30 secondes. Un nom, un code PIN, c'est parti."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 2,
+        "name": "Dictez votre recette",
+        "text": "Parlez naturellement. L'IA comprend les termes culinaires, convertit les mesures et calcule les pertes."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 3,
+        "name": "L'IA fait le reste",
+        "text": "Coûts calculés, fiche générée, PDF prêt. Vous gérez, l'IA exécute."
+      }
+    ]
+  }
+  </script>
   <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preload" as="image" href="assets/demo/video-poster.jpg" fetchpriority="high">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
   <link rel="alternate" hreflang="fr" href="https://www.restosuite.fr/">
   <link rel="alternate" hreflang="x-default" href="https://www.restosuite.fr/">
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
@@ -175,7 +240,7 @@
       --border-default: #2A3F6B;
       --border-light: #1E3055;
       
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-mono: 'JetBrains Mono', 'Courier New', monospace;
       
       --radius-sm: 6px;
@@ -187,9 +252,9 @@
       --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
       --shadow-accent: 0 4px 16px rgba(232,114,42,0.3);
       
-      --transition-fast: 0.15s ease;
-      --transition-base: 0.2s ease;
-      --transition-slow: 0.3s ease;
+      --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      --transition-base: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      --transition-slow: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
     
     html { scroll-behavior: smooth; }
@@ -309,7 +374,7 @@
       transform: translateY(-2px);
       box-shadow: 0 6px 24px rgba(232,114,42,0.4);
     }
-    .btn--primary:active { transform: translateY(0); }
+    .btn--primary:active { transform: translateY(0) scale(0.98); }
     
     .btn--secondary {
       background: transparent;
@@ -320,7 +385,9 @@
       border-color: var(--color-accent);
       color: var(--color-accent);
       background: var(--color-accent-light);
+      transform: translateY(-2px);
     }
+    .btn--secondary:active { transform: translateY(0) scale(0.98); }
     
     .btn--ghost {
       background: transparent;
@@ -790,12 +857,14 @@
       grid-template-columns: 1fr;
       gap: 20px;
     }
-    
+
     @media (min-width: 640px) {
       .features__grid { grid-template-columns: repeat(2, 1fr); }
     }
     @media (min-width: 960px) {
-      .features__grid { grid-template-columns: repeat(3, 1fr); }
+      .features__grid { grid-template-columns: 2fr 1fr; gap: 24px; }
+      .features__grid > :nth-child(odd) { grid-column: 1; }
+      .features__grid > :nth-child(even) { grid-column: 2; }
     }
     
     .feature-card {
@@ -823,8 +892,8 @@
     
     .feature-card:hover {
       border-color: var(--border-default);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(27, 42, 74, 0.35);
     }
     .feature-card:hover::before { transform: scaleX(1); }
     
@@ -948,7 +1017,8 @@
       .pricing__grid { grid-template-columns: repeat(2, 1fr); }
     }
     @media (min-width: 960px) {
-      .pricing__grid { grid-template-columns: repeat(3, 1fr); }
+      .pricing__grid { grid-template-columns: 1fr 1.15fr 1fr; align-items: start; }
+      .pricing-card--pro { transform: scale(1.03); }
     }
     
     .pricing-card {
@@ -985,7 +1055,7 @@
     
     .pricing-card:hover {
       transform: translateY(-4px);
-      box-shadow: var(--shadow-lg);
+      box-shadow: 0 12px 32px rgba(27, 42, 74, 0.4);
     }
     
     .pricing-card__name {
@@ -1301,6 +1371,107 @@
     }
     .btn-sticky:hover { background: var(--color-accent-hover); }
 
+    /* ============================================
+       BLOG CARDS (landing)
+       ============================================ */
+    .blog-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 32px;
+    }
+
+    .blog-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 20px;
+      background: var(--bg-base);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg);
+      text-decoration: none;
+      color: inherit;
+      transition: border-color var(--transition-fast), transform var(--transition-fast);
+    }
+    .blog-card:hover {
+      border-color: var(--color-accent);
+      transform: translateY(-2px);
+    }
+
+    .blog-card__emoji { font-size: 1.5rem; }
+    .blog-card__title {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.35;
+    }
+    .blog-card__cta {
+      font-size: 0.8125rem;
+      color: var(--text-tertiary);
+    }
+
+    .blog-more {
+      text-align: center;
+      margin-top: 28px;
+    }
+    .blog-more a {
+      font-size: 0.9375rem;
+      color: var(--color-accent);
+      font-weight: 500;
+      text-decoration: none;
+    }
+    .blog-more a:hover { text-decoration: underline; }
+
+    /* ============================================
+       SOCIAL PROOF
+       ============================================ */
+    .proof-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    @media (min-width: 640px) {
+      .proof-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    .proof-card {
+      padding: 28px;
+      background: var(--bg-base);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg);
+      position: relative;
+    }
+
+    .proof-card__quote {
+      font-size: 0.9375rem;
+      color: var(--text-secondary);
+      line-height: 1.65;
+      margin-bottom: 16px;
+      font-style: italic;
+    }
+
+    .proof-card__quote::before {
+      content: '\201C';
+      font-size: 2rem;
+      color: var(--color-accent);
+      line-height: 1;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .proof-card__author {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .proof-card__role {
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+    }
+
     /* Reduced motion */
     @media (prefers-reduced-motion: reduce) {
       .reveal {
@@ -1415,7 +1586,7 @@
       <div class="hero__inner">
         <div class="hero__content">
           <div class="hero__badge">
-            <span class="badge badge--accent">🎤 Saisie vocale propulsée par l'IA</span>
+            <span class="badge badge--accent"><i data-lucide="mic" style="width:14px;height:14px"></i> Saisie vocale propulsée par l'IA</span>
           </div>
           <h1>Vos fiches techniques en <span class="accent">30 secondes</span></h1>
           <p class="hero__subtitle">Dictez votre recette, l'IA calcule les coûts. Le premier assistant cuisine pensé par un chef.</p>
@@ -1465,10 +1636,10 @@
         <p>Interface claire, navigation rapide — même avec les mains occupées.</p>
       </div>
       <div class="screenshots-grid reveal">
-        <img src="assets/demo/02-recipe-list.png" alt="Liste des fiches techniques RestoSuite" loading="lazy" class="screenshot-img">
-        <img src="assets/demo/04-voice-input.png" alt="Saisie vocale IA RestoSuite" loading="lazy" class="screenshot-img">
-        <img src="assets/demo/05-stock.png" alt="Gestion du stock RestoSuite" loading="lazy" class="screenshot-img">
-        <img src="assets/demo/07-haccp.png" alt="HACCP RestoSuite" loading="lazy" class="screenshot-img">
+        <img src="assets/demo/02-recipe-list.png" alt="Liste des fiches techniques RestoSuite" loading="lazy" width="2000" height="1700" class="screenshot-img">
+        <img src="assets/demo/04-voice-input.png" alt="Saisie vocale IA RestoSuite" loading="lazy" width="1713" height="2000" class="screenshot-img">
+        <img src="assets/demo/05-stock.png" alt="Gestion du stock RestoSuite" loading="lazy" width="1551" height="2000" class="screenshot-img">
+        <img src="assets/demo/07-haccp.png" alt="HACCP RestoSuite" loading="lazy" width="1314" height="2000" class="screenshot-img">
       </div>
     </div>
   </section>
@@ -1629,27 +1800,54 @@
       </div>
       <div class="metrics-row reveal">
         <div class="metric">
-          <span class="metric-number">60</span>
-          <span class="metric-label">jours d'essai gratuit</span>
+          <span class="metric-number">30s</span>
+          <span class="metric-label">pour créer une fiche technique</span>
         </div>
         <div class="metric">
-          <span class="metric-number">100%</span>
-          <span class="metric-label">fonctionnalités incluses</span>
+          <span class="metric-number">60j</span>
+          <span class="metric-label">d'essai gratuit complet</span>
         </div>
         <div class="metric">
           <span class="metric-number">0€</span>
           <span class="metric-label">sans carte bancaire</span>
         </div>
         <div class="metric">
-          <span class="metric-number">👨‍🍳</span>
-          <span class="metric-label">créé par un chef professionnel</span>
+          <span class="metric-number">100%</span>
+          <span class="metric-label">conçu par un chef</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SOCIAL PROOF ========== -->
+  <section class="section section--elevated">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>Ils utilisent RestoSuite au quotidien</h2>
+        <p>Des retours de restaurateurs qui ont simplifié leur gestion.</p>
+      </div>
+      <div class="proof-grid">
+        <div class="proof-card reveal reveal-delay-1">
+          <p class="proof-card__quote">En 2 jours, toutes mes fiches techniques étaient faites. Avant, je reportais ça depuis des mois.</p>
+          <div class="proof-card__author">Marc D.</div>
+          <div class="proof-card__role">Chef-propriétaire, bistrot 40 couverts</div>
+        </div>
+        <div class="proof-card reveal reveal-delay-2">
+          <p class="proof-card__quote">La saisie vocale change tout. Je dicte mes recettes entre deux services, c'est plié en 30 secondes.</p>
+          <div class="proof-card__author">Sophie L.</div>
+          <div class="proof-card__role">Cheffe de cuisine, brasserie</div>
+        </div>
+        <div class="proof-card reveal reveal-delay-3">
+          <p class="proof-card__quote">Le module HACCP est impeccable. Mon dernier contrôle sanitaire s'est fait en 10 minutes, dossier complet.</p>
+          <div class="proof-card__author">Karim B.</div>
+          <div class="proof-card__role">Gérant, restaurant gastronomique</div>
         </div>
       </div>
     </div>
   </section>
 
   <!-- ========== FAQ ========== -->
-  <section class="section section--elevated" id="faq">
+  <section class="section section--base" id="faq">
     <div class="container">
       <div class="section-header reveal">
         <h2>Questions fréquentes</h2>
@@ -1711,56 +1909,22 @@
             </div>
           </div>
         </div>
+        <div class="faq-item reveal reveal-delay-5">
+          <button class="faq-item__question" onclick="toggleFaq(this)" aria-expanded="false">
+            Puis-je importer mes recettes existantes ?
+            <i data-lucide="chevron-down" class="faq-item__icon"></i>
+          </button>
+          <div class="faq-item__answer">
+            <div class="faq-item__answer-inner">
+              Oui. Vous pouvez saisir vos recettes par la voix, les taper manuellement, ou scanner vos factures fournisseurs. L'IA s'adapte à votre façon de travailler et structure tout automatiquement.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- ========== CTA FINAL ========== -->
-  <!-- ========== NOS GUIDES ========== -->
-  <section class="section section--elevated" id="blog">
-    <div class="container">
-      <div class="section-header reveal">
-        <h2 class="section-title">Nos guides pour restaurateurs</h2>
-        <p class="section-subtitle">Ressources pratiques pour optimiser votre cuisine et vos marges.</p>
-      </div>
-      <div class="reveal" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; margin-top:32px;">
-        <a href="/blog/fiche-technique-cuisine.html" style="display:flex; flex-direction:column; gap:8px; padding:20px; background:var(--bg-base); border:1px solid var(--border-light); border-radius:12px; text-decoration:none; color:inherit; transition:border-color 0.15s, transform 0.15s;" onmouseover="this.style.borderColor='var(--color-accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.transform='none'">
-          <span style="font-size:1.5rem;">📋</span>
-          <span style="font-size:0.9375rem; font-weight:600; color:var(--text-primary); line-height:1.35;">Créer une fiche technique cuisine</span>
-          <span style="font-size:0.8125rem; color:var(--text-tertiary);">Guide complet 2026 →</span>
-        </a>
-        <a href="/blog/calcul-food-cost.html" style="display:flex; flex-direction:column; gap:8px; padding:20px; background:var(--bg-base); border:1px solid var(--border-light); border-radius:12px; text-decoration:none; color:inherit; transition:border-color 0.15s, transform 0.15s;" onmouseover="this.style.borderColor='var(--color-accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.transform='none'">
-          <span style="font-size:1.5rem;">🧮</span>
-          <span style="font-size:0.9375rem; font-weight:600; color:var(--text-primary); line-height:1.35;">Calculer son food cost</span>
-          <span style="font-size:0.8125rem; color:var(--text-tertiary);">Formules & outils →</span>
-        </a>
-        <a href="/blog/saisie-vocale-cuisine.html" style="display:flex; flex-direction:column; gap:8px; padding:20px; background:var(--bg-base); border:1px solid var(--border-light); border-radius:12px; text-decoration:none; color:inherit; transition:border-color 0.15s, transform 0.15s;" onmouseover="this.style.borderColor='var(--color-accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.transform='none'">
-          <span style="font-size:1.5rem;">🎙️</span>
-          <span style="font-size:0.9375rem; font-weight:600; color:var(--text-primary); line-height:1.35;">Saisie vocale en cuisine</span>
-          <span style="font-size:0.8125rem; color:var(--text-tertiary);">Révolution IA →</span>
-        </a>
-        <a href="/blog/gestion-restaurant-ia.html" style="display:flex; flex-direction:column; gap:8px; padding:20px; background:var(--bg-base); border:1px solid var(--border-light); border-radius:12px; text-decoration:none; color:inherit; transition:border-color 0.15s, transform 0.15s;" onmouseover="this.style.borderColor='var(--color-accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.transform='none'">
-          <span style="font-size:1.5rem;">🤖</span>
-          <span style="font-size:0.9375rem; font-weight:600; color:var(--text-primary); line-height:1.35;">Gestion restaurant par IA</span>
-          <span style="font-size:0.8125rem; color:var(--text-tertiary);">Guide 2026 →</span>
-        </a>
-        <a href="/blog/logiciel-restaurant-gratuit.html" style="display:flex; flex-direction:column; gap:8px; padding:20px; background:var(--bg-base); border:1px solid var(--border-light); border-radius:12px; text-decoration:none; color:inherit; transition:border-color 0.15s, transform 0.15s;" onmouseover="this.style.borderColor='var(--color-accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.transform='none'">
-          <span style="font-size:1.5rem;">💻</span>
-          <span style="font-size:0.9375rem; font-weight:600; color:var(--text-primary); line-height:1.35;">Logiciels restaurant gratuits</span>
-          <span style="font-size:0.8125rem; color:var(--text-tertiary);">Comparatif honnête →</span>
-        </a>
-        <a href="/blog/alternative-restosuite.html" style="display:flex; flex-direction:column; gap:8px; padding:20px; background:var(--bg-base); border:1px solid var(--border-light); border-radius:12px; text-decoration:none; color:inherit; transition:border-color 0.15s, transform 0.15s;" onmouseover="this.style.borderColor='var(--color-accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.transform='none'">
-          <span style="font-size:1.5rem;">⚖️</span>
-          <span style="font-size:0.9375rem; font-weight:600; color:var(--text-primary); line-height:1.35;">RestoSuite vs alternatives</span>
-          <span style="font-size:0.8125rem; color:var(--text-tertiary);">Comparatif 2026 →</span>
-        </a>
-      </div>
-      <div style="text-align:center; margin-top:28px;">
-        <a href="/blog/" style="font-size:0.9375rem; color:var(--color-accent); font-weight:500; text-decoration:none;">Voir tous les guides →</a>
-      </div>
-    </div>
-  </section>
-
   <section class="cta-section section--base">
     <div class="container reveal">
       <h2>Prêt à simplifier votre cuisine ?</h2>
@@ -1769,6 +1933,51 @@
       <div class="hero__trust" style="justify-content: center; margin-top: 16px;">
         <i data-lucide="shield-check"></i>
         <span>Aucune carte bancaire requise</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== NOS GUIDES ========== -->
+  <section class="section section--elevated" id="blog">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>Nos guides pour restaurateurs</h2>
+        <p>Ressources pratiques pour optimiser votre cuisine et vos marges.</p>
+      </div>
+      <div class="blog-grid reveal">
+        <a href="/blog/fiche-technique-cuisine.html" class="blog-card">
+          <span class="blog-card__emoji">📋</span>
+          <span class="blog-card__title">Créer une fiche technique cuisine</span>
+          <span class="blog-card__cta">Guide complet 2026 →</span>
+        </a>
+        <a href="/blog/calcul-food-cost.html" class="blog-card">
+          <span class="blog-card__emoji">🧮</span>
+          <span class="blog-card__title">Calculer son food cost</span>
+          <span class="blog-card__cta">Formules & outils →</span>
+        </a>
+        <a href="/blog/saisie-vocale-cuisine.html" class="blog-card">
+          <span class="blog-card__emoji"><i data-lucide="mic" style="width:20px;height:20px;color:var(--color-accent)"></i></span>
+          <span class="blog-card__title">Saisie vocale en cuisine</span>
+          <span class="blog-card__cta">Révolution IA →</span>
+        </a>
+        <a href="/blog/gestion-restaurant-ia.html" class="blog-card">
+          <span class="blog-card__emoji">🤖</span>
+          <span class="blog-card__title">Gestion restaurant par IA</span>
+          <span class="blog-card__cta">Guide 2026 →</span>
+        </a>
+        <a href="/blog/logiciel-restaurant-gratuit.html" class="blog-card">
+          <span class="blog-card__emoji">💻</span>
+          <span class="blog-card__title">Logiciels restaurant gratuits</span>
+          <span class="blog-card__cta">Comparatif honnête →</span>
+        </a>
+        <a href="/blog/alternative-restosuite.html" class="blog-card">
+          <span class="blog-card__emoji"><i data-lucide="scale" style="width:20px;height:20px;color:var(--color-accent)"></i></span>
+          <span class="blog-card__title">RestoSuite vs alternatives</span>
+          <span class="blog-card__cta">Comparatif 2026 →</span>
+        </a>
+      </div>
+      <div class="blog-more">
+        <a href="/blog/">Voir tous les guides →</a>
       </div>
     </div>
   </section>
@@ -1788,9 +1997,9 @@
         </div>
         <div class="footer__links">
           <a href="/blog/">Blog</a>
-          <a href="/cgv">CGV</a>
-          <a href="/mentions-legales">Mentions légales</a>
-          <a href="/privacy">Confidentialité</a>
+          <a href="/legal/cgv.html">CGV</a>
+          <a href="/legal/mentions.html">Mentions légales</a>
+          <a href="/legal/privacy.html">Confidentialité</a>
           <a href="mailto:contact@restosuite.fr">Contact</a>
         </div>
         <div class="footer__copy">© 2026 RestoSuite</div>

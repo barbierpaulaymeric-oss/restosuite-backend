@@ -14,7 +14,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Validate JWT_SECRET on startup
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+const DEV_JWT_SECRET = 'restosuite-dev-secret-2026';
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEV_JWT_SECRET) {
+    console.error('❌ FATAL: JWT_SECRET must be set to a strong secret in production.');
+    console.error('   The dev fallback secret cannot be used in production.');
+    console.error('   Set JWT_SECRET in your environment variables and restart.');
+    process.exit(1);
+  }
+} else if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   console.warn('⚠️  WARNING: JWT_SECRET not set or too short. Using default (NOT SAFE FOR PRODUCTION).');
 }
 
