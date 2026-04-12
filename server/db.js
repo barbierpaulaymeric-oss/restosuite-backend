@@ -61,7 +61,8 @@ db.exec(`
     net_quantity REAL,
     unit TEXT NOT NULL DEFAULT 'portions',
     custom_waste_percent REAL,
-    notes TEXT
+    notes TEXT,
+    sub_recipe_id INTEGER REFERENCES recipes(id)
   );
   CREATE TABLE IF NOT EXISTS recipe_steps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
