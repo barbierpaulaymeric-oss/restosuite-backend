@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "description": "RestoSuite — Professional restaurant recipe & fiche technique management",
   "main": "index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "postinstall": "npm rebuild better-sqlite3"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

@@ -3,6 +3,7 @@ services:
     name: restosuite
     env: node
     # Dependencies are in server/, not the repo root
+    # npm install triggers postinstall which rebuilds better-sqlite3 native module
     buildCommand: cd server && npm install
     startCommand: node server/index.js
     envVars:
