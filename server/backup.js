@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const dataDir = path.join(__dirname, 'data');
+const dataDir = process.env.NODE_ENV === 'production' && fs.existsSync('/data')
+  ? '/data'
+  : path.join(__dirname, 'data');
 const backupDir = path.join(dataDir, 'backups');
 const dbPath = path.join(dataDir, 'restosuite.db');
 
