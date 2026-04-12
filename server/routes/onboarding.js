@@ -4,13 +4,14 @@
 
 const express = require('express');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
 
 const router = express.Router();
 
 function hashPin(pin) {
-  return crypto.createHash('sha256').update(pin).digest('hex');
+  return bcrypt.hashSync(pin, 10);
 }
 
 // All onboarding routes require auth

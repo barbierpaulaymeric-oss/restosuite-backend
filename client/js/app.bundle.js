@@ -503,6 +503,68 @@ const API = {
   updateIngredientAllergens(id, allergenCodes) {
     return this.request(`/ingredients/${id}/allergens`, { method: "PUT", body: { allergen_codes: allergenCodes } });
   },
+  // ─── Carbon ───
+  getCarbonRecipes() {
+    return this.request("/carbon/recipes");
+  },
+  getCarbonGlobal(days) {
+    const qs = days ? `?days=${days}` : "";
+    return this.request(`/carbon/global${qs}`);
+  },
+  getCarbonTargets() {
+    return this.request("/carbon/targets");
+  },
+  saveCarbonTarget(data) {
+    return this.request("/carbon/targets", { method: "POST", body: data });
+  },
+  // ─── Multi-Site ───
+  getSites() {
+    return this.request("/sites");
+  },
+  getSite(id) {
+    return this.request(`/sites/${id}`);
+  },
+  createSite(data) {
+    return this.request("/sites", { method: "POST", body: data });
+  },
+  updateSite(id, data) {
+    return this.request(`/sites/${id}`, { method: "PUT", body: data });
+  },
+  deleteSite(id) {
+    return this.request(`/sites/${id}`, { method: "DELETE" });
+  },
+  compareSites(days) {
+    const qs = days ? `?days=${days}` : "";
+    return this.request(`/sites/compare/all${qs}`);
+  },
+  // ─── Deliveries (extra) ───
+  createDelivery(data) {
+    return this.request("/deliveries", { method: "POST", body: data });
+  },
+  // ─── Alerts ───
+  getAlertsDailySummary() {
+    return this.request("/alerts/daily-summary");
+  },
+  // ─── Predictions ───
+  getDemandPredictions(refresh) {
+    const qs = refresh ? "?refresh=true" : "";
+    return this.request(`/predictions/demand${qs}`);
+  },
+  savePredictionAccuracy(data) {
+    return this.request("/predictions/accuracy", { method: "POST", body: data });
+  },
+  getPredictionAccuracy(days) {
+    const qs = days ? `?days=${days}` : "";
+    return this.request(`/predictions/accuracy${qs}`);
+  },
+  // ─── Health History ───
+  saveHealthScore(score) {
+    return this.request("/health/score", { method: "POST", body: { score } });
+  },
+  getHealthHistory(days) {
+    const qs = days ? `?days=${days}` : "";
+    return this.request(`/health/history${qs}`);
+  },
   // AI
   parseVoice(text) {
     return this.request("/ai/parse-voice", { method: "POST", body: { text } });
@@ -717,7 +779,8 @@ async function renderDashboard() {
   lucide.createIcons();
   let recipes = [];
   try {
-    recipes = await API.getRecipes();
+    const response = await API.getRecipes();
+    recipes = response.recipes || [];
   } catch (e) {
     showToast("Erreur de chargement", "error");
   }
@@ -7002,16 +7065,16 @@ class MoreView {
         ` : ""}
 
         ${canAccess(["gerant"]) ? `
-        <div class="more-card more-card--coming">
+        <a href="#/supplier-portal" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
           <div class="more-card__icon" style="background: var(--color-primary-light)">
             <i data-lucide="truck"></i>
           </div>
           <div class="more-card__content">
             <h3>Portail Fournisseur</h3>
-            <span class="badge badge--warning">Bient\xF4t</span>
+            <span class="badge badge--success">Actif</span>
           </div>
           <p class="text-secondary text-sm">Vos fournisseurs mettent \xE0 jour leurs catalogues et prix directement</p>
-        </div>
+        </a>
         ` : ""}
 
         ${canAccess(["gerant"]) ? `

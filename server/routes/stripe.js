@@ -24,11 +24,16 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   let event;
 
   try {
-    if (process.env.STRIPE_WEBHOOK_SECRET) {
-      event = s.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-    } else {
-      // In dev without webhook secret, parse body directly
+    if (!process.env.STRIPE_WEBHOOK_SECRET) {
+      // CRITICAL: In production, webhook secret MUST be set
+      if (process.env.NODE_ENV === 'production') {
+        console.error('WEBHOOK REJECTED: STRIPE_WEBHOOK_SECRET not set in production');
+        return res.status(400).json({ error: 'Webhook secret not configured' });
+      }
+      // In development without webhook secret, parse body directly (for testing only)
       event = JSON.parse(req.body.toString());
+    } else {
+      event = s.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
     }
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);

@@ -48,7 +48,8 @@ async function renderDashboard() {
 
   let recipes = [];
   try {
-    recipes = await API.getRecipes();
+    const response = await API.getRecipes();
+    recipes = response.recipes || [];
   } catch (e) {
     showToast('Erreur de chargement', 'error');
   }

@@ -10,7 +10,11 @@ const { requireAuth } = require('./auth');
 const router = express.Router();
 
 function hashPin(pin) {
-  return crypto.createHash('sha256').update(pin).digest('hex');
+  return bcrypt.hashSync(pin, 10);
+}
+
+function verifyPin(pin, hash) {
+  return bcrypt.compareSync(pin, hash);
 }
 
 const GERANT_PERMISSIONS = {
@@ -77,8 +81,7 @@ router.post('/login', (req, res) => {
       return res.status(404).json({ error: 'Compte introuvable' });
     }
 
-    const hashedPin = hashPin(pin);
-    if (account.pin !== hashedPin) {
+    if (!account.pin || !verifyPin(pin, account.pin)) {
       return res.status(401).json({ error: 'PIN incorrect' });
     }
 
@@ -274,8 +277,8 @@ router.delete('/:id', (req, res) => {
   res.json({ success: true });
 });
 
-// GET /api/accounts/:id/export — RGPD data export
-router.get('/:id/export', (req, res) => {
+// GET /api/accounts/:id/export — RGPD data export (requires auth)
+router.get('/:id/export', requireAuth, (req, res) => {
   const { id } = req.params;
 
   const account = get('SELECT id, name, role, created_at, last_login FROM accounts WHERE id = ?', [id]);

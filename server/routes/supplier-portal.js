@@ -13,7 +13,11 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'restosuite-dev-secret-2026';
 
 function hashPin(pin) {
-  return crypto.createHash('sha256').update(pin).digest('hex');
+  return bcrypt.hashSync(pin, 10);
+}
+
+function verifyPin(pin, hash) {
+  return bcrypt.compareSync(pin, hash);
 }
 
 function generateToken() {
@@ -227,8 +231,7 @@ router.post('/member-pin', (req, res) => {
     return res.status(404).json({ error: 'Compte introuvable pour ce fournisseur' });
   }
 
-  const hashedPin = hashPin(pin);
-  if (account.pin !== hashedPin) {
+  if (!account.pin || !verifyPin(pin, account.pin)) {
     return res.status(401).json({ error: 'PIN incorrect' });
   }
 
