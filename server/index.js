@@ -26,7 +26,24 @@ if (process.env.NODE_ENV === 'production') {
   console.warn('⚠️  WARNING: JWT_SECRET not set or too short. Using default (NOT SAFE FOR PRODUCTION).');
 }
 
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://www.restosuite.fr', 'https://restosuite.fr']
+    : true,
+  credentials: true
+}));
+
+app.disable('x-powered-by');
+
+// HTTP → HTTPS redirect in production
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.headers['x-forwarded-proto'] !== 'https') {
+      return res.redirect(301, `https://${req.hostname}${req.url}`);
+    }
+    next();
+  });
+}
 
 // Security headers
 app.use((req, res, next) => {
@@ -34,6 +51,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.stripe.com https://generativelanguage.googleapis.com; frame-src https://js.stripe.com;");
   if (process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
