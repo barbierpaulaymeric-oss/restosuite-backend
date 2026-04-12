@@ -15,7 +15,16 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/png" href="favicon.png">
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script>
+    // Fallback: if Lucide CDN fails, provide a no-op to prevent crashes
+    window.addEventListener('DOMContentLoaded', function() {
+      if (typeof lucide === 'undefined') {
+        window.lucide = { createIcons: function() {} };
+        console.warn('Lucide CDN unavailable — icons disabled');
+      }
+    });
+  </script>
 </head>
 <body>
   <a href="#app" class="skip-link">Aller au contenu principal</a>
