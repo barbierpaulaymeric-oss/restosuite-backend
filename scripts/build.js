@@ -47,6 +47,7 @@ const JS_FILES = [
   'js/views/mercuriale.js',
   'js/views/import-mercuriale.js',
   'js/views/ai-chef.js',
+  'js/views/ai-assistant.js',
   'js/views/menu-engineering.js',
   'js/views/carbon.js',
   'js/views/integrations.js',
@@ -57,6 +58,7 @@ const JS_FILES = [
   'js/views/qrcodes.js',
   'js/views/command-palette.js',
   'js/views/errors-log.js',
+  'js/floating-ai-bubble.js',
   'js/router.js',
   'js/app.js',
 ];

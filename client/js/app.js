@@ -204,6 +204,7 @@ function registerRoutes() {
   Router.add(/^\/orders\/(\d+)$/, (id) => renderOrderDetail(parseInt(id)));
   Router.add(/^\/kitchen$/, renderKitchenView);
   Router.add(/^\/suppliers$/, renderSuppliers);
+  Router.add(/^\/ia$/, renderAIAssistant);
   Router.add(/^\/haccp$/, renderHACCPDashboard);
   Router.add(/^\/haccp\/temperatures$/, renderHACCPTemperatures);
   Router.add(/^\/haccp\/cleaning$/, renderHACCPCleaning);

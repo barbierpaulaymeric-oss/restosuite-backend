@@ -884,6 +884,402 @@ DOMAINES D'EXPERTISE :
   }
 });
 
+// ═══════════════════════════════════════════
+// POST /api/ai/assistant — Advanced AI with action detection
+// ═══════════════════════════════════════════
+router.post('/assistant', async (req, res) => {
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+
+  const { message, conversation_history, context_page, context_id } = req.body;
+  const user = req.user; // From requireAuth middleware
+
+  if (!message) return res.status(400).json({ error: 'Message requis' });
+
+  try {
+    // Build restaurant context from real data
+    const context = buildRestaurantContext();
+
+    // Fetch page-specific context if provided
+    let pageContext = '';
+    if (context_page && context_id) {
+      pageContext = buildPageContext(context_page, context_id);
+    }
+
+    const systemPrompt = `Tu es "Chef", l'assistant IA expert de RestoSuite. Tu connais parfaitement ce restaurant et ses données.
+
+CONTEXTE DU RESTAURANT :
+${context}
+${pageContext}
+
+CAPACITÉS D'ACTION :
+Tu peux détecter les demandes d'action et retourner un plan d'action structuré. Les types d'actions possibles :
+- add_ingredient: ajouter un ingrédient à une recette
+- modify_ingredient: modifier quantité/notes d'un ingrédient
+- remove_ingredient: supprimer un ingrédient
+- create_recipe: créer une nouvelle fiche technique
+- modify_recipe: modifier les paramètres d'une recette (portions, prix, etc)
+- delete_recipe: supprimer une recette
+- add_supplier: créer un nouveau fournisseur
+- create_order: créer une commande
+- record_temperature: enregistrer une température HACCP
+- record_loss: enregistrer une perte stock
+- modify_supplier_price: modifier le prix d'un ingrédient chez un fournisseur
+
+RÈGLES :
+- Réponds en français, de manière concise et professionnelle
+- Base tes réponses sur les données réelles du restaurant ci-dessus
+- Pour les questions sur les coûts, utilise les prix et food cost réels
+- Pour les conseils, sois pratique et actionnable
+- Si tu ne connais pas une info spécifique, dis-le honnêtement
+- Tu peux suggérer des optimisations basées sur les données
+- Formate tes réponses de manière claire avec des paragraphes courts
+- Respecte les rôles : ${user.role}. Utilise \`requires_confirmation: true\` pour toute action modifiant les données
+- JAMAIS d'HTML ou de Markdown. Texte brut avec retours à la ligne (\n) pour les listes
+
+DOMAINES D'EXPERTISE :
+- Fiches techniques et costing
+- Gestion des stocks et approvisionnement
+- HACCP et hygiène alimentaire
+- Analyse de marge et food cost
+- Optimisation des pertes
+- Gestion fournisseurs
+- Réglementation restauration (allergènes INCO, traçabilité)
+- Conseils culinaires et techniques`;
+
+    // Build conversation
+    const contents = [];
+
+    // Add system context as first user message
+    contents.push({
+      role: 'user',
+      parts: [{ text: systemPrompt + '\n\nVoici ma première question : Bonjour !' }]
+    });
+    contents.push({
+      role: 'model',
+      parts: [{ text: 'Bonjour ! Je suis Chef, votre assistant IA RestoSuite. Je connais les données de votre restaurant et je peux effectuer des actions pour vous. Que puis-je faire ?' }]
+    });
+
+    // Add conversation history
+    if (conversation_history && Array.isArray(conversation_history)) {
+      for (const msg of conversation_history.slice(-10)) { // Keep last 10 exchanges
+        contents.push({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }]
+        });
+      }
+    }
+
+    // Add current message
+    contents.push({
+      role: 'user',
+      parts: [{ text: message }]
+    });
+
+    // First call: get text response and action detection
+    const response = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2048,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            properties: {
+              reply: { type: 'string', description: 'Réponse textuelle au message' },
+              actions: {
+                type: 'array',
+                description: 'Actions détectées',
+                items: {
+                  type: 'object',
+                  properties: {
+                    type: { type: 'string', enum: ['add_ingredient', 'modify_ingredient', 'remove_ingredient', 'create_recipe', 'modify_recipe', 'delete_recipe', 'add_supplier', 'create_order', 'record_temperature', 'record_loss', 'modify_supplier_price'] },
+                    description: { type: 'string' },
+                    params: { type: 'object' },
+                    requires_confirmation: { type: 'boolean' }
+                  },
+                  required: ['type', 'description', 'params', 'requires_confirmation']
+                }
+              }
+            },
+            required: ['reply']
+          }
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('Gemini Assistant error:', err);
+      return res.status(502).json({ error: 'Erreur service IA' });
+    }
+
+    const data = await response.json();
+    let result = { reply: '', actions: [] };
+
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (content) {
+      try {
+        // Try to parse as JSON (structured output)
+        const parsed = typeof content === 'string' ? JSON.parse(content) : content;
+        result = {
+          reply: parsed.reply || '',
+          actions: parsed.actions || []
+        };
+      } catch (e) {
+        // Fallback: treat as plain text response
+        result.reply = content;
+      }
+    }
+
+    if (!result.reply) return res.status(502).json({ error: 'Réponse IA vide' });
+
+    // Filter actions based on user role
+    if (result.actions && result.actions.length > 0) {
+      result.actions = filterActionsByRole(result.actions, user.role);
+    }
+
+    res.json(result);
+  } catch (e) {
+    console.error('Chef AI error:', e);
+    res.status(500).json({ error: 'Erreur assistant', details: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════
+// POST /api/ai/execute-action — Execute a confirmed action
+// ═══════════════════════════════════════════
+router.post('/execute-action', async (req, res) => {
+  const { type, params } = req.body;
+  const user = req.user;
+
+  if (!type || !params) {
+    return res.status(400).json({ error: 'type et params requis' });
+  }
+
+  try {
+    let result = null;
+
+    switch (type) {
+      case 'add_ingredient': {
+        // Add ingredient to a recipe
+        const { recipe_id, ingredient_id, gross_quantity, unit, notes } = params;
+        if (!recipe_id || !ingredient_id) {
+          return res.status(400).json({ error: 'recipe_id et ingredient_id requis' });
+        }
+        run(
+          'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, gross_quantity, unit, notes) VALUES (?, ?, ?, ?, ?)',
+          [recipe_id, ingredient_id, gross_quantity || 0, unit || 'g', notes || '']
+        );
+        result = { success: true, message: 'Ingrédient ajouté' };
+        break;
+      }
+
+      case 'modify_ingredient': {
+        // Update ingredient in recipe
+        const { recipe_id, ingredient_id, changes } = params;
+        if (!recipe_id || !ingredient_id) {
+          return res.status(400).json({ error: 'recipe_id et ingredient_id requis' });
+        }
+        const setClauses = [];
+        const values = [];
+        for (const [key, value] of Object.entries(changes)) {
+          if (['gross_quantity', 'net_quantity', 'unit', 'notes'].includes(key)) {
+            setClauses.push(`${key} = ?`);
+            values.push(value);
+          }
+        }
+        if (setClauses.length > 0) {
+          values.push(recipe_id, ingredient_id);
+          run(
+            `UPDATE recipe_ingredients SET ${setClauses.join(', ')} WHERE recipe_id = ? AND ingredient_id = ?`,
+            values
+          );
+        }
+        result = { success: true, message: 'Ingrédient modifié' };
+        break;
+      }
+
+      case 'remove_ingredient': {
+        const { recipe_id, ingredient_id } = params;
+        if (!recipe_id || !ingredient_id) {
+          return res.status(400).json({ error: 'recipe_id et ingredient_id requis' });
+        }
+        run('DELETE FROM recipe_ingredients WHERE recipe_id = ? AND ingredient_id = ?', [recipe_id, ingredient_id]);
+        result = { success: true, message: 'Ingrédient supprimé' };
+        break;
+      }
+
+      case 'create_recipe': {
+        const { name, category, portions, selling_price, recipe_type } = params;
+        if (!name) return res.status(400).json({ error: 'name requis' });
+        const info = run(
+          'INSERT INTO recipes (name, category, portions, selling_price, recipe_type) VALUES (?, ?, ?, ?, ?)',
+          [name, category || 'plat', portions || 1, selling_price || 0, recipe_type || 'plat']
+        );
+        result = { success: true, message: 'Fiche créée', recipe_id: info.lastInsertRowid };
+        break;
+      }
+
+      case 'modify_recipe': {
+        const { recipe_id, changes } = params;
+        if (!recipe_id) return res.status(400).json({ error: 'recipe_id requis' });
+        const setClauses = [];
+        const values = [];
+        for (const [key, value] of Object.entries(changes)) {
+          if (['name', 'category', 'portions', 'selling_price', 'recipe_type', 'description'].includes(key)) {
+            setClauses.push(`${key} = ?`);
+            values.push(value);
+          }
+        }
+        if (setClauses.length > 0) {
+          values.push(recipe_id);
+          run(`UPDATE recipes SET ${setClauses.join(', ')} WHERE id = ?`, values);
+        }
+        result = { success: true, message: 'Fiche modifiée' };
+        break;
+      }
+
+      case 'delete_recipe': {
+        const { recipe_id } = params;
+        if (!recipe_id) return res.status(400).json({ error: 'recipe_id requis' });
+        // Delete recipe_ingredients first (FK constraint)
+        run('DELETE FROM recipe_ingredients WHERE recipe_id = ?', [recipe_id]);
+        run('DELETE FROM recipes WHERE id = ?', [recipe_id]);
+        result = { success: true, message: 'Fiche supprimée' };
+        break;
+      }
+
+      case 'add_supplier': {
+        const { name, email, phone } = params;
+        if (!name) return res.status(400).json({ error: 'name requis' });
+        const info = run(
+          'INSERT INTO suppliers (name, email, phone) VALUES (?, ?, ?)',
+          [name, email || null, phone || null]
+        );
+        result = { success: true, message: 'Fournisseur créé', supplier_id: info.lastInsertRowid };
+        break;
+      }
+
+      case 'create_order': {
+        const { supplier_id, ingredient_id, quantity, unit, notes } = params;
+        if (!supplier_id || !ingredient_id) {
+          return res.status(400).json({ error: 'supplier_id et ingredient_id requis' });
+        }
+        const info = run(
+          'INSERT INTO orders (supplier_id, ingredient_id, quantity, unit, status, notes) VALUES (?, ?, ?, ?, ?, ?)',
+          [supplier_id, ingredient_id, quantity || 0, unit || 'kg', 'pending', notes || '']
+        );
+        result = { success: true, message: 'Commande créée', order_id: info.lastInsertRowid };
+        break;
+      }
+
+      case 'record_temperature': {
+        const { location, temperature, timestamp } = params;
+        if (!location || temperature === undefined) {
+          return res.status(400).json({ error: 'location et temperature requis' });
+        }
+        const info = run(
+          'INSERT INTO haccp_temperatures (location, temperature, recorded_at) VALUES (?, ?, ?)',
+          [location, temperature, timestamp || new Date().toISOString()]
+        );
+        result = { success: true, message: 'Température enregistrée', record_id: info.lastInsertRowid };
+        break;
+      }
+
+      case 'record_loss': {
+        const { ingredient_id, quantity, reason, notes } = params;
+        if (!ingredient_id || !quantity) {
+          return res.status(400).json({ error: 'ingredient_id et quantity requis' });
+        }
+        run(
+          'INSERT INTO stock_movements (ingredient_id, quantity, movement_type, reason, notes, recorded_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [ingredient_id, -Math.abs(quantity), 'perte', reason || '', notes || '', new Date().toISOString()]
+        );
+        result = { success: true, message: 'Perte enregistrée' };
+        break;
+      }
+
+      case 'modify_supplier_price': {
+        const { supplier_id, ingredient_id, price, unit } = params;
+        if (!supplier_id || !ingredient_id || price === undefined) {
+          return res.status(400).json({ error: 'supplier_id, ingredient_id et price requis' });
+        }
+        run(
+          'INSERT OR REPLACE INTO supplier_prices (supplier_id, ingredient_id, price, unit, last_updated) VALUES (?, ?, ?, ?, ?)',
+          [supplier_id, ingredient_id, price, unit || 'kg', new Date().toISOString()]
+        );
+        result = { success: true, message: 'Prix mis à jour' };
+        break;
+      }
+
+      default:
+        return res.status(400).json({ error: `Action non reconnue: ${type}` });
+    }
+
+    res.json(result);
+  } catch (e) {
+    console.error('Execute action error:', e);
+    res.status(500).json({ error: 'Erreur exécution action', details: e.message });
+  }
+});
+
+function filterActionsByRole(actions, role) {
+  // Restrict certain actions based on role
+  const roleRestrictions = {
+    'cuisinier': ['create_recipe', 'delete_recipe', 'add_supplier', 'modify_supplier_price'],
+    'equipier': ['add_ingredient', 'modify_ingredient', 'create_recipe', 'delete_recipe', 'add_supplier', 'create_order', 'modify_supplier_price'],
+    'salle': ['add_ingredient', 'modify_ingredient', 'create_recipe', 'delete_recipe', 'add_supplier', 'create_order', 'modify_supplier_price'],
+  };
+
+  if (!roleRestrictions[role]) {
+    return actions; // gerant has full access
+  }
+
+  return actions.filter(action => !roleRestrictions[role].includes(action.type));
+}
+
+function buildPageContext(page, id) {
+  try {
+    if (page === 'recipe' && id) {
+      const recipe = get('SELECT * FROM recipes WHERE id = ?', [id]);
+      if (!recipe) return '';
+
+      const ingredients = all(
+        'SELECT ri.*, i.name, i.price_per_unit FROM recipe_ingredients ri JOIN ingredients i ON i.id = ri.ingredient_id WHERE ri.recipe_id = ?',
+        [id]
+      );
+
+      let totalCost = 0;
+      const ingList = ingredients.map(ing => {
+        const costPerBase = ing.price_per_unit ? ing.price_per_unit / (ing.price_unit === 'kg' ? 1000 : 1) : 0;
+        const qty = ing.gross_quantity * (ing.unit === 'kg' ? 1000 : ing.unit === 'l' ? 1000 : 1);
+        const cost = qty * costPerBase;
+        totalCost += cost;
+        return `${ing.name} (${ing.gross_quantity}${ing.unit})`;
+      }).join(', ');
+
+      return `\n\nCONTEXTE RECETTE :
+Fiche: "${recipe.name}" (${recipe.portions} portions, prix vente ${recipe.selling_price}€)
+Ingrédients: ${ingList}
+Coût estimé: ${totalCost.toFixed(2)}€
+Food cost: ${recipe.selling_price > 0 ? (totalCost / recipe.selling_price * 100).toFixed(1) : 0}%`;
+    } else if (page === 'stock' && id) {
+      const stock = get('SELECT s.*, i.name FROM stock s JOIN ingredients i ON i.id = s.ingredient_id WHERE s.id = ?', [id]);
+      if (!stock) return '';
+      return `\n\nCONTEXTE STOCK :
+Ingrédient: "${stock.name}"
+Quantité en stock: ${stock.quantity}${stock.unit}
+Minimum: ${stock.min_quantity}${stock.unit}`;
+    }
+    return '';
+  } catch (e) {
+    return '';
+  }
+}
+
 function buildRestaurantContext() {
   try {
     const parts = [];
