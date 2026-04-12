@@ -310,19 +310,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_stock_movements_ingredient_id ON stock_movements(ingredient_id);
   CREATE INDEX IF NOT EXISTS idx_stock_movements_recorded_at ON stock_movements(recorded_at);
   CREATE INDEX IF NOT EXISTS idx_stock_movements_type ON stock_movements(movement_type);
-  CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
-  CREATE INDEX IF NOT EXISTS idx_order_items_recipe_id ON order_items(recipe_id);
-  CREATE INDEX IF NOT EXISTS idx_orders_restaurant_id ON orders(restaurant_id);
-  CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
-  CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
   CREATE INDEX IF NOT EXISTS idx_price_history_ingredient_id ON price_history(ingredient_id);
   CREATE INDEX IF NOT EXISTS idx_price_history_recorded_at ON price_history(recorded_at);
   CREATE INDEX IF NOT EXISTS idx_temperature_logs_zone_id ON temperature_logs(zone_id);
   CREATE INDEX IF NOT EXISTS idx_temperature_logs_recorded_at ON temperature_logs(recorded_at);
   CREATE INDEX IF NOT EXISTS idx_cleaning_logs_task_id ON cleaning_logs(task_id);
-  CREATE INDEX IF NOT EXISTS idx_accounts_restaurant_id ON accounts(restaurant_id);
-  CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(reservation_date);
-  CREATE INDEX IF NOT EXISTS idx_customers_restaurant_id ON customers(restaurant_id);
 `);
 
 // ─── HACCP: Seed default zones & cleaning tasks ───
@@ -438,6 +430,10 @@ try {
       notes TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+    CREATE INDEX IF NOT EXISTS idx_order_items_recipe_id ON order_items(recipe_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
+    CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
   `);
 } catch (e) {
   // Tables may already exist
@@ -574,6 +570,7 @@ try {
     db.exec("ALTER TABLE accounts ADD COLUMN is_owner INTEGER DEFAULT 0");
     console.log('✅ Migration: added is_owner to accounts');
   }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_accounts_restaurant_id ON accounts(restaurant_id)");
 } catch (e) {
   console.error('Migration auth columns error:', e.message);
 }
@@ -617,6 +614,7 @@ try {
   if (pinCol && pinCol.notnull === 1) {
     // Get all current column names for the copy
     const colNames = accPinCols.map(c => c.name).join(', ');
+    db.exec(`DROP TABLE IF EXISTS accounts_new`);
     db.exec(`
       CREATE TABLE accounts_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -717,6 +715,7 @@ try {
     }
     console.log('✅ Migration: added restaurant_id to orders');
   }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_orders_restaurant_id ON orders(restaurant_id)");
 } catch (e) {
   console.error('Migration orders restaurant_id error:', e.message);
 }

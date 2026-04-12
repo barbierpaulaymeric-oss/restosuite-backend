@@ -33,6 +33,7 @@ try {
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   )`);
+  run(`CREATE INDEX IF NOT EXISTS idx_customers_restaurant_id ON customers(restaurant_id)`);
 } catch {}
 
 try {

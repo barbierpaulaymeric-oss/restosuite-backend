@@ -50,6 +50,7 @@ try {
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   )`);
+  run(`CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(reservation_date)`);
 } catch (e) { /* table already exists */ }
 
 // GET /api/integrations — List all integrations
