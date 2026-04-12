@@ -202,7 +202,8 @@ async function showInventoryModal() {
   const account = getAccount();
   let ingredients;
   try {
-    ingredients = await API.getIngredients();
+    const response = await API.getIngredients();
+    ingredients = response.ingredients || [];
   } catch (e) {
     showToast('Erreur chargement ingrédients', 'error');
     return;

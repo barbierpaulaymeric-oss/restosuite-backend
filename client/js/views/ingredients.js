@@ -22,7 +22,10 @@ async function renderIngredients() {
   lucide.createIcons();
 
   let ingredients = [];
-  try { ingredients = await API.getIngredients(); } catch(e) { showToast('Erreur', 'error'); }
+  try {
+    const response = await API.getIngredients();
+    ingredients = response.ingredients || [];
+  } catch(e) { showToast('Erreur', 'error'); }
 
   const listEl = document.getElementById('ing-list');
   const searchInput = document.getElementById('ing-search');
@@ -307,7 +310,10 @@ function showCSVImportModal() {
 
 async function showIngredientDetail(id) {
   let ingredients;
-  try { ingredients = await API.getIngredients(); } catch(e) { return; }
+  try {
+    const response = await API.getIngredients();
+    ingredients = response.ingredients || [];
+  } catch(e) { return; }
   const ing = ingredients.find(i => i.id === id);
   if (!ing) return;
   showIngredientModal(ing);

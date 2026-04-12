@@ -48,10 +48,13 @@ async function renderMercuriale() {
   let ingredients = [];
 
   try {
-    [alerts, ingredients] = await Promise.all([
+    const results = await Promise.all([
       API.request('/analytics/price-alerts'),
       API.getIngredients()
     ]);
+    alerts = results[0];
+    const ingredientsResponse = results[1];
+    ingredients = ingredientsResponse.ingredients || [];
   } catch (e) {
     showToast('Erreur chargement données', 'error');
   }

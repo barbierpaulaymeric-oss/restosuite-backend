@@ -195,7 +195,8 @@ async function renderNewOrder() {
   let ingredients = [];
   try {
     suppliers = await API.getSuppliers();
-    ingredients = await API.getIngredients();
+    const ingredientsResponse = await API.getIngredients();
+    ingredients = ingredientsResponse.ingredients || [];
   } catch (e) {
     showToast('Erreur chargement données', 'error');
   }

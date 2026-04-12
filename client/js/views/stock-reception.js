@@ -8,10 +8,13 @@ async function renderStockReception() {
 
   let suppliers = [], ingredients = [];
   try {
-    [suppliers, ingredients] = await Promise.all([
+    const results = await Promise.all([
       API.getSuppliers(),
       API.getIngredients()
     ]);
+    suppliers = results[0];
+    const ingredientsResponse = results[1];
+    ingredients = ingredientsResponse.ingredients || [];
   } catch (e) {
     app.innerHTML = `<div class="empty-state"><p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p></div>`;
     return;

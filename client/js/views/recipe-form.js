@@ -33,7 +33,10 @@ async function renderRecipeForm(editId) {
   }
 
   // Load ingredients for autocomplete
-  try { allIngredients = await API.getIngredients(); } catch(e) { allIngredients = []; }
+  try {
+    const response = await API.getIngredients();
+    allIngredients = response.ingredients || [];
+  } catch(e) { allIngredients = []; }
   // Load sub-recipes
   try {
     const allRecipes = await API.getRecipes();

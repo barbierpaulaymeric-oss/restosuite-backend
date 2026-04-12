@@ -1569,7 +1569,8 @@ async function renderRecipeForm(editId) {
     }
   }
   try {
-    allIngredients = await API.getIngredients();
+    const response = await API.getIngredients();
+    allIngredients = response.ingredients || [];
   } catch (e) {
     allIngredients = [];
   }
@@ -2214,7 +2215,8 @@ async function renderIngredients() {
   lucide.createIcons();
   let ingredients = [];
   try {
-    ingredients = await API.getIngredients();
+    const response = await API.getIngredients();
+    ingredients = response.ingredients || [];
   } catch (e) {
     showToast("Erreur", "error");
   }
@@ -2489,7 +2491,8 @@ function showCSVImportModal() {
 async function showIngredientDetail(id) {
   let ingredients;
   try {
-    ingredients = await API.getIngredients();
+    const response = await API.getIngredients();
+    ingredients = response.ingredients || [];
   } catch (e) {
     return;
   }
@@ -2715,7 +2718,8 @@ async function showInventoryModal() {
   const account = getAccount();
   let ingredients;
   try {
-    ingredients = await API.getIngredients();
+    const response = await API.getIngredients();
+    ingredients = response.ingredients || [];
   } catch (e) {
     showToast("Erreur chargement ingr\xE9dients", "error");
     return;
@@ -2785,10 +2789,13 @@ async function renderStockReception() {
   const account = getAccount();
   let suppliers = [], ingredients = [];
   try {
-    [suppliers, ingredients] = await Promise.all([
+    const results = await Promise.all([
       API.getSuppliers(),
       API.getIngredients()
     ]);
+    suppliers = results[0];
+    const ingredientsResponse = results[1];
+    ingredients = ingredientsResponse.ingredients || [];
   } catch (e) {
     app.innerHTML = `<div class="empty-state"><p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p></div>`;
     return;
@@ -4559,7 +4566,8 @@ async function renderNewOrder() {
   let ingredients = [];
   try {
     suppliers = await API.getSuppliers();
-    ingredients = await API.getIngredients();
+    const ingredientsResponse = await API.getIngredients();
+    ingredients = ingredientsResponse.ingredients || [];
   } catch (e) {
     showToast("Erreur chargement donn\xE9es", "error");
   }
@@ -10618,10 +10626,13 @@ async function renderMercuriale() {
   let alerts = [];
   let ingredients = [];
   try {
-    [alerts, ingredients] = await Promise.all([
+    const results = await Promise.all([
       API.request("/analytics/price-alerts"),
       API.getIngredients()
     ]);
+    alerts = results[0];
+    const ingredientsResponse = results[1];
+    ingredients = ingredientsResponse.ingredients || [];
   } catch (e) {
     showToast("Erreur chargement donn\xE9es", "error");
   }
