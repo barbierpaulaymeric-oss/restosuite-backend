@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: restosuite
+    env: node
+    # Dependencies are in server/, not the repo root
+    buildCommand: cd server && npm install
+    startCommand: node server/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # ── Required — set these in the Render dashboard ──────────────────────
+      # JWT_SECRET : strong random string (min 32 chars), e.g. openssl rand -hex 32
+      - key: JWT_SECRET
+        sync: false
+      # ── Optional — only needed if you use these features ─────────────────
+      # GEMINI_API_KEY      : for AI predictions / analytics
+      # STRIPE_SECRET_KEY   : for Stripe payments
+      # STRIPE_WEBHOOK_SECRET : for Stripe webhooks
+      # STRIPE_PRICE_ID     : Stripe price ID for subscriptions
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
