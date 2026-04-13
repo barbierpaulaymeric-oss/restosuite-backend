@@ -61,14 +61,14 @@ router.get('/checklist', (req, res) => {
   const logRow      = get('SELECT COUNT(*) as c FROM temperature_logs');
 
   const steps = [
-    { id: 'recipe',      label: 'Créez votre première fiche technique vocale', route: '#/new',                done: recipeRow.c > 0 },
-    { id: 'supplier',    label: 'Ajoutez un fournisseur',                      route: '#/suppliers',          done: supplierRow.c > 0 },
-    { id: 'temp_zone',   label: 'Configurez vos zones de température',         route: '#/haccp/temperatures', done: zoneRow.c > 0 },
-    { id: 'temp_record', label: 'Faites votre premier relevé de température',  route: '#/haccp',              done: logRow.c > 0 },
+    { id: 'recipe',      label: 'Créez votre première fiche technique vocale', link: '#/new',                done: recipeRow.c > 0 },
+    { id: 'supplier',    label: 'Ajoutez un fournisseur',                      link: '#/suppliers',          done: supplierRow.c > 0 },
+    { id: 'temp_zone',   label: 'Configurez vos zones de température',         link: '#/haccp/temperatures', done: zoneRow.c > 0 },
+    { id: 'temp_record', label: 'Faites votre premier relevé de température',  link: '#/haccp',              done: logRow.c > 0 },
   ];
 
   const doneCount = steps.filter(s => s.done).length;
-  res.json({ steps, progress: doneCount / steps.length });
+  res.json({ steps, progress: doneCount / steps.length, completed: doneCount === steps.length });
 });
 
 // ─── PUT /api/onboarding/step/1 — Profil gérant ───

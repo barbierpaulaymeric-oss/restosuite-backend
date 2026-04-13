@@ -791,6 +791,7 @@ document.addEventListener("keydown", function(e) {
 async function renderOnboardingChecklist() {
   const container = document.getElementById("dashboard-onboarding");
   if (!container) return;
+  if (localStorage.getItem("hideOnboarding") === "1") return;
   try {
     const data = await API.getOnboardingChecklist();
     if (!data || data.progress >= 1) {
@@ -801,15 +802,18 @@ async function renderOnboardingChecklist() {
     container.innerHTML = `
       <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-          <h3 style="margin:0;font-size:var(--text-base)">\u{1F680} Prise en main</h3>
-          <span style="font-size:var(--text-sm);font-weight:600;color:var(--color-accent)">${pct}%</span>
+          <h3 style="margin:0;font-size:var(--text-base)">Premiers pas avec RestoSuite</h3>
+          <div style="display:flex;align-items:center;gap:var(--space-3)">
+            <span style="font-size:var(--text-sm);font-weight:600;color:var(--color-accent)">${pct}%</span>
+            <button id="hide-onboarding-btn" style="background:none;border:none;cursor:pointer;color:var(--text-tertiary);font-size:var(--text-sm);padding:2px 6px;border-radius:var(--radius-sm)" title="Masquer">Masquer</button>
+          </div>
         </div>
         <div style="height:6px;background:var(--bg-sunken);border-radius:var(--radius-full);margin-bottom:var(--space-3);overflow:hidden">
           <div style="height:100%;width:${pct}%;background:var(--color-accent);border-radius:var(--radius-full);transition:width 0.6s ease"></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:var(--space-2)">
           ${data.steps.map((step) => `
-            <a ${step.done ? "" : `href="${step.route}"`} class="onboarding-step${step.done ? " done" : ""}" style="${step.done ? "pointer-events:none" : ""}">
+            <a ${step.done ? "" : `href="${step.link}"`} class="onboarding-step${step.done ? " done" : ""}" style="${step.done ? "pointer-events:none" : ""}">
               <span class="onboarding-step__check">
                 ${step.done ? '<i data-lucide="check-circle-2" style="color:var(--color-success);width:20px;height:20px;flex-shrink:0"></i>' : '<i data-lucide="circle" style="color:var(--text-tertiary);width:20px;height:20px;flex-shrink:0"></i>'}
               </span>
@@ -821,6 +825,10 @@ async function renderOnboardingChecklist() {
       </div>
     `;
     if (window.lucide) lucide.createIcons({ nodes: [container] });
+    document.getElementById("hide-onboarding-btn").addEventListener("click", () => {
+      localStorage.setItem("hideOnboarding", "1");
+      container.innerHTML = "";
+    });
   } catch (e) {
     if (container) container.innerHTML = "";
   }
@@ -14965,11 +14973,19 @@ const NAV_GROUPS = {
       { label: "Cuisine (\xE9cran)", route: "/kitchen", icon: "chef-hat", roles: ["gerant", "cuisinier"] }
     ]
   },
-  conformite: {
-    label: "Conformit\xE9",
+  config: {
+    label: "Param\xE8tres",
     items: [
-      { label: "HACCP", route: "/haccp", icon: "shield-check", roles: ["gerant", "cuisinier"] },
-      { label: "Allerg\xE8nes", route: "/haccp/allergens", icon: "triangle-alert", roles: ["gerant", "cuisinier"] }
+      { label: "\xC9quipe", route: "/team", icon: "users", roles: ["gerant"] },
+      { label: "CRM & Fid\xE9lit\xE9", route: "/crm", icon: "heart", roles: ["gerant"] },
+      { label: "Int\xE9grations", route: "/integrations", icon: "plug", roles: ["gerant"] },
+      { label: "QR Codes", route: "/qrcodes", icon: "qr-code", roles: ["gerant"] },
+      { label: "Bilan Carbone", route: "/carbon", icon: "leaf", roles: ["gerant"] },
+      { label: "Multi-Sites", route: "/multi-site", icon: "building-2", roles: ["gerant"] },
+      { label: "API", route: "/api-keys", icon: "key", roles: ["gerant"] },
+      { label: "Portail Fournisseur", route: "/supplier-portal", icon: "truck", roles: ["gerant"] },
+      { label: "Journal erreurs", route: "/errors-log", icon: "bug", roles: ["gerant"] },
+      { label: "Se d\xE9connecter", route: null, icon: "log-out", roles: ["gerant", "cuisinier", "equipier"], action: "logout" }
     ]
   },
   pilotage: {
@@ -14996,26 +15012,23 @@ const ROUTE_TO_GROUP = {
   "/service": "operations",
   "/kitchen": "operations",
   "/scan-invoice": "operations",
-  "/haccp": "conformite",
   "/analytics": "pilotage",
   "/health": "pilotage",
   "/menu-engineering": "pilotage",
   "/predictions": "pilotage",
   "/mercuriale": "pilotage",
   "/import-mercuriale": "pilotage",
-  "/chef": "ia",
-  "/ia": "ia",
-  "/more": "plus",
-  "/team": "plus",
-  "/integrations": "plus",
-  "/multi-site": "plus",
-  "/api-keys": "plus",
-  "/qrcodes": "plus",
-  "/carbon": "plus",
-  "/supplier-portal": "plus",
-  "/errors-log": "plus",
-  "/crm": "plus",
-  "/subscribe": "plus"
+  "/more": "config",
+  "/team": "config",
+  "/integrations": "config",
+  "/multi-site": "config",
+  "/api-keys": "config",
+  "/qrcodes": "config",
+  "/carbon": "config",
+  "/supplier-portal": "config",
+  "/errors-log": "config",
+  "/crm": "config",
+  "/subscribe": "config"
 };
 document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -15276,6 +15289,12 @@ function initNavGroups(role) {
     panelContent.innerHTML = `
       <div class="nav-panel-title">${escapeHtml(group.label)}</div>
       ${accessible.map((item) => {
+      if (item.action === "logout") {
+        return `<button class="nav-panel-item nav-panel-item--danger" onclick="logout()">
+            <i data-lucide="${item.icon}"></i>
+            ${escapeHtml(item.label)}
+          </button>`;
+      }
       const isActive = currentPath === item.route || item.route !== "/" && currentPath.startsWith(item.route);
       return `<a href="#${item.route}" class="nav-panel-item${isActive ? " active" : ""}">
           <i data-lucide="${item.icon}"></i>

@@ -5,6 +5,7 @@
 async function renderOnboardingChecklist() {
   const container = document.getElementById('dashboard-onboarding');
   if (!container) return;
+  if (localStorage.getItem('hideOnboarding') === '1') return;
   try {
     const data = await API.getOnboardingChecklist();
     if (!data || data.progress >= 1) { container.innerHTML = ''; return; }
@@ -13,15 +14,18 @@ async function renderOnboardingChecklist() {
     container.innerHTML = `
       <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-          <h3 style="margin:0;font-size:var(--text-base)">🚀 Prise en main</h3>
-          <span style="font-size:var(--text-sm);font-weight:600;color:var(--color-accent)">${pct}%</span>
+          <h3 style="margin:0;font-size:var(--text-base)">Premiers pas avec RestoSuite</h3>
+          <div style="display:flex;align-items:center;gap:var(--space-3)">
+            <span style="font-size:var(--text-sm);font-weight:600;color:var(--color-accent)">${pct}%</span>
+            <button id="hide-onboarding-btn" style="background:none;border:none;cursor:pointer;color:var(--text-tertiary);font-size:var(--text-sm);padding:2px 6px;border-radius:var(--radius-sm)" title="Masquer">Masquer</button>
+          </div>
         </div>
         <div style="height:6px;background:var(--bg-sunken);border-radius:var(--radius-full);margin-bottom:var(--space-3);overflow:hidden">
           <div style="height:100%;width:${pct}%;background:var(--color-accent);border-radius:var(--radius-full);transition:width 0.6s ease"></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:var(--space-2)">
           ${data.steps.map(step => `
-            <a ${step.done ? '' : `href="${step.route}"`} class="onboarding-step${step.done ? ' done' : ''}" style="${step.done ? 'pointer-events:none' : ''}">
+            <a ${step.done ? '' : `href="${step.link}"`} class="onboarding-step${step.done ? ' done' : ''}" style="${step.done ? 'pointer-events:none' : ''}">
               <span class="onboarding-step__check">
                 ${step.done
                   ? '<i data-lucide="check-circle-2" style="color:var(--color-success);width:20px;height:20px;flex-shrink:0"></i>'
@@ -36,6 +40,10 @@ async function renderOnboardingChecklist() {
       </div>
     `;
     if (window.lucide) lucide.createIcons({ nodes: [container] });
+    document.getElementById('hide-onboarding-btn').addEventListener('click', () => {
+      localStorage.setItem('hideOnboarding', '1');
+      container.innerHTML = '';
+    });
   } catch (e) {
     if (container) container.innerHTML = '';
   }
