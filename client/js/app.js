@@ -59,8 +59,7 @@ const NAV_GROUPS = {
   pilotage: {
     label: 'Pilotage',
     items: [
-      { label: 'Santé du restaurant', route: '/health',           icon: 'heart-pulse',  roles: ['gerant'] },
-      { label: 'Analytics',           route: '/analytics',        icon: 'bar-chart-3',  roles: ['gerant'] },
+      { label: 'Pilotage',             route: '/analytics',        icon: 'bar-chart-3',  roles: ['gerant'] },
       { label: 'Menu Engineering',    route: '/menu-engineering', icon: 'target',       roles: ['gerant'] },
       { label: 'Prédictions IA',      route: '/predictions',      icon: 'brain',        roles: ['gerant'] },
       { label: 'Mercuriale',          route: '/mercuriale',       icon: 'trending-up',  roles: ['gerant'] },
@@ -74,7 +73,7 @@ const ROUTE_TO_GROUP = {
   '/orders': 'operations', '/suppliers': 'operations',
   '/deliveries': 'operations', '/service': 'operations',
   '/kitchen': 'operations', '/scan-invoice': 'operations',
-  '/analytics': 'pilotage', '/health': 'pilotage',
+  '/analytics': 'pilotage',
   '/menu-engineering': 'pilotage', '/predictions': 'pilotage',
   '/mercuriale': 'pilotage', '/import-mercuriale': 'pilotage',
   '/more': 'config', '/team': 'config', '/integrations': 'config',
@@ -277,7 +276,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/non-conformities$/, renderHACCPNonConformities);
   Router.add(/^\/haccp\/allergens$/, renderHACCPAllergens);
   Router.add(/^\/analytics$/, renderAnalytics);
-  Router.add(/^\/health$/, renderHealthDashboard);
+  Router.add(/^\/health$/, () => { location.hash = '#/analytics'; });
   Router.add(/^\/more$/, () => new MoreView().render());
   Router.add(/^\/team$/, renderTeam);
   Router.add(/^\/subscribe$/, renderSubscribe);

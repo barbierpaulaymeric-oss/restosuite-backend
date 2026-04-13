@@ -7175,8 +7175,8 @@ async function renderAnalytics() {
   }
   app.innerHTML = `
     <div class="view-header">
-      <h1>\u{1F4CA} Analytics</h1>
-      <p class="text-secondary">Vue d'ensemble \xB7 Food cost \xB7 Stock \xB7 HACCP \xB7 IA</p>
+      <h1>\u{1F4CA} Pilotage</h1>
+      <p class="text-secondary">Score de sant\xE9 \xB7 Food cost \xB7 Stock \xB7 HACCP \xB7 Fournisseurs \xB7 IA</p>
     </div>
     <div class="analytics-loading">
       <div class="spinner"></div>
@@ -7184,20 +7184,24 @@ async function renderAnalytics() {
     </div>
   `;
   try {
-    const [kpis, foodCost, stockData, pricesData, haccpData, insightsData] = await Promise.all([
+    const [kpis, foodCost, stockData, pricesData, haccpData, insightsData, varianceSummary, dailyAlerts, stockAlerts, availability] = await Promise.all([
       API.getAnalyticsKPIs(),
       API.getAnalyticsFoodCost(),
       API.getAnalyticsStock(),
       API.getAnalyticsPrices(),
       API.getAnalyticsHACCP(),
-      API.getAnalyticsInsights()
+      API.getAnalyticsInsights(),
+      API.getVarianceSummary().catch(() => ({ total_loss_value: 0, total_purchase_value: 0, loss_ratio_pct: 0, ingredients_with_losses: 0, health: "good" })),
+      API.request("/alerts/daily-summary").catch(() => null),
+      API.getStockAlerts().catch(() => []),
+      API.getRecipeAvailability().catch(() => null)
     ]);
-    renderAnalyticsDashboard(kpis, foodCost, stockData, pricesData, haccpData, insightsData);
+    renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpData, insightsData, varianceSummary, dailyAlerts, stockAlerts, availability);
   } catch (e) {
-    console.error("Analytics error:", e);
+    console.error("Pilotage error:", e);
     app.innerHTML = `
       <div class="view-header">
-        <h1>\u{1F4CA} Analytics</h1>
+        <h1>\u{1F4CA} Pilotage</h1>
       </div>
       <div class="empty-state">
         <div class="empty-icon">\u26A0\uFE0F</div>
@@ -7208,8 +7212,54 @@ async function renderAnalytics() {
     `;
   }
 }
-function renderAnalyticsDashboard(kpis, foodCost, stockData, pricesData, haccpData, insightsData) {
+function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpData, insightsData, variance, alerts, stockAlerts, availability) {
   const app = document.getElementById("app");
+  let healthScore = 100;
+  const issues = [];
+  if (kpis.avg_food_cost_pct > 35) {
+    healthScore -= 20;
+    issues.push({ icon: "\u{1F534}", text: `Food cost moyen \xE9lev\xE9 : ${kpis.avg_food_cost_pct.toFixed(1)}% (cible < 30%)`, severity: "critical" });
+  } else if (kpis.avg_food_cost_pct > 30) {
+    healthScore -= 10;
+    issues.push({ icon: "\u{1F7E1}", text: `Food cost moyen acceptable : ${kpis.avg_food_cost_pct.toFixed(1)}% (cible < 30%)`, severity: "warning" });
+  }
+  if (variance.health === "critical") {
+    healthScore -= 20;
+    issues.push({ icon: "\u{1F534}", text: `Pertes \xE9lev\xE9es : ratio ${variance.loss_ratio_pct.toFixed(1)}% des achats`, severity: "critical" });
+  } else if (variance.health === "warning") {
+    healthScore -= 10;
+    issues.push({ icon: "\u{1F7E1}", text: `Pertes \xE0 surveiller : ratio ${variance.loss_ratio_pct.toFixed(1)}% des achats`, severity: "warning" });
+  }
+  if (stockAlerts.length > 5) {
+    healthScore -= 15;
+    issues.push({ icon: "\u{1F534}", text: `${stockAlerts.length} alertes de stock bas`, severity: "critical" });
+  } else if (stockAlerts.length > 0) {
+    healthScore -= 5;
+    issues.push({ icon: "\u{1F7E1}", text: `${stockAlerts.length} alerte(s) de stock bas`, severity: "warning" });
+  }
+  const tempCompliance = haccpData.temperature_compliance_7d || 100;
+  const cleanCompliance = haccpData.cleaning_compliance_7d || 100;
+  if (tempCompliance < 80 || cleanCompliance < 80) {
+    healthScore -= 15;
+    issues.push({ icon: "\u{1F534}", text: `HACCP insuffisant : temp\xE9ratures ${tempCompliance}%, nettoyage ${cleanCompliance}%`, severity: "critical" });
+  } else if (tempCompliance < 95 || cleanCompliance < 95) {
+    healthScore -= 5;
+    issues.push({ icon: "\u{1F7E1}", text: `HACCP \xE0 am\xE9liorer : temp\xE9ratures ${tempCompliance}%, nettoyage ${cleanCompliance}%`, severity: "warning" });
+  }
+  if (alerts && alerts.summary && alerts.summary.critical > 0) {
+    healthScore -= 10;
+    issues.push({ icon: "\u{1F534}", text: `${alerts.summary.critical} alerte(s) critique(s) active(s) (DLC, temp\xE9ratures)`, severity: "critical" });
+  }
+  if (availability && availability.summary && (availability.summary.unavailable || 0) > 0) {
+    healthScore -= 5;
+    issues.push({ icon: "\u{1F7E1}", text: `${availability.summary.unavailable} recette(s) indisponible(s) par manque de stock`, severity: "warning" });
+  }
+  healthScore = Math.max(0, healthScore);
+  const scoreColor = healthScore >= 80 ? "var(--color-success)" : healthScore >= 60 ? "var(--color-warning)" : "var(--color-danger)";
+  const scoreLabel = healthScore >= 80 ? "Bon" : healthScore >= 60 ? "\xC0 surveiller" : "Critique";
+  const scoreEmoji = healthScore >= 80 ? "\u2705" : healthScore >= 60 ? "\u26A0\uFE0F" : "\u{1F6A8}";
+  const criticalCount = issues.filter((i) => i.severity === "critical").length;
+  const warningCount = issues.filter((i) => i.severity === "warning").length;
   const haccpTemp = kpis.haccp_compliance_today.temperatures;
   const haccpClean = kpis.haccp_compliance_today.cleaning;
   const haccpPct = haccpTemp.total + haccpClean.total > 0 ? Math.round((haccpTemp.done + haccpClean.done) / (haccpTemp.total + haccpClean.total) * 100) : 100;
@@ -7217,11 +7267,47 @@ function renderAnalyticsDashboard(kpis, foodCost, stockData, pricesData, haccpDa
   const fcClass = kpis.avg_food_cost_pct < 30 ? "kpi--success" : kpis.avg_food_cost_pct <= 35 ? "kpi--warning" : "kpi--danger";
   app.innerHTML = `
     <div class="view-header">
-      <h1>\u{1F4CA} Analytics</h1>
-      <p class="text-secondary">Vue d'ensemble de votre \xE9tablissement</p>
+      <h1>\u{1F4CA} Pilotage</h1>
+      <p class="text-secondary">Score de sant\xE9 \xB7 Food cost \xB7 Stock \xB7 HACCP \xB7 Fournisseurs \xB7 IA</p>
     </div>
 
-    <!-- KPIs -->
+    <!-- \u2550\u2550\u2550 Score de sant\xE9 global \u2550\u2550\u2550 -->
+    <div style="background:linear-gradient(135deg,var(--bg-elevated),var(--color-surface));border:2px solid ${scoreColor};border-radius:var(--radius-lg);padding:var(--space-5);margin-bottom:var(--space-5)">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-4)">
+        <div style="display:flex;align-items:center;gap:var(--space-4)">
+          <div style="text-align:center">
+            <div style="font-size:3rem;font-weight:800;color:${scoreColor};line-height:1">${healthScore}</div>
+            <div style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:2px">/ 100</div>
+          </div>
+          <div>
+            <div style="font-size:var(--text-lg);font-weight:600;color:var(--text-primary)">${scoreEmoji} Score de sant\xE9 \u2014 ${scoreLabel}</div>
+            <div style="font-size:var(--text-sm);color:var(--text-secondary)">
+              ${issues.length === 0 ? "Tout est en ordre, bravo !" : `${criticalCount} probl\xE8me(s), ${warningCount} avertissement(s)`}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+          <a href="#/stock/reception" class="btn btn-secondary" style="font-size:var(--text-sm)">\u{1F4E5} R\xE9ception</a>
+          <a href="#/stock/variance" class="btn btn-secondary" style="font-size:var(--text-sm)">\u{1F4CA} \xC9carts</a>
+          <a href="#/haccp" class="btn btn-secondary" style="font-size:var(--text-sm)">\u{1F6E1}\uFE0F HACCP</a>
+          <a href="#/orders" class="btn btn-secondary" style="font-size:var(--text-sm)">\u{1F4CB} Commandes</a>
+        </div>
+      </div>
+      <div style="margin-top:var(--space-3);background:var(--bg-sunken);border-radius:6px;height:8px;overflow:hidden">
+        <div style="height:100%;width:${healthScore}%;background:${scoreColor};border-radius:6px;transition:width 0.5s"></div>
+      </div>
+      ${issues.length > 0 ? `
+      <div style="margin-top:var(--space-3);display:flex;flex-direction:column;gap:var(--space-2)">
+        ${issues.map((i) => `
+          <div style="padding:var(--space-2) var(--space-3);background:${i.severity === "critical" ? "rgba(217,48,37,0.08)" : "rgba(229,161,0,0.08)"};border-radius:var(--radius-sm);border-left:3px solid ${i.severity === "critical" ? "var(--color-danger)" : "var(--color-warning)"}">
+            <span style="font-size:var(--text-sm)">${i.icon} ${i.text}</span>
+          </div>
+        `).join("")}
+      </div>
+      ` : ""}
+    </div>
+
+    <!-- \u2550\u2550\u2550 KPIs principaux \u2550\u2550\u2550 -->
     <div class="analytics-kpis">
       <div class="kpi-card ${fcClass} anim-fadeIn" style="--delay:0">
         <div class="kpi-icon">\u{1F4CA}</div>
@@ -7249,7 +7335,7 @@ function renderAnalyticsDashboard(kpis, foodCost, stockData, pricesData, haccpDa
       </div>
     </div>
 
-    <!-- Section 1: Food Cost -->
+    <!-- \u2550\u2550\u2550 Section Food Cost \u2550\u2550\u2550 -->
     <section class="analytics-section anim-fadeIn" style="--delay:4">
       <h2>\u{1F37D}\uFE0F Food Cost par recette</h2>
       ${foodCost.best_margin ? `
@@ -7286,7 +7372,7 @@ function renderAnalyticsDashboard(kpis, foodCost, stockData, pricesData, haccpDa
       </div>
     </section>
 
-    <!-- Section 2: Stock -->
+    <!-- \u2550\u2550\u2550 Section Stock \u2550\u2550\u2550 -->
     <section class="analytics-section anim-fadeIn" style="--delay:5">
       <h2>\u{1F4E6} Stock</h2>
       <div class="analytics-row">
@@ -7336,8 +7422,55 @@ function renderAnalyticsDashboard(kpis, foodCost, stockData, pricesData, haccpDa
       </div>
     </section>
 
-    <!-- Section 3: Prix Fournisseurs -->
+    <!-- \u2550\u2550\u2550 Section HACCP \u2550\u2550\u2550 -->
     <section class="analytics-section anim-fadeIn" style="--delay:6">
+      <h2>\u{1F6E1}\uFE0F HACCP Compliance</h2>
+      <div class="analytics-row">
+        <div class="analytics-col">
+          <h3>Conformit\xE9 7 jours</h3>
+          <div class="compliance-bars">
+            <div class="compliance-row">
+              <span class="compliance-label">Temp\xE9ratures</span>
+              <div class="compliance-track">
+                <div class="compliance-fill ${haccpData.temperature_compliance_7d >= 90 ? "fill--success" : haccpData.temperature_compliance_7d >= 70 ? "fill--warning" : "fill--danger"}" style="width:${haccpData.temperature_compliance_7d}%"></div>
+              </div>
+              <span class="compliance-val font-mono">${haccpData.temperature_compliance_7d}%</span>
+            </div>
+            <div class="compliance-row">
+              <span class="compliance-label">Nettoyage</span>
+              <div class="compliance-track">
+                <div class="compliance-fill ${haccpData.cleaning_compliance_7d >= 90 ? "fill--success" : haccpData.cleaning_compliance_7d >= 70 ? "fill--warning" : "fill--danger"}" style="width:${haccpData.cleaning_compliance_7d}%"></div>
+              </div>
+              <span class="compliance-val font-mono">${haccpData.cleaning_compliance_7d}%</span>
+            </div>
+          </div>
+          ${haccpData.alerts_count_7d > 0 ? `<p class="text-danger text-sm" style="margin-top:var(--space-2)">\u26A0\uFE0F ${haccpData.alerts_count_7d} alerte(s) temp\xE9rature sur 7j</p>` : ""}
+          <a href="#/haccp" style="display:inline-block;margin-top:var(--space-3);font-size:var(--text-sm);color:var(--color-accent)">Voir le d\xE9tail HACCP \u2192</a>
+        </div>
+        <div class="analytics-col">
+          <h3>7 derniers jours</h3>
+          <div class="haccp-mini-chart">
+            ${haccpData.daily_scores.slice(-7).map((d) => {
+    const avg = [d.temp_score, d.cleaning_score].filter((s) => s !== null);
+    const avgScore = avg.length > 0 ? Math.round(avg.reduce((a, b) => a + b, 0) / avg.length) : 0;
+    const barClass = avgScore >= 90 ? "bar-v--success" : avgScore >= 70 ? "bar-v--warning" : "bar-v--danger";
+    const day = new Date(d.date).toLocaleDateString("fr-FR", { weekday: "short" }).substring(0, 3);
+    return `
+                <div class="bar-v-col">
+                  <div class="bar-v-track">
+                    <div class="bar-v-fill ${barClass}" style="height:${avgScore}%"></div>
+                  </div>
+                  <span class="bar-v-label">${day}</span>
+                </div>
+              `;
+  }).join("")}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- \u2550\u2550\u2550 Section Fournisseurs \u2550\u2550\u2550 -->
+    <section class="analytics-section anim-fadeIn" style="--delay:7">
       <h2>\u{1F4B2} Prix Fournisseurs</h2>
       <div class="analytics-row">
         <div class="analytics-col">
@@ -7372,54 +7505,7 @@ function renderAnalyticsDashboard(kpis, foodCost, stockData, pricesData, haccpDa
       </div>
     </section>
 
-    <!-- Section 4: HACCP -->
-    <section class="analytics-section anim-fadeIn" style="--delay:7">
-      <h2>\u{1F6E1}\uFE0F HACCP Compliance</h2>
-      <div class="analytics-row">
-        <div class="analytics-col">
-          <h3>Conformit\xE9 7 jours</h3>
-          <div class="compliance-bars">
-            <div class="compliance-row">
-              <span class="compliance-label">Temp\xE9ratures</span>
-              <div class="compliance-track">
-                <div class="compliance-fill ${haccpData.temperature_compliance_7d >= 90 ? "fill--success" : haccpData.temperature_compliance_7d >= 70 ? "fill--warning" : "fill--danger"}" style="width:${haccpData.temperature_compliance_7d}%"></div>
-              </div>
-              <span class="compliance-val font-mono">${haccpData.temperature_compliance_7d}%</span>
-            </div>
-            <div class="compliance-row">
-              <span class="compliance-label">Nettoyage</span>
-              <div class="compliance-track">
-                <div class="compliance-fill ${haccpData.cleaning_compliance_7d >= 90 ? "fill--success" : haccpData.cleaning_compliance_7d >= 70 ? "fill--warning" : "fill--danger"}" style="width:${haccpData.cleaning_compliance_7d}%"></div>
-              </div>
-              <span class="compliance-val font-mono">${haccpData.cleaning_compliance_7d}%</span>
-            </div>
-          </div>
-          ${haccpData.alerts_count_7d > 0 ? `<p class="text-danger text-sm" style="margin-top:var(--space-2)">\u26A0\uFE0F ${haccpData.alerts_count_7d} alerte(s) temp\xE9rature sur 7j</p>` : ""}
-        </div>
-        <div class="analytics-col">
-          <h3>7 derniers jours</h3>
-          <div class="haccp-mini-chart">
-            ${haccpData.daily_scores.slice(-7).map((d) => {
-    const score = d.temp_score !== null ? d.temp_score : d.cleaning_score !== null ? d.cleaning_score : 0;
-    const avg = [d.temp_score, d.cleaning_score].filter((s) => s !== null);
-    const avgScore = avg.length > 0 ? Math.round(avg.reduce((a, b) => a + b, 0) / avg.length) : 0;
-    const barClass = avgScore >= 90 ? "bar-v--success" : avgScore >= 70 ? "bar-v--warning" : "bar-v--danger";
-    const day = new Date(d.date).toLocaleDateString("fr-FR", { weekday: "short" }).substring(0, 3);
-    return `
-                <div class="bar-v-col">
-                  <div class="bar-v-track">
-                    <div class="bar-v-fill ${barClass}" style="height:${avgScore}%"></div>
-                  </div>
-                  <span class="bar-v-label">${day}</span>
-                </div>
-              `;
-  }).join("")}
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Section 5: AI Insights -->
+    <!-- \u2550\u2550\u2550 Section Insights IA \u2550\u2550\u2550 -->
     <section class="analytics-section analytics-section--ai anim-fadeIn" style="--delay:8">
       <div class="ai-section-header">
         <h2>\u{1F9E0} Insights IA</h2>
@@ -7430,6 +7516,20 @@ function renderAnalyticsDashboard(kpis, foodCost, stockData, pricesData, haccpDa
       ${insightsData.cached_at ? `<p class="text-secondary text-sm" id="insights-timestamp">Derni\xE8re analyse : ${formatTimeAgo(insightsData.cached_at)}</p>` : ""}
       <div class="ai-insights-grid" id="ai-insights-grid">
         ${renderInsightCards(insightsData.insights)}
+      </div>
+    </section>
+
+    <!-- \u2550\u2550\u2550 Actions rapides \u2550\u2550\u2550 -->
+    <section class="analytics-section anim-fadeIn" style="--delay:9">
+      <h2>\u26A1 Actions rapides</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+        <a href="#/stock/reception" class="btn btn-secondary">\u{1F4E5} R\xE9ception stock</a>
+        <a href="#/stock/variance" class="btn btn-secondary">\u{1F4CA} Analyse \xE9carts</a>
+        <a href="#/haccp" class="btn btn-secondary">\u{1F6E1}\uFE0F HACCP</a>
+        <a href="#/orders" class="btn btn-secondary">\u{1F4CB} Commandes fournisseurs</a>
+        <a href="#/menu-engineering" class="btn btn-secondary">\u{1F3AF} Menu Engineering</a>
+        <a href="#/predictions" class="btn btn-secondary">\u{1F9E0} Pr\xE9dictions IA</a>
+        <a href="#/suppliers" class="btn btn-secondary">\u{1F3ED} Fournisseurs</a>
       </div>
     </section>
   `;
@@ -14991,8 +15091,7 @@ const NAV_GROUPS = {
   pilotage: {
     label: "Pilotage",
     items: [
-      { label: "Sant\xE9 du restaurant", route: "/health", icon: "heart-pulse", roles: ["gerant"] },
-      { label: "Analytics", route: "/analytics", icon: "bar-chart-3", roles: ["gerant"] },
+      { label: "Pilotage", route: "/analytics", icon: "bar-chart-3", roles: ["gerant"] },
       { label: "Menu Engineering", route: "/menu-engineering", icon: "target", roles: ["gerant"] },
       { label: "Pr\xE9dictions IA", route: "/predictions", icon: "brain", roles: ["gerant"] },
       { label: "Mercuriale", route: "/mercuriale", icon: "trending-up", roles: ["gerant"] }
@@ -15013,7 +15112,6 @@ const ROUTE_TO_GROUP = {
   "/kitchen": "operations",
   "/scan-invoice": "operations",
   "/analytics": "pilotage",
-  "/health": "pilotage",
   "/menu-engineering": "pilotage",
   "/predictions": "pilotage",
   "/mercuriale": "pilotage",
@@ -15194,7 +15292,9 @@ function registerRoutes() {
   Router.add(/^\/haccp\/non-conformities$/, renderHACCPNonConformities);
   Router.add(/^\/haccp\/allergens$/, renderHACCPAllergens);
   Router.add(/^\/analytics$/, renderAnalytics);
-  Router.add(/^\/health$/, renderHealthDashboard);
+  Router.add(/^\/health$/, () => {
+    location.hash = "#/analytics";
+  });
   Router.add(/^\/more$/, () => new MoreView().render());
   Router.add(/^\/team$/, renderTeam);
   Router.add(/^\/subscribe$/, renderSubscribe);
