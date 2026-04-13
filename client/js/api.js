@@ -217,6 +217,39 @@ const API = {
   createTraceability(data) { return this.request('/haccp/traceability', { method: 'POST', body: data }); },
   getDLCAlerts() { return this.request('/haccp/traceability/dlc-alerts'); },
 
+  // Cooling
+  getCoolingLogs(params) {
+    const qs = params ? new URLSearchParams(params).toString() : '';
+    return this.request(`/haccp/cooling${qs ? '?' + qs : ''}`);
+  },
+  createCoolingLog(data) { return this.request('/haccp/cooling', { method: 'POST', body: data }); },
+  updateCoolingLog(id, data) { return this.request(`/haccp/cooling/${id}`, { method: 'PUT', body: data }); },
+
+  // Reheating
+  getReheatingLogs(params) {
+    const qs = params ? new URLSearchParams(params).toString() : '';
+    return this.request(`/haccp/reheating${qs ? '?' + qs : ''}`);
+  },
+  createReheatingLog(data) { return this.request('/haccp/reheating', { method: 'POST', body: data }); },
+  updateReheatingLog(id, data) { return this.request(`/haccp/reheating/${id}`, { method: 'PUT', body: data }); },
+
+  // Fryers
+  getFryers() { return this.request('/haccp/fryers'); },
+  createFryer(data) { return this.request('/haccp/fryers', { method: 'POST', body: data }); },
+  getFryerChecks(fryerId) { return this.request(`/haccp/fryers/${fryerId}/checks`); },
+  createFryerCheck(fryerId, data) { return this.request(`/haccp/fryers/${fryerId}/checks`, { method: 'POST', body: data }); },
+
+  // Non-conformités
+  getNonConformities(status) {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.request(`/haccp/non-conformities${qs}`);
+  },
+  createNonConformity(data) { return this.request('/haccp/non-conformities', { method: 'POST', body: data }); },
+  updateNonConformity(id, data) { return this.request(`/haccp/non-conformities/${id}`, { method: 'PUT', body: data }); },
+
+  // Allergens INCO
+  getAllergenMenuDisplay() { return this.request('/allergens/menu-display'); },
+
   // HACCP PDF exports — returns blob URL
   async getHACCPExportUrl(type, from, to) {
     const params = new URLSearchParams();
