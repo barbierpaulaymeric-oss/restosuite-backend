@@ -239,6 +239,56 @@ const API = {
   getDLCAlerts() {
     return this.request("/haccp/traceability/dlc-alerts");
   },
+  // Cooling
+  getCoolingLogs(params) {
+    const qs = params ? new URLSearchParams(params).toString() : "";
+    return this.request(`/haccp/cooling${qs ? "?" + qs : ""}`);
+  },
+  createCoolingLog(data) {
+    return this.request("/haccp/cooling", { method: "POST", body: data });
+  },
+  updateCoolingLog(id, data) {
+    return this.request(`/haccp/cooling/${id}`, { method: "PUT", body: data });
+  },
+  // Reheating
+  getReheatingLogs(params) {
+    const qs = params ? new URLSearchParams(params).toString() : "";
+    return this.request(`/haccp/reheating${qs ? "?" + qs : ""}`);
+  },
+  createReheatingLog(data) {
+    return this.request("/haccp/reheating", { method: "POST", body: data });
+  },
+  updateReheatingLog(id, data) {
+    return this.request(`/haccp/reheating/${id}`, { method: "PUT", body: data });
+  },
+  // Fryers
+  getFryers() {
+    return this.request("/haccp/fryers");
+  },
+  createFryer(data) {
+    return this.request("/haccp/fryers", { method: "POST", body: data });
+  },
+  getFryerChecks(fryerId) {
+    return this.request(`/haccp/fryers/${fryerId}/checks`);
+  },
+  createFryerCheck(fryerId, data) {
+    return this.request(`/haccp/fryers/${fryerId}/checks`, { method: "POST", body: data });
+  },
+  // Non-conformités
+  getNonConformities(status) {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return this.request(`/haccp/non-conformities${qs}`);
+  },
+  createNonConformity(data) {
+    return this.request("/haccp/non-conformities", { method: "POST", body: data });
+  },
+  updateNonConformity(id, data) {
+    return this.request(`/haccp/non-conformities/${id}`, { method: "PUT", body: data });
+  },
+  // Allergens INCO
+  getAllergenMenuDisplay() {
+    return this.request("/allergens/menu-display");
+  },
   // HACCP PDF exports — returns blob URL
   async getHACCPExportUrl(type, from, to) {
     const params = new URLSearchParams();
@@ -3434,6 +3484,19 @@ async function showSupplierDetail(id) {
   if (!sup) return;
   showSupplierModal(sup);
 }
+const HACCP_SUBNAV_FULL = `
+  <div class="haccp-subnav">
+    <a href="#/haccp" class="haccp-subnav__link" id="haccp-nav-dashboard">Dashboard</a>
+    <a href="#/haccp/temperatures" class="haccp-subnav__link">Temp\xE9ratures</a>
+    <a href="#/haccp/cleaning" class="haccp-subnav__link">Nettoyage</a>
+    <a href="#/haccp/traceability" class="haccp-subnav__link">Tra\xE7abilit\xE9</a>
+    <a href="#/haccp/cooling" class="haccp-subnav__link">Refroidissement</a>
+    <a href="#/haccp/reheating" class="haccp-subnav__link">Remise en T\xB0</a>
+    <a href="#/haccp/fryers" class="haccp-subnav__link">Friteuses</a>
+    <a href="#/haccp/non-conformities" class="haccp-subnav__link">Non-conf.</a>
+    <a href="#/haccp/allergens" class="haccp-subnav__link">Allerg\xE8nes</a>
+  </div>
+`;
 async function renderHACCPDashboard() {
   const app = document.getElementById("app");
   app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
@@ -3454,12 +3517,7 @@ async function renderHACCPDashboard() {
         </div>
 
         <!-- HACCP Sub-navigation -->
-        <div class="haccp-subnav">
-          <a href="#/haccp" class="haccp-subnav__link active">Dashboard</a>
-          <a href="#/haccp/temperatures" class="haccp-subnav__link">Temp\xE9ratures</a>
-          <a href="#/haccp/cleaning" class="haccp-subnav__link">Nettoyage</a>
-          <a href="#/haccp/traceability" class="haccp-subnav__link">Tra\xE7abilit\xE9</a>
-        </div>
+        ${HACCP_SUBNAV_FULL.replace('id="haccp-nav-dashboard"', 'id="haccp-nav-dashboard" style="font-weight:700"')}
 
         <!-- SECTION: Temp\xE9ratures du jour -->
         <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
@@ -3676,12 +3734,7 @@ async function renderHACCPTemperatures() {
           </button>
         </div>
 
-        <div class="haccp-subnav">
-          <a href="#/haccp" class="haccp-subnav__link">Dashboard</a>
-          <a href="#/haccp/temperatures" class="haccp-subnav__link active">Temp\xE9ratures</a>
-          <a href="#/haccp/cleaning" class="haccp-subnav__link">Nettoyage</a>
-          <a href="#/haccp/traceability" class="haccp-subnav__link">Tra\xE7abilit\xE9</a>
-        </div>
+        ${HACCP_SUBNAV_FULL}
 
         <!-- Filters -->
         <div class="haccp-filters">
@@ -3971,12 +4024,7 @@ async function renderHACCPCleaning() {
           ` : ""}
         </div>
 
-        <div class="haccp-subnav">
-          <a href="#/haccp" class="haccp-subnav__link">Dashboard</a>
-          <a href="#/haccp/temperatures" class="haccp-subnav__link">Temp\xE9ratures</a>
-          <a href="#/haccp/cleaning" class="haccp-subnav__link active">Nettoyage</a>
-          <a href="#/haccp/traceability" class="haccp-subnav__link">Tra\xE7abilit\xE9</a>
-        </div>
+        ${HACCP_SUBNAV_FULL}
 
         <!-- Today's status -->
         <div class="haccp-cleaning-today-box">
@@ -4183,12 +4231,7 @@ async function renderHACCPTraceability() {
           </button>
         </div>
 
-        <div class="haccp-subnav">
-          <a href="#/haccp" class="haccp-subnav__link">Dashboard</a>
-          <a href="#/haccp/temperatures" class="haccp-subnav__link">Temp\xE9ratures</a>
-          <a href="#/haccp/cleaning" class="haccp-subnav__link">Nettoyage</a>
-          <a href="#/haccp/traceability" class="haccp-subnav__link active">Tra\xE7abilit\xE9</a>
-        </div>
+        ${HACCP_SUBNAV_FULL}
 
         ${dlcAlerts.length > 0 ? `
         <div class="haccp-dlc-alert-banner">
@@ -4399,6 +4442,906 @@ function showReceptionModal() {
       showToast("Erreur : " + err.message, "error");
     }
   });
+}
+async function renderHACCPCooling() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const { items } = await API.getCoolingLogs({ limit: 100 });
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1>\u2744\uFE0F Refroidissements rapides</h1>
+          <button class="btn btn-primary" id="btn-new-cooling">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+          <span class="text-sm">R\xE9glementation : passage de <strong>+63\xB0C \xE0 +10\xB0C en moins de 2h</strong>.</span>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Produit</th>
+                <th>D\xE9but</th>
+                <th>T\xB0 initiale</th>
+                <th>Passage 63\xB0C</th>
+                <th>Passage 10\xB0C</th>
+                <th>Dur\xE9e 63\u219210\xB0C</th>
+                <th>Conformit\xE9</th>
+                <th>Op\xE9rateur</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="cooling-table-body">
+              ${renderCoolingRows(items)}
+            </tbody>
+          </table>
+        </div>
+        ${items.length === 0 ? '<div class="empty-state"><p>Aucun enregistrement</p></div>' : ""}
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupCoolingEvents();
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function renderCoolingRows(items) {
+  return items.map((item) => {
+    const startDate = new Date(item.start_time).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+    const time63 = item.time_at_63c ? new Date(item.time_at_63c).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "\u2014";
+    const time10 = item.time_at_10c ? new Date(item.time_at_10c).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "\u2014";
+    let durationStr = "\u2014";
+    if (item.time_at_63c && item.time_at_10c) {
+      const mins = Math.round((new Date(item.time_at_10c) - new Date(item.time_at_63c)) / 6e4);
+      durationStr = `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}`;
+    }
+    const complianceHtml = item.is_compliant === null ? '<span class="badge">En cours</span>' : item.is_compliant ? '<span class="badge badge--success">\u2713 Conforme</span>' : '<span class="badge badge--danger">\u2717 Non conforme</span>';
+    const needsUpdate = item.is_compliant === null;
+    return `
+      <tr>
+        <td style="font-weight:500">${escapeHtml(item.product_name)}</td>
+        <td class="mono text-sm">${startDate}</td>
+        <td class="mono">${item.temp_start}\xB0C</td>
+        <td class="mono">${time63}</td>
+        <td class="mono">${time10}</td>
+        <td class="mono">${durationStr}</td>
+        <td>${complianceHtml}</td>
+        <td>${escapeHtml(item.recorded_by_name || "\u2014")}</td>
+        <td>${needsUpdate ? `<button class="btn btn-secondary btn-sm" data-id="${item.id}" data-product="${escapeHtml(item.product_name)}" data-action="update-cooling">Compl\xE9ter</button>` : ""}</td>
+      </tr>
+    `;
+  }).join("");
+}
+function setupCoolingEvents() {
+  var _a;
+  (_a = document.getElementById("btn-new-cooling")) == null ? void 0 : _a.addEventListener("click", () => showCoolingModal());
+  document.querySelectorAll('[data-action="update-cooling"]').forEach((btn) => {
+    btn.addEventListener("click", () => showCoolingUpdateModal(Number(btn.dataset.id), btn.dataset.product));
+  });
+}
+function showCoolingModal() {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const account = getAccount();
+  const now = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16);
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:540px">
+      <h2>\u2744\uFE0F Nouveau refroidissement</h2>
+      <p class="text-secondary text-sm" style="margin-bottom:16px">Enregistrez le d\xE9but. Compl\xE9tez les temps de passage ult\xE9rieurement.</p>
+      <div class="form-group">
+        <label>Produit *</label>
+        <input type="text" class="form-control" id="cool-product" placeholder="ex: Blanquette de veau" autofocus>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Heure d\xE9but *</label>
+          <input type="datetime-local" class="form-control" id="cool-start" value="${now}">
+        </div>
+        <div class="form-group">
+          <label>T\xB0 initiale (\xB0C) *</label>
+          <input type="number" step="0.1" class="form-control" id="cool-temp" placeholder="ex: 85" inputmode="decimal">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" class="form-control" id="cool-notes" placeholder="ex: Cellule de refroidissement n\xB01">
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="cool-cancel">Annuler</button>
+        <button class="btn btn-primary" id="cool-save">
+          <i data-lucide="check" style="width:18px;height:18px"></i> Enregistrer
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("cool-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("cool-save").addEventListener("click", async () => {
+    const product_name = document.getElementById("cool-product").value.trim();
+    const temp_start = parseFloat(document.getElementById("cool-temp").value);
+    if (!product_name) {
+      document.getElementById("cool-product").classList.add("form-control--error");
+      return;
+    }
+    if (isNaN(temp_start)) {
+      document.getElementById("cool-temp").classList.add("form-control--error");
+      return;
+    }
+    try {
+      await API.createCoolingLog({
+        product_name,
+        start_time: new Date(document.getElementById("cool-start").value).toISOString(),
+        temp_start,
+        notes: document.getElementById("cool-notes").value.trim() || null,
+        recorded_by: account ? account.id : null
+      });
+      overlay.remove();
+      showToast("Refroidissement enregistr\xE9 \u2713", "success");
+      renderHACCPCooling();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+function showCoolingUpdateModal(id, productName) {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const now = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16);
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:480px">
+      <h2>\u2744\uFE0F Compl\xE9ter \u2014 ${escapeHtml(productName)}</h2>
+      <div class="form-group">
+        <label>Heure passage 63\xB0C \u2193</label>
+        <input type="datetime-local" class="form-control" id="cool-u-63c" value="${now}">
+      </div>
+      <div class="form-group">
+        <label>Heure passage 10\xB0C \u2193</label>
+        <input type="datetime-local" class="form-control" id="cool-u-10c" value="${now}">
+        <p class="text-secondary text-sm">Objectif : moins de 2h entre 63\xB0C et 10\xB0C</p>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" class="form-control" id="cool-u-notes">
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="cool-u-cancel">Annuler</button>
+        <button class="btn btn-primary" id="cool-u-save">Enregistrer</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("cool-u-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("cool-u-save").addEventListener("click", async () => {
+    const t63 = document.getElementById("cool-u-63c").value;
+    const t10 = document.getElementById("cool-u-10c").value;
+    try {
+      await API.updateCoolingLog(id, {
+        time_at_63c: t63 ? new Date(t63).toISOString() : null,
+        time_at_10c: t10 ? new Date(t10).toISOString() : null,
+        notes: document.getElementById("cool-u-notes").value.trim() || null
+      });
+      overlay.remove();
+      if (t63 && t10) {
+        const mins = Math.round((new Date(t10) - new Date(t63)) / 6e4);
+        showToast(mins <= 120 ? `\u2705 Conforme \u2014 ${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}` : `\u26A0\uFE0F Non conforme \u2014 ${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")} > 2h`, mins <= 120 ? "success" : "error");
+      }
+      renderHACCPCooling();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+async function renderHACCPReheating() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const { items } = await API.getReheatingLogs({ limit: 100 });
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1>\u{1F525} Remises en temp\xE9rature</h1>
+          <button class="btn btn-primary" id="btn-new-reheat">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+          <span class="text-sm">R\xE9glementation : atteindre <strong>+63\xB0C en moins de 1h</strong> depuis la mise en chauffe.</span>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Produit</th>
+                <th>D\xE9but</th>
+                <th>T\xB0 initiale</th>
+                <th>Atteinte 63\xB0C</th>
+                <th>Dur\xE9e</th>
+                <th>Conformit\xE9</th>
+                <th>Op\xE9rateur</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>${renderReheatingRows(items)}</tbody>
+          </table>
+        </div>
+        ${items.length === 0 ? '<div class="empty-state"><p>Aucun enregistrement</p></div>' : ""}
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupReheatingEvents();
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function renderReheatingRows(items) {
+  return items.map((item) => {
+    const startDate = new Date(item.start_time).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+    const time63 = item.time_at_63c ? new Date(item.time_at_63c).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "\u2014";
+    let durationStr = "\u2014";
+    if (item.time_at_63c) {
+      const mins = Math.round((new Date(item.time_at_63c) - new Date(item.start_time)) / 6e4);
+      durationStr = `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}`;
+    }
+    const complianceHtml = item.is_compliant === null ? '<span class="badge">En cours</span>' : item.is_compliant ? '<span class="badge badge--success">\u2713 Conforme</span>' : '<span class="badge badge--danger">\u2717 Non conforme</span>';
+    return `
+      <tr>
+        <td style="font-weight:500">${escapeHtml(item.product_name)}</td>
+        <td class="mono text-sm">${startDate}</td>
+        <td class="mono">${item.temp_start}\xB0C</td>
+        <td class="mono">${time63}</td>
+        <td class="mono">${durationStr}</td>
+        <td>${complianceHtml}</td>
+        <td>${escapeHtml(item.recorded_by_name || "\u2014")}</td>
+        <td>${item.is_compliant === null ? `<button class="btn btn-secondary btn-sm" data-id="${item.id}" data-product="${escapeHtml(item.product_name)}" data-action="update-reheat">Compl\xE9ter</button>` : ""}</td>
+      </tr>
+    `;
+  }).join("");
+}
+function setupReheatingEvents() {
+  var _a;
+  (_a = document.getElementById("btn-new-reheat")) == null ? void 0 : _a.addEventListener("click", () => showReheatingModal());
+  document.querySelectorAll('[data-action="update-reheat"]').forEach((btn) => {
+    btn.addEventListener("click", () => showReheatingUpdateModal(Number(btn.dataset.id), btn.dataset.product));
+  });
+}
+function showReheatingModal() {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const account = getAccount();
+  const now = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16);
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:540px">
+      <h2>\u{1F525} Nouvelle remise en temp\xE9rature</h2>
+      <p class="text-secondary text-sm" style="margin-bottom:16px">Compl\xE9tez quand +63\xB0C est atteint.</p>
+      <div class="form-group">
+        <label>Produit *</label>
+        <input type="text" class="form-control" id="reheat-product" placeholder="ex: B\u0153uf bourguignon" autofocus>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Heure d\xE9but *</label>
+          <input type="datetime-local" class="form-control" id="reheat-start" value="${now}">
+        </div>
+        <div class="form-group">
+          <label>T\xB0 initiale (\xB0C) *</label>
+          <input type="number" step="0.1" class="form-control" id="reheat-temp" placeholder="ex: 4" inputmode="decimal">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" class="form-control" id="reheat-notes" placeholder="ex: Bain-marie">
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="reheat-cancel">Annuler</button>
+        <button class="btn btn-primary" id="reheat-save">
+          <i data-lucide="check" style="width:18px;height:18px"></i> Enregistrer
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("reheat-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("reheat-save").addEventListener("click", async () => {
+    const product_name = document.getElementById("reheat-product").value.trim();
+    const temp_start = parseFloat(document.getElementById("reheat-temp").value);
+    if (!product_name) {
+      document.getElementById("reheat-product").classList.add("form-control--error");
+      return;
+    }
+    if (isNaN(temp_start)) {
+      document.getElementById("reheat-temp").classList.add("form-control--error");
+      return;
+    }
+    try {
+      await API.createReheatingLog({
+        product_name,
+        start_time: new Date(document.getElementById("reheat-start").value).toISOString(),
+        temp_start,
+        notes: document.getElementById("reheat-notes").value.trim() || null,
+        recorded_by: account ? account.id : null
+      });
+      overlay.remove();
+      showToast("Remise en temp\xE9rature enregistr\xE9e \u2713", "success");
+      renderHACCPReheating();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+function showReheatingUpdateModal(id, productName) {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const now = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16);
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:440px">
+      <h2>\u{1F525} Compl\xE9ter \u2014 ${escapeHtml(productName)}</h2>
+      <div class="form-group">
+        <label>Heure atteinte 63\xB0C *</label>
+        <input type="datetime-local" class="form-control" id="reheat-u-63c" value="${now}">
+        <p class="text-secondary text-sm">Objectif : moins de 1h depuis le d\xE9but</p>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" class="form-control" id="reheat-u-notes">
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="reheat-u-cancel">Annuler</button>
+        <button class="btn btn-primary" id="reheat-u-save">Enregistrer</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("reheat-u-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("reheat-u-save").addEventListener("click", async () => {
+    const t63 = document.getElementById("reheat-u-63c").value;
+    try {
+      await API.updateReheatingLog(id, {
+        time_at_63c: t63 ? new Date(t63).toISOString() : null,
+        notes: document.getElementById("reheat-u-notes").value.trim() || null
+      });
+      overlay.remove();
+      showToast("Remise en temp\xE9rature compl\xE9t\xE9e \u2713", "success");
+      renderHACCPReheating();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+const FRYER_ACTION_LABELS = {
+  mise_en_service: "\u{1F527} Mise en service",
+  controle_polaire: "\u{1F9EA} Contr\xF4le polaire",
+  filtrage: "\u{1F53D} Filtrage",
+  changement: "\u{1F504} Changement huile"
+};
+async function renderHACCPFryers() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const { items: fryers } = await API.getFryers();
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1>\u{1F35F} Huiles de friture</h1>
+          <button class="btn btn-primary" id="btn-new-fryer">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter friteuse
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+          <span class="text-sm">Seuil l\xE9gal : <strong>25% de compos\xE9s polaires</strong>. Au-del\xE0, changement obligatoire.</span>
+        </div>
+        <div id="fryers-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+          ${fryers.length === 0 ? '<p class="text-secondary" style="grid-column:1/-1;padding:16px">Aucune friteuse enregistr\xE9e. Ajoutez-en une pour commencer.</p>' : fryers.map((f) => renderFryerCard(f)).join("")}
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupFryerEvents();
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function renderFryerCard(fryer) {
+  const lastPolar = fryer.last_check && fryer.last_check.action_type === "controle_polaire" ? fryer.last_check : null;
+  const polar = lastPolar ? lastPolar.polar_value : null;
+  const polarClass = polar !== null ? polar >= 25 ? "color:var(--color-danger,#dc3545);" : polar >= 20 ? "color:var(--color-warning,#ffc107);" : "color:var(--color-success,#28a745);" : "";
+  const serviceDate = fryer.service_start ? new Date(fryer.service_start.action_date).toLocaleDateString("fr-FR") : "Non renseign\xE9";
+  const lastFilterDate = fryer.last_filter ? new Date(fryer.last_filter.action_date).toLocaleDateString("fr-FR") : "\u2014";
+  const lastChangeDate = fryer.last_change ? new Date(fryer.last_change.action_date).toLocaleDateString("fr-FR") : "\u2014";
+  return `
+    <div class="card" style="padding:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0;font-size:var(--text-lg)">${escapeHtml(fryer.name)}</h3>
+        ${polar !== null && polar >= 25 ? '<span class="badge badge--danger">Huile \xE0 changer !</span>' : ""}
+        ${polar !== null && polar >= 20 && polar < 25 ? '<span class="badge badge--warning">Surveiller</span>' : ""}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        <div><div class="text-secondary text-sm">Mise en service</div><div class="mono text-sm">${serviceDate}</div></div>
+        <div><div class="text-secondary text-sm">Compos\xE9s polaires</div><div class="mono" style="font-size:var(--text-xl);font-weight:700;${polarClass}">${polar !== null ? polar + "%" : "\u2014"}</div></div>
+        <div><div class="text-secondary text-sm">Dernier filtrage</div><div class="mono text-sm">${lastFilterDate}</div></div>
+        <div><div class="text-secondary text-sm">Dernier changement</div><div class="mono text-sm">${lastChangeDate}</div></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" data-fryer-id="${fryer.id}" data-fryer-name="${escapeHtml(fryer.name)}" data-action="fryer-check" data-type="controle_polaire">\u{1F9EA} Polaire</button>
+        <button class="btn btn-secondary btn-sm" data-fryer-id="${fryer.id}" data-fryer-name="${escapeHtml(fryer.name)}" data-action="fryer-check" data-type="filtrage">\u{1F53D} Filtrage</button>
+        <button class="btn btn-secondary btn-sm" data-fryer-id="${fryer.id}" data-fryer-name="${escapeHtml(fryer.name)}" data-action="fryer-check" data-type="changement">\u{1F504} Changement</button>
+        <button class="btn btn-ghost btn-sm" data-fryer-id="${fryer.id}" data-fryer-name="${escapeHtml(fryer.name)}" data-action="fryer-history">\u{1F4CB} Historique</button>
+      </div>
+    </div>
+  `;
+}
+function setupFryerEvents() {
+  var _a;
+  (_a = document.getElementById("btn-new-fryer")) == null ? void 0 : _a.addEventListener("click", () => showNewFryerModal());
+  document.querySelectorAll('[data-action="fryer-check"]').forEach((btn) => {
+    btn.addEventListener("click", () => showFryerCheckModal(Number(btn.dataset.fryerId), btn.dataset.fryerName, btn.dataset.type));
+  });
+  document.querySelectorAll('[data-action="fryer-history"]').forEach((btn) => {
+    btn.addEventListener("click", () => showFryerHistoryModal(Number(btn.dataset.fryerId), btn.dataset.fryerName));
+  });
+}
+function showNewFryerModal() {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:400px">
+      <h2>\u{1F35F} Ajouter une friteuse</h2>
+      <div class="form-group">
+        <label>Nom *</label>
+        <input type="text" class="form-control" id="fryer-name-input" placeholder="ex: Friteuse 1, Grande friteuse" autofocus>
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="fryer-cancel">Annuler</button>
+        <button class="btn btn-primary" id="fryer-save">Ajouter</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("fryer-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("fryer-save").addEventListener("click", async () => {
+    const name = document.getElementById("fryer-name-input").value.trim();
+    if (!name) {
+      document.getElementById("fryer-name-input").classList.add("form-control--error");
+      return;
+    }
+    try {
+      const account = getAccount();
+      const { id } = await API.createFryer({ name });
+      await API.createFryerCheck(id, { action_type: "mise_en_service", recorded_by: account ? account.id : null });
+      overlay.remove();
+      showToast("Friteuse ajout\xE9e \u2713", "success");
+      renderHACCPFryers();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+function showFryerCheckModal(fryerId, fryerName, actionType) {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const account = getAccount();
+  const now = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16);
+  const isPolar = actionType === "controle_polaire";
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:440px">
+      <h2>${FRYER_ACTION_LABELS[actionType]} \u2014 ${escapeHtml(fryerName)}</h2>
+      <div class="form-group">
+        <label>Date et heure</label>
+        <input type="datetime-local" class="form-control" id="fryer-check-date" value="${now}">
+      </div>
+      ${isPolar ? `
+      <div class="form-group">
+        <label>Valeur (% compos\xE9s polaires) *</label>
+        <input type="number" step="0.1" min="0" max="100" class="form-control" id="fryer-polar-val"
+               placeholder="ex: 18.5" inputmode="decimal" autofocus
+               style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)">
+        <p class="text-secondary text-sm">Seuil l\xE9gal : 25%</p>
+      </div>
+      ` : ""}
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" class="form-control" id="fryer-check-notes" placeholder="Observations">
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="fryer-check-cancel">Annuler</button>
+        <button class="btn btn-primary" id="fryer-check-save">
+          <i data-lucide="check" style="width:18px;height:18px"></i> Enregistrer
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("fryer-check-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("fryer-check-save").addEventListener("click", async () => {
+    const polar_value = isPolar ? parseFloat(document.getElementById("fryer-polar-val").value) : null;
+    if (isPolar && isNaN(polar_value)) {
+      document.getElementById("fryer-polar-val").classList.add("form-control--error");
+      return;
+    }
+    try {
+      await API.createFryerCheck(fryerId, {
+        action_type: actionType,
+        action_date: new Date(document.getElementById("fryer-check-date").value).toISOString(),
+        polar_value: isPolar ? polar_value : null,
+        notes: document.getElementById("fryer-check-notes").value.trim() || null,
+        recorded_by: account ? account.id : null
+      });
+      overlay.remove();
+      if (isPolar && polar_value >= 25) {
+        showToast(`\u26A0\uFE0F ${polar_value}% \u2014 Seuil d\xE9pass\xE9 ! Changement obligatoire`, "error");
+      } else {
+        showToast(`${FRYER_ACTION_LABELS[actionType]} enregistr\xE9 \u2713`, "success");
+      }
+      renderHACCPFryers();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+async function showFryerHistoryModal(fryerId, fryerName) {
+  try {
+    const { items } = await API.getFryerChecks(fryerId);
+    const existing = document.querySelector(".modal-overlay");
+    if (existing) existing.remove();
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:600px">
+        <h2>\u{1F4CB} Historique \u2014 ${escapeHtml(fryerName)}</h2>
+        <div class="table-container" style="max-height:400px;overflow-y:auto">
+          <table>
+            <thead><tr><th>Date</th><th>Action</th><th>Polaire</th><th>Notes</th><th>Op\xE9rateur</th></tr></thead>
+            <tbody>
+              ${items.map((c) => `
+                <tr>
+                  <td class="mono text-sm">${new Date(c.action_date).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</td>
+                  <td>${escapeHtml(FRYER_ACTION_LABELS[c.action_type] || c.action_type)}</td>
+                  <td class="mono ${c.polar_value !== null && c.polar_value >= 25 ? "text-danger" : ""}">${c.polar_value !== null ? c.polar_value + "%" : "\u2014"}</td>
+                  <td class="text-secondary text-sm">${escapeHtml(c.notes || "\u2014")}</td>
+                  <td>${escapeHtml(c.recorded_by_name || "\u2014")}</td>
+                </tr>
+              `).join("")}
+              ${items.length === 0 ? '<tr><td colspan="5" class="text-secondary" style="text-align:center">Aucun enregistrement</td></tr>' : ""}
+            </tbody>
+          </table>
+        </div>
+        <div style="text-align:right;margin-top:16px">
+          <button class="btn btn-secondary" id="fryer-hist-close">Fermer</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    document.getElementById("fryer-hist-close").addEventListener("click", () => overlay.remove());
+  } catch (err) {
+    showToast("Erreur : " + err.message, "error");
+  }
+}
+const NC_CATEGORIES = {
+  temperature: "\u{1F321}\uFE0F Temp\xE9rature",
+  dlc: "\u{1F4C5} DLC/DLUO",
+  hygiene: "\u{1F9F9} Hygi\xE8ne",
+  reception: "\u{1F4E6} R\xE9ception",
+  equipement: "\u2699\uFE0F \xC9quipement",
+  allergen: "\u26A0\uFE0F Allerg\xE8ne",
+  autre: "\u{1F4CB} Autre"
+};
+const NC_SEVERITIES = {
+  mineure: { label: "Mineure", class: "badge--info" },
+  majeure: { label: "Majeure", class: "badge--warning" },
+  critique: { label: "Critique", class: "badge--danger" }
+};
+async function renderHACCPNonConformities() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const [openData, closedData] = await Promise.all([
+      API.getNonConformities("ouvert"),
+      API.getNonConformities("resolu")
+    ]);
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1>\u26A0\uFE0F Non-conformit\xE9s</h1>
+          <button class="btn btn-primary" id="btn-new-nc">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> D\xE9clarer
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+
+        ${openData.items.length > 0 ? `
+        <div class="section-title" style="display:flex;align-items:center;gap:8px">
+          <span>\u{1F534} En cours (${openData.items.length})</span>
+        </div>
+        <div>
+          ${openData.items.map((nc) => renderNCCard(nc, false)).join("")}
+        </div>
+        ` : '<div style="background:#d4edda;border:1px solid #28a745;border-radius:8px;padding:12px 16px;margin-bottom:16px">\u2705 Aucune non-conformit\xE9 ouverte</div>'}
+
+        ${closedData.items.length > 0 ? `
+        <div class="section-title" style="margin-top:24px">\u2705 R\xE9solues (${closedData.items.length})</div>
+        <div>
+          ${closedData.items.slice(0, 10).map((nc) => renderNCCard(nc, true)).join("")}
+        </div>
+        ` : ""}
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupNCEvents();
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function renderNCCard(nc, resolved) {
+  const sev = NC_SEVERITIES[nc.severity] || NC_SEVERITIES.mineure;
+  const cat = NC_CATEGORIES[nc.category] || nc.category;
+  const detectedDate = new Date(nc.detected_at).toLocaleDateString("fr-FR");
+  const borderColor = nc.severity === "critique" ? "var(--color-danger,#dc3545)" : nc.severity === "majeure" ? "var(--color-warning,#ffc107)" : "var(--color-info,#3b9ede)";
+  return `
+    <div class="card" style="padding:16px;margin-bottom:12px;border-left:4px solid ${borderColor}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span class="badge ${sev.class}">${sev.label}</span>
+            <span class="text-secondary text-sm">${cat}</span>
+            <span class="text-secondary text-sm">\xB7 ${detectedDate}</span>
+          </div>
+          <div style="font-weight:600;margin-bottom:4px">${escapeHtml(nc.title)}</div>
+          ${nc.description ? `<div class="text-secondary text-sm" style="margin-bottom:8px">${escapeHtml(nc.description)}</div>` : ""}
+          ${nc.corrective_action ? `<div style="background:var(--color-bg-secondary,#f8f9fa);border-radius:4px;padding:8px 12px;margin-top:8px;font-size:var(--text-sm)"><strong>Action corrective :</strong> ${escapeHtml(nc.corrective_action)}</div>` : ""}
+          ${resolved && nc.resolved_at ? `<div class="text-secondary text-sm" style="margin-top:4px">R\xE9solu le ${new Date(nc.resolved_at).toLocaleDateString("fr-FR")} par ${escapeHtml(nc.resolved_by_name || "\u2014")}</div>` : ""}
+        </div>
+        ${!resolved ? `<button class="btn btn-secondary btn-sm" data-nc-id="${nc.id}" data-nc-title="${escapeHtml(nc.title)}" data-action="nc-resolve">R\xE9soudre</button>` : ""}
+      </div>
+    </div>
+  `;
+}
+function setupNCEvents() {
+  var _a;
+  (_a = document.getElementById("btn-new-nc")) == null ? void 0 : _a.addEventListener("click", () => showNCModal());
+  document.querySelectorAll('[data-action="nc-resolve"]').forEach((btn) => {
+    btn.addEventListener("click", () => showNCResolveModal(Number(btn.dataset.ncId), btn.dataset.ncTitle));
+  });
+}
+function showNCModal() {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const account = getAccount();
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:540px">
+      <h2>\u26A0\uFE0F D\xE9clarer une non-conformit\xE9</h2>
+      <div class="form-group">
+        <label>Titre *</label>
+        <input type="text" class="form-control" id="nc-title" placeholder="ex: Temp\xE9rature frigo hors norme" autofocus>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Cat\xE9gorie</label>
+          <select class="form-control" id="nc-category">
+            ${Object.entries(NC_CATEGORIES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>S\xE9v\xE9rit\xE9</label>
+          <select class="form-control" id="nc-severity">
+            ${Object.entries(NC_SEVERITIES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea class="form-control" id="nc-description" rows="3" placeholder="D\xE9crivez la non-conformit\xE9..."></textarea>
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="nc-cancel">Annuler</button>
+        <button class="btn btn-primary" id="nc-save">
+          <i data-lucide="check" style="width:18px;height:18px"></i> D\xE9clarer
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("nc-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("nc-save").addEventListener("click", async () => {
+    const title = document.getElementById("nc-title").value.trim();
+    if (!title) {
+      document.getElementById("nc-title").classList.add("form-control--error");
+      return;
+    }
+    try {
+      await API.createNonConformity({
+        title,
+        description: document.getElementById("nc-description").value.trim() || null,
+        category: document.getElementById("nc-category").value,
+        severity: document.getElementById("nc-severity").value,
+        detected_by: account ? account.id : null
+      });
+      overlay.remove();
+      showToast("Non-conformit\xE9 d\xE9clar\xE9e \u2713", "success");
+      renderHACCPNonConformities();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+function showNCResolveModal(id, title) {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const account = getAccount();
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:480px">
+      <h2>\u2705 R\xE9soudre \u2014 ${escapeHtml(title)}</h2>
+      <div class="form-group">
+        <label>Action corrective *</label>
+        <textarea class="form-control" id="nc-corrective" rows="4" placeholder="D\xE9crivez l'action corrective mise en place..." autofocus></textarea>
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="nc-r-cancel">Annuler</button>
+        <button class="btn btn-primary" id="nc-r-save" style="background:var(--color-success,#28a745)">
+          <i data-lucide="check-circle" style="width:18px;height:18px"></i> Marquer r\xE9solue
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("nc-r-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("nc-r-save").addEventListener("click", async () => {
+    const corrective_action = document.getElementById("nc-corrective").value.trim();
+    if (!corrective_action) {
+      document.getElementById("nc-corrective").classList.add("form-control--error");
+      return;
+    }
+    try {
+      await API.updateNonConformity(id, {
+        corrective_action,
+        status: "resolu",
+        resolved_by: account ? account.id : null
+      });
+      overlay.remove();
+      showToast("Non-conformit\xE9 r\xE9solue \u2713", "success");
+      renderHACCPNonConformities();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+const ALLERGEN_LABELS = {
+  gluten: { label: "Gluten", icon: "\u{1F33E}" },
+  crustaceans: { label: "Crustac\xE9s", icon: "\u{1F980}" },
+  eggs: { label: "\u0152ufs", icon: "\u{1F95A}" },
+  fish: { label: "Poissons", icon: "\u{1F41F}" },
+  peanuts: { label: "Arachides", icon: "\u{1F95C}" },
+  soybeans: { label: "Soja", icon: "\u{1FAD8}" },
+  milk: { label: "Lait", icon: "\u{1F95B}" },
+  nuts: { label: "Fruits \xE0 coque", icon: "\u{1F330}" },
+  celery: { label: "C\xE9leri", icon: "\u{1F33F}" },
+  mustard: { label: "Moutarde", icon: "\u{1F7E1}" },
+  sesame: { label: "S\xE9same", icon: "\u26AA" },
+  sulphites: { label: "Sulfites", icon: "\u{1F377}" },
+  lupin: { label: "Lupin", icon: "\u{1F338}" },
+  molluscs: { label: "Mollusques", icon: "\u{1F41A}" }
+};
+async function renderHACCPAllergens() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const { items } = await API.getAllergenMenuDisplay();
+    const byCategory = {};
+    items.forEach((recipe) => {
+      const cat = recipe.category || "Sans cat\xE9gorie";
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(recipe);
+    });
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1>\u26A0\uFE0F Allerg\xE8nes \u2014 Affichage INCO</h1>
+          <button class="btn btn-secondary" onclick="window.print()">
+            <i data-lucide="printer" style="width:18px;height:18px"></i> Imprimer
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+          <span class="text-sm">R\xE8glement INCO (UE) n\xB01169/2011 \u2014 Les 14 allerg\xE8nes majeurs doivent \xEAtre port\xE9s \xE0 la connaissance des consommateurs. Peut \xEAtre affich\xE9 en salle ou remis sur demande.</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;padding:12px;background:var(--color-bg-secondary,#f8f9fa);border-radius:8px">
+          ${Object.entries(ALLERGEN_LABELS).map(([k, v]) => `
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:var(--text-sm);padding:4px 8px;background:white;border-radius:4px;border:1px solid var(--color-border,#e0e0e0)">
+              ${v.icon} <strong>${v.label}</strong>
+            </span>
+          `).join("")}
+        </div>
+        ${Object.entries(byCategory).map(([category, recipes]) => `
+          <div style="margin-bottom:24px">
+            <div class="section-title">${escapeHtml(category)}</div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="min-width:180px">Plat</th>
+                    ${Object.entries(ALLERGEN_LABELS).map(([k, v]) => `<th style="text-align:center;min-width:44px" title="${v.label}">${v.icon}</th>`).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${recipes.map((recipe) => `
+                    <tr>
+                      <td style="font-weight:500">${escapeHtml(recipe.name)}</td>
+                      ${Object.keys(ALLERGEN_LABELS).map((k) => `
+                        <td style="text-align:center">${recipe.allergen_codes.includes(k) ? '<span style="color:var(--color-danger,#dc3545);font-size:16px;font-weight:700">\u25CF</span>' : ""}</td>
+                      `).join("")}
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `).join("")}
+        ${items.length === 0 ? '<div class="empty-state"><p>Aucune recette avec allerg\xE8nes. Renseignez les allerg\xE8nes dans les fiches ingr\xE9dients.</p></div>' : ""}
+        <p class="text-secondary text-sm" style="margin-top:16px">* G\xE9n\xE9r\xE9 depuis les fiches recettes. V\xE9rifiez que tous les ingr\xE9dients sont correctement renseign\xE9s.</p>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
 }
 async function renderOrdersDashboard() {
   const app = document.getElementById("app");
@@ -14348,6 +15291,11 @@ function registerRoutes() {
   Router.add(/^\/haccp\/temperatures$/, renderHACCPTemperatures);
   Router.add(/^\/haccp\/cleaning$/, renderHACCPCleaning);
   Router.add(/^\/haccp\/traceability$/, renderHACCPTraceability);
+  Router.add(/^\/haccp\/cooling$/, renderHACCPCooling);
+  Router.add(/^\/haccp\/reheating$/, renderHACCPReheating);
+  Router.add(/^\/haccp\/fryers$/, renderHACCPFryers);
+  Router.add(/^\/haccp\/non-conformities$/, renderHACCPNonConformities);
+  Router.add(/^\/haccp\/allergens$/, renderHACCPAllergens);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, renderHealthDashboard);
   Router.add(/^\/more$/, () => new MoreView().render());

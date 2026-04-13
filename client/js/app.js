@@ -209,6 +209,11 @@ function registerRoutes() {
   Router.add(/^\/haccp\/temperatures$/, renderHACCPTemperatures);
   Router.add(/^\/haccp\/cleaning$/, renderHACCPCleaning);
   Router.add(/^\/haccp\/traceability$/, renderHACCPTraceability);
+  Router.add(/^\/haccp\/cooling$/, renderHACCPCooling);
+  Router.add(/^\/haccp\/reheating$/, renderHACCPReheating);
+  Router.add(/^\/haccp\/fryers$/, renderHACCPFryers);
+  Router.add(/^\/haccp\/non-conformities$/, renderHACCPNonConformities);
+  Router.add(/^\/haccp\/allergens$/, renderHACCPAllergens);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, renderHealthDashboard);
   Router.add(/^\/more$/, () => new MoreView().render());
