@@ -67,7 +67,8 @@ const NAV_GROUPS = {
       { label: 'Multi-Sites',         route: '/multi-site',      icon: 'building-2',   roles: ['gerant'], minPlan: 'premium' },
       { label: 'API',                 route: '/api-keys',        icon: 'key',          roles: ['gerant'], minPlan: 'enterprise' },
       { label: 'Portail Fournisseur', route: '/supplier-portal', icon: 'truck',        roles: ['gerant'], minPlan: 'essential' },
-      { label: 'Journal erreurs',     route: '/errors-log',      icon: 'bug',          roles: ['gerant'] },
+      { label: 'Journal erreurs',     route: '/errors-log',         icon: 'bug',          roles: ['gerant'] },
+      { label: 'Agrément sanitaire',  route: '/settings/sanitary-approval', icon: 'badge-check', roles: ['gerant'] },
       { label: 'Se déconnecter',      route: null,               icon: 'log-out',      roles: ['gerant','cuisinier','equipier'], action: 'logout' },
     ]
   },
@@ -86,6 +87,12 @@ const NAV_GROUPS = {
       { label: 'Traçabilité aval', route: '/traceability/downstream', icon: 'package-check', roles: ['gerant', 'cuisinier'] },
     ]
   },
+  documents: {
+    label: 'Documents',
+    items: [
+      { label: 'Export PMS complet', route: '/pms/export', icon: 'file-text', roles: ['gerant'] },
+    ]
+  },
 };
 
 const ROUTE_TO_GROUP = {
@@ -101,7 +108,9 @@ const ROUTE_TO_GROUP = {
   '/multi-site': 'config', '/api-keys': 'config', '/qrcodes': 'config',
   '/carbon': 'config', '/supplier-portal': 'config', '/errors-log': 'config',
   '/crm': 'config', '/subscribe': 'config', '/settings/plans': 'config',
+  '/settings/sanitary-approval': 'config',
   '/traceability/downstream': 'traceability',
+  '/pms/export': 'documents',
 };
 
 // ─── Command Palette shortcut ───
@@ -304,6 +313,10 @@ function registerRoutes() {
   Router.add(/^\/haccp\/maintenance$/, renderHACCPMaintenance);
   Router.add(/^\/haccp\/waste$/, renderHACCPWaste);
   Router.add(/^\/haccp\/corrective-actions$/, renderCorrectiveActions);
+  Router.add(/^\/haccp\/allergens-plan$/, renderHACCPAllergensplan);
+  Router.add(/^\/haccp\/water$/, renderHACCPWater);
+  Router.add(/^\/haccp\/pms-audit$/, renderHACCPPmsAudit);
+  Router.add(/^\/settings\/sanitary-approval$/, renderSanitaryApproval);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, () => { location.hash = '#/analytics'; });
   Router.add(/^\/more$/, () => new MoreView().render());
@@ -326,6 +339,7 @@ function registerRoutes() {
   Router.add(/^\/settings\/plans$/, (highlightPlan) => renderPlans(highlightPlan));
   Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
   Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
+  Router.add(/^\/pms\/export$/, renderPMSExport);
 }
 
 function bootApp(role, account, opts = {}) {

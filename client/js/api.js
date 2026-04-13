@@ -555,6 +555,9 @@ const API = {
   getPlans() { return this.request('/plans'); },
   getCurrentPlan() { return this.request('/plans/current'); },
   upgradePlan(plan) { return this.request('/plans/upgrade', { method: 'POST', body: { plan } }); },
+
+  // PMS Export
+  getPMSExport(period = '3m') { return this.request(`/pms/export?period=${period}`); },
 };
 
 // ─── Toast utility ───

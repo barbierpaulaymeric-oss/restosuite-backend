@@ -205,6 +205,11 @@ app.use('/api/waste', require('./routes/waste'));
 app.use('/api/corrective-actions', require('./routes/corrective-actions'));
 app.use('/api/traceability', require('./routes/traceability-downstream'));
 app.use('/api/plans', require('./routes/plans'));
+app.use('/api/allergen-plan', require('./routes/allergen-plan'));
+app.use('/api/water', require('./routes/water'));
+app.use('/api/pms-audit', require('./routes/pms-audit'));
+app.use('/api/sanitary', require('./routes/sanitary-settings'));
+app.use('/api/pms', require('./routes/pms-export'));
 app.use('/api/errors', require('./routes/errors').router);
 
 // Admin endpoints — JWT required (gérant only)

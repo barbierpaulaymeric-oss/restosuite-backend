@@ -21,6 +21,9 @@ const HACCP_SUBNAV_FULL = `
     <a href="#/haccp/maintenance" class="haccp-subnav__link">Maintenance</a>
     <a href="#/haccp/waste" class="haccp-subnav__link">Déchets</a>
     <a href="#/haccp/corrective-actions" class="haccp-subnav__link">Actions correctives</a>
+    <a href="#/haccp/allergens-plan" class="haccp-subnav__link">Plan allergènes</a>
+    <a href="#/haccp/water" class="haccp-subnav__link">Eau</a>
+    <a href="#/haccp/pms-audit" class="haccp-subnav__link">Audits PMS</a>
   </div>
 `;
 

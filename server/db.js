@@ -1310,4 +1310,176 @@ try {
   console.error('Seed downstream_traceability error:', e.message);
 }
 
+// ─── Migration: Plan de gestion des allergènes ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS allergen_management_plan (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      allergen_code TEXT NOT NULL UNIQUE,
+      allergen_name TEXT NOT NULL,
+      risk_level TEXT CHECK(risk_level IN ('élevé','moyen','faible')) DEFAULT 'moyen',
+      presence_in_menu INTEGER DEFAULT 0,
+      cross_contamination_risk TEXT,
+      preventive_measures TEXT,
+      cleaning_procedure TEXT,
+      staff_training_ref TEXT,
+      display_method TEXT,
+      last_review_date TEXT,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('✅ Migration: allergen_management_plan table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration allergen_management_plan error:', e.message);
+}
+
+// ─── Seed: Plan de gestion des allergènes ───
+try {
+  const ampCount = get("SELECT COUNT(*) as c FROM allergen_management_plan");
+  if (ampCount && ampCount.c === 0) {
+    const insertAMP = db.prepare(`
+      INSERT INTO allergen_management_plan
+        (allergen_code, allergen_name, risk_level, presence_in_menu, cross_contamination_risk, preventive_measures, cleaning_procedure, staff_training_ref, display_method, last_review_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertAMP.run('gluten', 'Gluten (blé, seigle, orge, avoine)', 'élevé', 1, 'Élevé — farine en suspension dans l\'air, ustensiles partagés', 'Utiliser des ustensiles dédiés sans gluten. Préparer les plats sans gluten avant les préparations ordinaires. Zone de préparation séparée si possible.', 'Nettoyage et désinfection complète des surfaces après préparation. Rinçage soigneux des ustensiles. Changer de tablier avant les préparations.', 'Formation HACCP allergènes — Module 3', 'Carte + ardoise + mention orale au service', '2026-04-01');
+    insertAMP.run('crustaces', 'Crustacés (crevettes, crabes, homard)', 'élevé', 1, 'Moyen — vapeurs de cuisson, eau de rinçage', 'Stocker les crustacés dans des bacs hermétiques séparés. Cuire dans une casserole dédiée. Rincer la planche à découper à l\'eau chaude savonneuse.', 'Nettoyage des surfaces avec désinfectant après manipulation. Laver les ustensiles à 60°C minimum.', 'Formation HACCP allergènes — Module 3', 'Carte + mention orale sur demande', '2026-04-01');
+    insertAMP.run('oeufs', 'Œufs et ovoproduits', 'élevé', 1, 'Élevé — présents dans de nombreuses préparations (mayonnaise, pâtisseries)', 'Identifier clairement les préparations contenant des œufs. Utiliser des équipements séparés pour les mayonnaises et sauces. Ne pas réutiliser les coquilles.', 'Nettoyage standard des surfaces. Attention particulière aux mélanges et émulsions.', 'Formation HACCP allergènes — Module 3', 'Carte + fiche technique sur demande', '2026-04-01');
+    insertAMP.run('poissons', 'Poissons et produits dérivés', 'élevé', 1, 'Moyen — jus de cuisson, fumage, vapeurs', 'Stocker les poissons séparément des autres denrées. Utiliser des planches à découper dédiées (code couleur). Éviter les sauces communes.', 'Nettoyage à l\'eau chaude + désinfectant après découpe. Renouveler l\'huile de cuisson après poisson.', 'Formation HACCP allergènes — Module 3', 'Carte + ardoise', '2026-04-01');
+    insertAMP.run('arachides', 'Arachides (cacahuètes)', 'élevé', 1, 'Élevé — huile d\'arachide, sauces asiatiques, traces dans huiles', 'Proscrire l\'huile d\'arachide en cuisine. Vérifier la composition de toutes les sauces. Former le personnel aux risques de choc anaphylactique.', 'Nettoyage complet des surfaces et ustensiles après utilisation. Ne jamais réutiliser les huiles ayant cuit des arachides.', 'Formation HACCP allergènes — Module 3 + Formation choc anaphylactique', 'Mention explicite sur la carte + oral systématique au service', '2026-04-01');
+    insertAMP.run('soja', 'Soja et dérivés', 'moyen', 1, 'Moyen — sauces, marinades, tofu', 'Vérifier la composition des sauces de soja et substituts. Étiqueter clairement les plats contenant du tofu ou des produits à base de soja.', 'Nettoyage standard des équipements de cuisson.', 'Formation HACCP allergènes — Module 3', 'Carte + fiche technique sur demande', '2026-04-01');
+    insertAMP.run('lait', 'Lait et produits laitiers (lactose)', 'élevé', 1, 'Élevé — beurre, crème, fromages présents dans de nombreux plats', 'Identifier tous les plats contenant du lait ou dérivés. Proposer des alternatives (lait végétal, margarine) sur demande. Séparer les préparations.', 'Nettoyage soigneux des ustensiles et récipients. Éviter les contaminations croisées avec les mêmes louches.', 'Formation HACCP allergènes — Module 3', 'Carte + ardoise + mention orale', '2026-04-01');
+    insertAMP.run('fruits_coque', 'Fruits à coque (amandes, noisettes, noix, cajou...)', 'élevé', 1, 'Élevé — huiles, pâtes, poudres en suspension', 'Stocker dans des contenants hermétiques. Utiliser des planches et couteaux dédiés. Éviter les préparations au même poste.', 'Nettoyage approfondi après utilisation. Aspirer les poussières et éclats.', 'Formation HACCP allergènes — Module 3 + Formation choc anaphylactique', 'Mention explicite sur la carte', '2026-04-01');
+    insertAMP.run('celeri', 'Céleri (branches, graines, feuilles)', 'faible', 0, 'Faible — utilisé ponctuellement en garniture', 'Étiqueter les bouquets garnis contenant du céleri. Signaler dans les fonds et bouillons.', 'Nettoyage standard.', 'Formation HACCP allergènes — Module 3', 'Mention sur demande', '2026-04-01');
+    insertAMP.run('moutarde', 'Moutarde et graines de moutarde', 'moyen', 1, 'Moyen — vinaigrettes, sauces, marinades', 'Identifier tous les plats avec moutarde (sauces, vinaigres). Ne pas utiliser les mêmes contenants. Proposer des alternatives sans moutarde.', 'Nettoyage des récipients à vinaigrette. Attention aux sauces du commerce.', 'Formation HACCP allergènes — Module 3', 'Carte + mention orale', '2026-04-01');
+    insertAMP.run('sesame', 'Sésame (graines, huile, tahini)', 'moyen', 1, 'Moyen — pains, houmous, huile de sésame', 'Vérifier la composition des pains achetés. Signaler l\'huile de sésame dans les assaisonnements. Séparer les préparations avec tahini.', 'Nettoyage des surfaces après utilisation. Éviter les mélanges d\'huiles.', 'Formation HACCP allergènes — Module 3', 'Carte + mention sur demande', '2026-04-01');
+    insertAMP.run('sulfites', 'Sulfites et anhydride sulfureux (>10mg/kg)', 'faible', 1, 'Faible — vins, charcuteries, conserves', 'Informer les clients lors du service de vin ou charcuteries. Vérifier les teneurs dans les produits du commerce.', 'Aucune procédure spécifique — risque minimal en cuisine.', 'Formation HACCP allergènes — Module 3', 'Mention sur la carte des vins + oral', '2026-04-01');
+    insertAMP.run('lupin', 'Lupin (farine, graines)', 'faible', 0, 'Faible — peut remplacer la farine de blé dans certains produits', 'Vérifier les étiquettes des farines et pains du commerce. Ne pas substituer sans vérification.', 'Nettoyage standard si utilisation.', 'Formation HACCP allergènes — Module 3', 'Mention sur demande', '2026-04-01');
+    insertAMP.run('mollusques', 'Mollusques (moules, huîtres, escargots, poulpe)', 'moyen', 1, 'Moyen — vapeurs de cuisson, eau de cuisson, jus', 'Cuire séparément des autres poissons. Utiliser des casseroles dédiées. Prévenir les clients systématiquement lors du service.', 'Nettoyage à l\'eau chaude + désinfectant après cuisson. Éliminer les eaux de cuisson.', 'Formation HACCP allergènes — Module 3', 'Carte + ardoise + mention orale', '2026-04-01');
+    console.log("✅ Seed: 14 allergènes INCO insérés dans allergen_management_plan");
+  }
+} catch (e) {
+  console.error('Seed allergen_management_plan error:', e.message);
+}
+
+// ─── Migration: Gestion de l'eau ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS water_management (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      analysis_date TEXT NOT NULL,
+      analysis_type TEXT CHECK(analysis_type IN ('microbiologique','physico-chimique','complète')) DEFAULT 'complète',
+      provider TEXT,
+      results TEXT,
+      conformity INTEGER DEFAULT 1,
+      next_analysis_date TEXT,
+      report_ref TEXT,
+      water_source TEXT CHECK(water_source IN ('réseau public','forage','autre')) DEFAULT 'réseau public',
+      treatment TEXT,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_wm_analysis_date ON water_management(analysis_date);
+  `);
+  console.log('✅ Migration: water_management table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration water_management error:', e.message);
+}
+
+// ─── Seed: Gestion de l'eau ───
+try {
+  const wmCount = get("SELECT COUNT(*) as c FROM water_management");
+  if (wmCount && wmCount.c === 0) {
+    const insertWM = db.prepare(`
+      INSERT INTO water_management
+        (analysis_date, analysis_type, provider, results, conformity, next_analysis_date, report_ref, water_source, treatment, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertWM.run('2026-01-15', 'complète', 'Laboratoire Eurofins Environnement', 'pH 7.4, Turbidité 0.3 NTU, Nitrates 12mg/L, Bactéries coliformes 0 UFC/100mL, Légionelles <10 UFC/L — Conforme aux normes en vigueur', 1, '2026-07-15', 'EUR-2026-0115-EAU', 'réseau public', 'Aucun traitement complémentaire — eau du réseau municipal', 'Analyse annuelle réglementaire. Résultats conformes.');
+    insertWM.run('2025-07-10', 'microbiologique', 'Laboratoire Eurofins Environnement', 'Bactéries coliformes 0 UFC/100mL, E.coli 0 UFC/100mL, Entérocoques 0 UFC/100mL — Conforme', 1, '2026-01-15', 'EUR-2025-0710-EAU', 'réseau public', 'Aucun traitement', 'Analyse semestrielle. Conforme.');
+    insertWM.run('2025-01-20', 'physico-chimique', 'Eurofins Environnement', 'pH 7.2, Chlore résiduel 0.12mg/L, Dureté 28°f, Nitrates 10mg/L — Conforme', 1, '2025-07-10', 'EUR-2025-0120-EAU', 'réseau public', 'Adoucisseur — réglage 20°f', 'Résultats conformes. Dureté légèrement élevée — adoucisseur en place.');
+    console.log("✅ Seed: 3 analyses eau insérées");
+  }
+} catch (e) {
+  console.error('Seed water_management error:', e.message);
+}
+
+// ─── Migration: Audits PMS ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pms_audits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      audit_date TEXT NOT NULL,
+      auditor_name TEXT NOT NULL,
+      audit_type TEXT CHECK(audit_type IN ('interne','externe')) DEFAULT 'interne',
+      scope TEXT CHECK(scope IN ('complet','partiel')) DEFAULT 'complet',
+      findings TEXT,
+      overall_score INTEGER CHECK(overall_score BETWEEN 0 AND 100),
+      status TEXT CHECK(status IN ('planifié','réalisé','actions_en_cours','clôturé')) DEFAULT 'planifié',
+      next_audit_date TEXT,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_pa_audit_date ON pms_audits(audit_date);
+    CREATE INDEX IF NOT EXISTS idx_pa_status ON pms_audits(status);
+  `);
+  console.log('✅ Migration: pms_audits table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration pms_audits error:', e.message);
+}
+
+// ─── Seed: Audits PMS ───
+try {
+  const paCount = get("SELECT COUNT(*) as c FROM pms_audits");
+  if (paCount && paCount.c === 0) {
+    const insertPA = db.prepare(`
+      INSERT INTO pms_audits
+        (audit_date, auditor_name, audit_type, scope, findings, overall_score, status, next_audit_date, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const findings = JSON.stringify([
+      { section: 'Températures', finding: 'Relevés complets et conformes sur les 3 derniers mois', severity: 'conforme', action_required: null },
+      { section: 'Nettoyage & Désinfection', finding: 'Plan de nettoyage respecté à 95%. 2 tâches quotidiennes non tracées semaine 12', severity: 'mineure', action_required: 'Rappel équipe + renforcement suivi semaine 13' },
+      { section: 'Traçabilité', finding: 'DLC correctement renseignées. 1 étiquette illisible constatée en chambre froide', severity: 'mineure', action_required: 'Réétiqueter et former le personnel à la lisibilité des étiquettes' },
+      { section: 'Gestion des allergènes', finding: 'Affichage carte conforme INCO. Formation personnel à jour', severity: 'conforme', action_required: null },
+      { section: 'Lutte contre les nuisibles', finding: 'Contrat dératisation valide. Dernier passage conforme. Aucun signe d\'infestation', severity: 'conforme', action_required: null },
+      { section: 'Formation du personnel', finding: 'Modules HACCP complétés à 80%. 2 nouveaux employés en attente de formation', severity: 'majeure', action_required: 'Planifier formation HACCP pour 2 employés avant fin de période d\'essai (J+30)' },
+      { section: 'Maintenance des équipements', finding: 'Contrats de maintenance à jour. Sonde thermomètre n°2 à étalonner', severity: 'mineure', action_required: 'Étalonner sonde thermomètre n°2 — contact prestataire sous 15 jours' },
+    ]);
+    insertPA.run('2026-01-15', 'Marie Dupont — Responsable HACCP', 'interne', 'complet', findings, 82, 'clôturé', '2026-04-15', 'Audit trimestriel Q1 2026. Score 82/100. 1 non-conformité majeure résolue (formation personnel).');
+    const findingsFuture = JSON.stringify([
+      { section: 'Températures', finding: 'À vérifier', severity: 'en attente', action_required: null },
+      { section: 'Nettoyage & Désinfection', finding: 'À vérifier', severity: 'en attente', action_required: null },
+      { section: 'Traçabilité', finding: 'À vérifier', severity: 'en attente', action_required: null },
+      { section: 'Gestion des allergènes', finding: 'À vérifier', severity: 'en attente', action_required: null },
+      { section: 'Lutte contre les nuisibles', finding: 'À vérifier', severity: 'en attente', action_required: null },
+    ]);
+    insertPA.run('2026-04-15', 'Marie Dupont — Responsable HACCP', 'interne', 'complet', findingsFuture, null, 'planifié', '2026-07-15', 'Audit trimestriel Q2 2026 — planifié.');
+    console.log("✅ Seed: 2 audits PMS insérés");
+  }
+} catch (e) {
+  console.error('Seed pms_audits error:', e.message);
+}
+
+// ─── Migration: Paramètres sanitaires ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sanitary_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER REFERENCES restaurants(id),
+      sanitary_approval_number TEXT,
+      sanitary_approval_date TEXT,
+      sanitary_approval_type TEXT CHECK(sanitary_approval_type IN ('agrément','dérogation','déclaration')) DEFAULT 'déclaration',
+      activity_type TEXT CHECK(activity_type IN ('restaurant','traiteur','fabrication','entreposage')) DEFAULT 'restaurant',
+      dd_pp_office TEXT,
+      notes TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('✅ Migration: sanitary_settings table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration sanitary_settings error:', e.message);
+}
+
 module.exports = { db, all, get, run };

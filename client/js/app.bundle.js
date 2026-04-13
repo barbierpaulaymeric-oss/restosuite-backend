@@ -699,6 +699,10 @@ const API = {
   },
   upgradePlan(plan) {
     return this.request("/plans/upgrade", { method: "POST", body: { plan } });
+  },
+  // PMS Export
+  getPMSExport(period = "3m") {
+    return this.request(`/pms/export?period=${period}`);
   }
 };
 function showToast(message, type = "info") {
@@ -3609,6 +3613,9 @@ const HACCP_SUBNAV_FULL = `
     <a href="#/haccp/maintenance" class="haccp-subnav__link">Maintenance</a>
     <a href="#/haccp/waste" class="haccp-subnav__link">D\xE9chets</a>
     <a href="#/haccp/corrective-actions" class="haccp-subnav__link">Actions correctives</a>
+    <a href="#/haccp/allergens-plan" class="haccp-subnav__link">Plan allerg\xE8nes</a>
+    <a href="#/haccp/water" class="haccp-subnav__link">Eau</a>
+    <a href="#/haccp/pms-audit" class="haccp-subnav__link">Audits PMS</a>
   </div>
 `;
 async function renderHACCPDashboard() {
@@ -18508,6 +18515,7 @@ const NAV_GROUPS = {
       { label: "API", route: "/api-keys", icon: "key", roles: ["gerant"], minPlan: "enterprise" },
       { label: "Portail Fournisseur", route: "/supplier-portal", icon: "truck", roles: ["gerant"], minPlan: "essential" },
       { label: "Journal erreurs", route: "/errors-log", icon: "bug", roles: ["gerant"] },
+      { label: "Agr\xE9ment sanitaire", route: "/settings/sanitary-approval", icon: "badge-check", roles: ["gerant"] },
       { label: "Se d\xE9connecter", route: null, icon: "log-out", roles: ["gerant", "cuisinier", "equipier"], action: "logout" }
     ]
   },
@@ -18557,6 +18565,7 @@ const ROUTE_TO_GROUP = {
   "/crm": "config",
   "/subscribe": "config",
   "/settings/plans": "config",
+  "/settings/sanitary-approval": "config",
   "/traceability/downstream": "traceability"
 };
 document.addEventListener("keydown", (e) => {
@@ -18729,6 +18738,10 @@ function registerRoutes() {
   Router.add(/^\/haccp\/maintenance$/, renderHACCPMaintenance);
   Router.add(/^\/haccp\/waste$/, renderHACCPWaste);
   Router.add(/^\/haccp\/corrective-actions$/, renderCorrectiveActions);
+  Router.add(/^\/haccp\/allergens-plan$/, renderHACCPAllergensplan);
+  Router.add(/^\/haccp\/water$/, renderHACCPWater);
+  Router.add(/^\/haccp\/pms-audit$/, renderHACCPPmsAudit);
+  Router.add(/^\/settings\/sanitary-approval$/, renderSanitaryApproval);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, () => {
     location.hash = "#/analytics";
