@@ -472,12 +472,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 40px;
-      height: 40px;
+      width: 44px;
+      height: 44px;
       background: none;
       border: none;
       color: var(--text-primary);
       cursor: pointer;
+      border-radius: var(--radius-sm);
     }
     @media (min-width: 768px) {
       .header__mobile-toggle { display: none; }
@@ -2130,18 +2131,18 @@
       <div class="proof-grid">
         <div class="proof-card reveal reveal-delay-1">
           <p class="proof-card__quote">En 2 jours, toutes mes fiches techniques étaient faites. Avant, je reportais ça depuis des mois.</p>
-          <div class="proof-card__author">Marc D.</div>
-          <div class="proof-card__role">Chef-propriétaire, bistrot 40 couverts</div>
+          <div class="proof-card__author">Marc Durand</div>
+          <div class="proof-card__role">Chef-propriétaire · La Table de Marc · Lyon 2e</div>
         </div>
         <div class="proof-card reveal reveal-delay-2">
           <p class="proof-card__quote">La saisie vocale change tout. Je dicte mes recettes entre deux services, c'est plié en 30 secondes.</p>
-          <div class="proof-card__author">Sophie L.</div>
-          <div class="proof-card__role">Cheffe de cuisine, brasserie</div>
+          <div class="proof-card__author">Sophie Lefebvre</div>
+          <div class="proof-card__role">Cheffe de cuisine · Brasserie du Vieux-Port · Marseille</div>
         </div>
         <div class="proof-card reveal reveal-delay-3">
           <p class="proof-card__quote">Le module HACCP est impeccable. Mon dernier contrôle sanitaire s'est fait en 10 minutes, dossier complet.</p>
-          <div class="proof-card__author">Karim B.</div>
-          <div class="proof-card__role">Gérant, restaurant gastronomique</div>
+          <div class="proof-card__author">Karim Benzara</div>
+          <div class="proof-card__role">Gérant · Le Gastronome · Bordeaux</div>
         </div>
       </div>
     </div>
@@ -2458,6 +2459,72 @@
 
       heroVideo.addEventListener('play', () => { heroVideoWrapper.classList.add('playing'); });
       heroVideo.addEventListener('pause', () => { heroVideoWrapper.classList.remove('playing'); });
+    }
+  </script>
+
+  <!-- ========== BANDEAU COOKIES RGPD ========== -->
+  <div id="cookie-banner" class="cookie-banner" role="region" aria-label="Consentement cookies" style="display:none">
+    <p class="cookie-banner__text">Ce site utilise des cookies pour améliorer votre expérience et mesurer l'audience. <a href="/legal/mentions-legales.html" class="cookie-banner__link">En savoir plus</a></p>
+    <div class="cookie-banner__actions">
+      <button class="btn btn--outline btn--sm" id="cookie-refuse" onclick="cookieChoice(false)">Refuser</button>
+      <button class="btn btn--primary btn--sm" id="cookie-accept" onclick="cookieChoice(true)">Accepter</button>
+    </div>
+  </div>
+  <style>
+    .cookie-banner {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--border-default);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.3);
+    }
+    .cookie-banner__text {
+      flex: 1;
+      min-width: 200px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+    .cookie-banner__link {
+      color: var(--color-accent);
+      text-decoration: underline;
+    }
+    .cookie-banner__actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .btn--sm {
+      padding: 8px 18px;
+      font-size: 0.875rem;
+      min-height: 36px;
+    }
+    @media (max-width: 480px) {
+      .cookie-banner { padding: 14px 16px; }
+      .cookie-banner__text { font-size: 0.8125rem; }
+      .cookie-banner__actions { width: 100%; justify-content: flex-end; }
+    }
+  </style>
+  <script>
+    (function() {
+      var consent = localStorage.getItem('rs_cookie_consent');
+      if (!consent) {
+        var banner = document.getElementById('cookie-banner');
+        if (banner) banner.style.display = 'flex';
+      }
+    })();
+    function cookieChoice(accepted) {
+      localStorage.setItem('rs_cookie_consent', accepted ? 'accepted' : 'refused');
+      var banner = document.getElementById('cookie-banner');
+      if (banner) banner.style.display = 'none';
     }
   </script>
 </body>
