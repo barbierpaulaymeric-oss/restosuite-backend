@@ -160,6 +160,9 @@ const API = {
   saveOnboardingStep(step, data) {
     return this.request(`/onboarding/step/${step}`, { method: 'PUT', body: data });
   },
+  getOnboardingChecklist() {
+    return this.request('/onboarding/checklist');
+  },
 
   // Accounts
   getAccounts() {

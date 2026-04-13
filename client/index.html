@@ -88,32 +88,38 @@
       <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 28px; width: auto;">
     </div>
     <div class="nav-links">
-      <a href="#/" class="nav-link active" data-route="/" data-roles="gerant,cuisinier,equipier">
-        <span class="nav-icon"><i data-lucide="clipboard-list"></i></span>
-        <span class="nav-label">Fiches</span>
-      </a>
-      <a href="#/stock" class="nav-link" data-route="/stock" data-roles="gerant,cuisinier">
-        <span class="nav-icon"><i data-lucide="warehouse"></i></span>
-        <span class="nav-label">Stock</span>
-      </a>
-      <a href="#/haccp" class="nav-link" data-route="/haccp" data-roles="gerant,cuisinier">
+      <button class="nav-link" data-group="cuisine" data-roles="gerant,cuisinier,equipier">
+        <span class="nav-icon"><i data-lucide="utensils"></i></span>
+        <span class="nav-label">Cuisine</span>
+      </button>
+      <button class="nav-link" data-group="operations" data-roles="gerant,cuisinier,salle">
+        <span class="nav-icon"><i data-lucide="clipboard-pen"></i></span>
+        <span class="nav-label">Opérations</span>
+      </button>
+      <button class="nav-link" data-group="conformite" data-roles="gerant,cuisinier">
         <span class="nav-icon"><i data-lucide="shield-check"></i></span>
-        <span class="nav-label">HACCP</span>
-      </a>
-      <a href="#/suppliers" class="nav-link" data-route="/suppliers" data-roles="gerant">
-        <span class="nav-icon"><i data-lucide="truck"></i></span>
-        <span class="nav-label">Fournisseurs</span>
-      </a>
-      <a href="#/ia" class="nav-link" data-route="/ia" data-roles="gerant,cuisinier,equipier">
-        <span class="nav-icon"><i data-lucide="brain"></i></span>
+        <span class="nav-label">Conformité</span>
+      </button>
+      <button class="nav-link" data-group="pilotage" data-roles="gerant">
+        <span class="nav-icon"><i data-lucide="bar-chart-3"></i></span>
+        <span class="nav-label">Pilotage</span>
+      </button>
+      <a href="#/chef" class="nav-link" data-route="/chef" data-roles="gerant,cuisinier,equipier">
+        <span class="nav-icon"><i data-lucide="bot"></i></span>
         <span class="nav-label">IA</span>
       </a>
       <a href="#/more" class="nav-link" data-route="/more" data-roles="gerant,cuisinier,equipier">
-        <span class="nav-icon"><i data-lucide="menu"></i></span>
+        <span class="nav-icon"><i data-lucide="settings"></i></span>
         <span class="nav-label">Plus</span>
       </a>
     </div>
   </nav>
+
+  <!-- Nav Group Panel (slide-up drawer on mobile, dropdown on desktop) -->
+  <div id="nav-panel" class="nav-panel">
+    <div class="nav-panel-backdrop"></div>
+    <div class="nav-panel-sheet" id="nav-panel-content"></div>
+  </div>
 
   <!-- Main content -->
   <main id="app"></main>

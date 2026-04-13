@@ -21,6 +21,62 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
   }
 });
 
+// ─── Nav group definitions ───
+const NAV_GROUPS = {
+  cuisine: {
+    label: 'Cuisine',
+    items: [
+      { label: 'Fiches Techniques',  route: '/',            icon: 'clipboard-list', roles: ['gerant','cuisinier','equipier'] },
+      { label: 'Ingrédients',        route: '/ingredients', icon: 'package',        roles: ['gerant','cuisinier','equipier'] },
+      { label: 'Stock & Réception',  route: '/stock',       icon: 'warehouse',      roles: ['gerant','cuisinier'] },
+    ]
+  },
+  operations: {
+    label: 'Opérations',
+    items: [
+      { label: 'Commandes fournisseurs', route: '/orders',    icon: 'clipboard-pen',  roles: ['gerant'] },
+      { label: 'Fournisseurs',           route: '/suppliers', icon: 'truck',          roles: ['gerant'] },
+      { label: 'Livraisons',             route: '/deliveries',icon: 'package-check',  roles: ['gerant','cuisinier'] },
+      { label: 'Service (Salle)',        route: '/service',   icon: 'concierge-bell', roles: ['gerant','salle'] },
+      { label: 'Cuisine (écran)',        route: '/kitchen',   icon: 'chef-hat',       roles: ['gerant','cuisinier'] },
+    ]
+  },
+  conformite: {
+    label: 'Conformité',
+    items: [
+      { label: 'HACCP',      route: '/haccp',           icon: 'shield-check',   roles: ['gerant','cuisinier'] },
+      { label: 'Allergènes', route: '/haccp/allergens', icon: 'triangle-alert', roles: ['gerant','cuisinier'] },
+    ]
+  },
+  pilotage: {
+    label: 'Pilotage',
+    items: [
+      { label: 'Santé du restaurant', route: '/health',           icon: 'heart-pulse',  roles: ['gerant'] },
+      { label: 'Analytics',           route: '/analytics',        icon: 'bar-chart-3',  roles: ['gerant'] },
+      { label: 'Menu Engineering',    route: '/menu-engineering', icon: 'target',       roles: ['gerant'] },
+      { label: 'Prédictions IA',      route: '/predictions',      icon: 'brain',        roles: ['gerant'] },
+      { label: 'Mercuriale',          route: '/mercuriale',       icon: 'trending-up',  roles: ['gerant'] },
+    ]
+  },
+};
+
+const ROUTE_TO_GROUP = {
+  '/': 'cuisine', '/new': 'cuisine', '/ingredients': 'cuisine',
+  '/stock': 'cuisine', '/recipe': 'cuisine', '/edit': 'cuisine',
+  '/orders': 'operations', '/suppliers': 'operations',
+  '/deliveries': 'operations', '/service': 'operations',
+  '/kitchen': 'operations', '/scan-invoice': 'operations',
+  '/haccp': 'conformite',
+  '/analytics': 'pilotage', '/health': 'pilotage',
+  '/menu-engineering': 'pilotage', '/predictions': 'pilotage',
+  '/mercuriale': 'pilotage', '/import-mercuriale': 'pilotage',
+  '/chef': 'ia', '/ia': 'ia',
+  '/more': 'plus', '/team': 'plus', '/integrations': 'plus',
+  '/multi-site': 'plus', '/api-keys': 'plus', '/qrcodes': 'plus',
+  '/carbon': 'plus', '/supplier-portal': 'plus', '/errors-log': 'plus',
+  '/crm': 'plus', '/subscribe': 'plus',
+};
+
 // ─── Command Palette shortcut ───
 document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -240,6 +296,7 @@ function bootApp(role, account, opts = {}) {
   applyRole(role);
   updateNavUser(account);
   registerRoutes();
+  initNavGroups(role);
 
   // Filter nav items based on role — hide links user cannot access
   const navLinks = document.querySelectorAll('.nav-link[data-roles]');
@@ -299,6 +356,82 @@ function updateNavUser(account) {
   if (navLinks) {
     navLinks.appendChild(badge);
   }
+}
+
+function initNavGroups(role) {
+  const panel = document.getElementById('nav-panel');
+  const panelContent = document.getElementById('nav-panel-content');
+  if (!panel || !panelContent) return;
+
+  const backdrop = panel.querySelector('.nav-panel-backdrop');
+  let activeGroupKey = null;
+
+  function closePanel() {
+    panel.classList.remove('open');
+    document.querySelectorAll('.nav-link.panel-open').forEach(el => el.classList.remove('panel-open'));
+    activeGroupKey = null;
+  }
+
+  function openPanel(btn, groupKey) {
+    const group = NAV_GROUPS[groupKey];
+    if (!group) return;
+
+    const accessible = group.items.filter(item => item.roles.includes(role));
+    if (accessible.length === 0) return;
+
+    // Single accessible item → navigate directly, no panel
+    if (accessible.length === 1) {
+      closePanel();
+      location.hash = '#' + accessible[0].route;
+      return;
+    }
+
+    const currentPath = location.hash.replace('#', '') || '/';
+
+    panelContent.innerHTML = `
+      <div class="nav-panel-title">${escapeHtml(group.label)}</div>
+      ${accessible.map(item => {
+        const isActive = currentPath === item.route || (item.route !== '/' && currentPath.startsWith(item.route));
+        return `<a href="#${item.route}" class="nav-panel-item${isActive ? ' active' : ''}">
+          <i data-lucide="${item.icon}"></i>
+          ${escapeHtml(item.label)}
+        </a>`;
+      }).join('')}
+    `;
+
+    if (window.lucide) lucide.createIcons({ nodes: [panelContent] });
+
+    // Desktop: position dropdown under the button
+    if (window.innerWidth >= 768) {
+      const rect = btn.getBoundingClientRect();
+      const sheet = panelContent.parentElement;
+      sheet.style.left = Math.max(8, rect.left - 20) + 'px';
+    }
+
+    panel.classList.add('open');
+    btn.classList.add('panel-open');
+    activeGroupKey = groupKey;
+
+    panelContent.querySelectorAll('.nav-panel-item').forEach(item => {
+      item.addEventListener('click', closePanel, { once: true });
+    });
+  }
+
+  document.querySelectorAll('.nav-link[data-group]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const groupKey = btn.dataset.group;
+      if (activeGroupKey === groupKey && panel.classList.contains('open')) {
+        closePanel();
+      } else {
+        closePanel();
+        openPanel(btn, groupKey);
+      }
+    });
+  });
+
+  if (backdrop) backdrop.addEventListener('click', closePanel);
+  window.addEventListener('hashchange', closePanel);
 }
 
 (async function init() {

@@ -75,20 +75,24 @@ const Router = {
     // Close any open modals on route change
     document.querySelectorAll('.modal-overlay').forEach(el => el.remove());
 
-    // Update nav active state
-    document.querySelectorAll('.nav-link').forEach(link => {
+    // Update nav active state — direct links
+    document.querySelectorAll('.nav-link[data-route]').forEach(link => {
       const route = link.dataset.route;
-      const isActive = route === path ||
-        (route !== '/' && path.startsWith(route)) ||
-        (route === '/haccp' && path.startsWith('/haccp')) ||
-        (route === '/stock' && path.startsWith('/stock')) ||
-        (route === '/orders' && path.startsWith('/orders'));
-      if (isActive) {
-        link.classList.add('active');
-      } else {
-        link.classList.remove('active');
-      }
+      const isActive = route === path || (route !== '/' && path.startsWith(route));
+      link.classList.toggle('active', isActive);
     });
+
+    // Update nav active state — group buttons
+    if (typeof ROUTE_TO_GROUP !== 'undefined') {
+      let activeGroup = ROUTE_TO_GROUP[path];
+      if (!activeGroup) {
+        const key = Object.keys(ROUTE_TO_GROUP).find(p => p !== '/' && path.startsWith(p));
+        activeGroup = key ? ROUTE_TO_GROUP[key] : null;
+      }
+      document.querySelectorAll('.nav-link[data-group]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.group === activeGroup);
+      });
+    }
 
     // Match route
     for (const route of this.routes) {

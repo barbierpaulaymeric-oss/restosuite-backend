@@ -4,9 +4,7 @@ class MoreView {
     const account = getAccount();
     const role = account ? account.role : getRole();
     const isGerant = role === 'gerant';
-
-    // Helper function to check if a role can access a module
-    const canAccess = (roles) => roles.includes(role);
+    const showAdvanced = localStorage.getItem('restosuite_show_advanced') === 'true';
 
     app.innerHTML = `
       <div class="view-header">
@@ -15,324 +13,84 @@ class MoreView {
           ${renderAvatar(account.name, 48)}
           <div>
             <h1>${escapeHtml(account.name)}</h1>
-            <p class="text-secondary text-sm">${role === 'gerant' ? '👑 Gérant — Accès complet' : role === 'cuisinier' ? '👨‍🍳 Cuisinier — Accès cuisine' : role === 'salle' ? '🍽️ Salle — Commandes' : '👤 Équipier'}</p>
+            <p class="text-secondary text-sm">${role === 'gerant' ? '👑 Gérant — Accès complet' : role === 'cuisinier' ? '👨‍🍳 Cuisinier' : role === 'salle' ? '🍽️ Salle' : '👤 Équipier'}</p>
           </div>
         </div>
-        ` : `
-        <h1>Plus</h1>
-        `}
-        <p class="text-secondary">Modules et paramètres</p>
+        ` : `<h1>Paramètres</h1>`}
+        <p class="text-secondary">Paramètres & configuration</p>
       </div>
 
-      ${canAccess(['gerant']) ? `
-      <div style="margin-bottom:var(--space-5)">
+      ${isGerant ? `
+      <div style="margin-bottom:var(--space-4)">
         <a href="#/team" class="more-card more-card--active" style="text-decoration:none;cursor:pointer;display:flex;flex-direction:column">
-          <div class="more-card__icon" style="background: var(--color-info)">
-            <i data-lucide="users"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Gérer l'équipe</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
+          <div class="more-card__icon" style="background:var(--color-info)"><i data-lucide="users"></i></div>
+          <div class="more-card__content"><h3>Gérer l'équipe</h3><span class="badge badge--success">Actif</span></div>
           <p class="text-secondary text-sm">Comptes, permissions, accès par rôle</p>
         </a>
       </div>
       ` : ''}
 
-      <!-- SECTION: Opérations quotidiennes -->
-      <div class="section-title" style="margin-top: var(--space-5); margin-bottom: var(--space-2);">🏪 Opérations quotidiennes</div>
+      <div class="section-title" style="margin-top:var(--space-2);margin-bottom:var(--space-2);">⚙️ Configuration</div>
       <div class="more-grid">
-        ${canAccess(['gerant', 'cuisinier', 'equipier']) ? `
-        <div class="more-card more-card--active">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="clipboard-list"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Fiches Techniques</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Saisie vocale, calcul des coûts, export PDF</p>
-        </div>
-        ` : ''}
-
-        ${canAccess(['gerant', 'cuisinier']) ? `
-        <a href="#/stock" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="warehouse"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Stock & Réception</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Réception marchandise, suivi DLC, alertes stock bas</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant', 'cuisinier', 'equipier']) ? `
-        <a href="#/ingredients" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-info)">
-            <i data-lucide="package"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Ingrédients</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Base de données ingrédients, allergènes, unités</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant']) ? `
-        <a href="#/orders" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="clipboard-pen"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Commandes fournisseurs</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Bons de commande matières premières, suggestions, réception</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant', 'salle']) ? `
-        <a href="#/service" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="concierge-bell"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Service (Salle)</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Prise de commande tablette, plan de salle, suivi service</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant', 'cuisinier']) ? `
-        <a href="#/kitchen" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="chef-hat"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Cuisine</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Écran cuisine, tickets commandes, suivi préparation</p>
-        </a>
-        ` : ''}
-      </div>
-
-      <!-- SECTION: Business & Analytics -->
-      <div class="section-title" style="margin-top: var(--space-5); margin-bottom: var(--space-2);">📊 Business & Analytics</div>
-      <div class="more-grid">
-        ${canAccess(['gerant']) ? `
-        <a href="#/health" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #2D8B55">
-            <i data-lucide="heart-pulse"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Santé du restaurant</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Score de santé, alertes, conformité HACCP, pertes, disponibilité</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant']) ? `
-        <a href="#/analytics" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="bar-chart-3"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Analytics</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Food cost, marges, prédictions IA, insights fournisseurs</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant']) ? `
-        <a href="#/menu-engineering" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #F59E0B">
-            <i data-lucide="target"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Menu Engineering</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Matrice BCG : Stars, Puzzles, Plowhorses, Dogs — optimisez votre carte</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant']) ? `
-        <a href="#/predictions" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #7C3AED">
-            <i data-lucide="brain"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Prédictions IA</h3>
-            <span class="badge badge--success">Nouveau</span>
-          </div>
-          <p class="text-secondary text-sm">Anticipez la demande, optimisez vos commandes fournisseurs</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant']) ? `
-        <a href="#/mercuriale" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="trending-up"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>📊 Mercuriale</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Suivi des prix fournisseurs, alertes variations, tendances</p>
-        </a>
-        ` : ''}
-      </div>
-
-      <!-- SECTION: Intelligence Artificielle -->
-      <div class="section-title" style="margin-top: var(--space-5); margin-bottom: var(--space-2);">🤖 Intelligence Artificielle</div>
-      <div class="more-grid">
-        ${canAccess(['gerant', 'cuisinier']) ? `
-        <a href="#/chef" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #7C3AED">
-            <i data-lucide="bot"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>👨‍🍳 Chef IA</h3>
-            <span class="badge badge--success">Nouveau</span>
-          </div>
-          <p class="text-secondary text-sm">Assistant expert : food cost, stocks, HACCP, suggestions</p>
-        </a>
-        ` : ''}
-      </div>
-
-      <!-- SECTION: Clients & Réservations -->
-      <div class="section-title" style="margin-top: var(--space-5); margin-bottom: var(--space-2);">👥 Clients & Réservations</div>
-      <div class="more-grid">
-        ${canAccess(['gerant']) ? `
-        <a href="#/crm" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #EC4899">
-            <i data-lucide="heart"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>CRM & Fidélité</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Clients, points de fidélité, récompenses, VIP</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant']) ? `
+        ${isGerant ? `
         <a href="#/integrations" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #00B37E">
-            <i data-lucide="plug"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Intégrations & Résa.</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">TheFork, caisse, livraison, réservations, comptabilité</p>
+          <div class="more-card__icon" style="background:#00B37E"><i data-lucide="plug"></i></div>
+          <div class="more-card__content"><h3>Intégrations</h3><span class="badge badge--success">Actif</span></div>
+          <p class="text-secondary text-sm">TheFork, caisse, livraison, réservations</p>
         </a>
-        ` : ''}
-      </div>
-
-      <!-- SECTION: Outils & Configuration -->
-      <div class="section-title" style="margin-top: var(--space-5); margin-bottom: var(--space-2);">⚙️ Outils & Configuration</div>
-      <div class="more-grid">
-        ${canAccess(['gerant', 'cuisinier']) ? `
-        <a href="#/haccp" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-success)">
-            <i data-lucide="shield-check"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>HACCP</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Relevés températures, plan de nettoyage, traçabilité, export PDF</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant']) ? `
         <a href="#/qrcodes" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="qr-code"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>📱 QR Codes Menu</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Menu digital, commande client par QR code, impression par table</p>
+          <div class="more-card__icon" style="background:var(--color-accent)"><i data-lucide="qr-code"></i></div>
+          <div class="more-card__content"><h3>QR Codes Menu</h3><span class="badge badge--success">Actif</span></div>
+          <p class="text-secondary text-sm">Menu digital, commande client par QR code</p>
         </a>
-        ` : ''}
-
-        ${canAccess(['gerant']) ? `
-        <a href="#/carbon" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #16A34A">
-            <i data-lucide="leaf"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Bilan Carbone</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Empreinte CO₂ par recette, notation A→E, équivalences ADEME</p>
+        <a href="#/crm" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+          <div class="more-card__icon" style="background:#EC4899"><i data-lucide="heart"></i></div>
+          <div class="more-card__content"><h3>CRM & Fidélité</h3><span class="badge badge--success">Actif</span></div>
+          <p class="text-secondary text-sm">Clients, fidélité, VIP</p>
         </a>
-        ` : ''}
-
-        ${canAccess(['gerant']) ? `
-        <a href="#/multi-site" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-info)">
-            <i data-lucide="building-2"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Multi-Sites</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Gérez plusieurs établissements, comparez les performances</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant']) ? `
-        <a href="#/api-keys" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-primary)">
-            <i data-lucide="key"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>API Publique</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Clés API, documentation, intégrations externes</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant']) ? `
-        <a href="#/supplier-portal" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-primary-light)">
-            <i data-lucide="truck"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Portail Fournisseur</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Vos fournisseurs mettent à jour leurs catalogues et prix directement</p>
-        </a>
-        ` : ''}
-
-        ${canAccess(['gerant']) ? `
         <a href="#/errors-log" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #DC2626">
-            <i data-lucide="bug"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Journal d'erreurs</h3>
-            <span class="badge badge--error">Tech</span>
-          </div>
-          <p class="text-secondary text-sm">50 dernières erreurs serveur et client en temps réel</p>
+          <div class="more-card__icon" style="background:#DC2626"><i data-lucide="bug"></i></div>
+          <div class="more-card__content"><h3>Journal d'erreurs</h3><span class="badge badge--error">Tech</span></div>
+          <p class="text-secondary text-sm">Erreurs serveur et client en temps réel</p>
         </a>
         ` : ''}
       </div>
 
-      <div class="section-title" style="margin-top: var(--space-6);">Préférences</div>
+      ${isGerant ? `
+      <div style="margin:var(--space-5) 0 var(--space-3)">
+        <button id="btn-toggle-advanced" class="btn btn-secondary" style="width:100%;justify-content:center;gap:var(--space-2)">
+          <i data-lucide="${showAdvanced ? 'eye-off' : 'eye'}" style="width:16px;height:16px"></i>
+          ${showAdvanced ? 'Masquer les modules avancés' : 'Afficher les modules avancés'}
+        </button>
+      </div>
+      <div id="advanced-modules" style="display:${showAdvanced ? 'block' : 'none'}">
+        <div class="section-title" style="margin-bottom:var(--space-2);">🔬 Modules avancés</div>
+        <div class="more-grid">
+          <a href="#/multi-site" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+            <div class="more-card__icon" style="background:var(--color-info)"><i data-lucide="building-2"></i></div>
+            <div class="more-card__content"><h3>Multi-Sites</h3><span class="badge badge--info">Avancé</span></div>
+            <p class="text-secondary text-sm">Gérez plusieurs établissements</p>
+          </a>
+          <a href="#/api-keys" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+            <div class="more-card__icon" style="background:var(--color-primary)"><i data-lucide="key"></i></div>
+            <div class="more-card__content"><h3>API Publique</h3><span class="badge badge--info">Avancé</span></div>
+            <p class="text-secondary text-sm">Clés API, intégrations externes</p>
+          </a>
+          <a href="#/carbon" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+            <div class="more-card__icon" style="background:#16A34A"><i data-lucide="leaf"></i></div>
+            <div class="more-card__content"><h3>Bilan Carbone</h3><span class="badge badge--info">Avancé</span></div>
+            <p class="text-secondary text-sm">Empreinte CO₂ par recette, notation A→E</p>
+          </a>
+          <a href="#/supplier-portal" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+            <div class="more-card__icon" style="background:var(--color-primary-light)"><i data-lucide="truck"></i></div>
+            <div class="more-card__content"><h3>Portail Fournisseur</h3><span class="badge badge--info">Avancé</span></div>
+            <p class="text-secondary text-sm">Fournisseurs mettent à jour leurs catalogues</p>
+          </a>
+        </div>
+      </div>
+      ` : ''}
+
+      <div class="section-title" style="margin-top:var(--space-6);">Préférences</div>
       <div class="setting-row">
         <span>🌙 Mode sombre</span>
         <label class="toggle">
@@ -342,7 +100,7 @@ class MoreView {
       </div>
 
       <div class="more-footer">
-        <div style="text-align:center; margin-top: 2rem;">
+        <div style="text-align:center;margin-top:2rem">
           <button class="btn btn-secondary" id="btn-export-data" style="margin-bottom:1rem">
             <i data-lucide="download" style="width:18px;height:18px"></i> Exporter mes données
           </button>
@@ -350,13 +108,22 @@ class MoreView {
           <button class="btn btn-secondary" onclick="logout()" style="margin-bottom:1rem">
             <i data-lucide="log-out" style="width:18px;height:18px"></i> Se déconnecter
           </button>
-          <p class="text-secondary text-sm">
-            RestoSuite v1.0 — Votre cuisine tourne. Vos chiffres suivent.
-          </p>
+          <p class="text-secondary text-sm">RestoSuite v1.0 — Votre cuisine tourne. Vos chiffres suivent.</p>
         </div>
       </div>
     `;
+
     if (window.lucide) lucide.createIcons();
+
+    // Advanced modules toggle
+    const toggleBtn = document.getElementById('btn-toggle-advanced');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const newVal = localStorage.getItem('restosuite_show_advanced') !== 'true';
+        localStorage.setItem('restosuite_show_advanced', String(newVal));
+        new MoreView().render();
+      });
+    }
 
     // Theme toggle
     const themeToggle = document.getElementById('themeToggle');
@@ -382,8 +149,7 @@ class MoreView {
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          const today = new Date().toISOString().slice(0, 10);
-          a.download = `restosuite-export-${today}.json`;
+          a.download = `restosuite-export-${new Date().toISOString().slice(0,10)}.json`;
           a.click();
           URL.revokeObjectURL(url);
           showToast('Données exportées ✓', 'success');
@@ -396,6 +162,5 @@ class MoreView {
         }
       });
     }
-
   }
 }

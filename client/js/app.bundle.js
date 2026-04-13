@@ -158,6 +158,9 @@ const API = {
   saveOnboardingStep(step, data) {
     return this.request(`/onboarding/step/${step}`, { method: "PUT", body: data });
   },
+  getOnboardingChecklist() {
+    return this.request("/onboarding/checklist");
+  },
   // Accounts
   getAccounts() {
     return this.request("/accounts");
@@ -785,6 +788,43 @@ document.addEventListener("keydown", function(e) {
     }
   }
 }, true);
+async function renderOnboardingChecklist() {
+  const container = document.getElementById("dashboard-onboarding");
+  if (!container) return;
+  try {
+    const data = await API.getOnboardingChecklist();
+    if (!data || data.progress >= 1) {
+      container.innerHTML = "";
+      return;
+    }
+    const pct = Math.round(data.progress * 100);
+    container.innerHTML = `
+      <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
+          <h3 style="margin:0;font-size:var(--text-base)">\u{1F680} Prise en main</h3>
+          <span style="font-size:var(--text-sm);font-weight:600;color:var(--color-accent)">${pct}%</span>
+        </div>
+        <div style="height:6px;background:var(--bg-sunken);border-radius:var(--radius-full);margin-bottom:var(--space-3);overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:var(--color-accent);border-radius:var(--radius-full);transition:width 0.6s ease"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+          ${data.steps.map((step) => `
+            <a ${step.done ? "" : `href="${step.route}"`} class="onboarding-step${step.done ? " done" : ""}" style="${step.done ? "pointer-events:none" : ""}">
+              <span class="onboarding-step__check">
+                ${step.done ? '<i data-lucide="check-circle-2" style="color:var(--color-success);width:20px;height:20px;flex-shrink:0"></i>' : '<i data-lucide="circle" style="color:var(--text-tertiary);width:20px;height:20px;flex-shrink:0"></i>'}
+              </span>
+              <span class="onboarding-step__label">${escapeHtml(step.label)}</span>
+              ${!step.done ? '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text-tertiary);margin-left:auto;flex-shrink:0"></i>' : ""}
+            </a>
+          `).join("")}
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons({ nodes: [container] });
+  } catch (e) {
+    if (container) container.innerHTML = "";
+  }
+}
 async function renderDashboard() {
   const app = document.getElementById("app");
   const perms = getPermissions();
@@ -799,6 +839,7 @@ async function renderDashboard() {
       </div>
     </div>
 
+    <div id="dashboard-onboarding"></div>
     <div id="dashboard-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
 
     <div id="dashboard-alerts"></div>
@@ -913,6 +954,7 @@ async function renderDashboard() {
       renderList(searchInput.value, currentTypeFilter);
     });
   });
+  renderOnboardingChecklist();
   loadAISuggestions();
   try {
     const alertData = await API.request("/alerts/daily-summary");
@@ -7717,7 +7759,7 @@ class MoreView {
     const account = getAccount();
     const role = account ? account.role : getRole();
     const isGerant = role === "gerant";
-    const canAccess = (roles) => roles.includes(role);
+    const showAdvanced = localStorage.getItem("restosuite_show_advanced") === "true";
     app.innerHTML = `
       <div class="view-header">
         ${account ? `
@@ -7725,324 +7767,84 @@ class MoreView {
           ${renderAvatar(account.name, 48)}
           <div>
             <h1>${escapeHtml(account.name)}</h1>
-            <p class="text-secondary text-sm">${role === "gerant" ? "\u{1F451} G\xE9rant \u2014 Acc\xE8s complet" : role === "cuisinier" ? "\u{1F468}\u200D\u{1F373} Cuisinier \u2014 Acc\xE8s cuisine" : role === "salle" ? "\u{1F37D}\uFE0F Salle \u2014 Commandes" : "\u{1F464} \xC9quipier"}</p>
+            <p class="text-secondary text-sm">${role === "gerant" ? "\u{1F451} G\xE9rant \u2014 Acc\xE8s complet" : role === "cuisinier" ? "\u{1F468}\u200D\u{1F373} Cuisinier" : role === "salle" ? "\u{1F37D}\uFE0F Salle" : "\u{1F464} \xC9quipier"}</p>
           </div>
         </div>
-        ` : `
-        <h1>Plus</h1>
-        `}
-        <p class="text-secondary">Modules et param\xE8tres</p>
+        ` : `<h1>Param\xE8tres</h1>`}
+        <p class="text-secondary">Param\xE8tres & configuration</p>
       </div>
 
-      ${canAccess(["gerant"]) ? `
-      <div style="margin-bottom:var(--space-5)">
+      ${isGerant ? `
+      <div style="margin-bottom:var(--space-4)">
         <a href="#/team" class="more-card more-card--active" style="text-decoration:none;cursor:pointer;display:flex;flex-direction:column">
-          <div class="more-card__icon" style="background: var(--color-info)">
-            <i data-lucide="users"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>G\xE9rer l'\xE9quipe</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
+          <div class="more-card__icon" style="background:var(--color-info)"><i data-lucide="users"></i></div>
+          <div class="more-card__content"><h3>G\xE9rer l'\xE9quipe</h3><span class="badge badge--success">Actif</span></div>
           <p class="text-secondary text-sm">Comptes, permissions, acc\xE8s par r\xF4le</p>
         </a>
       </div>
       ` : ""}
 
-      <!-- SECTION: Op\xE9rations quotidiennes -->
-      <div class="section-title" style="margin-top: var(--space-5); margin-bottom: var(--space-2);">\u{1F3EA} Op\xE9rations quotidiennes</div>
+      <div class="section-title" style="margin-top:var(--space-2);margin-bottom:var(--space-2);">\u2699\uFE0F Configuration</div>
       <div class="more-grid">
-        ${canAccess(["gerant", "cuisinier", "equipier"]) ? `
-        <div class="more-card more-card--active">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="clipboard-list"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Fiches Techniques</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Saisie vocale, calcul des co\xFBts, export PDF</p>
-        </div>
-        ` : ""}
-
-        ${canAccess(["gerant", "cuisinier"]) ? `
-        <a href="#/stock" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="warehouse"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Stock & R\xE9ception</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">R\xE9ception marchandise, suivi DLC, alertes stock bas</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant", "cuisinier", "equipier"]) ? `
-        <a href="#/ingredients" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-info)">
-            <i data-lucide="package"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Ingr\xE9dients</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Base de donn\xE9es ingr\xE9dients, allerg\xE8nes, unit\xE9s</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant"]) ? `
-        <a href="#/orders" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="clipboard-pen"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Commandes fournisseurs</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Bons de commande mati\xE8res premi\xE8res, suggestions, r\xE9ception</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant", "salle"]) ? `
-        <a href="#/service" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="concierge-bell"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Service (Salle)</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Prise de commande tablette, plan de salle, suivi service</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant", "cuisinier"]) ? `
-        <a href="#/kitchen" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="chef-hat"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Cuisine</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">\xC9cran cuisine, tickets commandes, suivi pr\xE9paration</p>
-        </a>
-        ` : ""}
-      </div>
-
-      <!-- SECTION: Business & Analytics -->
-      <div class="section-title" style="margin-top: var(--space-5); margin-bottom: var(--space-2);">\u{1F4CA} Business & Analytics</div>
-      <div class="more-grid">
-        ${canAccess(["gerant"]) ? `
-        <a href="#/health" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #2D8B55">
-            <i data-lucide="heart-pulse"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Sant\xE9 du restaurant</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Score de sant\xE9, alertes, conformit\xE9 HACCP, pertes, disponibilit\xE9</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant"]) ? `
-        <a href="#/analytics" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="bar-chart-3"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Analytics</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Food cost, marges, pr\xE9dictions IA, insights fournisseurs</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant"]) ? `
-        <a href="#/menu-engineering" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #F59E0B">
-            <i data-lucide="target"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Menu Engineering</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Matrice BCG : Stars, Puzzles, Plowhorses, Dogs \u2014 optimisez votre carte</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant"]) ? `
-        <a href="#/predictions" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #7C3AED">
-            <i data-lucide="brain"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Pr\xE9dictions IA</h3>
-            <span class="badge badge--success">Nouveau</span>
-          </div>
-          <p class="text-secondary text-sm">Anticipez la demande, optimisez vos commandes fournisseurs</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant"]) ? `
-        <a href="#/mercuriale" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="trending-up"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>\u{1F4CA} Mercuriale</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Suivi des prix fournisseurs, alertes variations, tendances</p>
-        </a>
-        ` : ""}
-      </div>
-
-      <!-- SECTION: Intelligence Artificielle -->
-      <div class="section-title" style="margin-top: var(--space-5); margin-bottom: var(--space-2);">\u{1F916} Intelligence Artificielle</div>
-      <div class="more-grid">
-        ${canAccess(["gerant", "cuisinier"]) ? `
-        <a href="#/chef" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #7C3AED">
-            <i data-lucide="bot"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>\u{1F468}\u200D\u{1F373} Chef IA</h3>
-            <span class="badge badge--success">Nouveau</span>
-          </div>
-          <p class="text-secondary text-sm">Assistant expert : food cost, stocks, HACCP, suggestions</p>
-        </a>
-        ` : ""}
-      </div>
-
-      <!-- SECTION: Clients & R\xE9servations -->
-      <div class="section-title" style="margin-top: var(--space-5); margin-bottom: var(--space-2);">\u{1F465} Clients & R\xE9servations</div>
-      <div class="more-grid">
-        ${canAccess(["gerant"]) ? `
-        <a href="#/crm" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #EC4899">
-            <i data-lucide="heart"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>CRM & Fid\xE9lit\xE9</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Clients, points de fid\xE9lit\xE9, r\xE9compenses, VIP</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant"]) ? `
+        ${isGerant ? `
         <a href="#/integrations" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #00B37E">
-            <i data-lucide="plug"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Int\xE9grations & R\xE9sa.</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">TheFork, caisse, livraison, r\xE9servations, comptabilit\xE9</p>
+          <div class="more-card__icon" style="background:#00B37E"><i data-lucide="plug"></i></div>
+          <div class="more-card__content"><h3>Int\xE9grations</h3><span class="badge badge--success">Actif</span></div>
+          <p class="text-secondary text-sm">TheFork, caisse, livraison, r\xE9servations</p>
         </a>
-        ` : ""}
-      </div>
-
-      <!-- SECTION: Outils & Configuration -->
-      <div class="section-title" style="margin-top: var(--space-5); margin-bottom: var(--space-2);">\u2699\uFE0F Outils & Configuration</div>
-      <div class="more-grid">
-        ${canAccess(["gerant", "cuisinier"]) ? `
-        <a href="#/haccp" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-success)">
-            <i data-lucide="shield-check"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>HACCP</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Relev\xE9s temp\xE9ratures, plan de nettoyage, tra\xE7abilit\xE9, export PDF</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant"]) ? `
         <a href="#/qrcodes" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-accent)">
-            <i data-lucide="qr-code"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>\u{1F4F1} QR Codes Menu</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Menu digital, commande client par QR code, impression par table</p>
+          <div class="more-card__icon" style="background:var(--color-accent)"><i data-lucide="qr-code"></i></div>
+          <div class="more-card__content"><h3>QR Codes Menu</h3><span class="badge badge--success">Actif</span></div>
+          <p class="text-secondary text-sm">Menu digital, commande client par QR code</p>
         </a>
-        ` : ""}
-
-        ${canAccess(["gerant"]) ? `
-        <a href="#/carbon" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #16A34A">
-            <i data-lucide="leaf"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Bilan Carbone</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Empreinte CO\u2082 par recette, notation A\u2192E, \xE9quivalences ADEME</p>
+        <a href="#/crm" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+          <div class="more-card__icon" style="background:#EC4899"><i data-lucide="heart"></i></div>
+          <div class="more-card__content"><h3>CRM & Fid\xE9lit\xE9</h3><span class="badge badge--success">Actif</span></div>
+          <p class="text-secondary text-sm">Clients, fid\xE9lit\xE9, VIP</p>
         </a>
-        ` : ""}
-
-        ${canAccess(["gerant"]) ? `
-        <a href="#/multi-site" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-info)">
-            <i data-lucide="building-2"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Multi-Sites</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">G\xE9rez plusieurs \xE9tablissements, comparez les performances</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant"]) ? `
-        <a href="#/api-keys" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-primary)">
-            <i data-lucide="key"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>API Publique</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Cl\xE9s API, documentation, int\xE9grations externes</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant"]) ? `
-        <a href="#/supplier-portal" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: var(--color-primary-light)">
-            <i data-lucide="truck"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Portail Fournisseur</h3>
-            <span class="badge badge--success">Actif</span>
-          </div>
-          <p class="text-secondary text-sm">Vos fournisseurs mettent \xE0 jour leurs catalogues et prix directement</p>
-        </a>
-        ` : ""}
-
-        ${canAccess(["gerant"]) ? `
         <a href="#/errors-log" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-          <div class="more-card__icon" style="background: #DC2626">
-            <i data-lucide="bug"></i>
-          </div>
-          <div class="more-card__content">
-            <h3>Journal d'erreurs</h3>
-            <span class="badge badge--error">Tech</span>
-          </div>
-          <p class="text-secondary text-sm">50 derni\xE8res erreurs serveur et client en temps r\xE9el</p>
+          <div class="more-card__icon" style="background:#DC2626"><i data-lucide="bug"></i></div>
+          <div class="more-card__content"><h3>Journal d'erreurs</h3><span class="badge badge--error">Tech</span></div>
+          <p class="text-secondary text-sm">Erreurs serveur et client en temps r\xE9el</p>
         </a>
         ` : ""}
       </div>
 
-      <div class="section-title" style="margin-top: var(--space-6);">Pr\xE9f\xE9rences</div>
+      ${isGerant ? `
+      <div style="margin:var(--space-5) 0 var(--space-3)">
+        <button id="btn-toggle-advanced" class="btn btn-secondary" style="width:100%;justify-content:center;gap:var(--space-2)">
+          <i data-lucide="${showAdvanced ? "eye-off" : "eye"}" style="width:16px;height:16px"></i>
+          ${showAdvanced ? "Masquer les modules avanc\xE9s" : "Afficher les modules avanc\xE9s"}
+        </button>
+      </div>
+      <div id="advanced-modules" style="display:${showAdvanced ? "block" : "none"}">
+        <div class="section-title" style="margin-bottom:var(--space-2);">\u{1F52C} Modules avanc\xE9s</div>
+        <div class="more-grid">
+          <a href="#/multi-site" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+            <div class="more-card__icon" style="background:var(--color-info)"><i data-lucide="building-2"></i></div>
+            <div class="more-card__content"><h3>Multi-Sites</h3><span class="badge badge--info">Avanc\xE9</span></div>
+            <p class="text-secondary text-sm">G\xE9rez plusieurs \xE9tablissements</p>
+          </a>
+          <a href="#/api-keys" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+            <div class="more-card__icon" style="background:var(--color-primary)"><i data-lucide="key"></i></div>
+            <div class="more-card__content"><h3>API Publique</h3><span class="badge badge--info">Avanc\xE9</span></div>
+            <p class="text-secondary text-sm">Cl\xE9s API, int\xE9grations externes</p>
+          </a>
+          <a href="#/carbon" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+            <div class="more-card__icon" style="background:#16A34A"><i data-lucide="leaf"></i></div>
+            <div class="more-card__content"><h3>Bilan Carbone</h3><span class="badge badge--info">Avanc\xE9</span></div>
+            <p class="text-secondary text-sm">Empreinte CO\u2082 par recette, notation A\u2192E</p>
+          </a>
+          <a href="#/supplier-portal" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
+            <div class="more-card__icon" style="background:var(--color-primary-light)"><i data-lucide="truck"></i></div>
+            <div class="more-card__content"><h3>Portail Fournisseur</h3><span class="badge badge--info">Avanc\xE9</span></div>
+            <p class="text-secondary text-sm">Fournisseurs mettent \xE0 jour leurs catalogues</p>
+          </a>
+        </div>
+      </div>
+      ` : ""}
+
+      <div class="section-title" style="margin-top:var(--space-6);">Pr\xE9f\xE9rences</div>
       <div class="setting-row">
         <span>\u{1F319} Mode sombre</span>
         <label class="toggle">
@@ -8052,7 +7854,7 @@ class MoreView {
       </div>
 
       <div class="more-footer">
-        <div style="text-align:center; margin-top: 2rem;">
+        <div style="text-align:center;margin-top:2rem">
           <button class="btn btn-secondary" id="btn-export-data" style="margin-bottom:1rem">
             <i data-lucide="download" style="width:18px;height:18px"></i> Exporter mes donn\xE9es
           </button>
@@ -8060,13 +7862,19 @@ class MoreView {
           <button class="btn btn-secondary" onclick="logout()" style="margin-bottom:1rem">
             <i data-lucide="log-out" style="width:18px;height:18px"></i> Se d\xE9connecter
           </button>
-          <p class="text-secondary text-sm">
-            RestoSuite v1.0 \u2014 Votre cuisine tourne. Vos chiffres suivent.
-          </p>
+          <p class="text-secondary text-sm">RestoSuite v1.0 \u2014 Votre cuisine tourne. Vos chiffres suivent.</p>
         </div>
       </div>
     `;
     if (window.lucide) lucide.createIcons();
+    const toggleBtn = document.getElementById("btn-toggle-advanced");
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", () => {
+        const newVal = localStorage.getItem("restosuite_show_advanced") !== "true";
+        localStorage.setItem("restosuite_show_advanced", String(newVal));
+        new MoreView().render();
+      });
+    }
     const themeToggle = document.getElementById("themeToggle");
     if (themeToggle) {
       themeToggle.checked = document.documentElement.getAttribute("data-theme") !== "light";
@@ -8088,8 +7896,7 @@ class MoreView {
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-          a.download = `restosuite-export-${today}.json`;
+          a.download = `restosuite-export-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`;
           a.click();
           URL.revokeObjectURL(url);
           showToast("Donn\xE9es export\xE9es \u2713", "success");
@@ -15090,15 +14897,21 @@ const Router = {
       _svcCleanup();
     }
     document.querySelectorAll(".modal-overlay").forEach((el) => el.remove());
-    document.querySelectorAll(".nav-link").forEach((link) => {
+    document.querySelectorAll(".nav-link[data-route]").forEach((link) => {
       const route = link.dataset.route;
-      const isActive = route === path || route !== "/" && path.startsWith(route) || route === "/haccp" && path.startsWith("/haccp") || route === "/stock" && path.startsWith("/stock") || route === "/orders" && path.startsWith("/orders");
-      if (isActive) {
-        link.classList.add("active");
-      } else {
-        link.classList.remove("active");
-      }
+      const isActive = route === path || route !== "/" && path.startsWith(route);
+      link.classList.toggle("active", isActive);
     });
+    if (typeof ROUTE_TO_GROUP !== "undefined") {
+      let activeGroup = ROUTE_TO_GROUP[path];
+      if (!activeGroup) {
+        const key = Object.keys(ROUTE_TO_GROUP).find((p) => p !== "/" && path.startsWith(p));
+        activeGroup = key ? ROUTE_TO_GROUP[key] : null;
+      }
+      document.querySelectorAll(".nav-link[data-group]").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.group === activeGroup);
+      });
+    }
     for (const route of this.routes) {
       const match = path.match(route.pattern);
       if (match) {
@@ -15133,6 +14946,77 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e)
     document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
   }
 });
+const NAV_GROUPS = {
+  cuisine: {
+    label: "Cuisine",
+    items: [
+      { label: "Fiches Techniques", route: "/", icon: "clipboard-list", roles: ["gerant", "cuisinier", "equipier"] },
+      { label: "Ingr\xE9dients", route: "/ingredients", icon: "package", roles: ["gerant", "cuisinier", "equipier"] },
+      { label: "Stock & R\xE9ception", route: "/stock", icon: "warehouse", roles: ["gerant", "cuisinier"] }
+    ]
+  },
+  operations: {
+    label: "Op\xE9rations",
+    items: [
+      { label: "Commandes fournisseurs", route: "/orders", icon: "clipboard-pen", roles: ["gerant"] },
+      { label: "Fournisseurs", route: "/suppliers", icon: "truck", roles: ["gerant"] },
+      { label: "Livraisons", route: "/deliveries", icon: "package-check", roles: ["gerant", "cuisinier"] },
+      { label: "Service (Salle)", route: "/service", icon: "concierge-bell", roles: ["gerant", "salle"] },
+      { label: "Cuisine (\xE9cran)", route: "/kitchen", icon: "chef-hat", roles: ["gerant", "cuisinier"] }
+    ]
+  },
+  conformite: {
+    label: "Conformit\xE9",
+    items: [
+      { label: "HACCP", route: "/haccp", icon: "shield-check", roles: ["gerant", "cuisinier"] },
+      { label: "Allerg\xE8nes", route: "/haccp/allergens", icon: "triangle-alert", roles: ["gerant", "cuisinier"] }
+    ]
+  },
+  pilotage: {
+    label: "Pilotage",
+    items: [
+      { label: "Sant\xE9 du restaurant", route: "/health", icon: "heart-pulse", roles: ["gerant"] },
+      { label: "Analytics", route: "/analytics", icon: "bar-chart-3", roles: ["gerant"] },
+      { label: "Menu Engineering", route: "/menu-engineering", icon: "target", roles: ["gerant"] },
+      { label: "Pr\xE9dictions IA", route: "/predictions", icon: "brain", roles: ["gerant"] },
+      { label: "Mercuriale", route: "/mercuriale", icon: "trending-up", roles: ["gerant"] }
+    ]
+  }
+};
+const ROUTE_TO_GROUP = {
+  "/": "cuisine",
+  "/new": "cuisine",
+  "/ingredients": "cuisine",
+  "/stock": "cuisine",
+  "/recipe": "cuisine",
+  "/edit": "cuisine",
+  "/orders": "operations",
+  "/suppliers": "operations",
+  "/deliveries": "operations",
+  "/service": "operations",
+  "/kitchen": "operations",
+  "/scan-invoice": "operations",
+  "/haccp": "conformite",
+  "/analytics": "pilotage",
+  "/health": "pilotage",
+  "/menu-engineering": "pilotage",
+  "/predictions": "pilotage",
+  "/mercuriale": "pilotage",
+  "/import-mercuriale": "pilotage",
+  "/chef": "ia",
+  "/ia": "ia",
+  "/more": "plus",
+  "/team": "plus",
+  "/integrations": "plus",
+  "/multi-site": "plus",
+  "/api-keys": "plus",
+  "/qrcodes": "plus",
+  "/carbon": "plus",
+  "/supplier-portal": "plus",
+  "/errors-log": "plus",
+  "/crm": "plus",
+  "/subscribe": "plus"
+};
 document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "k") {
     e.preventDefault();
@@ -15321,6 +15205,7 @@ function bootApp(role, account, opts = {}) {
   applyRole(role);
   updateNavUser(account);
   registerRoutes();
+  initNavGroups(role);
   const navLinks = document.querySelectorAll(".nav-link[data-roles]");
   navLinks.forEach((link) => {
     const allowedRoles = link.dataset.roles.split(",").map((r) => r.trim());
@@ -15365,6 +15250,66 @@ function updateNavUser(account) {
   if (navLinks) {
     navLinks.appendChild(badge);
   }
+}
+function initNavGroups(role) {
+  const panel = document.getElementById("nav-panel");
+  const panelContent = document.getElementById("nav-panel-content");
+  if (!panel || !panelContent) return;
+  const backdrop = panel.querySelector(".nav-panel-backdrop");
+  let activeGroupKey = null;
+  function closePanel() {
+    panel.classList.remove("open");
+    document.querySelectorAll(".nav-link.panel-open").forEach((el) => el.classList.remove("panel-open"));
+    activeGroupKey = null;
+  }
+  function openPanel(btn, groupKey) {
+    const group = NAV_GROUPS[groupKey];
+    if (!group) return;
+    const accessible = group.items.filter((item) => item.roles.includes(role));
+    if (accessible.length === 0) return;
+    if (accessible.length === 1) {
+      closePanel();
+      location.hash = "#" + accessible[0].route;
+      return;
+    }
+    const currentPath = location.hash.replace("#", "") || "/";
+    panelContent.innerHTML = `
+      <div class="nav-panel-title">${escapeHtml(group.label)}</div>
+      ${accessible.map((item) => {
+      const isActive = currentPath === item.route || item.route !== "/" && currentPath.startsWith(item.route);
+      return `<a href="#${item.route}" class="nav-panel-item${isActive ? " active" : ""}">
+          <i data-lucide="${item.icon}"></i>
+          ${escapeHtml(item.label)}
+        </a>`;
+    }).join("")}
+    `;
+    if (window.lucide) lucide.createIcons({ nodes: [panelContent] });
+    if (window.innerWidth >= 768) {
+      const rect = btn.getBoundingClientRect();
+      const sheet = panelContent.parentElement;
+      sheet.style.left = Math.max(8, rect.left - 20) + "px";
+    }
+    panel.classList.add("open");
+    btn.classList.add("panel-open");
+    activeGroupKey = groupKey;
+    panelContent.querySelectorAll(".nav-panel-item").forEach((item) => {
+      item.addEventListener("click", closePanel, { once: true });
+    });
+  }
+  document.querySelectorAll(".nav-link[data-group]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const groupKey = btn.dataset.group;
+      if (activeGroupKey === groupKey && panel.classList.contains("open")) {
+        closePanel();
+      } else {
+        closePanel();
+        openPanel(btn, groupKey);
+      }
+    });
+  });
+  if (backdrop) backdrop.addEventListener("click", closePanel);
+  window.addEventListener("hashchange", closePanel);
 }
 (async function init() {
   const supplierSession = getSupplierSession();

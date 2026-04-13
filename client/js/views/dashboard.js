@@ -2,6 +2,45 @@
 // Dashboard — Fiches Techniques (with recipe type filter)
 // ═══════════════════════════════════════════
 
+async function renderOnboardingChecklist() {
+  const container = document.getElementById('dashboard-onboarding');
+  if (!container) return;
+  try {
+    const data = await API.getOnboardingChecklist();
+    if (!data || data.progress >= 1) { container.innerHTML = ''; return; }
+
+    const pct = Math.round(data.progress * 100);
+    container.innerHTML = `
+      <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
+          <h3 style="margin:0;font-size:var(--text-base)">🚀 Prise en main</h3>
+          <span style="font-size:var(--text-sm);font-weight:600;color:var(--color-accent)">${pct}%</span>
+        </div>
+        <div style="height:6px;background:var(--bg-sunken);border-radius:var(--radius-full);margin-bottom:var(--space-3);overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:var(--color-accent);border-radius:var(--radius-full);transition:width 0.6s ease"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+          ${data.steps.map(step => `
+            <a ${step.done ? '' : `href="${step.route}"`} class="onboarding-step${step.done ? ' done' : ''}" style="${step.done ? 'pointer-events:none' : ''}">
+              <span class="onboarding-step__check">
+                ${step.done
+                  ? '<i data-lucide="check-circle-2" style="color:var(--color-success);width:20px;height:20px;flex-shrink:0"></i>'
+                  : '<i data-lucide="circle" style="color:var(--text-tertiary);width:20px;height:20px;flex-shrink:0"></i>'
+                }
+              </span>
+              <span class="onboarding-step__label">${escapeHtml(step.label)}</span>
+              ${!step.done ? '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text-tertiary);margin-left:auto;flex-shrink:0"></i>' : ''}
+            </a>
+          `).join('')}
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons({ nodes: [container] });
+  } catch (e) {
+    if (container) container.innerHTML = '';
+  }
+}
+
 async function renderDashboard() {
   const app = document.getElementById('app');
   const perms = getPermissions();
@@ -17,6 +56,7 @@ async function renderDashboard() {
       </div>
     </div>
 
+    <div id="dashboard-onboarding"></div>
     <div id="dashboard-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
 
     <div id="dashboard-alerts"></div>
@@ -151,6 +191,9 @@ async function renderDashboard() {
       renderList(searchInput.value, currentTypeFilter);
     });
   });
+
+  // Onboarding checklist (shown until all 4 steps complete)
+  renderOnboardingChecklist();
 
   // AI Suggestions card
   loadAISuggestions();
