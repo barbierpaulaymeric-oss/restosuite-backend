@@ -12795,38 +12795,64 @@ async function renderTeam(tab) {
       </button>
     </div>
 
-    <!-- Staff Password Section -->
-    <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-5);border:1px solid var(--border-color)">
-      <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
-        <i data-lucide="lock" style="width:20px;height:20px;color:var(--color-accent)"></i>
-        <h3 style="margin:0;font-size:var(--text-lg)">Mot de passe \xE9quipe</h3>
+    <!-- Tab: Membres -->
+    <div id="tab-members" style="${_teamActiveTab !== "members" ? "display:none" : ""}">
+      <!-- Staff Password Section -->
+      <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-5);border:1px solid var(--border-color)">
+        <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+          <i data-lucide="lock" style="width:20px;height:20px;color:var(--color-accent)"></i>
+          <h3 style="margin:0;font-size:var(--text-lg)">Mot de passe \xE9quipe</h3>
+        </div>
+        <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-3)">Ce mot de passe est partag\xE9 avec votre staff pour acc\xE9der au restaurant. Chaque membre cr\xE9e ensuite son propre PIN personnel.</p>
+        <div style="display:flex;gap:var(--space-2);align-items:center">
+          <input type="password" class="form-control" id="staff-password-input" placeholder="Nouveau mot de passe" autocomplete="new-password" style="max-width:280px">
+          <button class="btn btn-ghost" id="staff-password-toggle" style="padding:8px" title="Afficher/masquer">
+            <i data-lucide="eye" style="width:18px;height:18px" id="staff-password-eye"></i>
+          </button>
+          <button class="btn btn-primary" id="staff-password-save-btn">Enregistrer</button>
+        </div>
+        <div id="staff-password-message" style="margin-top:var(--space-2);font-size:var(--text-sm)"></div>
       </div>
-      <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-3)">Ce mot de passe est partag\xE9 avec votre staff pour acc\xE9der au restaurant. Chaque membre cr\xE9e ensuite son propre PIN personnel.</p>
-      <div style="display:flex;gap:var(--space-2);align-items:center">
-        <input type="password" class="form-control" id="staff-password-input" placeholder="Nouveau mot de passe" autocomplete="new-password" style="max-width:280px">
-        <button class="btn btn-ghost" id="staff-password-toggle" style="padding:8px" title="Afficher/masquer">
-          <i data-lucide="eye" style="width:18px;height:18px" id="staff-password-eye"></i>
+
+      <div id="team-list"><div class="loading"><div class="spinner"></div></div></div>
+
+      <!-- Danger Zone -->
+      <div style="margin-top:var(--space-8);padding:var(--space-4);border:1px solid rgba(217,48,37,0.3);border-radius:var(--radius-lg);background:linear-gradient(135deg, rgba(217,48,37,0.05), transparent)">
+        <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)">
+          <i data-lucide="alert-triangle" style="width:20px;height:20px;color:var(--color-danger)"></i>
+          <h3 style="color:var(--color-danger);margin:0;font-size:var(--text-base)">Zone dangereuse</h3>
+        </div>
+        <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-3)">Supprimer votre compte et toutes les donn\xE9es du restaurant. Cette action est irr\xE9versible.</p>
+        <button class="btn btn-sm" id="delete-account-btn" style="color:var(--color-danger);border:1px solid rgba(217,48,37,0.4);background:transparent;border-radius:var(--radius-md);padding:8px 16px;transition:var(--transition-base)">
+          <i data-lucide="trash-2" style="width:14px;height:14px"></i> Supprimer mon compte
         </button>
-        <button class="btn btn-primary" id="staff-password-save-btn">Enregistrer</button>
       </div>
-      <div id="staff-password-message" style="margin-top:var(--space-2);font-size:var(--text-sm)"></div>
     </div>
 
-    <div id="team-list"><div class="loading"><div class="spinner"></div></div></div>
+    <!-- Tab: Zones & Comp\xE9tences -->
+    <div id="tab-matrix" style="${_teamActiveTab !== "matrix" ? "display:none" : ""}">
+      <div id="team-matrix-content"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
 
-    <!-- Danger Zone \u2014 styled to match site DA -->
-    <div style="margin-top:var(--space-8);padding:var(--space-4);border:1px solid rgba(217,48,37,0.3);border-radius:var(--radius-lg);background:linear-gradient(135deg, rgba(217,48,37,0.05), transparent)">
-      <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)">
-        <i data-lucide="alert-triangle" style="width:20px;height:20px;color:var(--color-danger)"></i>
-        <h3 style="color:var(--color-danger);margin:0;font-size:var(--text-base)">Zone dangereuse</h3>
-      </div>
-      <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-3)">Supprimer votre compte et toutes les donn\xE9es du restaurant. Cette action est irr\xE9versible.</p>
-      <button class="btn btn-sm" id="delete-account-btn" style="color:var(--color-danger);border:1px solid rgba(217,48,37,0.4);background:transparent;border-radius:var(--radius-md);padding:8px 16px;transition:var(--transition-base)">
-        <i data-lucide="trash-2" style="width:14px;height:14px"></i> Supprimer mon compte
-      </button>
+    <!-- Tab: Formations -->
+    <div id="tab-training" style="${_teamActiveTab !== "training" ? "display:none" : ""}">
+      <div id="team-training-content"><div class="loading"><div class="spinner"></div></div></div>
     </div>
   `;
   lucide.createIcons();
+  app.querySelectorAll(".team-tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _teamActiveTab = btn.dataset.tab;
+      app.querySelectorAll(".team-tab-btn").forEach((b) => b.classList.toggle("team-tab-btn--active", b.dataset.tab === _teamActiveTab));
+      ["members", "matrix", "training"].forEach((t) => {
+        const el = document.getElementById("tab-" + t);
+        if (el) el.style.display = t === _teamActiveTab ? "" : "none";
+      });
+      const addBtn = document.getElementById("add-member-btn");
+      if (addBtn) addBtn.style.display = _teamActiveTab === "members" ? "" : "none";
+      _populateTeamTab(accounts, staff, gerant);
+    });
+  });
   document.getElementById("staff-password-toggle").addEventListener("click", () => {
     const input = document.getElementById("staff-password-input");
     const icon = document.getElementById("staff-password-eye");
@@ -12866,14 +12892,27 @@ async function renderTeam(tab) {
   } catch (e) {
     showToast("Erreur de chargement", "error");
   }
-  const listEl = document.getElementById("team-list");
-  if (accounts.length === 0) {
-    listEl.innerHTML = `<div class="empty-state"><p>Aucun membre dans l'\xE9quipe</p></div>`;
-    document.getElementById("add-member-btn").addEventListener("click", showAddMemberModal);
-    return;
-  }
   const gerant = accounts.find((a) => a.role === "gerant");
   const staff = accounts.filter((a) => a.role !== "gerant");
+  _populateTeamTab(accounts, staff, gerant);
+  document.getElementById("add-member-btn").addEventListener("click", showAddMemberModal);
+}
+function _populateTeamTab(accounts, staff, gerant) {
+  if (_teamActiveTab === "members") {
+    _renderTeamMembersList(staff, gerant);
+  } else if (_teamActiveTab === "matrix") {
+    _renderTeamMatrix(staff);
+  } else if (_teamActiveTab === "training") {
+    _renderTeamTraining(staff, gerant);
+  }
+}
+function _renderTeamMembersList(staff, gerant) {
+  const listEl = document.getElementById("team-list");
+  if (!listEl) return;
+  if (!gerant && staff.length === 0) {
+    listEl.innerHTML = `<div class="empty-state"><p>Aucun membre dans l'\xE9quipe</p></div>`;
+    return;
+  }
   let html = "";
   if (gerant) {
     html += `
@@ -12895,6 +12934,10 @@ async function renderTeam(tab) {
     for (const m of staff) {
       const lastLogin = m.last_login ? new Date(m.last_login).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "Jamais";
       const pinStatus = m.has_pin ? '<span style="color:var(--color-success);font-size:var(--text-xs)">PIN configur\xE9</span>' : '<span style="color:var(--color-warning);font-size:var(--text-xs)">PIN non d\xE9fini</span>';
+      const zones = _teamParseJSON(m.zones);
+      const zoneHtml = zones.length > 0 ? `<div style="margin-top:var(--space-2);display:flex;flex-wrap:wrap;gap:4px">${zones.map(
+        (z) => `<span style="font-size:var(--text-xs);background:var(--color-accent-10,rgba(var(--color-accent-rgb),0.1));color:var(--color-accent);border-radius:4px;padding:2px 7px">${escapeHtml(z)}</span>`
+      ).join("")}</div>` : "";
       html += `
         <div class="team-card" data-member-id="${m.id}">
           <div class="team-card__header">
@@ -12902,6 +12945,7 @@ async function renderTeam(tab) {
             <div class="team-card__info">
               <span class="team-card__name">${escapeHtml(m.name)}</span>
               <span class="team-card__role">${_getRoleLabel(m.role)}</span>
+              ${zoneHtml}
             </div>
             <div style="text-align:right;font-size:var(--text-xs);color:var(--text-tertiary)">
               ${pinStatus}<br>
@@ -12950,7 +12994,122 @@ async function renderTeam(tab) {
       }
     });
   });
-  document.getElementById("add-member-btn").addEventListener("click", showAddMemberModal);
+}
+function _renderTeamMatrix(staff) {
+  const el = document.getElementById("team-matrix-content");
+  if (!el) return;
+  if (staff.length === 0) {
+    el.innerHTML = `<div class="empty-state"><p>Ajoutez des membres d'\xE9quipe pour voir la matrice</p></div>`;
+    return;
+  }
+  const zoneRows = staff.map((m) => {
+    const zones = _teamParseJSON(m.zones);
+    return `
+      <tr>
+        <td style="font-weight:500">${renderAvatar(m.name, 28)} <span style="vertical-align:middle;margin-left:8px">${escapeHtml(m.name)}</span></td>
+        ${TEAM_ZONES.map((z) => `
+          <td style="text-align:center">
+            ${zones.includes(z) ? '<span style="color:var(--color-success);font-size:18px">\u2713</span>' : '<span style="color:var(--border-color);font-size:16px">\u2014</span>'}
+          </td>
+        `).join("")}
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="showEditMemberModal(${JSON.stringify(m).split('"').join("&quot;")})"
+                  data-matrix-edit="${m.id}" title="Modifier">
+            <i data-lucide="pencil" style="width:13px;height:13px"></i>
+          </button>
+        </td>
+      </tr>`;
+  }).join("");
+  const skillRows = staff.map((m) => {
+    const skills = _teamParseJSON(m.skills);
+    return `
+      <tr>
+        <td style="font-weight:500">${renderAvatar(m.name, 28)} <span style="vertical-align:middle;margin-left:8px">${escapeHtml(m.name)}</span></td>
+        ${TEAM_SKILLS.map((s) => `
+          <td style="text-align:center">
+            ${skills.includes(s) ? '<span style="color:var(--color-success);font-size:18px">\u2713</span>' : '<span style="color:var(--border-color);font-size:16px">\u2014</span>'}
+          </td>
+        `).join("")}
+      </tr>`;
+  }).join("");
+  el.innerHTML = `
+    <h3 style="margin-bottom:var(--space-3);display:flex;align-items:center;gap:8px">
+      <i data-lucide="map-pin" style="width:18px;height:18px;color:var(--color-accent)"></i> Zones de responsabilit\xE9
+    </h3>
+    <div class="table-container" style="margin-bottom:var(--space-6);overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th style="min-width:140px">Membre</th>
+          ${TEAM_ZONES.map((z) => `<th style="text-align:center;min-width:90px">${escapeHtml(z)}</th>`).join("")}
+          <th></th>
+        </tr></thead>
+        <tbody>${zoneRows}</tbody>
+      </table>
+    </div>
+
+    <h3 style="margin-bottom:var(--space-3);display:flex;align-items:center;gap:8px">
+      <i data-lucide="star" style="width:18px;height:18px;color:var(--color-accent)"></i> Matrice de comp\xE9tences
+    </h3>
+    <div class="table-container" style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th style="min-width:140px">Membre</th>
+          ${TEAM_SKILLS.map((s) => `<th style="text-align:center;min-width:100px;font-size:var(--text-xs)">${escapeHtml(s)}</th>`).join("")}
+        </tr></thead>
+        <tbody>${skillRows}</tbody>
+      </table>
+    </div>
+    <p style="margin-top:var(--space-3);color:var(--text-tertiary);font-size:var(--text-sm)">
+      <i data-lucide="info" style="width:14px;height:14px;vertical-align:middle"></i>
+      Modifiez les zones et comp\xE9tences depuis la fiche membre (onglet Membres \u2192 Modifier).
+    </p>
+  `;
+  lucide.createIcons();
+  el.querySelectorAll("[data-matrix-edit]").forEach((btn) => {
+    const id = Number(btn.dataset.matrixEdit);
+    btn.onclick = () => showEditMemberModal(staff.find((m) => m.id === id));
+  });
+}
+function _renderTeamTraining(staff, gerant) {
+  const el = document.getElementById("team-training-content");
+  if (!el) return;
+  const members = [gerant, ...staff].filter(Boolean);
+  if (members.length === 0) {
+    el.innerHTML = '<div class="empty-state"><p>Aucun membre</p></div>';
+    return;
+  }
+  el.innerHTML = `
+    <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-4)">
+      Notez ici les formations suivies, certifications obtenues ou formations \xE0 planifier pour chaque membre.
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--space-4)">
+      ${members.map((m) => {
+    const notes = m.training_notes || "";
+    const hire = m.hire_date ? new Date(m.hire_date).toLocaleDateString("fr-FR") : null;
+    return `
+          <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:var(--space-4);border:1px solid var(--border-color)">
+            <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+              ${renderAvatar(m.name, 36)}
+              <div>
+                <div style="font-weight:600">${escapeHtml(m.name)}</div>
+                <div style="font-size:var(--text-xs);color:var(--text-tertiary)">${_getRoleLabel(m.role)}${hire ? ` \xB7 depuis ${hire}` : ""}</div>
+              </div>
+            </div>
+            ${notes ? `<p style="font-size:var(--text-sm);color:var(--text-secondary);white-space:pre-wrap;line-height:1.6;margin:0">${escapeHtml(notes)}</p>` : `<p style="font-size:var(--text-sm);color:var(--text-tertiary);font-style:italic;margin:0">Aucune note de formation</p>`}
+            ${m.role !== "gerant" ? `
+              <button class="btn btn-secondary btn-sm" style="margin-top:var(--space-3)" data-training-edit="${m.id}">
+                <i data-lucide="pencil" style="width:13px;height:13px"></i> Modifier
+              </button>
+            ` : ""}
+          </div>`;
+  }).join("")}
+    </div>
+  `;
+  lucide.createIcons();
+  el.querySelectorAll("[data-training-edit]").forEach((btn) => {
+    const id = Number(btn.dataset.trainingEdit);
+    btn.onclick = () => showEditMemberModal(staff.find((m) => m.id === id));
+  });
 }
 function showAddMemberModal() {
   const overlay = document.createElement("div");
@@ -13022,15 +13181,25 @@ function showAddMemberModal() {
 }
 function showEditMemberModal(member) {
   const isCustomRole = !["cuisinier", "salle", "serveur"].includes(member.role);
+  const memberZones = _teamParseJSON(member.zones);
+  const memberSkills = _teamParseJSON(member.skills);
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
-    <div class="modal">
+    <div class="modal" style="max-width:560px">
       <h2>Modifier \u2014 ${escapeHtml(member.name)}</h2>
-      <div class="form-group">
-        <label>Nom</label>
-        <input type="text" class="form-control" id="m-edit-name" value="${escapeHtml(member.name)}" autocomplete="off">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+        <div class="form-group">
+          <label>Nom</label>
+          <input type="text" class="form-control" id="m-edit-name" value="${escapeHtml(member.name)}" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label>Date d'embauche</label>
+          <input type="date" class="form-control" id="m-edit-hire" value="${member.hire_date || ""}">
+        </div>
       </div>
+
       <div class="form-group">
         <label>R\xF4le</label>
         <div style="display:flex;gap:var(--space-2)">
@@ -13045,6 +13214,36 @@ function showEditMemberModal(member) {
                  style="flex:1;${isCustomRole ? "" : "display:none"}">
         </div>
       </div>
+
+      <div class="form-group">
+        <label>Zones de responsabilit\xE9</label>
+        <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+          ${TEAM_ZONES.map((z) => `
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--text-sm);cursor:pointer;background:var(--bg-secondary);padding:5px 10px;border-radius:var(--radius-md)">
+              <input type="checkbox" class="m-edit-zone" value="${escapeHtml(z)}" ${memberZones.includes(z) ? "checked" : ""} style="width:14px;height:14px">
+              ${escapeHtml(z)}
+            </label>
+          `).join("")}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Comp\xE9tences</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
+          ${TEAM_SKILLS.map((s) => `
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--text-sm);cursor:pointer">
+              <input type="checkbox" class="m-edit-skill" value="${escapeHtml(s)}" ${memberSkills.includes(s) ? "checked" : ""} style="width:14px;height:14px">
+              ${escapeHtml(s)}
+            </label>
+          `).join("")}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Notes de formation <span style="color:var(--text-tertiary);font-weight:400">(certifications, formations suivies, \xE0 planifier\u2026)</span></label>
+        <textarea class="form-control" id="m-edit-training" rows="3" placeholder="Ex: HACCP niveau 1 \u2014 01/2026&#10;Formation s\xE9curit\xE9 alimentaire \xE0 planifier">${escapeHtml(member.training_notes || "")}</textarea>
+      </div>
+
       <div id="m-edit-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
       <div class="actions-row">
         <button class="btn btn-primary" id="m-edit-save">
@@ -13070,6 +13269,10 @@ function showEditMemberModal(member) {
     const name = document.getElementById("m-edit-name").value.trim();
     let role = document.getElementById("m-edit-role").value;
     if (role === "__custom__") role = document.getElementById("m-edit-custom-role").value.trim();
+    const hire_date = document.getElementById("m-edit-hire").value || null;
+    const training_notes = document.getElementById("m-edit-training").value.trim();
+    const zones = [...overlay.querySelectorAll(".m-edit-zone:checked")].map((c) => c.value);
+    const skills = [...overlay.querySelectorAll(".m-edit-skill:checked")].map((c) => c.value);
     const errorEl = document.getElementById("m-edit-error");
     const caller = getAccount();
     if (!name) {
@@ -13081,10 +13284,18 @@ function showEditMemberModal(member) {
       return;
     }
     try {
-      await API.updateAccount(member.id, { name, role, caller_id: caller.id });
+      await API.updateAccount(member.id, {
+        name,
+        role,
+        caller_id: caller.id,
+        hire_date,
+        training_notes,
+        zones: JSON.stringify(zones),
+        skills: JSON.stringify(skills)
+      });
       showToast("Membre mis \xE0 jour", "success");
       overlay.remove();
-      renderTeam();
+      renderTeam(_teamActiveTab);
     } catch (e) {
       errorEl.textContent = e.message || "Erreur";
     }

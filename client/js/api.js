@@ -277,6 +277,13 @@ const API = {
   saveHACCPDecisionTree(hazardId, data) { return this.request(`/haccp-plan/decision-tree/${hazardId}`, { method: 'POST', body: data }); },
   getHACCPPlanSummary() { return this.request('/haccp-plan/summary'); },
 
+  // ─── Recall Procedures (Retrait/Rappel) ───
+  getRecallProcedures() { return this.request('/recall'); },
+  getActiveRecallProcedures() { return this.request('/recall/active'); },
+  createRecallProcedure(data) { return this.request('/recall', { method: 'POST', body: data }); },
+  updateRecallProcedure(id, data) { return this.request(`/recall/${id}`, { method: 'PUT', body: data }); },
+  deleteRecallProcedure(id) { return this.request(`/recall/${id}`, { method: 'DELETE' }); },
+
   // ─── Stock ───
   getStock(q) {
     const qs = q ? `?q=${encodeURIComponent(q)}` : '';

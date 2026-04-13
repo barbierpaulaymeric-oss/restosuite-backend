@@ -104,7 +104,7 @@ router.use(requireAuth);
 
 // GET /api/accounts — list all accounts (no PIN)
 router.get('/', (req, res) => {
-  const accounts = all('SELECT id, name, role, permissions, created_at, last_login, CASE WHEN pin IS NOT NULL AND pin != \'\' THEN 1 ELSE 0 END as has_pin FROM accounts ORDER BY created_at ASC');
+  const accounts = all('SELECT id, name, role, permissions, created_at, last_login, zones, skills, hire_date, training_notes, CASE WHEN pin IS NOT NULL AND pin != \'\' THEN 1 ELSE 0 END as has_pin FROM accounts ORDER BY created_at ASC');
   res.json(accounts.map(a => ({
     ...a,
     permissions: JSON.parse(a.permissions)
@@ -209,6 +209,24 @@ router.put('/:id', (req, res) => {
     };
     updates.push('permissions = ?');
     params.push(JSON.stringify(sanitized));
+  }
+
+  // New fields: zones, skills, hire_date, training_notes
+  if (req.body.zones !== undefined) {
+    updates.push('zones = ?');
+    params.push(typeof req.body.zones === 'string' ? req.body.zones : JSON.stringify(req.body.zones));
+  }
+  if (req.body.skills !== undefined) {
+    updates.push('skills = ?');
+    params.push(typeof req.body.skills === 'string' ? req.body.skills : JSON.stringify(req.body.skills));
+  }
+  if (req.body.hire_date !== undefined) {
+    updates.push('hire_date = ?');
+    params.push(req.body.hire_date || null);
+  }
+  if (req.body.training_notes !== undefined) {
+    updates.push('training_notes = ?');
+    params.push(req.body.training_notes || '');
   }
 
   if (updates.length === 0) {
