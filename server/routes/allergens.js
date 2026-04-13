@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { all, get, run } = require('../db');
+const { db, all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
 const router = Router();
 
@@ -178,6 +178,43 @@ function getRecipeAllergens(recipeId, visited = new Set()) {
 
   return INCO_ALLERGENS.filter(a => foundSet.has(a.code));
 }
+
+// ─── INCO: Affichage allergènes menu complet ───
+router.get('/menu-display', requireAuth, (req, res) => {
+  try {
+    const recipes = db.prepare(`
+      SELECT r.id, r.name, r.category
+      FROM recipes r
+      ORDER BY r.category, r.name
+    `).all();
+
+    const result = recipes.map(recipe => {
+      const allergenRows = db.prepare(`
+        SELECT DISTINCT i.allergens
+        FROM recipe_ingredients ri
+        JOIN ingredients i ON ri.ingredient_id = i.id
+        WHERE ri.recipe_id = ? AND i.allergens IS NOT NULL AND i.allergens != ''
+      `).all(recipe.id);
+
+      const allergenSet = new Set();
+      allergenRows.forEach(row => {
+        try {
+          const codes = JSON.parse(row.allergens);
+          if (Array.isArray(codes)) codes.forEach(c => allergenSet.add(c));
+        } catch {}
+      });
+
+      return {
+        ...recipe,
+        allergen_codes: [...allergenSet].sort()
+      };
+    });
+
+    res.json({ items: result, total: result.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 module.exports = router;
 module.exports.INCO_ALLERGENS = INCO_ALLERGENS;

@@ -321,18 +321,26 @@ router.post('/traceability', (req, res) => {
   res.status(201).json(log);
 });
 
-router.get('/traceability/dlc-alerts', (req, res) => {
-  const alerts = all(`
-    SELECT tl.*, a.name as received_by_name,
-           julianday(tl.dlc) - julianday('now') as days_until_dlc
-    FROM traceability_logs tl
-    LEFT JOIN accounts a ON a.id = tl.received_by
-    WHERE tl.dlc IS NOT NULL
-      AND julianday(tl.dlc) - julianday('now') <= 3
-      AND julianday(tl.dlc) - julianday('now') >= -1
-    ORDER BY tl.dlc ASC
-  `);
-  res.json(alerts);
+router.get('/traceability/dlc-alerts', requireAuth, (req, res) => {
+  try {
+    const now = new Date();
+    const in3days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const rows = db.prepare(`
+      SELECT *, CAST((julianday(dlc) - julianday('now')) AS INTEGER) as days_until_dlc
+      FROM traceability_logs
+      WHERE dlc IS NOT NULL AND dlc <= ?
+      ORDER BY dlc ASC
+    `).all(in3days);
+    const categorized = rows.map(r => ({
+      ...r,
+      alert_level: r.days_until_dlc < 0 ? 'expired' :
+                   r.days_until_dlc === 0 ? 'today' :
+                   r.days_until_dlc === 1 ? 'tomorrow' : 'two_days'
+    }));
+    res.json(categorized);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ═══════════════════════════════════════════
