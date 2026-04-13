@@ -907,6 +907,111 @@ try {
   console.error('Seed haccp hazards error:', e.message);
 }
 
+// ─── Seed: HACCP CCP — limites critiques des 3 CCP ───
+try {
+  const existingCCPs = get("SELECT COUNT(*) as count FROM haccp_ccp");
+  if (existingCCPs && existingCCPs.count === 0) {
+    const stockage  = get("SELECT id FROM haccp_hazard_analysis WHERE step_name='Stockage'       AND hazard_type='B' LIMIT 1");
+    const cuisson   = get("SELECT id FROM haccp_hazard_analysis WHERE step_name='Cuisson'        AND hazard_type='B' LIMIT 1");
+    const refroid   = get("SELECT id FROM haccp_hazard_analysis WHERE step_name='Refroidissement' AND hazard_type='B' LIMIT 1");
+
+    if (stockage && cuisson && refroid) {
+      const insertCCP = db.prepare(`
+        INSERT INTO haccp_ccp
+          (hazard_analysis_id, ccp_number, critical_limits, monitoring_procedure, monitoring_frequency,
+           corrective_actions, verification_procedure, records_kept, responsible_person)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+      insertCCP.run(
+        stockage.id, 'CCP1',
+        'Température chambre froide ≤4°C en permanence',
+        'Lecture du thermomètre numérique de la chambre froide positive',
+        '2 fois par jour (ouverture et fermeture)',
+        'Vérification thermostat ; transfert immédiat des produits si T°>5°C ; alerte maintenance si anomalie persistante >2h',
+        'Calibration du thermomètre trimestrielle ; revue mensuelle des fiches relevé',
+        'Fiche relevé température journalière (Fiche T-CF-001)',
+        'Responsable cuisine / Chef de partie froid'
+      );
+      insertCCP.run(
+        cuisson.id, 'CCP2',
+        'Température à cœur ≥75°C pendant ≥2 minutes (70°C pendant ≥2 min pour volaille)',
+        'Mesure à la sonde thermométrique au centre géométrique du produit en fin de cuisson',
+        'À chaque cuisson — 100 % des lots',
+        'Prolonger la cuisson jusqu\'à T° cible atteinte ; rejeter le lot si T° non atteignable après 2 corrections',
+        'Calibration annuelle de la sonde ; audit procédure par responsable qualité trimestriel',
+        'Fiche cuisson journalière (Fiche C-001) ; registre de calibration sonde',
+        'Chef de cuisine / Cuisinier responsable'
+      );
+      insertCCP.run(
+        refroid.id, 'CCP3',
+        'Passage de 63°C à moins de 10°C en ≤2 heures (cellule de refroidissement rapide)',
+        'Mesure sonde au cœur du produit au départ (≥63°C) et à l\'arrivée (<10°C) ; chronométrage de la durée',
+        'À chaque refroidissement — 100 % des préparations chaudes destinées à la conservation',
+        'Si délai >2h : destruction de la préparation et traçabilité ; si cellule défaillante : alerte maintenance immédiate et suspension de la production',
+        'Contrôle de la cellule hebdomadaire (cycle test à vide) ; maintenance préventive semestrielle',
+        'Fiche refroidissement rapide (Fiche RF-001) avec heures et températures',
+        'Chef de cuisine / Commis responsable refroidissement'
+      );
+      console.log('✅ Seed: 3 CCP HACCP avec limites critiques insérés (CCP1/2/3)');
+    }
+  }
+} catch (e) {
+  console.error('Seed haccp CCPs error:', e.message);
+}
+
+// ─── Seed: HACCP Arbre de décision — résultats Codex Alimentarius pour les 11 dangers ───
+try {
+  const existingDT = get("SELECT COUNT(*) as count FROM haccp_decision_tree_results");
+  if (existingDT && existingDT.count === 0) {
+    const hazards = all("SELECT id, step_name, hazard_type, is_ccp FROM haccp_hazard_analysis ORDER BY id");
+    if (hazards && hazards.length > 0) {
+      const insertDT = db.prepare(`
+        INSERT INTO haccp_decision_tree_results
+          (hazard_analysis_id, q1_preventive_measure, q2_step_designed_eliminate, q3_contamination_possible, q4_subsequent_step_eliminate, result)
+        VALUES (?, ?, ?, ?, ?, ?)`);
+
+      // Arbre de décision Codex Alimentarius : Q1 mesure préventive ? Q2 étape conçue pour éliminer ?
+      // Q3 contamination possible ? Q4 étape ultérieure élimine ?
+      // Logique : !Q1→PRP | Q2→CCP | !Q3→PRP | Q4→PRPO | sinon→CCP
+      const dtRules = {
+        // Réception / Biologique / Salmonella → PRPO (cuisson éliminera)
+        'Réception-B':   { q1:1, q2:0, q3:1, q4:1, result:'PRPO' },
+        // Réception / Chimique / Pesticides → PRP (pas de contamination significative si fournisseur certifié)
+        'Réception-C':   { q1:1, q2:0, q3:0, q4:0, result:'PRP'  },
+        // Réception / Physique / Corps étrangers → PRPO (inspection possible en préparation)
+        'Réception-P':   { q1:1, q2:0, q3:1, q4:1, result:'PRPO' },
+        // Stockage / Biologique / Listeria → CCP (maîtrise T° essentielle, pas d'étape ultérieure d'élimination)
+        'Stockage-B':    { q1:1, q2:1, q3:1, q4:0, result:'CCP'  },
+        // Stockage / Chimique / Allergènes → PRP (séparation physique, pas de contamination si protocole suivi)
+        'Stockage-C':    { q1:1, q2:0, q3:0, q4:0, result:'PRP'  },
+        // Préparation / Biologique / Contamination croisée → PRPO (cuisson éliminera les pathogènes)
+        'Préparation-B': { q1:1, q2:0, q3:1, q4:1, result:'PRPO' },
+        // Préparation / Physique / Corps étrangers → PRP (BPH suffisantes, risque faible)
+        'Préparation-P': { q1:1, q2:0, q3:0, q4:0, result:'PRP'  },
+        // Cuisson / Biologique / Salmonella → CCP (étape conçue pour éliminer les pathogènes)
+        'Cuisson-B':     { q1:1, q2:1, q3:1, q4:0, result:'CCP'  },
+        // Refroidissement / Biologique / Clostridium → CCP (maîtrise vitesse refroidissement critique)
+        'Refroidissement-B': { q1:1, q2:1, q3:1, q4:0, result:'CCP' },
+        // Service / Biologique / Personnel → PRP (BPH et hygiène du personnel suffisantes)
+        'Service-B':     { q1:1, q2:0, q3:0, q4:0, result:'PRP'  },
+        // Service / Chimique / Allergènes INCO → PRP (information consommateur, pas d'élimination physique)
+        'Service-C':     { q1:1, q2:0, q3:0, q4:0, result:'PRP'  },
+      };
+
+      for (const h of hazards) {
+        const key = `${h.step_name}-${h.hazard_type}`;
+        const rule = dtRules[key];
+        if (rule) {
+          insertDT.run(h.id, rule.q1, rule.q2, rule.q3, rule.q4, rule.result);
+        }
+      }
+      console.log(`✅ Seed: ${hazards.length} résultats arbre de décision HACCP insérés`);
+    }
+  }
+} catch (e) {
+  console.error('Seed haccp decision tree error:', e.message);
+}
+
 // ─── Migration: Recall Procedures (retrait/rappel produits) ───
 try {
   db.exec(`
