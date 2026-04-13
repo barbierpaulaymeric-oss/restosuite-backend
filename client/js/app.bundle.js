@@ -3377,7 +3377,7 @@ async function loadVariance() {
           </thead>
           <tbody>
             ${data.items.map((item) => {
-      const statusBadge = item.status === "critical" ? '<span class="badge badge--danger">Critique</span>' : item.status === "warning" ? '<span class="badge badge--warning">Alerte</span>' : '<span class="badge badge--success">OK</span>';
+      const statusBadge2 = item.status === "critical" ? '<span class="badge badge--danger">Critique</span>' : item.status === "warning" ? '<span class="badge badge--warning">Alerte</span>' : '<span class="badge badge--success">OK</span>';
       const varColor = item.variance_qty > 0 ? "var(--color-danger)" : item.variance_qty < 0 ? "var(--color-success)" : "inherit";
       return `
                 <tr>
@@ -3394,7 +3394,7 @@ async function loadVariance() {
                     ${item.variance_value > 0 ? "+" : ""}${formatCurrency(item.variance_value)}
                   </td>
                   <td class="numeric mono">${item.losses > 0 ? formatQuantity(item.losses, item.unit) : "--"}</td>
-                  <td>${statusBadge}</td>
+                  <td>${statusBadge2}</td>
                 </tr>
               `;
     }).join("")}
@@ -5465,6 +5465,917 @@ async function renderHACCPAllergens() {
     app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
   }
 }
+const RISK_CONFIG = {
+  \u00E9lev\u00E9: { color: "#dc3545", bg: "#fff5f5", badge: "danger", label: "\xC9lev\xE9" },
+  moyen: { color: "#e67e22", bg: "#fff8f0", badge: "warning", label: "Moyen" },
+  faible: { color: "#27ae60", bg: "#f0fff4", badge: "success", label: "Faible" }
+};
+function riskBadge(level) {
+  const c = RISK_CONFIG[level] || { color: "#888", bg: "#f5f5f5", label: level };
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;color:${c.color};background:${c.bg};border:1px solid ${c.color}33">${c.label}</span>`;
+}
+async function renderHACCPAllergensplan() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const { items } = await API.request("/allergen-plan");
+    const present = items.filter((i) => i.presence_in_menu);
+    const byRisk = {
+      \u00E9lev\u00E9: items.filter((i) => i.presence_in_menu && i.risk_level === "\xE9lev\xE9").length,
+      moyen: items.filter((i) => i.presence_in_menu && i.risk_level === "moyen").length,
+      faible: items.filter((i) => i.presence_in_menu && i.risk_level === "faible").length
+    };
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="shield-alert" style="width:22px;height:22px;vertical-align:middle;margin-right:8px"></i>Plan de gestion des allerg\xE8nes</h1>
+          <button class="btn btn-secondary" onclick="window.print()">
+            <i data-lucide="printer" style="width:18px;height:18px"></i> Imprimer
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+
+        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+          <span class="text-sm"><strong>R\xE8glement INCO (UE) n\xB01169/2011</strong> \u2014 Les 14 allerg\xE8nes majeurs doivent \xEAtre ma\xEEtris\xE9s dans le cadre du PMS. Ce plan documente les mesures pr\xE9ventives et les proc\xE9dures de nettoyage pour chaque allerg\xE8ne pr\xE9sent dans l'\xE9tablissement.</span>
+        </div>
+
+        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+          <div class="kpi-card">
+            <div class="kpi-card__label">Allerg\xE8nes r\xE9glementaires</div>
+            <div class="kpi-card__value">${items.length}</div>
+          </div>
+          <div class="kpi-card kpi-card--alert">
+            <div class="kpi-card__label">Pr\xE9sents (risque \xE9lev\xE9)</div>
+            <div class="kpi-card__value">${byRisk.\u00E9lev\u00E9}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__label">Pr\xE9sents (risque moyen)</div>
+            <div class="kpi-card__value">${byRisk.moyen}</div>
+          </div>
+          <div class="kpi-card kpi-card--success">
+            <div class="kpi-card__label">Absents ou ma\xEEtris\xE9s</div>
+            <div class="kpi-card__value">${items.length - present.length}</div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style="min-width:180px">Allerg\xE8ne</th>
+                <th style="text-align:center">Pr\xE9sent</th>
+                <th>Niveau de risque</th>
+                <th>Contamination crois\xE9e</th>
+                <th>Mesures pr\xE9ventives</th>
+                <th>Proc\xE9dure nettoyage</th>
+                <th>Affichage</th>
+                <th>Derni\xE8re r\xE9vision</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="allergens-plan-tbody">
+              ${items.map((item) => {
+      const risk = RISK_CONFIG[item.risk_level] || {};
+      const rowBg = item.presence_in_menu ? risk.bg || "" : "";
+      return `
+                  <tr style="background:${rowBg}" data-id="${item.id}">
+                    <td style="font-weight:600">${escapeHtml(item.allergen_name)}</td>
+                    <td style="text-align:center">
+                      <span style="font-size:18px">${item.presence_in_menu ? "\u{1F534}" : "\u26AA"}</span>
+                    </td>
+                    <td>${item.presence_in_menu ? riskBadge(item.risk_level) : '<span class="text-secondary text-sm">N/A</span>'}</td>
+                    <td class="text-sm" style="max-width:200px;white-space:normal">${escapeHtml(item.cross_contamination_risk || "\u2014")}</td>
+                    <td class="text-sm" style="max-width:220px;white-space:normal">${escapeHtml(item.preventive_measures || "\u2014")}</td>
+                    <td class="text-sm" style="max-width:200px;white-space:normal">${escapeHtml(item.cleaning_procedure || "\u2014")}</td>
+                    <td class="text-sm">${escapeHtml(item.display_method || "\u2014")}</td>
+                    <td class="mono text-sm">${item.last_review_date ? new Date(item.last_review_date).toLocaleDateString("fr-FR") : "\u2014"}</td>
+                    <td>
+                      <button class="btn btn-ghost btn-sm" onclick="openAllergenPlanModal(${item.id})">
+                        <i data-lucide="edit-2" style="width:14px;height:14px"></i>
+                      </button>
+                    </td>
+                  </tr>
+                `;
+    }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Modal \xE9dition allerg\xE8ne -->
+      <div id="allergen-plan-modal" class="modal-overlay" style="display:none">
+        <div class="modal" style="max-width:620px;width:95%">
+          <div class="modal-header">
+            <h3 id="allergen-plan-modal-title">Modifier l'allerg\xE8ne</h3>
+            <button class="modal-close" onclick="closeAllergenPlanModal()">\xD7</button>
+          </div>
+          <div class="modal-body" id="allergen-plan-modal-body"></div>
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    window._allergenPlanItems = items;
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function openAllergenPlanModal(id) {
+  const item = (window._allergenPlanItems || []).find((i) => i.id === id);
+  if (!item) return;
+  const modal = document.getElementById("allergen-plan-modal");
+  document.getElementById("allergen-plan-modal-title").textContent = `G\xE9rer \u2014 ${item.allergen_name}`;
+  document.getElementById("allergen-plan-modal-body").innerHTML = `
+    <form id="allergen-plan-form" style="display:flex;flex-direction:column;gap:14px">
+      <input type="hidden" name="id" value="${item.id}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Pr\xE9sent dans le menu</label>
+          <select name="presence_in_menu" class="form-control">
+            <option value="1" ${item.presence_in_menu ? "selected" : ""}>Oui</option>
+            <option value="0" ${!item.presence_in_menu ? "selected" : ""}>Non</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Niveau de risque</label>
+          <select name="risk_level" class="form-control">
+            <option value="\xE9lev\xE9"  ${item.risk_level === "\xE9lev\xE9" ? "selected" : ""}>\xC9lev\xE9</option>
+            <option value="moyen"  ${item.risk_level === "moyen" ? "selected" : ""}>Moyen</option>
+            <option value="faible" ${item.risk_level === "faible" ? "selected" : ""}>Faible</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Risque de contamination crois\xE9e</label>
+        <textarea name="cross_contamination_risk" class="form-control" rows="2">${escapeHtml(item.cross_contamination_risk || "")}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mesures pr\xE9ventives</label>
+        <textarea name="preventive_measures" class="form-control" rows="3">${escapeHtml(item.preventive_measures || "")}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Proc\xE9dure de nettoyage</label>
+        <textarea name="cleaning_procedure" class="form-control" rows="2">${escapeHtml(item.cleaning_procedure || "")}</textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">M\xE9thode d'affichage</label>
+          <input type="text" name="display_method" class="form-control" value="${escapeHtml(item.display_method || "")}" placeholder="Carte, ardoise, oral...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date de r\xE9vision</label>
+          <input type="date" name="last_review_date" class="form-control" value="${item.last_review_date || ""}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">R\xE9f\xE9rence formation</label>
+        <input type="text" name="staff_training_ref" class="form-control" value="${escapeHtml(item.staff_training_ref || "")}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea name="notes" class="form-control" rows="2">${escapeHtml(item.notes || "")}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" class="btn btn-secondary" onclick="closeAllergenPlanModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </form>
+  `;
+  modal.style.display = "flex";
+  if (window.lucide) lucide.createIcons();
+  document.getElementById("allergen-plan-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = {
+      presence_in_menu: fd.get("presence_in_menu") === "1",
+      risk_level: fd.get("risk_level"),
+      cross_contamination_risk: fd.get("cross_contamination_risk"),
+      preventive_measures: fd.get("preventive_measures"),
+      cleaning_procedure: fd.get("cleaning_procedure"),
+      display_method: fd.get("display_method"),
+      last_review_date: fd.get("last_review_date"),
+      staff_training_ref: fd.get("staff_training_ref"),
+      notes: fd.get("notes")
+    };
+    try {
+      await API.request(`/allergen-plan/${item.id}`, { method: "PUT", body: data });
+      closeAllergenPlanModal();
+      renderHACCPAllergensplan();
+    } catch (err) {
+      alert("Erreur : " + err.message);
+    }
+  });
+}
+function closeAllergenPlanModal() {
+  document.getElementById("allergen-plan-modal").style.display = "none";
+}
+async function renderHACCPWater() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const { items } = await API.request("/water");
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const in30Days = new Date(Date.now() + 30 * 24 * 3600 * 1e3).toISOString().slice(0, 10);
+    const lastAnalysis = items[0] || null;
+    const dueSoon = items.filter((i) => i.next_analysis_date && i.next_analysis_date <= in30Days && i.next_analysis_date >= today);
+    const overdue = items.filter((i) => i.next_analysis_date && i.next_analysis_date < today);
+    const conformCount = items.filter((i) => i.conformity).length;
+    const SOURCE_ICONS = { "r\xE9seau public": "\u{1F6BF}", forage: "\u26CF\uFE0F", autre: "\u{1F4A7}" };
+    const TYPE_LABELS = { microbiologique: "Microbiologique", "physico-chimique": "Physico-chimique", compl\u00E8te: "Compl\xE8te" };
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="droplets" style="width:22px;height:22px;vertical-align:middle;margin-right:8px"></i>Gestion de l'eau</h1>
+          <button class="btn btn-primary" id="btn-new-water">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle analyse
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+
+        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+          <span class="text-sm">La qualit\xE9 de l'eau utilis\xE9e en cuisine est un point de ma\xEEtrise du PMS. Le <strong>Code de la Sant\xE9 Publique</strong> impose des contr\xF4les r\xE9guliers. Conservez les rapports d'analyse pendant au moins 5 ans.</span>
+        </div>
+
+        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+          <div class="kpi-card">
+            <div class="kpi-card__label">Analyses enregistr\xE9es</div>
+            <div class="kpi-card__value">${items.length}</div>
+          </div>
+          <div class="kpi-card ${conformCount === items.length && items.length > 0 ? "kpi-card--success" : ""}">
+            <div class="kpi-card__label">Conformes</div>
+            <div class="kpi-card__value">${conformCount}/${items.length}</div>
+          </div>
+          <div class="kpi-card ${dueSoon.length > 0 ? "kpi-card--info" : ""}">
+            <div class="kpi-card__label">Analyse \xE0 venir (30j)</div>
+            <div class="kpi-card__value">${dueSoon.length}</div>
+          </div>
+          <div class="kpi-card ${overdue.length > 0 ? "kpi-card--alert" : ""}">
+            <div class="kpi-card__label">En retard</div>
+            <div class="kpi-card__value">${overdue.length}</div>
+          </div>
+        </div>
+
+        ${lastAnalysis ? `
+        <div style="background:${lastAnalysis.conformity ? "#f0fff4" : "#fff5f5"};border:1px solid ${lastAnalysis.conformity ? "#27ae60" : "#dc3545"};border-radius:8px;padding:16px;margin-bottom:20px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <i data-lucide="${lastAnalysis.conformity ? "check-circle" : "x-circle"}" style="width:18px;height:18px;color:${lastAnalysis.conformity ? "#27ae60" : "#dc3545"}"></i>
+            <strong>Derni\xE8re analyse \u2014 ${new Date(lastAnalysis.analysis_date).toLocaleDateString("fr-FR")}</strong>
+            <span class="text-secondary text-sm">${SOURCE_ICONS[lastAnalysis.water_source] || "\u{1F4A7}"} ${lastAnalysis.water_source} \xB7 ${TYPE_LABELS[lastAnalysis.analysis_type] || lastAnalysis.analysis_type}</span>
+          </div>
+          <p class="text-sm" style="margin:0 0 6px">${escapeHtml(lastAnalysis.results || "Aucun r\xE9sultat enregistr\xE9")}</p>
+          ${lastAnalysis.next_analysis_date ? `<p class="text-sm text-secondary" style="margin:0">Prochaine analyse pr\xE9vue : <strong>${new Date(lastAnalysis.next_analysis_date).toLocaleDateString("fr-FR")}</strong></p>` : ""}
+        </div>
+        ` : ""}
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Date d'analyse</th>
+                <th>Type</th>
+                <th>Source</th>
+                <th>Laboratoire</th>
+                <th>R\xE9sultats</th>
+                <th style="text-align:center">Conforme</th>
+                <th>Prochaine analyse</th>
+                <th>R\xE9f. rapport</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.length === 0 ? '<tr><td colspan="9" class="text-secondary text-center" style="padding:24px">Aucune analyse enregistr\xE9e</td></tr>' : items.map((item) => {
+      const isOverdue = item.next_analysis_date && item.next_analysis_date < today;
+      const isDueSoon = !isOverdue && item.next_analysis_date && item.next_analysis_date <= in30Days;
+      return `
+                    <tr${!item.conformity ? ' style="background:#fff8f8"' : ""}>
+                      <td class="mono">${new Date(item.analysis_date).toLocaleDateString("fr-FR")}</td>
+                      <td class="text-sm">${TYPE_LABELS[item.analysis_type] || item.analysis_type}</td>
+                      <td class="text-sm">${SOURCE_ICONS[item.water_source] || "\u{1F4A7}"} ${escapeHtml(item.water_source || "\u2014")}</td>
+                      <td class="text-sm">${escapeHtml(item.provider || "\u2014")}</td>
+                      <td class="text-sm" style="max-width:260px;white-space:normal">${escapeHtml(item.results || "\u2014")}</td>
+                      <td style="text-align:center">
+                        ${item.conformity ? '<span style="color:#27ae60;font-weight:700">\u2714 Oui</span>' : '<span style="color:#dc3545;font-weight:700">\u2718 Non</span>'}
+                      </td>
+                      <td class="mono text-sm${isOverdue ? " text-danger" : isDueSoon ? " text-warning" : ""}">
+                        ${item.next_analysis_date ? new Date(item.next_analysis_date).toLocaleDateString("fr-FR") : "\u2014"}
+                        ${isOverdue ? " \u26A0\uFE0F" : isDueSoon ? " \u23F0" : ""}
+                      </td>
+                      <td class="text-sm">${escapeHtml(item.report_ref || "\u2014")}</td>
+                      <td style="white-space:nowrap">
+                        <button class="btn btn-ghost btn-sm" onclick="openWaterModal(${item.id})"><i data-lucide="edit-2" style="width:14px;height:14px"></i></button>
+                        <button class="btn btn-ghost btn-sm text-danger" onclick="deleteWaterAnalysis(${item.id})"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
+                      </td>
+                    </tr>
+                  `;
+    }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Modal -->
+      <div id="water-modal" class="modal-overlay" style="display:none">
+        <div class="modal" style="max-width:560px;width:95%">
+          <div class="modal-header">
+            <h3 id="water-modal-title">Nouvelle analyse</h3>
+            <button class="modal-close" onclick="closeWaterModal()">\xD7</button>
+          </div>
+          <div class="modal-body" id="water-modal-body"></div>
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    window._waterItems = items;
+    document.getElementById("btn-new-water").addEventListener("click", () => openWaterModal(null));
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function openWaterModal(id) {
+  const item = id ? (window._waterItems || []).find((i) => i.id === id) : null;
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  document.getElementById("water-modal-title").textContent = item ? "Modifier l'analyse" : "Nouvelle analyse";
+  document.getElementById("water-modal-body").innerHTML = `
+    <form id="water-form" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Date d'analyse *</label>
+          <input type="date" name="analysis_date" class="form-control" required value="${item ? item.analysis_date : today}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type d'analyse</label>
+          <select name="analysis_type" class="form-control">
+            <option value="compl\xE8te" ${!item || item.analysis_type === "compl\xE8te" ? "selected" : ""}>Compl\xE8te</option>
+            <option value="microbiologique" ${item && item.analysis_type === "microbiologique" ? "selected" : ""}>Microbiologique</option>
+            <option value="physico-chimique" ${item && item.analysis_type === "physico-chimique" ? "selected" : ""}>Physico-chimique</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Laboratoire / Prestataire</label>
+          <input type="text" name="provider" class="form-control" value="${escapeHtml(item ? item.provider || "" : "")}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Source d'eau</label>
+          <select name="water_source" class="form-control">
+            <option value="r\xE9seau public" ${!item || item.water_source === "r\xE9seau public" ? "selected" : ""}>R\xE9seau public</option>
+            <option value="forage" ${item && item.water_source === "forage" ? "selected" : ""}>Forage</option>
+            <option value="autre" ${item && item.water_source === "autre" ? "selected" : ""}>Autre</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">R\xE9sultats de l'analyse</label>
+        <textarea name="results" class="form-control" rows="3" placeholder="pH, turbidit\xE9, nitrates, coliformes...">${escapeHtml(item ? item.results || "" : "")}</textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Conformit\xE9</label>
+          <select name="conformity" class="form-control">
+            <option value="1" ${!item || item.conformity ? "selected" : ""}>Conforme</option>
+            <option value="0" ${item && !item.conformity ? "selected" : ""}>Non conforme</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">R\xE9f\xE9rence rapport</label>
+          <input type="text" name="report_ref" class="form-control" value="${escapeHtml(item ? item.report_ref || "" : "")}">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Prochaine analyse pr\xE9vue</label>
+          <input type="date" name="next_analysis_date" class="form-control" value="${item ? item.next_analysis_date || "" : ""}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Traitement en place</label>
+          <input type="text" name="treatment" class="form-control" value="${escapeHtml(item ? item.treatment || "" : "")}" placeholder="Adoucisseur, filtre UV...">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea name="notes" class="form-control" rows="2">${escapeHtml(item ? item.notes || "" : "")}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" class="btn btn-secondary" onclick="closeWaterModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary">${item ? "Enregistrer" : "Ajouter"}</button>
+      </div>
+    </form>
+  `;
+  document.getElementById("water-modal").style.display = "flex";
+  document.getElementById("water-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = {
+      analysis_date: fd.get("analysis_date"),
+      analysis_type: fd.get("analysis_type"),
+      provider: fd.get("provider"),
+      water_source: fd.get("water_source"),
+      results: fd.get("results"),
+      conformity: fd.get("conformity") === "1",
+      report_ref: fd.get("report_ref"),
+      next_analysis_date: fd.get("next_analysis_date"),
+      treatment: fd.get("treatment"),
+      notes: fd.get("notes")
+    };
+    try {
+      if (item) {
+        await API.request(`/water/${item.id}`, { method: "PUT", body: data });
+      } else {
+        await API.request("/water", { method: "POST", body: data });
+      }
+      closeWaterModal();
+      renderHACCPWater();
+    } catch (err) {
+      alert("Erreur : " + err.message);
+    }
+  });
+}
+function closeWaterModal() {
+  document.getElementById("water-modal").style.display = "none";
+}
+async function deleteWaterAnalysis(id) {
+  if (!confirm("Supprimer cette analyse ?")) return;
+  try {
+    await API.request(`/water/${id}`, { method: "DELETE" });
+    renderHACCPWater();
+  } catch (err) {
+    alert("Erreur : " + err.message);
+  }
+}
+const PMS_STATUS_CONFIG = {
+  planifi\u00E9: { color: "#3b9ede", bg: "#e8f4fd", label: "Planifi\xE9" },
+  r\u00E9alis\u00E9: { color: "#27ae60", bg: "#f0fff4", label: "R\xE9alis\xE9" },
+  actions_en_cours: { color: "#e67e22", bg: "#fff8f0", label: "Actions en cours" },
+  cl\u00F4tur\u00E9: { color: "#888", bg: "#f5f5f5", label: "Cl\xF4tur\xE9" }
+};
+const SEVERITY_CONFIG = {
+  conforme: { color: "#27ae60", label: "\u2714 Conforme" },
+  mineure: { color: "#e67e22", label: "\u26A0 Mineure" },
+  majeure: { color: "#dc3545", label: "\u2718 Majeure" },
+  "en attente": { color: "#888", label: "\u2026 En attente" }
+};
+function statusBadge(status) {
+  const c = PMS_STATUS_CONFIG[status] || { color: "#888", bg: "#f5f5f5", label: status };
+  return `<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:600;color:${c.color};background:${c.bg};border:1px solid ${c.color}33">${c.label}</span>`;
+}
+function scoreColor(score) {
+  if (score === null || score === void 0) return "#888";
+  if (score >= 80) return "#27ae60";
+  if (score >= 60) return "#e67e22";
+  return "#dc3545";
+}
+async function renderHACCPPmsAudit() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const [{ items }, { upcoming, overdue }] = await Promise.all([
+      API.request("/pms-audit"),
+      API.request("/pms-audit/schedule")
+    ]);
+    items.forEach((item) => {
+      if (typeof item.findings === "string") {
+        try {
+          item.findings = JSON.parse(item.findings);
+        } catch (_) {
+          item.findings = [];
+        }
+      }
+      item.findings = item.findings || [];
+    });
+    const done = items.filter((i) => ["r\xE9alis\xE9", "actions_en_cours", "cl\xF4tur\xE9"].includes(i.status));
+    const avgScore = done.length > 0 ? Math.round(done.filter((i) => i.overall_score !== null).reduce((a, b) => a + b.overall_score, 0) / done.filter((i) => i.overall_score !== null).length) : null;
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="clipboard-check" style="width:22px;height:22px;vertical-align:middle;margin-right:8px"></i>V\xE9rification du PMS</h1>
+          <button class="btn btn-primary" id="btn-new-pms-audit">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvel audit
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+
+        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+          <span class="text-sm">Le PMS doit faire l'objet de <strong>v\xE9rifications r\xE9guli\xE8res</strong> (internes trimestrielles, externes annuelles). Ces audits permettent de valider l'efficacit\xE9 des mesures et de d\xE9clencher les actions correctives n\xE9cessaires.</span>
+        </div>
+
+        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+          <div class="kpi-card">
+            <div class="kpi-card__label">Audits r\xE9alis\xE9s</div>
+            <div class="kpi-card__value">${done.length}</div>
+          </div>
+          <div class="kpi-card ${avgScore !== null && avgScore >= 80 ? "kpi-card--success" : avgScore !== null && avgScore < 60 ? "kpi-card--alert" : ""}">
+            <div class="kpi-card__label">Score moyen</div>
+            <div class="kpi-card__value" style="color:${scoreColor(avgScore)}">${avgScore !== null ? avgScore + "/100" : "\u2014"}</div>
+          </div>
+          <div class="kpi-card ${upcoming.length > 0 ? "kpi-card--info" : ""}">
+            <div class="kpi-card__label">Planifi\xE9s</div>
+            <div class="kpi-card__value">${upcoming.length}</div>
+          </div>
+          <div class="kpi-card ${overdue.length > 0 ? "kpi-card--alert" : ""}">
+            <div class="kpi-card__label">En retard</div>
+            <div class="kpi-card__value">${overdue.length}</div>
+          </div>
+        </div>
+
+        ${overdue.length > 0 ? `
+        <div style="background:#fff5f5;border:1px solid #dc3545;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+          <strong style="color:#dc3545"><i data-lucide="alert-circle" style="width:16px;height:16px;vertical-align:middle;margin-right:4px"></i>Audits en retard</strong>
+          <ul style="margin:8px 0 0;padding-left:20px">
+            ${overdue.map((a) => `<li class="text-sm">${new Date(a.audit_date).toLocaleDateString("fr-FR")} \u2014 ${escapeHtml(a.auditor_name)} (${a.audit_type})</li>`).join("")}
+          </ul>
+        </div>
+        ` : ""}
+
+        ${upcoming.length > 0 ? `
+        <div style="background:#f0fff4;border:1px solid #27ae60;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+          <strong style="color:#27ae60"><i data-lucide="calendar" style="width:16px;height:16px;vertical-align:middle;margin-right:4px"></i>Prochains audits planifi\xE9s</strong>
+          <ul style="margin:8px 0 0;padding-left:20px">
+            ${upcoming.map((a) => `<li class="text-sm">${new Date(a.audit_date).toLocaleDateString("fr-FR")} \u2014 ${escapeHtml(a.auditor_name)} (${a.audit_type})</li>`).join("")}
+          </ul>
+        </div>
+        ` : ""}
+
+        <!-- Historique audits -->
+        <div class="section-title">Historique des audits</div>
+        <div style="display:flex;flex-direction:column;gap:16px" id="pms-audit-list">
+          ${items.length === 0 ? '<div class="empty-state"><p>Aucun audit enregistr\xE9</p></div>' : items.map((item) => {
+      const majorFindings = item.findings.filter((f) => f.severity === "majeure");
+      const minorFindings = item.findings.filter((f) => f.severity === "mineure");
+      return `
+                <div style="border:1px solid var(--color-border,#e0e0e0);border-radius:8px;overflow:hidden">
+                  <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--color-bg-secondary,#f8f9fa);flex-wrap:wrap">
+                    <span style="font-weight:700;font-size:15px">${new Date(item.audit_date).toLocaleDateString("fr-FR")}</span>
+                    <span class="text-sm text-secondary">${item.audit_type === "interne" ? "\u{1F3E0} Interne" : "\u{1F3E2} Externe"} \xB7 ${item.scope}</span>
+                    <span class="text-sm">${escapeHtml(item.auditor_name)}</span>
+                    ${statusBadge(item.status)}
+                    ${item.overall_score !== null ? `
+                      <span style="margin-left:auto;font-size:22px;font-weight:800;color:${scoreColor(item.overall_score)}">${item.overall_score}<span style="font-size:13px;color:var(--color-text-secondary,#888)">/100</span></span>
+                    ` : '<span style="margin-left:auto;color:#888;font-size:13px">Score N/A</span>'}
+                    <div style="display:flex;gap:6px">
+                      <button class="btn btn-ghost btn-sm" onclick="openPmsAuditModal(${item.id})"><i data-lucide="edit-2" style="width:14px;height:14px"></i></button>
+                      <button class="btn btn-ghost btn-sm text-danger" onclick="deletePmsAudit(${item.id})"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
+                    </div>
+                  </div>
+                  ${item.findings.length > 0 ? `
+                  <div style="padding:12px 16px">
+                    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                      ${majorFindings.length > 0 ? `<span style="color:#dc3545;font-size:12px;font-weight:600">\u2718 ${majorFindings.length} majeure${majorFindings.length > 1 ? "s" : ""}</span>` : ""}
+                      ${minorFindings.length > 0 ? `<span style="color:#e67e22;font-size:12px;font-weight:600">\u26A0 ${minorFindings.length} mineure${minorFindings.length > 1 ? "s" : ""}</span>` : ""}
+                      ${item.findings.filter((f) => f.severity === "conforme").length > 0 ? `<span style="color:#27ae60;font-size:12px;font-weight:600">\u2714 ${item.findings.filter((f) => f.severity === "conforme").length} conforme${item.findings.filter((f) => f.severity === "conforme").length > 1 ? "s" : ""}</span>` : ""}
+                    </div>
+                    <table style="width:100%;font-size:13px;border-collapse:collapse">
+                      <thead>
+                        <tr style="background:var(--color-bg-secondary,#f8f9fa)">
+                          <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--color-border,#e0e0e0);width:160px">Section</th>
+                          <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--color-border,#e0e0e0)">Constat</th>
+                          <th style="padding:6px 10px;text-align:center;border-bottom:1px solid var(--color-border,#e0e0e0);width:120px">S\xE9v\xE9rit\xE9</th>
+                          <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--color-border,#e0e0e0)">Action requise</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${item.findings.map((f) => {
+        const sc = SEVERITY_CONFIG[f.severity] || { color: "#888", label: f.severity };
+        return `
+                            <tr>
+                              <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0);font-weight:600">${escapeHtml(f.section)}</td>
+                              <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0)">${escapeHtml(f.finding)}</td>
+                              <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0);text-align:center;color:${sc.color};font-weight:600;white-space:nowrap">${sc.label}</td>
+                              <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0);color:var(--color-text-secondary,#666)">${escapeHtml(f.action_required || "\u2014")}</td>
+                            </tr>
+                          `;
+      }).join("")}
+                      </tbody>
+                    </table>
+                  </div>
+                  ` : ""}
+                  ${item.notes ? `<div style="padding:8px 16px;border-top:1px solid var(--color-border,#e0e0e0);color:var(--color-text-secondary,#666);font-size:13px"><em>${escapeHtml(item.notes)}</em></div>` : ""}
+                </div>
+              `;
+    }).join("")}
+        </div>
+      </div>
+
+      <!-- Modal audit -->
+      <div id="pms-audit-modal" class="modal-overlay" style="display:none">
+        <div class="modal" style="max-width:680px;width:95%;max-height:90vh;overflow-y:auto">
+          <div class="modal-header">
+            <h3 id="pms-audit-modal-title">Nouvel audit</h3>
+            <button class="modal-close" onclick="closePmsAuditModal()">\xD7</button>
+          </div>
+          <div class="modal-body" id="pms-audit-modal-body"></div>
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    window._pmsAuditItems = items;
+    document.getElementById("btn-new-pms-audit").addEventListener("click", () => openPmsAuditModal(null));
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function openPmsAuditModal(id) {
+  const item = id ? (window._pmsAuditItems || []).find((i) => i.id === id) : null;
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const DEFAULT_SECTIONS = [
+    "Temp\xE9ratures",
+    "Nettoyage & D\xE9sinfection",
+    "Tra\xE7abilit\xE9",
+    "Gestion des allerg\xE8nes",
+    "Lutte contre les nuisibles",
+    "Formation du personnel",
+    "Maintenance des \xE9quipements"
+  ];
+  const findings = item ? item.findings : DEFAULT_SECTIONS.map((s) => ({
+    section: s,
+    finding: "",
+    severity: "en attente",
+    action_required: ""
+  }));
+  document.getElementById("pms-audit-modal-title").textContent = item ? "Modifier l'audit" : "Nouvel audit PMS";
+  document.getElementById("pms-audit-modal-body").innerHTML = `
+    <form id="pms-audit-form" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Date d'audit *</label>
+          <input type="date" name="audit_date" class="form-control" required value="${item ? item.audit_date : today}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Auditeur *</label>
+          <input type="text" name="auditor_name" class="form-control" required value="${escapeHtml(item ? item.auditor_name : "")}">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Type d'audit</label>
+          <select name="audit_type" class="form-control">
+            <option value="interne" ${!item || item.audit_type === "interne" ? "selected" : ""}>Interne</option>
+            <option value="externe" ${item && item.audit_type === "externe" ? "selected" : ""}>Externe</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">P\xE9rim\xE8tre</label>
+          <select name="scope" class="form-control">
+            <option value="complet" ${!item || item.scope === "complet" ? "selected" : ""}>Complet</option>
+            <option value="partiel" ${item && item.scope === "partiel" ? "selected" : ""}>Partiel</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Statut</label>
+          <select name="status" class="form-control">
+            <option value="planifi\xE9" ${!item || item.status === "planifi\xE9" ? "selected" : ""}>Planifi\xE9</option>
+            <option value="r\xE9alis\xE9" ${item && item.status === "r\xE9alis\xE9" ? "selected" : ""}>R\xE9alis\xE9</option>
+            <option value="actions_en_cours" ${item && item.status === "actions_en_cours" ? "selected" : ""}>Actions en cours</option>
+            <option value="cl\xF4tur\xE9" ${item && item.status === "cl\xF4tur\xE9" ? "selected" : ""}>Cl\xF4tur\xE9</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Score global (0\u2013100)</label>
+          <input type="number" name="overall_score" class="form-control" min="0" max="100" value="${item && item.overall_score !== null ? item.overall_score : ""}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prochain audit pr\xE9vu</label>
+          <input type="date" name="next_audit_date" class="form-control" value="${item ? item.next_audit_date || "" : ""}">
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--color-border,#e0e0e0);padding-top:14px">
+        <strong class="text-sm">Constats par section</strong>
+        <div id="findings-list" style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+          ${findings.map((f, idx) => `
+            <div style="border:1px solid var(--color-border,#e0e0e0);border-radius:6px;padding:10px" data-finding-idx="${idx}">
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                <input type="text" class="form-control finding-section" placeholder="Section" value="${escapeHtml(f.section || "")}" style="flex:1">
+                <select class="form-control finding-severity" style="width:160px">
+                  <option value="en attente" ${f.severity === "en attente" ? "selected" : ""}>En attente</option>
+                  <option value="conforme" ${f.severity === "conforme" ? "selected" : ""}>Conforme</option>
+                  <option value="mineure" ${f.severity === "mineure" ? "selected" : ""}>Mineure</option>
+                  <option value="majeure" ${f.severity === "majeure" ? "selected" : ""}>Majeure</option>
+                </select>
+                <button type="button" class="btn btn-ghost btn-sm text-danger" onclick="removeFinding(this)"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+              </div>
+              <textarea class="form-control finding-finding" placeholder="Constat" rows="2" style="margin-bottom:6px">${escapeHtml(f.finding || "")}</textarea>
+              <input type="text" class="form-control finding-action" placeholder="Action requise (si applicable)" value="${escapeHtml(f.action_required || "")}">
+            </div>
+          `).join("")}
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="addFinding()">
+          <i data-lucide="plus" style="width:14px;height:14px"></i> Ajouter une section
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea name="notes" class="form-control" rows="2">${escapeHtml(item ? item.notes || "" : "")}</textarea>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" class="btn btn-secondary" onclick="closePmsAuditModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary">${item ? "Enregistrer" : "Cr\xE9er"}</button>
+      </div>
+    </form>
+  `;
+  document.getElementById("pms-audit-modal").style.display = "flex";
+  if (window.lucide) lucide.createIcons();
+  document.getElementById("pms-audit-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const findingEls = document.querySelectorAll("#findings-list [data-finding-idx]");
+    const findingsData = Array.from(findingEls).map((el) => ({
+      section: el.querySelector(".finding-section").value,
+      finding: el.querySelector(".finding-finding").value,
+      severity: el.querySelector(".finding-severity").value,
+      action_required: el.querySelector(".finding-action").value || null
+    }));
+    const score = fd.get("overall_score");
+    const data = {
+      audit_date: fd.get("audit_date"),
+      auditor_name: fd.get("auditor_name"),
+      audit_type: fd.get("audit_type"),
+      scope: fd.get("scope"),
+      status: fd.get("status"),
+      overall_score: score !== "" ? Number(score) : null,
+      next_audit_date: fd.get("next_audit_date") || null,
+      notes: fd.get("notes"),
+      findings: findingsData
+    };
+    try {
+      if (item) {
+        await API.request(`/pms-audit/${item.id}`, { method: "PUT", body: data });
+      } else {
+        await API.request("/pms-audit", { method: "POST", body: data });
+      }
+      closePmsAuditModal();
+      renderHACCPPmsAudit();
+    } catch (err) {
+      alert("Erreur : " + err.message);
+    }
+  });
+}
+function addFinding() {
+  const list = document.getElementById("findings-list");
+  const idx = list.children.length;
+  const div = document.createElement("div");
+  div.style.cssText = "border:1px solid var(--color-border,#e0e0e0);border-radius:6px;padding:10px";
+  div.setAttribute("data-finding-idx", idx);
+  div.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <input type="text" class="form-control finding-section" placeholder="Section" style="flex:1">
+      <select class="form-control finding-severity" style="width:160px">
+        <option value="en attente">En attente</option>
+        <option value="conforme">Conforme</option>
+        <option value="mineure">Mineure</option>
+        <option value="majeure">Majeure</option>
+      </select>
+      <button type="button" class="btn btn-ghost btn-sm text-danger" onclick="removeFinding(this)"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+    </div>
+    <textarea class="form-control finding-finding" placeholder="Constat" rows="2" style="margin-bottom:6px"></textarea>
+    <input type="text" class="form-control finding-action" placeholder="Action requise (si applicable)">
+  `;
+  list.appendChild(div);
+  if (window.lucide) lucide.createIcons();
+}
+function removeFinding(btn) {
+  btn.closest("[data-finding-idx]").remove();
+}
+function closePmsAuditModal() {
+  document.getElementById("pms-audit-modal").style.display = "none";
+}
+async function deletePmsAudit(id) {
+  if (!confirm("Supprimer cet audit ?")) return;
+  try {
+    await API.request(`/pms-audit/${id}`, { method: "DELETE" });
+    renderHACCPPmsAudit();
+  } catch (err) {
+    alert("Erreur : " + err.message);
+  }
+}
+async function renderSanitaryApproval() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const settings = await API.request("/sanitary");
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="badge-check" style="width:22px;height:22px;vertical-align:middle;margin-right:8px"></i>Agr\xE9ment sanitaire</h1>
+        </div>
+
+        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:24px;display:flex;gap:10px;align-items:flex-start">
+          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+          <span class="text-sm">
+            <strong>R\xE8glement CE 853/2004</strong> \u2014 Les \xE9tablissements manipulant des denr\xE9es d'origine animale \xE0 des fins commerciales doivent disposer d'un <strong>agr\xE9ment sanitaire</strong> ou d'une d\xE9rogation accord\xE9e par la DDPP (Direction D\xE9partementale de la Protection des Populations). Pour les restaurants classiques, une simple d\xE9claration d'activit\xE9 suffit.
+          </span>
+        </div>
+
+        <div style="max-width:680px">
+          <form id="sanitary-form" style="display:flex;flex-direction:column;gap:18px">
+
+            <div style="border:1px solid var(--color-border,#e0e0e0);border-radius:8px;padding:20px">
+              <div class="section-title" style="margin-top:0;margin-bottom:16px">Type d'\xE9tablissement</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group">
+                  <label class="form-label">Type d'activit\xE9</label>
+                  <select name="activity_type" class="form-control">
+                    <option value="restaurant" ${!settings || settings.activity_type === "restaurant" ? "selected" : ""}>Restaurant</option>
+                    <option value="traiteur" ${settings && settings.activity_type === "traiteur" ? "selected" : ""}>Traiteur</option>
+                    <option value="fabrication" ${settings && settings.activity_type === "fabrication" ? "selected" : ""}>Fabrication</option>
+                    <option value="entreposage" ${settings && settings.activity_type === "entreposage" ? "selected" : ""}>Entreposage</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Type d'autorisation</label>
+                  <select name="sanitary_approval_type" class="form-control">
+                    <option value="d\xE9claration" ${!settings || settings.sanitary_approval_type === "d\xE9claration" ? "selected" : ""}>D\xE9claration d'activit\xE9</option>
+                    <option value="d\xE9rogation" ${settings && settings.sanitary_approval_type === "d\xE9rogation" ? "selected" : ""}>D\xE9rogation \xE0 l'agr\xE9ment</option>
+                    <option value="agr\xE9ment" ${settings && settings.sanitary_approval_type === "agr\xE9ment" ? "selected" : ""}>Agr\xE9ment sanitaire CE</option>
+                  </select>
+                  <small class="text-secondary" style="font-size:11px;margin-top:4px;display:block">La majorit\xE9 des restaurants travaillent sous d\xE9rogation. L'agr\xE9ment CE est requis pour une activit\xE9 de traiteur/fabrication significative.</small>
+                </div>
+              </div>
+            </div>
+
+            <div style="border:1px solid var(--color-border,#e0e0e0);border-radius:8px;padding:20px">
+              <div class="section-title" style="margin-top:0;margin-bottom:16px">Num\xE9ro et date d'agr\xE9ment</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group">
+                  <label class="form-label">Num\xE9ro d'agr\xE9ment / d\xE9claration</label>
+                  <input type="text" name="sanitary_approval_number" class="form-control" value="${escapeHtml(settings ? settings.sanitary_approval_number || "" : "")}" placeholder="Ex: FR 75 001 01 CE">
+                  <small class="text-secondary" style="font-size:11px;margin-top:4px;display:block">Pour les restaurants : num\xE9ro de d\xE9claration DDPP ou num\xE9ro CE si agr\xE9\xE9s.</small>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Date d'obtention</label>
+                  <input type="date" name="sanitary_approval_date" class="form-control" value="${settings ? settings.sanitary_approval_date || "" : ""}">
+                </div>
+              </div>
+            </div>
+
+            <div style="border:1px solid var(--color-border,#e0e0e0);border-radius:8px;padding:20px">
+              <div class="section-title" style="margin-top:0;margin-bottom:16px">Service v\xE9t\xE9rinaire comp\xE9tent</div>
+              <div class="form-group">
+                <label class="form-label">DDPP / Service v\xE9t\xE9rinaire</label>
+                <input type="text" name="dd_pp_office" class="form-control" value="${escapeHtml(settings ? settings.dd_pp_office || "" : "")}" placeholder="Ex: DDPP de Paris \u2014 94 avenue Ledru-Rollin, 75012 Paris">
+                <small class="text-secondary" style="font-size:11px;margin-top:4px;display:block">La DDPP (Direction D\xE9partementale de la Protection des Populations) est l'autorit\xE9 comp\xE9tente pour les agr\xE9ments sanitaires.</small>
+              </div>
+              <div class="form-group" style="margin-top:12px">
+                <label class="form-label">Notes / Observations</label>
+                <textarea name="notes" class="form-control" rows="3" placeholder="Conditions particuli\xE8res, restrictions, renouvellements pr\xE9vus...">${escapeHtml(settings ? settings.notes || "" : "")}</textarea>
+              </div>
+            </div>
+
+            <div style="padding:16px;background:var(--color-bg-secondary,#f8f9fa);border-radius:8px;display:flex;align-items:flex-start;gap:10px">
+              <i data-lucide="alert-triangle" style="width:18px;height:18px;color:#e67e22;flex-shrink:0;margin-top:1px"></i>
+              <div class="text-sm">
+                <strong>Rappels r\xE9glementaires :</strong>
+                <ul style="margin:6px 0 0;padding-left:18px">
+                  <li>Tout \xE9tablissement remettant des denr\xE9es au public doit faire une <strong>d\xE9claration d'activit\xE9</strong> aupr\xE8s de la DDPP (arr\xEAt\xE9 du 8 juin 2006).</li>
+                  <li>La d\xE9rogation \xE0 l'agr\xE9ment est accord\xE9e aux \xE9tablissements dont la production reste <strong>majoritairement locale</strong> (remise directe au consommateur final).</li>
+                  <li>L'agr\xE9ment CE est obligatoire pour la <strong>fourniture \xE0 d'autres \xE9tablissements</strong> (grossiste, restauration collective, etc.).</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:8px">
+              <button type="button" class="btn btn-secondary" onclick="renderSanitaryApproval()">Annuler</button>
+              <button type="submit" class="btn btn-primary">
+                <i data-lucide="save" style="width:16px;height:16px"></i> Enregistrer
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    document.getElementById("sanitary-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const data = {
+        activity_type: fd.get("activity_type"),
+        sanitary_approval_type: fd.get("sanitary_approval_type"),
+        sanitary_approval_number: fd.get("sanitary_approval_number"),
+        sanitary_approval_date: fd.get("sanitary_approval_date") || null,
+        dd_pp_office: fd.get("dd_pp_office"),
+        notes: fd.get("notes")
+      };
+      try {
+        await API.request("/sanitary", { method: "PUT", body: data });
+        const toast = document.createElement("div");
+        toast.style.cssText = "position:fixed;bottom:20px;right:20px;background:#27ae60;color:white;padding:12px 20px;border-radius:6px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.2)";
+        toast.textContent = "\u2713 Param\xE8tres sanitaires enregistr\xE9s";
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2500);
+      } catch (err) {
+        alert("Erreur : " + err.message);
+      }
+    });
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
 const HACCP_PLAN_STEPS = ["R\xE9ception", "Stockage", "Pr\xE9paration", "Cuisson", "Refroidissement", "Remise en T\xB0", "Service", "Distribution"];
 function riskScore(severity, probability) {
   return severity * probability;
@@ -6565,10 +7476,10 @@ async function renderHACCPTraining() {
       const trainingDate = new Date(item.training_date).toLocaleDateString("fr-FR");
       const renewalDate = item.next_renewal_date ? new Date(item.next_renewal_date).toLocaleDateString("fr-FR") : "\u2014";
       const isExpiringSoon = expiring.some((e) => e.id === item.id);
-      let statusBadge = "";
-      if (item.status === "r\xE9alis\xE9") statusBadge = '<span class="badge badge--success">\u2713 R\xE9alis\xE9</span>';
-      else if (item.status === "planifi\xE9") statusBadge = '<span class="badge" style="background:#e0f0ff;color:#1a6fb5">Planifi\xE9</span>';
-      else statusBadge = '<span class="badge badge--danger">Expir\xE9</span>';
+      let statusBadge2 = "";
+      if (item.status === "r\xE9alis\xE9") statusBadge2 = '<span class="badge badge--success">\u2713 R\xE9alis\xE9</span>';
+      else if (item.status === "planifi\xE9") statusBadge2 = '<span class="badge" style="background:#e0f0ff;color:#1a6fb5">Planifi\xE9</span>';
+      else statusBadge2 = '<span class="badge badge--danger">Expir\xE9</span>';
       return `
                   <tr${isExpiringSoon ? ' style="background:#fffbf0"' : ""}>
                     <td style="font-weight:500">${escapeHtml(item.employee_name)}</td>
@@ -6578,7 +7489,7 @@ async function renderHACCPTraining() {
                     <td class="mono text-sm${isExpiringSoon ? " text-warning" : ""}">${renewalDate}</td>
                     <td class="mono">${item.duration_hours ? item.duration_hours + "h" : "\u2014"}</td>
                     <td class="text-secondary text-sm">${escapeHtml(item.certificate_ref || "\u2014")}</td>
-                    <td>${statusBadge}</td>
+                    <td>${statusBadge2}</td>
                     <td style="white-space:nowrap">
                       <button class="btn btn-secondary btn-sm" data-action="edit-training" data-id="${item.id}" style="margin-right:4px">
                         <i data-lucide="pencil" style="width:14px;height:14px"></i>
@@ -7047,10 +7958,10 @@ async function renderHACCPMaintenance() {
             <tbody>
               ${items.length === 0 ? '<tr><td colspan="10" class="text-secondary text-center" style="padding:24px">Aucun \xE9quipement enregistr\xE9</td></tr>' : items.map((item) => {
       const isOverdue = overdue.some((o) => o.id === item.id);
-      let statusBadge = "";
-      if (item.status === "\xE0_jour") statusBadge = '<span class="badge badge--success">\u2713 \xC0 jour</span>';
-      else if (item.status === "planifi\xE9") statusBadge = '<span class="badge" style="background:#e0f0ff;color:#1a6fb5">Planifi\xE9</span>';
-      else statusBadge = '<span class="badge badge--danger">En retard</span>';
+      let statusBadge2 = "";
+      if (item.status === "\xE0_jour") statusBadge2 = '<span class="badge badge--success">\u2713 \xC0 jour</span>';
+      else if (item.status === "planifi\xE9") statusBadge2 = '<span class="badge" style="background:#e0f0ff;color:#1a6fb5">Planifi\xE9</span>';
+      else statusBadge2 = '<span class="badge badge--danger">En retard</span>';
       return `
                   <tr${isOverdue ? ' style="background:#fff8f8"' : ""}>
                     <td style="font-weight:500">${EQUIPMENT_TYPE_ICONS[item.equipment_type] || "\u{1F527}"} ${escapeHtml(item.equipment_name)}</td>
@@ -7061,7 +7972,7 @@ async function renderHACCPMaintenance() {
                     <td class="text-secondary text-sm">${escapeHtml(item.maintenance_type || "\u2014")}</td>
                     <td class="text-secondary text-sm">${escapeHtml(item.provider || "\u2014")}</td>
                     <td class="mono text-sm">${item.cost ? item.cost.toLocaleString("fr-FR") + " \u20AC" : "\u2014"}</td>
-                    <td>${statusBadge}</td>
+                    <td>${statusBadge2}</td>
                     <td style="white-space:nowrap">
                       <button class="btn btn-secondary btn-sm" data-action="edit-maint" data-id="${item.id}" style="margin-right:4px">
                         <i data-lucide="pencil" style="width:14px;height:14px"></i>
@@ -9046,7 +9957,7 @@ function renderPMSSection7(d) {
 }
 function renderPMSSection8(d) {
   const { records, stats } = d.training;
-  const statusBadge = (s) => {
+  const statusBadge2 = (s) => {
     const map = { "r\xE9alis\xE9": "ok", "planifi\xE9": "info", "expir\xE9": "danger" };
     return `<span class="pms-badge pms-badge--${map[s] || "neutral"}">${s}</span>`;
   };
@@ -9075,7 +9986,7 @@ function renderPMSSection8(d) {
               <td>${r.duration_hours ? `${r.duration_hours}h` : "\u2014"}</td>
               <td style="white-space:nowrap">${r.next_renewal_date || "\u2014"}</td>
               <td>${escapeHtml(r.certificate_ref || "\u2014")}</td>
-              <td>${statusBadge(r.status)}</td>
+              <td>${statusBadge2(r.status)}</td>
             </tr>`).join("")}
           </tbody>
         </table>
@@ -9086,7 +9997,7 @@ function renderPMSSection8(d) {
 }
 function renderPMSSection9(d) {
   const { visits, last_visit, compliant_count } = d.pest_control;
-  const statusBadge = (s) => {
+  const statusBadge2 = (s) => {
     const map = { "conforme": "ok", "action-requise": "danger", "non-conforme": "danger" };
     return `<span class="pms-badge pms-badge--${map[s] || "neutral"}">${escapeHtml(s)}</span>`;
   };
@@ -9115,7 +10026,7 @@ function renderPMSSection9(d) {
               <td class="pms-td--wrap">${escapeHtml(v.actions_taken || "\u2014")}</td>
               <td style="text-align:center">${v.bait_stations_count}</td>
               <td style="white-space:nowrap">${v.next_visit_date || "\u2014"}</td>
-              <td>${statusBadge(v.status)}</td>
+              <td>${statusBadge2(v.status)}</td>
               <td>${escapeHtml(v.report_ref || "\u2014")}</td>
             </tr>`).join("")}
           </tbody>
@@ -9127,7 +10038,7 @@ function renderPMSSection9(d) {
 }
 function renderPMSSection10(d) {
   const { items, stats } = d.maintenance;
-  const statusBadge = (s) => {
+  const statusBadge2 = (s) => {
     const map = { "\xE0_jour": "ok", "planifi\xE9": "info", "en_retard": "danger", "en_panne": "danger" };
     return `<span class="pms-badge pms-badge--${map[s] || "neutral"}">${escapeHtml(s)}</span>`;
   };
@@ -9156,7 +10067,7 @@ function renderPMSSection10(d) {
               <td style="white-space:nowrap">${m.next_maintenance_date || "\u2014"}</td>
               <td>${escapeHtml(m.maintenance_type || "\u2014")}</td>
               <td>${escapeHtml(m.provider || "\u2014")}</td>
-              <td>${statusBadge(m.status)}</td>
+              <td>${statusBadge2(m.status)}</td>
             </tr>`).join("")}
           </tbody>
         </table>
@@ -9196,7 +10107,7 @@ function renderPMSSection11(d) {
 }
 function renderPMSSection12(d) {
   const { items } = d.allergens;
-  const riskBadge = (r) => {
+  const riskBadge2 = (r) => {
     const map = { "\xE9lev\xE9": "danger", "moyen": "warning", "faible": "ok" };
     return `<span class="pms-badge pms-badge--${map[r] || "neutral"}">${escapeHtml(r)}</span>`;
   };
@@ -9230,7 +10141,7 @@ function renderPMSSection12(d) {
             ${items.map((a) => `<tr>
               <td><strong>${escapeHtml(a.allergen_name)}</strong></td>
               <td style="text-align:center">${a.presence_in_menu ? '<span class="pms-badge pms-badge--warning">Oui</span>' : '<span class="pms-badge pms-badge--neutral">Non</span>'}</td>
-              <td style="text-align:center">${riskBadge(a.risk_level)}</td>
+              <td style="text-align:center">${riskBadge2(a.risk_level)}</td>
               <td class="pms-td--wrap">${escapeHtml(a.cross_contamination_risk || "\u2014")}</td>
               <td class="pms-td--wrap">${escapeHtml(a.preventive_measures || "\u2014")}</td>
               <td class="pms-td--wrap">${escapeHtml(a.cleaning_procedure || "\u2014")}</td>
@@ -9250,7 +10161,7 @@ function renderPMSSection13(d) {
     const map = { "critique": "danger", "majeur": "warning", "mineur": "ok" };
     return `<span class="pms-badge pms-badge--${map[s] || "neutral"}">${escapeHtml(s)}</span>`;
   };
-  const statusBadge = (s) => {
+  const statusBadge2 = (s) => {
     const map = { "clotur\xE9": "ok", "cloture": "ok", "en_cours": "warning", "alerte": "danger" };
     return `<span class="pms-badge pms-badge--${map[s] || "neutral"}">${escapeHtml(s)}</span>`;
   };
@@ -9295,7 +10206,7 @@ function renderPMSSection13(d) {
               <td class="pms-td--wrap">${escapeHtml(r.actions_taken || "\u2014")}</td>
               <td style="text-align:center">${r.notification_sent ? '<span class="pms-badge pms-badge--ok">Oui</span>' : '<span class="pms-badge pms-badge--danger">Non</span>'}</td>
               <td style="white-space:nowrap">${r.closure_date ? fmtDate(r.closure_date) : "\u2014"}</td>
-              <td style="text-align:center">${statusBadge(r.status)}</td>
+              <td style="text-align:center">${statusBadge2(r.status)}</td>
             </tr>`).join("")}
           </tbody>
         </table>
@@ -9307,7 +10218,7 @@ function renderPMSSection13(d) {
 function renderPMSSection14(d) {
   const { log, templates } = d.corrective_actions;
   const catLabels = { temperature: "Temp\xE9rature", cleaning: "Nettoyage", reception: "R\xE9ception", storage: "Stockage", preparation: "Pr\xE9paration", service: "Service" };
-  const statusBadge = (s) => {
+  const statusBadge2 = (s) => {
     const map = { "en_cours": "warning", "termin\xE9": "ok", "escalad\xE9": "danger" };
     return `<span class="pms-badge pms-badge--${map[s] || "neutral"}">${escapeHtml(s)}</span>`;
   };
@@ -9351,7 +10262,7 @@ function renderPMSSection14(d) {
                 <td class="pms-td--wrap">${escapeHtml(a.trigger_description || "\u2014")}</td>
                 <td class="pms-td--wrap">${escapeHtml(a.action_taken || "\u2014")}</td>
                 <td>${escapeHtml(a.responsible_person || "\u2014")}</td>
-                <td>${statusBadge(a.status)}</td>
+                <td>${statusBadge2(a.status)}</td>
               </tr>`).join("")}
               ${log.length > 30 ? `<tr><td colspan="6" style="text-align:center;font-style:italic">... ${log.length - 30} actions suppl\xE9mentaires</td></tr>` : ""}
             </tbody>
@@ -9424,7 +10335,7 @@ function renderPMSSection16(d) {
 }
 function renderPMSSection17(d) {
   const { items } = d.pms_audits;
-  const statusBadge = (s) => {
+  const statusBadge2 = (s) => {
     const map = { "r\xE9alis\xE9": "ok", "planifi\xE9": "info", "actions_en_cours": "warning", "cl\xF4tur\xE9": "ok" };
     return `<span class="pms-badge pms-badge--${map[s] || "neutral"}">${escapeHtml(s)}</span>`;
   };
@@ -9449,7 +10360,7 @@ function renderPMSSection17(d) {
                 <span class="pms-audit-card__auditor">${escapeHtml(a.auditor_name)}</span>
                 <span class="pms-audit-card__type">${escapeHtml(a.audit_type)} \u2014 ${escapeHtml(a.scope)}</span>
                 ${a.overall_score != null ? `<span class="pms-audit-card__score">Score : <strong>${a.overall_score}/100</strong></span>` : ""}
-                ${statusBadge(a.status)}
+                ${statusBadge2(a.status)}
               </div>
               ${a.notes ? `<p class="pms-audit-card__notes">${escapeHtml(a.notes)}</p>` : ""}
               ${findings.length > 0 ? `
@@ -11704,7 +12615,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
     issues.push({ icon: "\u{1F7E1}", text: `${availability.summary.unavailable} recette(s) indisponible(s) par manque de stock`, severity: "warning" });
   }
   healthScore = Math.max(0, healthScore);
-  const scoreColor = healthScore >= 80 ? "var(--color-success)" : healthScore >= 60 ? "var(--color-warning)" : "var(--color-danger)";
+  const scoreColor2 = healthScore >= 80 ? "var(--color-success)" : healthScore >= 60 ? "var(--color-warning)" : "var(--color-danger)";
   const scoreLabel = healthScore >= 80 ? "Bon" : healthScore >= 60 ? "\xC0 surveiller" : "Critique";
   const scoreEmoji = healthScore >= 80 ? "\u2705" : healthScore >= 60 ? "\u26A0\uFE0F" : "\u{1F6A8}";
   const criticalCount = issues.filter((i) => i.severity === "critical").length;
@@ -11721,11 +12632,11 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
     </div>
 
     <!-- \u2550\u2550\u2550 Score de sant\xE9 global \u2550\u2550\u2550 -->
-    <div style="background:linear-gradient(135deg,var(--bg-elevated),var(--color-surface));border:2px solid ${scoreColor};border-radius:var(--radius-lg);padding:var(--space-5);margin-bottom:var(--space-5)">
+    <div style="background:linear-gradient(135deg,var(--bg-elevated),var(--color-surface));border:2px solid ${scoreColor2};border-radius:var(--radius-lg);padding:var(--space-5);margin-bottom:var(--space-5)">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-4)">
         <div style="display:flex;align-items:center;gap:var(--space-4)">
           <div style="text-align:center">
-            <div style="font-size:3rem;font-weight:800;color:${scoreColor};line-height:1">${healthScore}</div>
+            <div style="font-size:3rem;font-weight:800;color:${scoreColor2};line-height:1">${healthScore}</div>
             <div style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:2px">/ 100</div>
           </div>
           <div>
@@ -11743,7 +12654,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
         </div>
       </div>
       <div style="margin-top:var(--space-3);background:var(--bg-sunken);border-radius:6px;height:8px;overflow:hidden">
-        <div style="height:100%;width:${healthScore}%;background:${scoreColor};border-radius:6px;transition:width 0.5s"></div>
+        <div style="height:100%;width:${healthScore}%;background:${scoreColor2};border-radius:6px;transition:width 0.5s"></div>
       </div>
       ${issues.length > 0 ? `
       <div style="margin-top:var(--space-3);display:flex;flex-direction:column;gap:var(--space-2)">
@@ -12134,17 +13045,17 @@ function renderHealthContent(kpis, variance, alerts, haccp, stockAlerts, availab
     }
   }
   healthScore = Math.max(0, healthScore);
-  const scoreColor = healthScore >= 80 ? "var(--color-success)" : healthScore >= 60 ? "var(--color-warning)" : "var(--color-danger)";
+  const scoreColor2 = healthScore >= 80 ? "var(--color-success)" : healthScore >= 60 ? "var(--color-warning)" : "var(--color-danger)";
   const scoreLabel = healthScore >= 80 ? "Bon" : healthScore >= 60 ? "\xC0 surveiller" : "Critique";
   const scoreEmoji = healthScore >= 80 ? "\u2705" : healthScore >= 60 ? "\u26A0\uFE0F" : "\u{1F6A8}";
   const criticalIssues = issues.filter((i) => i.severity === "critical");
   const warningIssues = issues.filter((i) => i.severity === "warning");
   el.innerHTML = `
     <!-- Health Score -->
-    <div style="background:linear-gradient(135deg, var(--bg-elevated), var(--color-surface));border:2px solid ${scoreColor};border-radius:var(--radius-lg);padding:var(--space-5);margin-bottom:var(--space-5);text-align:center">
+    <div style="background:linear-gradient(135deg, var(--bg-elevated), var(--color-surface));border:2px solid ${scoreColor2};border-radius:var(--radius-lg);padding:var(--space-5);margin-bottom:var(--space-5);text-align:center">
       <div style="display:flex;align-items:center;justify-content:center;gap:var(--space-4);flex-wrap:wrap">
         <div>
-          <div style="font-size:3.5rem;font-weight:800;color:${scoreColor};line-height:1">${healthScore}</div>
+          <div style="font-size:3.5rem;font-weight:800;color:${scoreColor2};line-height:1">${healthScore}</div>
           <div style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:4px">/ 100</div>
         </div>
         <div style="text-align:left">
@@ -12156,7 +13067,7 @@ function renderHealthContent(kpis, variance, alerts, haccp, stockAlerts, availab
       </div>
       <!-- Score bar -->
       <div style="margin-top:var(--space-3);background:var(--bg-sunken);border-radius:6px;height:10px;overflow:hidden">
-        <div style="height:100%;width:${healthScore}%;background:${scoreColor};border-radius:6px;transition:width 0.5s"></div>
+        <div style="height:100%;width:${healthScore}%;background:${scoreColor2};border-radius:6px;transition:width 0.5s"></div>
       </div>
     </div>
 
