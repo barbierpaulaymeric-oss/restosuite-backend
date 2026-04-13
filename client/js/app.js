@@ -276,6 +276,11 @@ function registerRoutes() {
   Router.add(/^\/haccp\/non-conformities$/, renderHACCPNonConformities);
   Router.add(/^\/haccp\/allergens$/, renderHACCPAllergens);
   Router.add(/^\/haccp\/plan$/, renderHACCPPlan);
+  Router.add(/^\/haccp\/recall$/, renderHACCPRecall);
+  Router.add(/^\/haccp\/training$/, renderHACCPTraining);
+  Router.add(/^\/haccp\/pest-control$/, renderHACCPPestControl);
+  Router.add(/^\/haccp\/maintenance$/, renderHACCPMaintenance);
+  Router.add(/^\/haccp\/waste$/, renderHACCPWaste);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, () => { location.hash = '#/analytics'; });
   Router.add(/^\/more$/, () => new MoreView().render());

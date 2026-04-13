@@ -177,6 +177,7 @@ app.use('/api/ai', require('./routes/ai'));
 app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/haccp', require('./routes/haccp'));
 app.use('/api/haccp-plan', require('./routes/haccp-plan'));
+app.use('/api/recall', require('./routes/recall'));
 app.use('/api/stock', require('./routes/stock'));
 app.use('/api/stripe', require('./routes/stripe'));
 app.use('/api/supplier-portal', require('./routes/supplier-portal'));
@@ -197,6 +198,10 @@ app.use('/api/predictions', require('./routes/predictions'));
 app.use('/api/health', require('./routes/health'));
 app.use('/api/public', require('./routes/public-api'));
 app.use('/api/crm', require('./routes/crm'));
+app.use('/api/training', require('./routes/training'));
+app.use('/api/pest-control', require('./routes/pest-control'));
+app.use('/api/maintenance', require('./routes/maintenance'));
+app.use('/api/waste', require('./routes/waste'));
 app.use('/api/errors', require('./routes/errors').router);
 
 // Admin endpoints — JWT required (gérant only)

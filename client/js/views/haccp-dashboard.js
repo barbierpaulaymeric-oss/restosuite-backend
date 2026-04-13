@@ -15,6 +15,11 @@ const HACCP_SUBNAV_FULL = `
     <a href="#/haccp/non-conformities" class="haccp-subnav__link">Non-conf.</a>
     <a href="#/haccp/allergens" class="haccp-subnav__link">Allergènes</a>
     <a href="#/haccp/plan" class="haccp-subnav__link">Plan HACCP</a>
+    <a href="#/haccp/recall" class="haccp-subnav__link">Retrait/Rappel</a>
+    <a href="#/haccp/training" class="haccp-subnav__link">Formation</a>
+    <a href="#/haccp/pest-control" class="haccp-subnav__link">Nuisibles</a>
+    <a href="#/haccp/maintenance" class="haccp-subnav__link">Maintenance</a>
+    <a href="#/haccp/waste" class="haccp-subnav__link">Déchets</a>
   </div>
 `;
 

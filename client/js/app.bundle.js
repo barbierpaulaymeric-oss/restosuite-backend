@@ -334,6 +334,22 @@ const API = {
   getHACCPPlanSummary() {
     return this.request("/haccp-plan/summary");
   },
+  // ─── Recall Procedures (Retrait/Rappel) ───
+  getRecallProcedures() {
+    return this.request("/recall");
+  },
+  getActiveRecallProcedures() {
+    return this.request("/recall/active");
+  },
+  createRecallProcedure(data) {
+    return this.request("/recall", { method: "POST", body: data });
+  },
+  updateRecallProcedure(id, data) {
+    return this.request(`/recall/${id}`, { method: "PUT", body: data });
+  },
+  deleteRecallProcedure(id) {
+    return this.request(`/recall/${id}`, { method: "DELETE" });
+  },
   // ─── Stock ───
   getStock(q) {
     const qs = q ? `?q=${encodeURIComponent(q)}` : "";
@@ -3577,6 +3593,11 @@ const HACCP_SUBNAV_FULL = `
     <a href="#/haccp/non-conformities" class="haccp-subnav__link">Non-conf.</a>
     <a href="#/haccp/allergens" class="haccp-subnav__link">Allerg\xE8nes</a>
     <a href="#/haccp/plan" class="haccp-subnav__link">Plan HACCP</a>
+    <a href="#/haccp/recall" class="haccp-subnav__link">Retrait/Rappel</a>
+    <a href="#/haccp/training" class="haccp-subnav__link">Formation</a>
+    <a href="#/haccp/pest-control" class="haccp-subnav__link">Nuisibles</a>
+    <a href="#/haccp/maintenance" class="haccp-subnav__link">Maintenance</a>
+    <a href="#/haccp/waste" class="haccp-subnav__link">D\xE9chets</a>
   </div>
 `;
 async function renderHACCPDashboard() {
@@ -5980,6 +6001,1430 @@ async function renderSummaryTab(container) {
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(e.message)}</p></div>`;
   }
+}
+async function renderHACCPRecall() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const { items } = await API.getRecallProcedures();
+    const active = items.filter((r) => r.status !== "cloture");
+    const closed = items.filter((r) => r.status === "cloture");
+    const critiques = active.filter((r) => r.severity === "critique");
+    let avgResolutionDays = "\u2014";
+    if (closed.length > 0) {
+      const total = closed.reduce((acc, r) => {
+        if (r.closure_date) {
+          const diff = (new Date(r.closure_date) - new Date(r.alert_date)) / 864e5;
+          return acc + Math.max(0, diff);
+        }
+        return acc;
+      }, 0);
+      avgResolutionDays = (total / closed.length).toFixed(1) + " j";
+    }
+    const closureRate = items.length > 0 ? Math.round(closed.length / items.length * 100) + "%" : "\u2014";
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="alert-triangle" style="width:22px;height:22px;vertical-align:middle;margin-right:6px;color:var(--color-warning)"></i>Retrait / Rappel produits</h1>
+          <button class="btn btn-primary" id="btn-new-recall">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle alerte
+          </button>
+        </div>
+
+        ${HACCP_SUBNAV_FULL}
+
+        <!-- KPIs -->
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:var(--space-5)">
+          <div class="kpi-card ${critiques.length > 0 ? "kpi-card--danger" : ""}">
+            <div class="kpi-value">${active.length}</div>
+            <div class="kpi-label">Alertes actives</div>
+          </div>
+          <div class="kpi-card ${critiques.length > 0 ? "kpi-card--danger" : "kpi-card--info"}">
+            <div class="kpi-value">${critiques.length}</div>
+            <div class="kpi-label">Critiques en cours</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-value">${avgResolutionDays}</div>
+            <div class="kpi-label">D\xE9lai moyen cl\xF4ture</div>
+          </div>
+          <div class="kpi-card kpi-card--success">
+            <div class="kpi-value">${closureRate}</div>
+            <div class="kpi-label">Taux de cl\xF4ture</div>
+          </div>
+        </div>
+
+        <!-- Alertes actives -->
+        ${active.length > 0 ? `
+          <h3 style="margin-bottom:var(--space-3);color:var(--color-warning);display:flex;align-items:center;gap:8px">
+            <i data-lucide="siren" style="width:18px;height:18px"></i> Alertes en cours (${active.length})
+          </h3>
+          <div class="table-container" style="margin-bottom:var(--space-5)">
+            <table>
+              <thead><tr>
+                <th>S\xE9v\xE9rit\xE9</th><th>Produit</th><th>Lot</th><th>Raison</th>
+                <th>Source</th><th>Date alerte</th><th>Statut</th><th>Notifi\xE9</th><th></th>
+              </tr></thead>
+              <tbody id="recall-active-body">
+                ${renderRecallRows(active)}
+              </tbody>
+            </table>
+          </div>
+        ` : `
+          <div class="empty-state" style="margin-bottom:var(--space-5)">
+            <i data-lucide="check-circle-2" style="width:40px;height:40px;color:var(--color-success);margin-bottom:8px"></i>
+            <p>Aucune alerte active</p>
+          </div>
+        `}
+
+        <!-- Historique cl\xF4tur\xE9 -->
+        ${closed.length > 0 ? `
+          <details style="margin-top:var(--space-4)">
+            <summary style="cursor:pointer;font-weight:600;padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md);user-select:none">
+              Historique cl\xF4tur\xE9 (${closed.length})
+            </summary>
+            <div class="table-container" style="margin-top:var(--space-3)">
+              <table>
+                <thead><tr>
+                  <th>S\xE9v\xE9rit\xE9</th><th>Produit</th><th>Lot</th><th>Raison</th>
+                  <th>Date alerte</th><th>Cl\xF4tur\xE9 le</th><th>Dur\xE9e</th><th></th>
+                </tr></thead>
+                <tbody>${renderRecallClosedRows(closed)}</tbody>
+              </table>
+            </div>
+          </details>
+        ` : ""}
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    document.getElementById("btn-new-recall").addEventListener("click", () => showRecallModal(null));
+    app.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-recall-action]");
+      if (!btn) return;
+      const id = Number(btn.dataset.id);
+      const item = items.find((r) => r.id === id);
+      if (!item) return;
+      switch (btn.dataset.recallAction) {
+        case "edit":
+          showRecallModal(item);
+          break;
+        case "progress":
+          advanceRecallStatus(item);
+          break;
+        case "checklist":
+          showRecallChecklist(item);
+          break;
+        case "delete":
+          deleteRecall(id);
+          break;
+      }
+    });
+  } catch (err) {
+    document.getElementById("app").innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function _recallSeverityBadge(sev) {
+  const map = {
+    critique: '<span class="badge badge--danger">Critique</span>',
+    majeur: '<span class="badge badge--warning">Majeur</span>',
+    mineur: '<span class="badge badge--info">Mineur</span>'
+  };
+  return map[sev] || `<span class="badge">${escapeHtml(sev)}</span>`;
+}
+function _recallStatusBadge(status) {
+  const map = {
+    alerte: '<span class="badge badge--danger">Alerte</span>',
+    en_cours: '<span class="badge badge--warning">En cours</span>',
+    cloture: '<span class="badge badge--success">Cl\xF4tur\xE9</span>'
+  };
+  return map[status] || `<span class="badge">${escapeHtml(status)}</span>`;
+}
+function _recallReasonLabel(r) {
+  const map = { sanitaire: "Sanitaire", qualite: "Qualit\xE9", etiquetage: "\xC9tiquetage", autre: "Autre" };
+  return map[r] || r;
+}
+function renderRecallRows(items) {
+  if (items.length === 0) return '<tr><td colspan="9" style="text-align:center;color:var(--text-tertiary)">Aucune alerte</td></tr>';
+  return items.map((r) => {
+    const dateStr = new Date(r.alert_date).toLocaleDateString("fr-FR");
+    const canAdvance = r.status !== "cloture";
+    return `
+      <tr>
+        <td>${_recallSeverityBadge(r.severity)}</td>
+        <td style="font-weight:500">${escapeHtml(r.product_name)}</td>
+        <td class="mono text-sm">${escapeHtml(r.lot_number || "\u2014")}</td>
+        <td class="text-sm">${_recallReasonLabel(r.reason)}</td>
+        <td class="text-sm">${escapeHtml(r.alert_source)}</td>
+        <td class="text-sm">${dateStr}</td>
+        <td>${_recallStatusBadge(r.status)}</td>
+        <td>${r.notification_sent ? '<span style="color:var(--color-success);font-size:var(--text-sm)">\u2713 Envoy\xE9e</span>' : '<span style="color:var(--text-tertiary);font-size:var(--text-sm)">Non</span>'}</td>
+        <td style="white-space:nowrap;display:flex;gap:4px">
+          <button class="btn btn-secondary btn-sm" data-recall-action="checklist" data-id="${r.id}" title="Checklist">
+            <i data-lucide="list-checks" style="width:14px;height:14px"></i>
+          </button>
+          ${canAdvance ? `<button class="btn btn-primary btn-sm" data-recall-action="progress" data-id="${r.id}" title="Avancer">
+            <i data-lucide="chevron-right" style="width:14px;height:14px"></i>
+          </button>` : ""}
+          <button class="btn btn-secondary btn-sm" data-recall-action="edit" data-id="${r.id}" title="Modifier">
+            <i data-lucide="pencil" style="width:14px;height:14px"></i>
+          </button>
+          <button class="btn btn-sm" data-recall-action="delete" data-id="${r.id}" title="Supprimer"
+                  style="color:var(--color-danger);border:1px solid rgba(217,48,37,0.3);background:transparent">
+            <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+          </button>
+        </td>
+      </tr>`;
+  }).join("");
+}
+function renderRecallClosedRows(items) {
+  return items.map((r) => {
+    const dateAlert = new Date(r.alert_date).toLocaleDateString("fr-FR");
+    const dateClosure = r.closure_date ? new Date(r.closure_date).toLocaleDateString("fr-FR") : "\u2014";
+    let duration = "\u2014";
+    if (r.closure_date) {
+      const d = Math.round((new Date(r.closure_date) - new Date(r.alert_date)) / 864e5);
+      duration = `${d} j`;
+    }
+    return `
+      <tr>
+        <td>${_recallSeverityBadge(r.severity)}</td>
+        <td style="font-weight:500">${escapeHtml(r.product_name)}</td>
+        <td class="mono text-sm">${escapeHtml(r.lot_number || "\u2014")}</td>
+        <td class="text-sm">${_recallReasonLabel(r.reason)}</td>
+        <td class="text-sm">${dateAlert}</td>
+        <td class="text-sm">${dateClosure}</td>
+        <td class="text-sm">${duration}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" data-recall-action="edit" data-id="${r.id}" title="D\xE9tails">
+            <i data-lucide="eye" style="width:14px;height:14px"></i>
+          </button>
+        </td>
+      </tr>`;
+  }).join("");
+}
+async function advanceRecallStatus(item) {
+  const next = item.status === "alerte" ? "en_cours" : "cloture";
+  const label = next === "en_cours" ? "Passer en cours" : "Cl\xF4turer";
+  if (next === "cloture") {
+    showRecallCloseModal(item);
+    return;
+  }
+  showConfirmModal(label, `Confirmer le passage en "En cours" pour le rappel de ${item.product_name} ?`, async () => {
+    try {
+      await API.updateRecallProcedure(item.id, { status: next });
+      showToast("Statut mis \xE0 jour", "success");
+      renderHACCPRecall();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+  }, { confirmText: label, confirmClass: "btn btn-primary" });
+}
+function showRecallChecklist(item) {
+  const steps = [
+    { id: "identify", label: "Identifier tous les lots concern\xE9s en stock" },
+    { id: "isolate", label: 'Retirer et isoler les produits (\xE9tiqueter "BLOQU\xC9")' },
+    { id: "supplier", label: "Contacter le fournisseur / fabricant" },
+    { id: "authority", label: "Notifier les autorit\xE9s si n\xE9cessaire (DDPP/DGAL)" },
+    { id: "staff", label: "Informer l'\xE9quipe en cuisine" },
+    { id: "document", label: "Documenter toutes les actions (tra\xE7abilit\xE9)" },
+    { id: "destroy", label: "Proc\xE9der \xE0 la destruction ou au retour document\xE9" }
+  ];
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:520px">
+      <h2 style="display:flex;align-items:center;gap:8px">
+        <i data-lucide="list-checks" style="width:20px;height:20px;color:var(--color-warning)"></i>
+        Checklist \u2014 ${escapeHtml(item.product_name)}
+      </h2>
+      <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-4)">
+        <div style="display:flex;gap:var(--space-4);flex-wrap:wrap;font-size:var(--text-sm)">
+          <span>Lot : <strong>${escapeHtml(item.lot_number || "N/A")}</strong></span>
+          <span>S\xE9v\xE9rit\xE9 : ${_recallSeverityBadge(item.severity)}</span>
+          <span>Statut : ${_recallStatusBadge(item.status)}</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:var(--space-2);margin-bottom:var(--space-4)">
+        ${steps.map((s) => `
+          <label style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2);border-radius:var(--radius-sm);cursor:pointer;transition:background 0.15s"
+                 onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background=''">
+            <input type="checkbox" id="chk-${s.id}" style="width:16px;height:16px;cursor:pointer">
+            <span style="font-size:var(--text-sm)">${escapeHtml(s.label)}</span>
+          </label>
+        `).join("")}
+      </div>
+      <div id="checklist-progress" style="height:6px;background:var(--border-color);border-radius:3px;margin-bottom:var(--space-4)">
+        <div id="checklist-bar" style="height:100%;background:var(--color-success);border-radius:3px;width:0%;transition:width 0.3s"></div>
+      </div>
+      <div class="actions-row">
+        <button class="btn btn-primary" id="checklist-done">Fermer</button>
+        ${item.status !== "cloture" ? `<button class="btn btn-secondary" id="checklist-close-recall">Cl\xF4turer le rappel</button>` : ""}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  lucide.createIcons();
+  const checkboxes = overlay.querySelectorAll('input[type="checkbox"]');
+  const bar = overlay.querySelector("#checklist-bar");
+  function updateProgress() {
+    const done = [...checkboxes].filter((c) => c.checked).length;
+    bar.style.width = Math.round(done / checkboxes.length * 100) + "%";
+  }
+  checkboxes.forEach((c) => c.addEventListener("change", updateProgress));
+  overlay.querySelector("#checklist-done").onclick = () => overlay.remove();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  const closeBtn = overlay.querySelector("#checklist-close-recall");
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      overlay.remove();
+      showRecallCloseModal(item);
+    };
+  }
+}
+function showRecallCloseModal(item) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:500px">
+      <h2><i data-lucide="check-circle-2" style="width:20px;height:20px;color:var(--color-success);vertical-align:middle;margin-right:6px"></i>Cl\xF4turer le rappel</h2>
+      <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-4)">
+        Rappel de <strong>${escapeHtml(item.product_name)}</strong> \u2014 Lot ${escapeHtml(item.lot_number || "N/A")}
+      </p>
+      <div class="form-group">
+        <label>Notes de cl\xF4ture <span style="color:var(--text-tertiary)">(actions men\xE9es, r\xE9sultats)</span></label>
+        <textarea class="form-control" id="close-notes" rows="4" placeholder="D\xE9crivez les actions r\xE9alis\xE9es, les quantit\xE9s d\xE9truites, les retours fournisseurs..."></textarea>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:var(--space-2)">
+          <input type="checkbox" id="close-notif" style="width:16px;height:16px">
+          Notification envoy\xE9e aux autorit\xE9s comp\xE9tentes
+        </label>
+      </div>
+      <div id="close-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
+      <div class="actions-row">
+        <button class="btn btn-primary" id="close-confirm">
+          <i data-lucide="check" style="width:18px;height:18px"></i> Confirmer la cl\xF4ture
+        </button>
+        <button class="btn btn-secondary" id="close-cancel">Annuler</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  lucide.createIcons();
+  overlay.querySelector("#close-cancel").onclick = () => overlay.remove();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  overlay.querySelector("#close-confirm").onclick = async () => {
+    const notes = document.getElementById("close-notes").value.trim();
+    const notifSent = document.getElementById("close-notif").checked;
+    const errorEl = document.getElementById("close-error");
+    try {
+      await API.updateRecallProcedure(item.id, {
+        status: "cloture",
+        closure_notes: notes,
+        notification_sent: notifSent ? 1 : item.notification_sent || 0
+      });
+      showToast("Rappel cl\xF4tur\xE9", "success");
+      overlay.remove();
+      renderHACCPRecall();
+    } catch (e) {
+      errorEl.textContent = e.message || "Erreur";
+    }
+  };
+}
+function showRecallModal(item) {
+  const isEdit = !!item;
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:560px">
+      <h2>${isEdit ? `<i data-lucide="pencil" style="width:18px;height:18px;vertical-align:middle;margin-right:6px"></i>Modifier le rappel` : `<i data-lucide="alert-triangle" style="width:18px;height:18px;vertical-align:middle;margin-right:6px;color:var(--color-warning)"></i>Nouvelle alerte retrait/rappel`}</h2>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Produit <span style="color:var(--color-danger)">*</span></label>
+          <input type="text" class="form-control" id="rc-product" value="${escapeHtml((item == null ? void 0 : item.product_name) || "")}" placeholder="Nom du produit concern\xE9">
+        </div>
+        <div class="form-group">
+          <label>Num\xE9ro de lot</label>
+          <input type="text" class="form-control" id="rc-lot" value="${escapeHtml((item == null ? void 0 : item.lot_number) || "")}" placeholder="Ex: FB-2026-0312">
+        </div>
+        <div class="form-group">
+          <label>Date d'alerte</label>
+          <input type="datetime-local" class="form-control" id="rc-date"
+            value="${(item == null ? void 0 : item.alert_date) ? new Date(item.alert_date).toISOString().slice(0, 16) : (/* @__PURE__ */ new Date()).toISOString().slice(0, 16)}">
+        </div>
+        <div class="form-group">
+          <label>Raison</label>
+          <select class="form-control" id="rc-reason">
+            <option value="sanitaire" ${(item == null ? void 0 : item.reason) === "sanitaire" || !item ? "selected" : ""}>\u{1F9A0} Sanitaire (contamination)</option>
+            <option value="qualite"   ${(item == null ? void 0 : item.reason) === "qualite" ? "selected" : ""}>\u26A0\uFE0F Qualit\xE9</option>
+            <option value="etiquetage" ${(item == null ? void 0 : item.reason) === "etiquetage" ? "selected" : ""}>\u{1F3F7}\uFE0F \xC9tiquetage / Allerg\xE8ne</option>
+            <option value="autre"     ${(item == null ? void 0 : item.reason) === "autre" ? "selected" : ""}>Autre</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Source de l'alerte</label>
+          <select class="form-control" id="rc-source">
+            <option value="DGAL"       ${(item == null ? void 0 : item.alert_source) === "DGAL" ? "selected" : ""}>DGAL / Autorit\xE9</option>
+            <option value="fournisseur" ${(item == null ? void 0 : item.alert_source) === "fournisseur" || !item ? "selected" : ""}>Fournisseur</option>
+            <option value="interne"    ${(item == null ? void 0 : item.alert_source) === "interne" ? "selected" : ""}>D\xE9tection interne</option>
+            <option value="client"     ${(item == null ? void 0 : item.alert_source) === "client" ? "selected" : ""}>R\xE9clamation client</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>S\xE9v\xE9rit\xE9</label>
+          <select class="form-control" id="rc-severity">
+            <option value="critique" ${(item == null ? void 0 : item.severity) === "critique" ? "selected" : ""}>\u{1F534} Critique</option>
+            <option value="majeur"   ${(item == null ? void 0 : item.severity) === "majeur" || !item ? "selected" : ""}>\u{1F7E0} Majeur</option>
+            <option value="mineur"   ${(item == null ? void 0 : item.severity) === "mineur" ? "selected" : ""}>\u{1F7E1} Mineur</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Quantit\xE9 concern\xE9e</label>
+          <div style="display:flex;gap:var(--space-2)">
+            <input type="number" class="form-control" id="rc-qty" value="${(item == null ? void 0 : item.quantity_affected) || ""}" placeholder="0" min="0" style="flex:2">
+            <select class="form-control" id="rc-qty-unit" style="flex:1">
+              <option value="kg"     ${(item == null ? void 0 : item.quantity_unit) === "kg" || !item ? "selected" : ""}>kg</option>
+              <option value="unit\xE9s" ${(item == null ? void 0 : item.quantity_unit) === "unit\xE9s" ? "selected" : ""}>unit\xE9s</option>
+              <option value="L"      ${(item == null ? void 0 : item.quantity_unit) === "L" ? "selected" : ""}>L</option>
+              <option value="bo\xEEtes" ${(item == null ? void 0 : item.quantity_unit) === "bo\xEEtes" ? "selected" : ""}>bo\xEEtes</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Actions prises</label>
+          <textarea class="form-control" id="rc-actions" rows="3" placeholder="Ex: Lots retir\xE9s des frigos, fournisseur contact\xE9...">${escapeHtml((item == null ? void 0 : item.actions_taken) || "")}</textarea>
+        </div>
+        ${isEdit ? `
+        <div class="form-group" style="display:flex;align-items:center;gap:var(--space-2)">
+          <input type="checkbox" id="rc-notif" style="width:16px;height:16px" ${(item == null ? void 0 : item.notification_sent) ? "checked" : ""}>
+          <label for="rc-notif" style="margin:0;cursor:pointer">Notification envoy\xE9e aux autorit\xE9s</label>
+        </div>
+        ` : ""}
+      </div>
+
+      <div id="rc-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-top:var(--space-2)"></div>
+      <div class="actions-row" style="margin-top:var(--space-3)">
+        <button class="btn btn-primary" id="rc-save">
+          <i data-lucide="${isEdit ? "save" : "alert-triangle"}" style="width:18px;height:18px"></i>
+          ${isEdit ? "Enregistrer" : "Cr\xE9er l'alerte"}
+        </button>
+        <button class="btn btn-secondary" id="rc-cancel">Annuler</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  lucide.createIcons();
+  overlay.querySelector("#rc-cancel").onclick = () => overlay.remove();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  overlay.querySelector("#rc-save").onclick = async () => {
+    const product_name = document.getElementById("rc-product").value.trim();
+    const lot_number = document.getElementById("rc-lot").value.trim();
+    const alert_date = document.getElementById("rc-date").value;
+    const reason = document.getElementById("rc-reason").value;
+    const alert_source = document.getElementById("rc-source").value;
+    const severity = document.getElementById("rc-severity").value;
+    const quantity_affected = document.getElementById("rc-qty").value || null;
+    const quantity_unit = document.getElementById("rc-qty-unit").value;
+    const actions_taken = document.getElementById("rc-actions").value.trim();
+    const errorEl = document.getElementById("rc-error");
+    if (!product_name) {
+      errorEl.textContent = "Le produit est requis";
+      return;
+    }
+    const payload = {
+      product_name,
+      lot_number: lot_number || null,
+      alert_date,
+      reason,
+      alert_source,
+      severity,
+      quantity_affected: quantity_affected ? Number(quantity_affected) : null,
+      quantity_unit,
+      actions_taken: actions_taken || null
+    };
+    if (isEdit) {
+      payload.notification_sent = document.getElementById("rc-notif").checked ? 1 : 0;
+    }
+    try {
+      if (isEdit) {
+        await API.updateRecallProcedure(item.id, payload);
+        showToast("Proc\xE9dure mise \xE0 jour", "success");
+      } else {
+        await API.createRecallProcedure(payload);
+        showToast("Alerte cr\xE9\xE9e", "success");
+      }
+      overlay.remove();
+      renderHACCPRecall();
+    } catch (e) {
+      errorEl.textContent = e.message || "Erreur";
+    }
+  };
+  document.getElementById("rc-product").focus();
+}
+async function deleteRecall(id) {
+  showConfirmModal("Supprimer", "Supprimer d\xE9finitivement cette proc\xE9dure de rappel ?", async () => {
+    try {
+      await API.deleteRecallProcedure(id);
+      showToast("Proc\xE9dure supprim\xE9e", "success");
+      renderHACCPRecall();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+  }, { confirmText: "Supprimer", confirmClass: "btn btn-danger" });
+}
+async function renderHACCPTraining() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const [{ items }, { items: expiring }] = await Promise.all([
+      API.request("/training"),
+      API.request("/training/expiring")
+    ]);
+    const total = items.length;
+    const upToDate = items.filter((i) => i.status === "r\xE9alis\xE9").length;
+    const pctUpToDate = total > 0 ? Math.round(upToDate / total * 100) : 0;
+    const nextRenewal = items.filter((i) => i.next_renewal_date).sort((a, b) => a.next_renewal_date.localeCompare(b.next_renewal_date))[0];
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="graduation-cap" style="width:22px;height:22px;vertical-align:middle;margin-right:8px"></i>Formation du personnel</h1>
+          <button class="btn btn-primary" id="btn-new-training">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle formation
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+
+        ${expiring.length > 0 ? `
+        <div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center">
+          <i data-lucide="alert-triangle" style="width:18px;height:18px;color:#f59e0b;flex-shrink:0"></i>
+          <span class="text-sm"><strong>${expiring.length} formation(s)</strong> arrivent \xE0 \xE9ch\xE9ance dans les 30 prochains jours</span>
+        </div>
+        ` : ""}
+
+        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+          <div class="kpi-card">
+            <div class="kpi-card__label">Total formations</div>
+            <div class="kpi-card__value">${total}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__label">\xC0 jour (r\xE9alis\xE9)</div>
+            <div class="kpi-card__value">${pctUpToDate}<span style="font-size:1rem">%</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__label">Prochaine \xE9ch\xE9ance</div>
+            <div class="kpi-card__value" style="font-size:1rem">${nextRenewal ? new Date(nextRenewal.next_renewal_date).toLocaleDateString("fr-FR") : "\u2014"}</div>
+          </div>
+          <div class="kpi-card ${expiring.length > 0 ? "kpi-card--warning" : ""}">
+            <div class="kpi-card__label">Expirent sous 30j</div>
+            <div class="kpi-card__value">${expiring.length}</div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Employ\xE9</th>
+                <th>Sujet de formation</th>
+                <th>Formateur</th>
+                <th>Date formation</th>
+                <th>Prochaine \xE9ch\xE9ance</th>
+                <th>Dur\xE9e</th>
+                <th>R\xE9f\xE9rence certificat</th>
+                <th>Statut</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.length === 0 ? '<tr><td colspan="9" class="text-secondary text-center" style="padding:24px">Aucune formation enregistr\xE9e</td></tr>' : items.map((item) => {
+      const trainingDate = new Date(item.training_date).toLocaleDateString("fr-FR");
+      const renewalDate = item.next_renewal_date ? new Date(item.next_renewal_date).toLocaleDateString("fr-FR") : "\u2014";
+      const isExpiringSoon = expiring.some((e) => e.id === item.id);
+      let statusBadge = "";
+      if (item.status === "r\xE9alis\xE9") statusBadge = '<span class="badge badge--success">\u2713 R\xE9alis\xE9</span>';
+      else if (item.status === "planifi\xE9") statusBadge = '<span class="badge" style="background:#e0f0ff;color:#1a6fb5">Planifi\xE9</span>';
+      else statusBadge = '<span class="badge badge--danger">Expir\xE9</span>';
+      return `
+                  <tr${isExpiringSoon ? ' style="background:#fffbf0"' : ""}>
+                    <td style="font-weight:500">${escapeHtml(item.employee_name)}</td>
+                    <td>${escapeHtml(item.training_topic)}</td>
+                    <td class="text-secondary">${escapeHtml(item.trainer || "\u2014")}</td>
+                    <td class="mono text-sm">${trainingDate}</td>
+                    <td class="mono text-sm${isExpiringSoon ? " text-warning" : ""}">${renewalDate}</td>
+                    <td class="mono">${item.duration_hours ? item.duration_hours + "h" : "\u2014"}</td>
+                    <td class="text-secondary text-sm">${escapeHtml(item.certificate_ref || "\u2014")}</td>
+                    <td>${statusBadge}</td>
+                    <td style="white-space:nowrap">
+                      <button class="btn btn-secondary btn-sm" data-action="edit-training" data-id="${item.id}" style="margin-right:4px">
+                        <i data-lucide="pencil" style="width:14px;height:14px"></i>
+                      </button>
+                      <button class="btn btn-ghost btn-sm" data-action="delete-training" data-id="${item.id}" style="color:var(--color-danger)">
+                        <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+                      </button>
+                    </td>
+                  </tr>
+                `;
+    }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupTrainingEvents(items);
+  } catch (err) {
+    document.getElementById("app").innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function setupTrainingEvents(items) {
+  var _a;
+  (_a = document.getElementById("btn-new-training")) == null ? void 0 : _a.addEventListener("click", () => showTrainingModal());
+  document.querySelectorAll('[data-action="edit-training"]').forEach((btn) => {
+    const record = items.find((i) => i.id === Number(btn.dataset.id));
+    btn.addEventListener("click", () => showTrainingModal(record));
+  });
+  document.querySelectorAll('[data-action="delete-training"]').forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Supprimer cette formation ?")) return;
+      try {
+        await API.request("/training/" + btn.dataset.id, { method: "DELETE" });
+        showToast("Formation supprim\xE9e", "success");
+        renderHACCPTraining();
+      } catch (err) {
+        showToast("Erreur : " + err.message, "error");
+      }
+    });
+  });
+}
+function showTrainingModal(record = null) {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const isEdit = !!record;
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:600px">
+      <h2>
+        <i data-lucide="graduation-cap" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>
+        ${isEdit ? "Modifier la formation" : "Nouvelle formation"}
+      </h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Employ\xE9 *</label>
+          <input type="text" class="form-control" id="tr-employee" value="${escapeHtml((record == null ? void 0 : record.employee_name) || "")}" placeholder="ex: Marie Dupont" autofocus>
+        </div>
+        <div class="form-group">
+          <label>Formateur</label>
+          <input type="text" class="form-control" id="tr-trainer" value="${escapeHtml((record == null ? void 0 : record.trainer) || "")}" placeholder="ex: AFPA Formation">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Sujet de formation *</label>
+        <input type="text" class="form-control" id="tr-topic" value="${escapeHtml((record == null ? void 0 : record.training_topic) || "")}" placeholder="ex: Hygi\xE8ne alimentaire HACCP">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date de formation *</label>
+          <input type="date" class="form-control" id="tr-date" value="${(record == null ? void 0 : record.training_date) || ""}">
+        </div>
+        <div class="form-group">
+          <label>Prochaine \xE9ch\xE9ance</label>
+          <input type="date" class="form-control" id="tr-renewal" value="${(record == null ? void 0 : record.next_renewal_date) || ""}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Dur\xE9e (heures)</label>
+          <input type="number" step="0.5" min="0" class="form-control" id="tr-duration" value="${(record == null ? void 0 : record.duration_hours) || ""}" placeholder="ex: 14">
+        </div>
+        <div class="form-group">
+          <label>Statut</label>
+          <select class="form-control" id="tr-status">
+            <option value="planifi\xE9" ${!record || record.status === "planifi\xE9" ? "selected" : ""}>Planifi\xE9</option>
+            <option value="r\xE9alis\xE9" ${(record == null ? void 0 : record.status) === "r\xE9alis\xE9" ? "selected" : ""}>R\xE9alis\xE9</option>
+            <option value="expir\xE9" ${(record == null ? void 0 : record.status) === "expir\xE9" ? "selected" : ""}>Expir\xE9</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>R\xE9f\xE9rence certificat</label>
+        <input type="text" class="form-control" id="tr-cert" value="${escapeHtml((record == null ? void 0 : record.certificate_ref) || "")}" placeholder="ex: HACCP-2026-001">
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" class="form-control" id="tr-notes" value="${escapeHtml((record == null ? void 0 : record.notes) || "")}" placeholder="">
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="tr-cancel">Annuler</button>
+        <button class="btn btn-primary" id="tr-save">
+          <i data-lucide="check" style="width:18px;height:18px"></i> ${isEdit ? "Enregistrer" : "Cr\xE9er"}
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("tr-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("tr-save").addEventListener("click", async () => {
+    const employee_name = document.getElementById("tr-employee").value.trim();
+    const training_topic = document.getElementById("tr-topic").value.trim();
+    const training_date = document.getElementById("tr-date").value;
+    if (!employee_name) {
+      document.getElementById("tr-employee").classList.add("form-control--error");
+      return;
+    }
+    if (!training_topic) {
+      document.getElementById("tr-topic").classList.add("form-control--error");
+      return;
+    }
+    if (!training_date) {
+      document.getElementById("tr-date").classList.add("form-control--error");
+      return;
+    }
+    const payload = {
+      employee_name,
+      training_topic,
+      trainer: document.getElementById("tr-trainer").value.trim() || null,
+      training_date,
+      next_renewal_date: document.getElementById("tr-renewal").value || null,
+      duration_hours: document.getElementById("tr-duration").value ? Number(document.getElementById("tr-duration").value) : null,
+      certificate_ref: document.getElementById("tr-cert").value.trim() || null,
+      status: document.getElementById("tr-status").value,
+      notes: document.getElementById("tr-notes").value.trim() || null
+    };
+    try {
+      if (isEdit) {
+        await API.request("/training/" + record.id, { method: "PUT", body: payload });
+        showToast("Formation mise \xE0 jour \u2713", "success");
+      } else {
+        await API.request("/training", { method: "POST", body: payload });
+        showToast("Formation enregistr\xE9e \u2713", "success");
+      }
+      overlay.remove();
+      renderHACCPTraining();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+async function renderHACCPPestControl() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const { items } = await API.request("/pest-control");
+    const lastVisit = items[0] || null;
+    const nextVisitDate = (lastVisit == null ? void 0 : lastVisit.next_visit_date) ? new Date(lastVisit.next_visit_date).toLocaleDateString("fr-FR") : "\u2014";
+    const actionRequired = items.filter((i) => i.status === "action-requise").length;
+    const nonCompliant = items.filter((i) => i.status === "non-conforme").length;
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="bug" style="width:22px;height:22px;vertical-align:middle;margin-right:8px"></i>Lutte contre les nuisibles</h1>
+          <button class="btn btn-primary" id="btn-new-pest">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle visite
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+
+        ${(lastVisit == null ? void 0 : lastVisit.next_visit_date) ? `
+        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:14px 18px;margin-bottom:16px;display:flex;gap:12px;align-items:center">
+          <i data-lucide="calendar-check" style="width:20px;height:20px;color:#3b9ede;flex-shrink:0"></i>
+          <div>
+            <strong>Prochaine visite programm\xE9e :</strong> ${nextVisitDate}
+            ${lastVisit.provider_name ? ` \u2014 ${escapeHtml(lastVisit.provider_name)}` : ""}
+            ${lastVisit.contract_ref ? ` (${escapeHtml(lastVisit.contract_ref)})` : ""}
+          </div>
+        </div>
+        ` : ""}
+
+        ${actionRequired > 0 || nonCompliant > 0 ? `
+        <div style="background:#fff0f0;border:1px solid #ef4444;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center">
+          <i data-lucide="alert-triangle" style="width:18px;height:18px;color:#ef4444;flex-shrink:0"></i>
+          <span class="text-sm"><strong>${actionRequired + nonCompliant} visite(s)</strong> n\xE9cessitent une action ou sont non conformes</span>
+        </div>
+        ` : ""}
+
+        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+          <div class="kpi-card">
+            <div class="kpi-card__label">Total visites</div>
+            <div class="kpi-card__value">${items.length}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__label">Derni\xE8re visite</div>
+            <div class="kpi-card__value" style="font-size:1rem">${lastVisit ? new Date(lastVisit.visit_date).toLocaleDateString("fr-FR") : "\u2014"}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__label">Prochaine visite</div>
+            <div class="kpi-card__value" style="font-size:1rem">${nextVisitDate}</div>
+          </div>
+          <div class="kpi-card ${(lastVisit == null ? void 0 : lastVisit.status) === "conforme" ? "" : (lastVisit == null ? void 0 : lastVisit.status) === "action-requise" ? "kpi-card--warning" : "kpi-card--danger"}">
+            <div class="kpi-card__label">Statut derni\xE8re visite</div>
+            <div class="kpi-card__value" style="font-size:1rem">${lastVisit ? renderPestBadge(lastVisit.status) : "\u2014"}</div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Prestataire</th>
+                <th>R\xE9f. contrat</th>
+                <th>Date visite</th>
+                <th>Prochaine visite</th>
+                <th>Constats</th>
+                <th>Actions effectu\xE9es</th>
+                <th>App\xE2ts</th>
+                <th>Statut</th>
+                <th>Rapport</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.length === 0 ? '<tr><td colspan="10" class="text-secondary text-center" style="padding:24px">Aucune visite enregistr\xE9e</td></tr>' : items.map((item) => {
+      var _a;
+      return `
+                <tr>
+                  <td style="font-weight:500">${escapeHtml(item.provider_name || "\u2014")}</td>
+                  <td class="text-secondary text-sm">${escapeHtml(item.contract_ref || "\u2014")}</td>
+                  <td class="mono text-sm">${new Date(item.visit_date).toLocaleDateString("fr-FR")}</td>
+                  <td class="mono text-sm">${item.next_visit_date ? new Date(item.next_visit_date).toLocaleDateString("fr-FR") : "\u2014"}</td>
+                  <td class="text-sm" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(item.findings || "")}">${escapeHtml(item.findings || "\u2014")}</td>
+                  <td class="text-sm" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(item.actions_taken || "")}">${escapeHtml(item.actions_taken || "\u2014")}</td>
+                  <td class="mono">${(_a = item.bait_stations_count) != null ? _a : "\u2014"}</td>
+                  <td>${renderPestBadge(item.status)}</td>
+                  <td class="text-secondary text-sm">${escapeHtml(item.report_ref || "\u2014")}</td>
+                  <td style="white-space:nowrap">
+                    <button class="btn btn-secondary btn-sm" data-action="edit-pest" data-id="${item.id}" style="margin-right:4px">
+                      <i data-lucide="pencil" style="width:14px;height:14px"></i>
+                    </button>
+                    <button class="btn btn-ghost btn-sm" data-action="delete-pest" data-id="${item.id}" style="color:var(--color-danger)">
+                      <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+                    </button>
+                  </td>
+                </tr>
+              `;
+    }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupPestControlEvents(items);
+  } catch (err) {
+    document.getElementById("app").innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function renderPestBadge(status) {
+  if (status === "conforme") return '<span class="badge badge--success">\u2713 Conforme</span>';
+  if (status === "non-conforme") return '<span class="badge badge--danger">\u2717 Non conforme</span>';
+  return '<span class="badge badge--warning">\u26A0 Action requise</span>';
+}
+function setupPestControlEvents(items) {
+  var _a;
+  (_a = document.getElementById("btn-new-pest")) == null ? void 0 : _a.addEventListener("click", () => showPestControlModal());
+  document.querySelectorAll('[data-action="edit-pest"]').forEach((btn) => {
+    const record = items.find((i) => i.id === Number(btn.dataset.id));
+    btn.addEventListener("click", () => showPestControlModal(record));
+  });
+  document.querySelectorAll('[data-action="delete-pest"]').forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Supprimer cette visite ?")) return;
+      try {
+        await API.request("/pest-control/" + btn.dataset.id, { method: "DELETE" });
+        showToast("Visite supprim\xE9e", "success");
+        renderHACCPPestControl();
+      } catch (err) {
+        showToast("Erreur : " + err.message, "error");
+      }
+    });
+  });
+}
+function showPestControlModal(record = null) {
+  var _a;
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const isEdit = !!record;
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:600px">
+      <h2>
+        <i data-lucide="bug" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>
+        ${isEdit ? "Modifier la visite" : "Nouvelle visite"}
+      </h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Prestataire</label>
+          <input type="text" class="form-control" id="pc-provider" value="${escapeHtml((record == null ? void 0 : record.provider_name) || "")}" placeholder="ex: Anticimex Pro" autofocus>
+        </div>
+        <div class="form-group">
+          <label>R\xE9f. contrat</label>
+          <input type="text" class="form-control" id="pc-contract" value="${escapeHtml((record == null ? void 0 : record.contract_ref) || "")}" placeholder="ex: ANTI-2026-0042">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date de visite *</label>
+          <input type="date" class="form-control" id="pc-date" value="${(record == null ? void 0 : record.visit_date) || ""}">
+        </div>
+        <div class="form-group">
+          <label>Prochaine visite</label>
+          <input type="date" class="form-control" id="pc-next" value="${(record == null ? void 0 : record.next_visit_date) || ""}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Constats</label>
+        <textarea class="form-control" id="pc-findings" rows="2" placeholder="ex: RAS \u2014 aucune trace d'infestation">${escapeHtml((record == null ? void 0 : record.findings) || "")}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Actions effectu\xE9es</label>
+        <textarea class="form-control" id="pc-actions" rows="2" placeholder="ex: V\xE9rification et renouvellement des app\xE2ts">${escapeHtml((record == null ? void 0 : record.actions_taken) || "")}</textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre de stations d'app\xE2t</label>
+          <input type="number" min="0" class="form-control" id="pc-baits" value="${(_a = record == null ? void 0 : record.bait_stations_count) != null ? _a : ""}" placeholder="ex: 8">
+        </div>
+        <div class="form-group">
+          <label>Statut</label>
+          <select class="form-control" id="pc-status">
+            <option value="conforme" ${!record || record.status === "conforme" ? "selected" : ""}>Conforme</option>
+            <option value="non-conforme" ${(record == null ? void 0 : record.status) === "non-conforme" ? "selected" : ""}>Non conforme</option>
+            <option value="action-requise" ${(record == null ? void 0 : record.status) === "action-requise" ? "selected" : ""}>Action requise</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>R\xE9f\xE9rence rapport</label>
+        <input type="text" class="form-control" id="pc-report" value="${escapeHtml((record == null ? void 0 : record.report_ref) || "")}" placeholder="ex: RPT-2026-Q1">
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="pc-cancel">Annuler</button>
+        <button class="btn btn-primary" id="pc-save">
+          <i data-lucide="check" style="width:18px;height:18px"></i> ${isEdit ? "Enregistrer" : "Cr\xE9er"}
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("pc-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("pc-save").addEventListener("click", async () => {
+    const visit_date = document.getElementById("pc-date").value;
+    if (!visit_date) {
+      document.getElementById("pc-date").classList.add("form-control--error");
+      return;
+    }
+    const payload = {
+      provider_name: document.getElementById("pc-provider").value.trim() || null,
+      contract_ref: document.getElementById("pc-contract").value.trim() || null,
+      visit_date,
+      next_visit_date: document.getElementById("pc-next").value || null,
+      findings: document.getElementById("pc-findings").value.trim() || null,
+      actions_taken: document.getElementById("pc-actions").value.trim() || null,
+      bait_stations_count: document.getElementById("pc-baits").value ? Number(document.getElementById("pc-baits").value) : 0,
+      status: document.getElementById("pc-status").value,
+      report_ref: document.getElementById("pc-report").value.trim() || null
+    };
+    try {
+      if (isEdit) {
+        await API.request("/pest-control/" + record.id, { method: "PUT", body: payload });
+        showToast("Visite mise \xE0 jour \u2713", "success");
+      } else {
+        await API.request("/pest-control", { method: "POST", body: payload });
+        showToast("Visite enregistr\xE9e \u2713", "success");
+      }
+      overlay.remove();
+      renderHACCPPestControl();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+const EQUIPMENT_TYPE_ICONS = {
+  froid: "\u2744\uFE0F",
+  cuisson: "\u{1F525}",
+  ventilation: "\u{1F4A8}",
+  lavage: "\u{1FAE7}",
+  autre: "\u{1F527}"
+};
+async function renderHACCPMaintenance() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const [{ items }, { items: overdue }] = await Promise.all([
+      API.request("/maintenance"),
+      API.request("/maintenance/overdue")
+    ]);
+    const total = items.length;
+    const upToDate = items.filter((i) => i.status === "\xE0_jour").length;
+    const planned = items.filter((i) => i.status === "planifi\xE9").length;
+    const late = items.filter((i) => i.status === "en_retard").length;
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="wrench" style="width:22px;height:22px;vertical-align:middle;margin-right:8px"></i>Maintenance des \xE9quipements</h1>
+          <button class="btn btn-primary" id="btn-new-maintenance">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter \xE9quipement
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+
+        ${overdue.length > 0 ? `
+        <div style="background:#fff0f0;border:1px solid #ef4444;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center">
+          <i data-lucide="alert-triangle" style="width:18px;height:18px;color:#ef4444;flex-shrink:0"></i>
+          <span class="text-sm"><strong>${overdue.length} \xE9quipement(s)</strong> en retard de maintenance : ${overdue.map((e) => escapeHtml(e.equipment_name)).join(", ")}</span>
+        </div>
+        ` : ""}
+
+        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+          <div class="kpi-card">
+            <div class="kpi-card__label">Total \xE9quipements</div>
+            <div class="kpi-card__value">${total}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__label">\xC0 jour</div>
+            <div class="kpi-card__value">${upToDate}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__label">Planifi\xE9s</div>
+            <div class="kpi-card__value">${planned}</div>
+          </div>
+          <div class="kpi-card ${late > 0 ? "kpi-card--danger" : ""}">
+            <div class="kpi-card__label">En retard</div>
+            <div class="kpi-card__value">${late}</div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>\xC9quipement</th>
+                <th>Type</th>
+                <th>Emplacement</th>
+                <th>Derni\xE8re maintenance</th>
+                <th>Prochaine maintenance</th>
+                <th>Type maintenance</th>
+                <th>Prestataire</th>
+                <th>Co\xFBt</th>
+                <th>Statut</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.length === 0 ? '<tr><td colspan="10" class="text-secondary text-center" style="padding:24px">Aucun \xE9quipement enregistr\xE9</td></tr>' : items.map((item) => {
+      const isOverdue = overdue.some((o) => o.id === item.id);
+      let statusBadge = "";
+      if (item.status === "\xE0_jour") statusBadge = '<span class="badge badge--success">\u2713 \xC0 jour</span>';
+      else if (item.status === "planifi\xE9") statusBadge = '<span class="badge" style="background:#e0f0ff;color:#1a6fb5">Planifi\xE9</span>';
+      else statusBadge = '<span class="badge badge--danger">En retard</span>';
+      return `
+                  <tr${isOverdue ? ' style="background:#fff8f8"' : ""}>
+                    <td style="font-weight:500">${EQUIPMENT_TYPE_ICONS[item.equipment_type] || "\u{1F527}"} ${escapeHtml(item.equipment_name)}</td>
+                    <td class="text-secondary text-sm">${escapeHtml(item.equipment_type)}</td>
+                    <td class="text-secondary text-sm">${escapeHtml(item.location || "\u2014")}</td>
+                    <td class="mono text-sm">${item.last_maintenance_date ? new Date(item.last_maintenance_date).toLocaleDateString("fr-FR") : "\u2014"}</td>
+                    <td class="mono text-sm${isOverdue ? " text-danger" : ""}">${item.next_maintenance_date ? new Date(item.next_maintenance_date).toLocaleDateString("fr-FR") : "\u2014"}</td>
+                    <td class="text-secondary text-sm">${escapeHtml(item.maintenance_type || "\u2014")}</td>
+                    <td class="text-secondary text-sm">${escapeHtml(item.provider || "\u2014")}</td>
+                    <td class="mono text-sm">${item.cost ? item.cost.toLocaleString("fr-FR") + " \u20AC" : "\u2014"}</td>
+                    <td>${statusBadge}</td>
+                    <td style="white-space:nowrap">
+                      <button class="btn btn-secondary btn-sm" data-action="edit-maint" data-id="${item.id}" style="margin-right:4px">
+                        <i data-lucide="pencil" style="width:14px;height:14px"></i>
+                      </button>
+                      <button class="btn btn-ghost btn-sm" data-action="delete-maint" data-id="${item.id}" style="color:var(--color-danger)">
+                        <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+                      </button>
+                    </td>
+                  </tr>
+                `;
+    }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupMaintenanceEvents(items);
+  } catch (err) {
+    document.getElementById("app").innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function setupMaintenanceEvents(items) {
+  var _a;
+  (_a = document.getElementById("btn-new-maintenance")) == null ? void 0 : _a.addEventListener("click", () => showMaintenanceModal());
+  document.querySelectorAll('[data-action="edit-maint"]').forEach((btn) => {
+    const record = items.find((i) => i.id === Number(btn.dataset.id));
+    btn.addEventListener("click", () => showMaintenanceModal(record));
+  });
+  document.querySelectorAll('[data-action="delete-maint"]').forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Supprimer cet \xE9quipement ?")) return;
+      try {
+        await API.request("/maintenance/" + btn.dataset.id, { method: "DELETE" });
+        showToast("\xC9quipement supprim\xE9", "success");
+        renderHACCPMaintenance();
+      } catch (err) {
+        showToast("Erreur : " + err.message, "error");
+      }
+    });
+  });
+}
+function showMaintenanceModal(record = null) {
+  var _a;
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const isEdit = !!record;
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:620px">
+      <h2>
+        <i data-lucide="wrench" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>
+        ${isEdit ? "Modifier l'\xE9quipement" : "Ajouter un \xE9quipement"}
+      </h2>
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Nom de l'\xE9quipement *</label>
+          <input type="text" class="form-control" id="maint-name" value="${escapeHtml((record == null ? void 0 : record.equipment_name) || "")}" placeholder="ex: Chambre froide positive" autofocus>
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select class="form-control" id="maint-type">
+            <option value="froid" ${(record == null ? void 0 : record.equipment_type) === "froid" ? "selected" : ""}>\u2744\uFE0F Froid</option>
+            <option value="cuisson" ${(record == null ? void 0 : record.equipment_type) === "cuisson" ? "selected" : ""}>\u{1F525} Cuisson</option>
+            <option value="ventilation" ${(record == null ? void 0 : record.equipment_type) === "ventilation" ? "selected" : ""}>\u{1F4A8} Ventilation</option>
+            <option value="lavage" ${(record == null ? void 0 : record.equipment_type) === "lavage" ? "selected" : ""}>\u{1FAE7} Lavage</option>
+            <option value="autre" ${!record || record.equipment_type === "autre" ? "selected" : ""}>\u{1F527} Autre</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Emplacement</label>
+        <input type="text" class="form-control" id="maint-location" value="${escapeHtml((record == null ? void 0 : record.location) || "")}" placeholder="ex: Cuisine, R\xE9serve, Salle...">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Derni\xE8re maintenance</label>
+          <input type="date" class="form-control" id="maint-last" value="${(record == null ? void 0 : record.last_maintenance_date) || ""}">
+        </div>
+        <div class="form-group">
+          <label>Prochaine maintenance</label>
+          <input type="date" class="form-control" id="maint-next" value="${(record == null ? void 0 : record.next_maintenance_date) || ""}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Type de maintenance</label>
+          <select class="form-control" id="maint-mtype">
+            <option value="pr\xE9ventive" ${!record || record.maintenance_type === "pr\xE9ventive" ? "selected" : ""}>Pr\xE9ventive</option>
+            <option value="corrective" ${(record == null ? void 0 : record.maintenance_type) === "corrective" ? "selected" : ""}>Corrective</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Statut</label>
+          <select class="form-control" id="maint-status">
+            <option value="\xE0_jour" ${(record == null ? void 0 : record.status) === "\xE0_jour" ? "selected" : ""}>\xC0 jour</option>
+            <option value="planifi\xE9" ${!record || record.status === "planifi\xE9" ? "selected" : ""}>Planifi\xE9</option>
+            <option value="en_retard" ${(record == null ? void 0 : record.status) === "en_retard" ? "selected" : ""}>En retard</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Prestataire</label>
+          <input type="text" class="form-control" id="maint-provider" value="${escapeHtml((record == null ? void 0 : record.provider) || "")}" placeholder="ex: FrigoTech SARL">
+        </div>
+        <div class="form-group">
+          <label>Co\xFBt (\u20AC)</label>
+          <input type="number" min="0" step="0.01" class="form-control" id="maint-cost" value="${(_a = record == null ? void 0 : record.cost) != null ? _a : ""}" placeholder="ex: 280">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" class="form-control" id="maint-notes" value="${escapeHtml((record == null ? void 0 : record.notes) || "")}" placeholder="">
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="maint-cancel">Annuler</button>
+        <button class="btn btn-primary" id="maint-save">
+          <i data-lucide="check" style="width:18px;height:18px"></i> ${isEdit ? "Enregistrer" : "Cr\xE9er"}
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("maint-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("maint-save").addEventListener("click", async () => {
+    const equipment_name = document.getElementById("maint-name").value.trim();
+    if (!equipment_name) {
+      document.getElementById("maint-name").classList.add("form-control--error");
+      return;
+    }
+    const payload = {
+      equipment_name,
+      equipment_type: document.getElementById("maint-type").value,
+      location: document.getElementById("maint-location").value.trim() || null,
+      last_maintenance_date: document.getElementById("maint-last").value || null,
+      next_maintenance_date: document.getElementById("maint-next").value || null,
+      maintenance_type: document.getElementById("maint-mtype").value,
+      provider: document.getElementById("maint-provider").value.trim() || null,
+      cost: document.getElementById("maint-cost").value ? Number(document.getElementById("maint-cost").value) : null,
+      status: document.getElementById("maint-status").value,
+      notes: document.getElementById("maint-notes").value.trim() || null
+    };
+    try {
+      if (isEdit) {
+        await API.request("/maintenance/" + record.id, { method: "PUT", body: payload });
+        showToast("\xC9quipement mis \xE0 jour \u2713", "success");
+      } else {
+        await API.request("/maintenance", { method: "POST", body: payload });
+        showToast("\xC9quipement ajout\xE9 \u2713", "success");
+      }
+      overlay.remove();
+      renderHACCPMaintenance();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+const WASTE_TYPE_ICONS = {
+  alimentaire: "\u{1F343}",
+  emballage: "\u{1F4E6}",
+  huile: "\u{1F6E2}\uFE0F",
+  verre: "\u{1FA9F}",
+  autre: "\u{1F5D1}\uFE0F"
+};
+async function renderHACCPWaste() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const { items } = await API.request("/waste");
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const in7Days = new Date(Date.now() + 7 * 24 * 3600 * 1e3).toISOString().slice(0, 10);
+    const collectionsThisWeek = items.filter((i) => i.next_collection_date && i.next_collection_date >= today && i.next_collection_date <= in7Days).length;
+    const providers = new Set(items.filter((i) => i.collection_provider).map((i) => i.collection_provider));
+    const contracts = items.filter((i) => i.contract_ref).length;
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="trash-2" style="width:22px;height:22px;vertical-align:middle;margin-right:8px"></i>Gestion des d\xE9chets</h1>
+          <button class="btn btn-primary" id="btn-new-waste">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter fili\xE8re
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+
+        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+          <span class="text-sm">La gestion des d\xE9chets alimentaires est r\xE9glement\xE9e par le <strong>r\xE8glement CE 1069/2009</strong>. L'huile de friture usag\xE9e n\xE9cessite un contrat BSDA.</span>
+        </div>
+
+        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+          <div class="kpi-card">
+            <div class="kpi-card__label">Fili\xE8res</div>
+            <div class="kpi-card__value">${items.length}</div>
+          </div>
+          <div class="kpi-card ${collectionsThisWeek > 0 ? "kpi-card--info" : ""}">
+            <div class="kpi-card__label">Collectes cette semaine</div>
+            <div class="kpi-card__value">${collectionsThisWeek}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__label">Prestataires</div>
+            <div class="kpi-card__value">${providers.size}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__label">Contrats actifs</div>
+            <div class="kpi-card__value">${contracts}</div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Type de d\xE9chet</th>
+                <th>Prestataire</th>
+                <th>Fr\xE9quence</th>
+                <th>Derni\xE8re collecte</th>
+                <th>Prochaine collecte</th>
+                <th>R\xE9f. contrat</th>
+                <th>Notes</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.length === 0 ? '<tr><td colspan="8" class="text-secondary text-center" style="padding:24px">Aucune fili\xE8re enregistr\xE9e</td></tr>' : items.map((item) => {
+      const isOverdue = item.next_collection_date && item.next_collection_date < today;
+      const isDueSoon = !isOverdue && item.next_collection_date && item.next_collection_date <= in7Days;
+      return `
+                  <tr${isOverdue ? ' style="background:#fff8f8"' : isDueSoon ? ' style="background:#fffbf0"' : ""}>
+                    <td style="font-weight:500">${WASTE_TYPE_ICONS[item.waste_type] || "\u{1F5D1}\uFE0F"} ${escapeHtml(item.waste_type)}</td>
+                    <td>${escapeHtml(item.collection_provider || "\u2014")}</td>
+                    <td class="text-secondary text-sm">${escapeHtml(item.collection_frequency || "\u2014")}</td>
+                    <td class="mono text-sm">${item.last_collection_date ? new Date(item.last_collection_date).toLocaleDateString("fr-FR") : "\u2014"}</td>
+                    <td class="mono text-sm${isOverdue ? " text-danger" : isDueSoon ? " text-warning" : ""}">
+                      ${item.next_collection_date ? new Date(item.next_collection_date).toLocaleDateString("fr-FR") : "\u2014"}
+                      ${isOverdue ? ' <span class="badge badge--danger" style="font-size:0.65rem">En retard</span>' : ""}
+                      ${isDueSoon && !isOverdue ? ' <span class="badge badge--warning" style="font-size:0.65rem">Cette semaine</span>' : ""}
+                    </td>
+                    <td class="text-secondary text-sm">${escapeHtml(item.contract_ref || "\u2014")}</td>
+                    <td class="text-secondary text-sm" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(item.notes || "")}">${escapeHtml(item.notes || "\u2014")}</td>
+                    <td style="white-space:nowrap">
+                      <button class="btn btn-secondary btn-sm" data-action="edit-waste" data-id="${item.id}" style="margin-right:4px">
+                        <i data-lucide="pencil" style="width:14px;height:14px"></i>
+                      </button>
+                      <button class="btn btn-ghost btn-sm" data-action="delete-waste" data-id="${item.id}" style="color:var(--color-danger)">
+                        <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+                      </button>
+                    </td>
+                  </tr>
+                `;
+    }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupWasteEvents(items);
+  } catch (err) {
+    document.getElementById("app").innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function setupWasteEvents(items) {
+  var _a;
+  (_a = document.getElementById("btn-new-waste")) == null ? void 0 : _a.addEventListener("click", () => showWasteModal());
+  document.querySelectorAll('[data-action="edit-waste"]').forEach((btn) => {
+    const record = items.find((i) => i.id === Number(btn.dataset.id));
+    btn.addEventListener("click", () => showWasteModal(record));
+  });
+  document.querySelectorAll('[data-action="delete-waste"]').forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Supprimer cette fili\xE8re ?")) return;
+      try {
+        await API.request("/waste/" + btn.dataset.id, { method: "DELETE" });
+        showToast("Fili\xE8re supprim\xE9e", "success");
+        renderHACCPWaste();
+      } catch (err) {
+        showToast("Erreur : " + err.message, "error");
+      }
+    });
+  });
+}
+function showWasteModal(record = null) {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const isEdit = !!record;
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:560px">
+      <h2>
+        <i data-lucide="trash-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>
+        ${isEdit ? "Modifier la fili\xE8re" : "Nouvelle fili\xE8re de d\xE9chets"}
+      </h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Type de d\xE9chet *</label>
+          <select class="form-control" id="wst-type">
+            <option value="alimentaire" ${!record || record.waste_type === "alimentaire" ? "selected" : ""}>\u{1F343} Alimentaire</option>
+            <option value="emballage" ${(record == null ? void 0 : record.waste_type) === "emballage" ? "selected" : ""}>\u{1F4E6} Emballage</option>
+            <option value="huile" ${(record == null ? void 0 : record.waste_type) === "huile" ? "selected" : ""}>\u{1F6E2}\uFE0F Huile</option>
+            <option value="verre" ${(record == null ? void 0 : record.waste_type) === "verre" ? "selected" : ""}>\u{1FA9F} Verre</option>
+            <option value="autre" ${(record == null ? void 0 : record.waste_type) === "autre" ? "selected" : ""}>\u{1F5D1}\uFE0F Autre</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Fr\xE9quence de collecte</label>
+          <select class="form-control" id="wst-freq">
+            <option value="quotidienne" ${(record == null ? void 0 : record.collection_frequency) === "quotidienne" ? "selected" : ""}>Quotidienne</option>
+            <option value="hebdomadaire" ${!record || record.collection_frequency === "hebdomadaire" ? "selected" : ""}>Hebdomadaire</option>
+            <option value="bimestrielle" ${(record == null ? void 0 : record.collection_frequency) === "bimestrielle" ? "selected" : ""}>Bimestrielle</option>
+            <option value="mensuelle" ${(record == null ? void 0 : record.collection_frequency) === "mensuelle" ? "selected" : ""}>Mensuelle</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Prestataire</label>
+          <input type="text" class="form-control" id="wst-provider" value="${escapeHtml((record == null ? void 0 : record.collection_provider) || "")}" placeholder="ex: Veolia, Paprec Group" autofocus>
+        </div>
+        <div class="form-group">
+          <label>R\xE9f. contrat</label>
+          <input type="text" class="form-control" id="wst-contract" value="${escapeHtml((record == null ? void 0 : record.contract_ref) || "")}" placeholder="ex: VEO-2026-C088">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Derni\xE8re collecte</label>
+          <input type="date" class="form-control" id="wst-last" value="${(record == null ? void 0 : record.last_collection_date) || ""}">
+        </div>
+        <div class="form-group">
+          <label>Prochaine collecte</label>
+          <input type="date" class="form-control" id="wst-next" value="${(record == null ? void 0 : record.next_collection_date) || ""}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea class="form-control" id="wst-notes" rows="2" placeholder="ex: Bac vert 240L \u2014 d\xE9chets organiques">${escapeHtml((record == null ? void 0 : record.notes) || "")}</textarea>
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="wst-cancel">Annuler</button>
+        <button class="btn btn-primary" id="wst-save">
+          <i data-lucide="check" style="width:18px;height:18px"></i> ${isEdit ? "Enregistrer" : "Cr\xE9er"}
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("wst-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("wst-save").addEventListener("click", async () => {
+    const payload = {
+      waste_type: document.getElementById("wst-type").value,
+      collection_provider: document.getElementById("wst-provider").value.trim() || null,
+      collection_frequency: document.getElementById("wst-freq").value,
+      last_collection_date: document.getElementById("wst-last").value || null,
+      next_collection_date: document.getElementById("wst-next").value || null,
+      contract_ref: document.getElementById("wst-contract").value.trim() || null,
+      notes: document.getElementById("wst-notes").value.trim() || null
+    };
+    try {
+      if (isEdit) {
+        await API.request("/waste/" + record.id, { method: "PUT", body: payload });
+        showToast("Fili\xE8re mise \xE0 jour \u2713", "success");
+      } else {
+        await API.request("/waste", { method: "POST", body: payload });
+        showToast("Fili\xE8re cr\xE9\xE9e \u2713", "success");
+      }
+      overlay.remove();
+      renderHACCPWaste();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
 }
 async function renderOrdersDashboard() {
   const app = document.getElementById("app");
@@ -11308,7 +12753,18 @@ async function revokeSupplierAccess(id, name) {
   }, { confirmText: "R\xE9voquer", confirmClass: "btn btn-danger" });
   return;
 }
-async function renderTeam() {
+const TEAM_ZONES = ["Cuisine", "Salle", "R\xE9ception", "Nettoyage", "Livraisons"];
+const TEAM_SKILLS = ["D\xE9coupe & prep", "P\xE2tisserie", "Caisse / POS", "Commandes fournisseurs", "HACCP & tra\xE7abilit\xE9", "Gestion stocks", "Service salle", "Mise en place"];
+function _teamParseJSON(str, fallback = []) {
+  try {
+    return JSON.parse(str || "[]") || fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+let _teamActiveTab = "members";
+async function renderTeam(tab) {
+  if (tab) _teamActiveTab = tab;
   const account = getAccount();
   if (!account || account.role !== "gerant") {
     location.hash = "#/";
@@ -11323,6 +12779,19 @@ async function renderTeam() {
       </div>
       <button class="btn btn-primary" id="add-member-btn">
         <i data-lucide="user-plus" style="width:18px;height:18px"></i> Ajouter
+      </button>
+    </div>
+
+    <!-- Tab nav -->
+    <div style="display:flex;gap:var(--space-1);margin-bottom:var(--space-5);border-bottom:2px solid var(--border-color);padding-bottom:0">
+      <button class="team-tab-btn ${_teamActiveTab === "members" ? "team-tab-btn--active" : ""}" data-tab="members">
+        <i data-lucide="users" style="width:16px;height:16px"></i> Membres
+      </button>
+      <button class="team-tab-btn ${_teamActiveTab === "matrix" ? "team-tab-btn--active" : ""}" data-tab="matrix">
+        <i data-lucide="layout-grid" style="width:16px;height:16px"></i> Zones & Comp\xE9tences
+      </button>
+      <button class="team-tab-btn ${_teamActiveTab === "training" ? "team-tab-btn--active" : ""}" data-tab="training">
+        <i data-lucide="graduation-cap" style="width:16px;height:16px"></i> Formations
       </button>
     </div>
 
@@ -15880,6 +17349,11 @@ function registerRoutes() {
   Router.add(/^\/haccp\/non-conformities$/, renderHACCPNonConformities);
   Router.add(/^\/haccp\/allergens$/, renderHACCPAllergens);
   Router.add(/^\/haccp\/plan$/, renderHACCPPlan);
+  Router.add(/^\/haccp\/recall$/, renderHACCPRecall);
+  Router.add(/^\/haccp\/training$/, renderHACCPTraining);
+  Router.add(/^\/haccp\/pest-control$/, renderHACCPPestControl);
+  Router.add(/^\/haccp\/maintenance$/, renderHACCPMaintenance);
+  Router.add(/^\/haccp\/waste$/, renderHACCPWaste);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, () => {
     location.hash = "#/analytics";

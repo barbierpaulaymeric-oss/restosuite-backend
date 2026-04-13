@@ -907,4 +907,276 @@ try {
   console.error('Seed haccp hazards error:', e.message);
 }
 
+// ─── Migration: Recall Procedures (retrait/rappel produits) ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS recall_procedures (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_name TEXT NOT NULL,
+      lot_number TEXT,
+      reason TEXT NOT NULL DEFAULT 'sanitaire',
+      alert_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      alert_source TEXT NOT NULL DEFAULT 'interne',
+      severity TEXT NOT NULL DEFAULT 'majeur',
+      status TEXT NOT NULL DEFAULT 'alerte',
+      actions_taken TEXT,
+      quantity_affected REAL,
+      quantity_unit TEXT DEFAULT 'kg',
+      supplier_id INTEGER REFERENCES suppliers(id),
+      notification_sent INTEGER DEFAULT 0,
+      closure_date DATETIME,
+      closure_notes TEXT,
+      created_by INTEGER REFERENCES accounts(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_recall_status ON recall_procedures(status);
+    CREATE INDEX IF NOT EXISTS idx_recall_alert_date ON recall_procedures(alert_date);
+  `);
+  console.log('✅ Migration: recall_procedures table ready');
+} catch (e) {
+  // Table may already exist
+}
+
+// ─── Seed: Recall examples ───
+try {
+  const recallCount = get("SELECT COUNT(*) as c FROM recall_procedures");
+  if (recallCount && recallCount.c === 0) {
+    db.prepare(`
+      INSERT INTO recall_procedures (product_name, lot_number, reason, alert_date, alert_source, severity, status, actions_taken, quantity_affected, quantity_unit, notification_sent)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      'Fromage blanc entier bio', 'FB-2026-0312', 'sanitaire',
+      new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(),
+      'DGAL', 'critique', 'cloturé',
+      'Lots retirés des frigos, fournisseur contacté, DDPP notifiée, destruction documentée',
+      12.5, 'kg', 1
+    );
+    db.prepare(`
+      INSERT INTO recall_procedures (product_name, lot_number, reason, alert_date, alert_source, severity, status, actions_taken, quantity_affected, quantity_unit, notification_sent)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      'Sauce pesto basilic', 'PST-2026-B02', 'etiquetage',
+      new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString(),
+      'fournisseur', 'majeur', 'en_cours',
+      'Lots identifiés en stock, mise en quarantaine effectuée',
+      4, 'unités', 0
+    );
+    console.log('✅ Seed: 2 procédures de rappel insérées');
+  }
+} catch (e) {
+  console.error('Seed recall error:', e.message);
+}
+
+// ─── Migration: BPH — Formation du personnel ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS training_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_name TEXT NOT NULL,
+      training_topic TEXT NOT NULL,
+      trainer TEXT,
+      training_date DATE NOT NULL,
+      next_renewal_date DATE,
+      duration_hours REAL,
+      certificate_ref TEXT,
+      status TEXT NOT NULL DEFAULT 'planifié',
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_training_employee ON training_records(employee_name);
+    CREATE INDEX IF NOT EXISTS idx_training_date ON training_records(training_date);
+    CREATE INDEX IF NOT EXISTS idx_training_renewal ON training_records(next_renewal_date);
+  `);
+  console.log('✅ Migration: training_records table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration training error:', e.message);
+}
+
+// ─── Seed: Formations types ───
+try {
+  const trainingCount = get("SELECT COUNT(*) as c FROM training_records");
+  if (trainingCount && trainingCount.c === 0) {
+    const today = new Date();
+    const fmtDate = (d) => d.toISOString().slice(0, 10);
+    const daysAgo = (n) => { const d = new Date(today); d.setDate(d.getDate() - n); return fmtDate(d); };
+    const daysLater = (n) => { const d = new Date(today); d.setDate(d.getDate() + n); return fmtDate(d); };
+    const insertTraining = db.prepare(
+      `INSERT INTO training_records (employee_name, training_topic, trainer, training_date, next_renewal_date, duration_hours, certificate_ref, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    insertTraining.run('Marie Dupont', 'Hygiène alimentaire HACCP', 'AFPA Formation', daysAgo(180), daysLater(185), 14, 'HACCP-2025-001', 'réalisé', 'Formation initiale réglementaire');
+    insertTraining.run('Jean Martin', 'Allergènes alimentaires INCO', 'CFOR', daysAgo(90), daysLater(275), 7, 'ALLERG-2025-042', 'réalisé', 'Réglementation EU 1169/2011');
+    insertTraining.run('Sophie Leblanc', 'Nettoyage et désinfection', 'Chef de cuisine', daysAgo(30), daysLater(335), 3.5, null, 'réalisé', null);
+    insertTraining.run('Paul Bernard', 'Gestes de premiers secours SST', 'Croix Rouge', daysAgo(400), daysLater(-35), 14, 'SST-2024-A18', 'expiré', 'Renouvellement à planifier');
+    insertTraining.run('Marie Dupont', 'Hygiène alimentaire HACCP — Recyclage', 'AFPA Formation', daysLater(15), daysLater(380), 7, null, 'planifié', 'Recyclage annuel obligatoire');
+    console.log('✅ Seed: 5 formations types insérées');
+  }
+} catch (e) {
+  console.error('Seed training error:', e.message);
+}
+
+// ─── Migration: BPH — Lutte contre les nuisibles ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pest_control (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider_name TEXT,
+      contract_ref TEXT,
+      visit_date DATE NOT NULL,
+      next_visit_date DATE,
+      findings TEXT,
+      actions_taken TEXT,
+      bait_stations_count INTEGER DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'conforme',
+      report_ref TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_pest_control_visit_date ON pest_control(visit_date);
+    CREATE INDEX IF NOT EXISTS idx_pest_control_status ON pest_control(status);
+  `);
+  console.log('✅ Migration: pest_control table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration pest_control error:', e.message);
+}
+
+// ─── Seed: Visites nuisibles ───
+try {
+  const pestCount = get("SELECT COUNT(*) as c FROM pest_control");
+  if (pestCount && pestCount.c === 0) {
+    const today = new Date();
+    const fmtDate = (d) => d.toISOString().slice(0, 10);
+    const daysAgo = (n) => { const d = new Date(today); d.setDate(d.getDate() - n); return fmtDate(d); };
+    const daysLater = (n) => { const d = new Date(today); d.setDate(d.getDate() + n); return fmtDate(d); };
+    const insertPest = db.prepare(
+      `INSERT INTO pest_control (provider_name, contract_ref, visit_date, next_visit_date, findings, actions_taken, bait_stations_count, status, report_ref)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    insertPest.run('Anticimex Pro', 'ANTI-2026-0042', daysAgo(90), daysLater(2), 'RAS — aucune trace d\'infestation', 'Vérification et renouvellement des appâts', 8, 'conforme', 'RPT-2026-Q1');
+    insertPest.run('Anticimex Pro', 'ANTI-2026-0042', daysAgo(180), daysLater(-90), 'Traces d\'excréments rongeurs en réserve sèche', 'Pose de pièges supplémentaires, colmatage interstices mur', 12, 'action-requise', 'RPT-2025-Q4');
+    insertPest.run('Anticimex Pro', 'ANTI-2026-0042', daysAgo(270), daysLater(-180), 'RAS', 'Contrôle des appâts, rapport de conformité', 8, 'conforme', 'RPT-2025-Q3');
+    console.log('✅ Seed: 3 visites nuisibles insérées');
+  }
+} catch (e) {
+  console.error('Seed pest_control error:', e.message);
+}
+
+// ─── Migration: BPH — Maintenance des équipements ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS equipment_maintenance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipment_name TEXT NOT NULL,
+      equipment_type TEXT NOT NULL DEFAULT 'autre',
+      location TEXT,
+      last_maintenance_date DATE,
+      next_maintenance_date DATE,
+      maintenance_type TEXT DEFAULT 'préventive',
+      provider TEXT,
+      cost REAL,
+      status TEXT NOT NULL DEFAULT 'planifié',
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_equipment_type ON equipment_maintenance(equipment_type);
+    CREATE INDEX IF NOT EXISTS idx_equipment_next_date ON equipment_maintenance(next_maintenance_date);
+    CREATE INDEX IF NOT EXISTS idx_equipment_status ON equipment_maintenance(status);
+  `);
+  console.log('✅ Migration: equipment_maintenance table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration equipment_maintenance error:', e.message);
+}
+
+// ─── Seed: Équipements types ───
+try {
+  const equipCount = get("SELECT COUNT(*) as c FROM equipment_maintenance");
+  if (equipCount && equipCount.c === 0) {
+    const today = new Date();
+    const fmtDate = (d) => d.toISOString().slice(0, 10);
+    const daysAgo = (n) => { const d = new Date(today); d.setDate(d.getDate() - n); return fmtDate(d); };
+    const daysLater = (n) => { const d = new Date(today); d.setDate(d.getDate() + n); return fmtDate(d); };
+    const insertEquip = db.prepare(
+      `INSERT INTO equipment_maintenance (equipment_name, equipment_type, location, last_maintenance_date, next_maintenance_date, maintenance_type, provider, cost, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    insertEquip.run('Chambre froide positive', 'froid', 'Cuisine', daysAgo(60), daysLater(120), 'préventive', 'FrigoTech SARL', 280, 'à_jour', 'Entretien annuel compresseur et joints');
+    insertEquip.run('Congélateur armoire', 'froid', 'Réserve', daysAgo(45), daysLater(135), 'préventive', 'FrigoTech SARL', 150, 'à_jour', null);
+    insertEquip.run('Four mixte Rational', 'cuisson', 'Cuisine', daysAgo(30), daysLater(60), 'préventive', 'Rational Service', 450, 'à_jour', 'Nettoyage programme + vérification sondes');
+    insertEquip.run('Hotte aspirante', 'ventilation', 'Cuisine', daysAgo(120), daysLater(-30), 'préventive', 'AirClean Pro', 320, 'en_retard', 'Nettoyage filtres en retard');
+    insertEquip.run('Lave-vaisselle tunnel', 'lavage', 'Plonge', daysAgo(10), daysLater(80), 'préventive', 'Electrolux Service', 180, 'à_jour', 'Vérification températures lavage et rinçage');
+    insertEquip.run('Vitrine réfrigérée', 'froid', 'Salle', daysAgo(200), daysLater(10), 'préventive', 'FrigoTech SARL', 200, 'planifié', 'Contrôle étanchéité porte et thermostat');
+    console.log('✅ Seed: 6 équipements insérés');
+  }
+} catch (e) {
+  console.error('Seed equipment_maintenance error:', e.message);
+}
+
+// ─── Migration: BPH — Gestion des déchets ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS waste_management (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      waste_type TEXT NOT NULL,
+      collection_provider TEXT,
+      collection_frequency TEXT DEFAULT 'hebdomadaire',
+      last_collection_date DATE,
+      next_collection_date DATE,
+      contract_ref TEXT,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_waste_type ON waste_management(waste_type);
+    CREATE INDEX IF NOT EXISTS idx_waste_next_collection ON waste_management(next_collection_date);
+  `);
+  console.log('✅ Migration: waste_management table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration waste_management error:', e.message);
+}
+
+// ─── Seed: Filières déchets ───
+try {
+  const wasteCount = get("SELECT COUNT(*) as c FROM waste_management");
+  if (wasteCount && wasteCount.c === 0) {
+    const today = new Date();
+    const fmtDate = (d) => d.toISOString().slice(0, 10);
+    const daysAgo = (n) => { const d = new Date(today); d.setDate(d.getDate() - n); return fmtDate(d); };
+    const daysLater = (n) => { const d = new Date(today); d.setDate(d.getDate() + n); return fmtDate(d); };
+    const insertWaste = db.prepare(
+      `INSERT INTO waste_management (waste_type, collection_provider, collection_frequency, last_collection_date, next_collection_date, contract_ref, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+    insertWaste.run('alimentaire', 'Paprec Group', 'hebdomadaire', daysAgo(3), daysLater(4), 'PAP-2026-R142', 'Bac vert 240L — déchets organiques');
+    insertWaste.run('emballage', 'Veolia', 'hebdomadaire', daysAgo(2), daysLater(5), 'VEO-2026-C088', 'Carton, plastique, métal');
+    insertWaste.run('huile', 'Sevia SAS', 'mensuelle', daysAgo(15), daysLater(15), 'SEV-2026-H22', 'Huile de friture usagée — contrat BSDA obligatoire');
+    insertWaste.run('verre', 'Veolia', 'bimestrielle', daysAgo(30), daysLater(30), 'VEO-2026-V019', 'Bouteilles et bocaux');
+    insertWaste.run('autre', 'Castorama Pro', 'mensuelle', daysAgo(20), daysLater(10), null, 'Piles, néons, DEEE');
+    console.log('✅ Seed: 5 filières déchets insérées');
+  }
+} catch (e) {
+  console.error('Seed waste_management error:', e.message);
+}
+
+// ─── Migration: Add zones + skills + hire_date to accounts ───
+try {
+  const accColsFull = all("PRAGMA table_info(accounts)");
+  if (!accColsFull.some(c => c.name === 'zones')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN zones TEXT DEFAULT '[]'");
+    console.log('✅ Migration: added zones to accounts');
+  }
+  if (!accColsFull.some(c => c.name === 'skills')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN skills TEXT DEFAULT '[]'");
+    console.log('✅ Migration: added skills to accounts');
+  }
+  if (!accColsFull.some(c => c.name === 'hire_date')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN hire_date DATE");
+    console.log('✅ Migration: added hire_date to accounts');
+  }
+  if (!accColsFull.some(c => c.name === 'training_notes')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN training_notes TEXT DEFAULT ''");
+    console.log('✅ Migration: added training_notes to accounts');
+  }
+} catch (e) {
+  console.error('Migration accounts zones/skills error:', e.message);
+}
+
 module.exports = { db, all, get, run };
