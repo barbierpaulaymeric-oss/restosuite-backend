@@ -21,12 +21,7 @@ async function renderHACCPTraceability() {
           </button>
         </div>
 
-        <div class="haccp-subnav">
-          <a href="#/haccp" class="haccp-subnav__link">Dashboard</a>
-          <a href="#/haccp/temperatures" class="haccp-subnav__link">Températures</a>
-          <a href="#/haccp/cleaning" class="haccp-subnav__link">Nettoyage</a>
-          <a href="#/haccp/traceability" class="haccp-subnav__link active">Traçabilité</a>
-        </div>
+        ${HACCP_SUBNAV_FULL}
 
         ${dlcAlerts.length > 0 ? `
         <div class="haccp-dlc-alert-banner">

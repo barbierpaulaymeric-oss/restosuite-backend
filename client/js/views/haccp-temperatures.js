@@ -29,12 +29,7 @@ async function renderHACCPTemperatures() {
           </button>
         </div>
 
-        <div class="haccp-subnav">
-          <a href="#/haccp" class="haccp-subnav__link">Dashboard</a>
-          <a href="#/haccp/temperatures" class="haccp-subnav__link active">Températures</a>
-          <a href="#/haccp/cleaning" class="haccp-subnav__link">Nettoyage</a>
-          <a href="#/haccp/traceability" class="haccp-subnav__link">Traçabilité</a>
-        </div>
+        ${HACCP_SUBNAV_FULL}
 
         <!-- Filters -->
         <div class="haccp-filters">

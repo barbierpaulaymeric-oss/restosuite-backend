@@ -2,6 +2,21 @@
 // HACCP Dashboard — Route #/haccp
 // ═══════════════════════════════════════════
 
+// Shared subnav for all HACCP pages (9 sections)
+const HACCP_SUBNAV_FULL = `
+  <div class="haccp-subnav">
+    <a href="#/haccp" class="haccp-subnav__link" id="haccp-nav-dashboard">Dashboard</a>
+    <a href="#/haccp/temperatures" class="haccp-subnav__link">Températures</a>
+    <a href="#/haccp/cleaning" class="haccp-subnav__link">Nettoyage</a>
+    <a href="#/haccp/traceability" class="haccp-subnav__link">Traçabilité</a>
+    <a href="#/haccp/cooling" class="haccp-subnav__link">Refroidissement</a>
+    <a href="#/haccp/reheating" class="haccp-subnav__link">Remise en T°</a>
+    <a href="#/haccp/fryers" class="haccp-subnav__link">Friteuses</a>
+    <a href="#/haccp/non-conformities" class="haccp-subnav__link">Non-conf.</a>
+    <a href="#/haccp/allergens" class="haccp-subnav__link">Allergènes</a>
+  </div>
+`;
+
 async function renderHACCPDashboard() {
   const app = document.getElementById('app');
   app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
@@ -25,12 +40,7 @@ async function renderHACCPDashboard() {
         </div>
 
         <!-- HACCP Sub-navigation -->
-        <div class="haccp-subnav">
-          <a href="#/haccp" class="haccp-subnav__link active">Dashboard</a>
-          <a href="#/haccp/temperatures" class="haccp-subnav__link">Températures</a>
-          <a href="#/haccp/cleaning" class="haccp-subnav__link">Nettoyage</a>
-          <a href="#/haccp/traceability" class="haccp-subnav__link">Traçabilité</a>
-        </div>
+        ${HACCP_SUBNAV_FULL.replace('id="haccp-nav-dashboard"', 'id="haccp-nav-dashboard" style="font-weight:700"')}
 
         <!-- SECTION: Températures du jour -->
         <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">

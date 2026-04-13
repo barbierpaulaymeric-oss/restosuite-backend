@@ -27,12 +27,7 @@ async function renderHACCPCleaning() {
           ` : ''}
         </div>
 
-        <div class="haccp-subnav">
-          <a href="#/haccp" class="haccp-subnav__link">Dashboard</a>
-          <a href="#/haccp/temperatures" class="haccp-subnav__link">Températures</a>
-          <a href="#/haccp/cleaning" class="haccp-subnav__link active">Nettoyage</a>
-          <a href="#/haccp/traceability" class="haccp-subnav__link">Traçabilité</a>
-        </div>
+        ${HACCP_SUBNAV_FULL}
 
         <!-- Today's status -->
         <div class="haccp-cleaning-today-box">
