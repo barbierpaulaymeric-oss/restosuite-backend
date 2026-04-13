@@ -550,6 +550,11 @@ const API = {
   importMercuriale(data) {
     return this.request('/ai/import-mercuriale', { method: 'POST', body: data });
   },
+
+  // Plans & Pricing
+  getPlans() { return this.request('/plans'); },
+  getCurrentPlan() { return this.request('/plans/current'); },
+  upgradePlan(plan) { return this.request('/plans/upgrade', { method: 'POST', body: { plan } }); },
 };
 
 // ─── Toast utility ───

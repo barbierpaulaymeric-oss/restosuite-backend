@@ -202,6 +202,8 @@ app.use('/api/training', require('./routes/training'));
 app.use('/api/pest-control', require('./routes/pest-control'));
 app.use('/api/maintenance', require('./routes/maintenance'));
 app.use('/api/waste', require('./routes/waste'));
+app.use('/api/corrective-actions', require('./routes/corrective-actions'));
+app.use('/api/plans', require('./routes/plans'));
 app.use('/api/errors', require('./routes/errors').router);
 
 // Admin endpoints — JWT required (gérant only)

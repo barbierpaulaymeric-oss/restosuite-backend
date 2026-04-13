@@ -1179,4 +1179,87 @@ try {
   console.error('Migration accounts zones/skills error:', e.message);
 }
 
+// ─── Migration: Add plan to restaurants ───
+try {
+  const restPlanCols = all("PRAGMA table_info(restaurants)");
+  if (!restPlanCols.some(c => c.name === 'plan')) {
+    db.exec("ALTER TABLE restaurants ADD COLUMN plan TEXT DEFAULT 'discovery'");
+    console.log('✅ Migration: added plan to restaurants');
+  }
+} catch (e) {
+  console.error('Migration restaurants.plan error:', e.message);
+}
+
+// ─── Migration: Actions correctives ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS corrective_actions_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL,
+      trigger_condition TEXT,
+      action_description TEXT,
+      responsible_role TEXT,
+      deadline_hours INTEGER,
+      escalation_procedure TEXT,
+      documentation_required TEXT,
+      is_active BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_cat_templates ON corrective_actions_templates(category);
+    CREATE INDEX IF NOT EXISTS idx_cat_templates_active ON corrective_actions_templates(is_active);
+
+    CREATE TABLE IF NOT EXISTS corrective_actions_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      template_id INTEGER REFERENCES corrective_actions_templates(id),
+      category TEXT,
+      trigger_description TEXT,
+      action_taken TEXT,
+      responsible_person TEXT,
+      started_at DATETIME,
+      completed_at DATETIME,
+      status TEXT DEFAULT 'en_cours',
+      notes TEXT,
+      related_record_id INTEGER,
+      related_record_type TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_cal_status ON corrective_actions_log(status);
+    CREATE INDEX IF NOT EXISTS idx_cal_category ON corrective_actions_log(category);
+    CREATE INDEX IF NOT EXISTS idx_cal_created ON corrective_actions_log(created_at);
+  `);
+  console.log('✅ Migration: corrective_actions tables ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration corrective_actions error:', e.message);
+}
+
+// ─── Seed: Actions correctives templates ───
+try {
+  const catCount = get("SELECT COUNT(*) as c FROM corrective_actions_templates");
+  if (catCount && catCount.c === 0) {
+    const insertTpl = db.prepare(`
+      INSERT INTO corrective_actions_templates
+        (category, trigger_condition, action_description, responsible_role, deadline_hours, escalation_procedure, documentation_required)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertTpl.run('temperature', 'Température chambre froide > 4°C', 'Vérifier la sonde, transférer les denrées dans une autre enceinte froide, appeler le technicien si anomalie persistante > 1h', 'cuisinier', 1, 'Contacter le responsable de site si température > 8°C ou si durée > 2h', "Relevé de température, bon d'intervention technicien");
+    insertTpl.run('temperature', 'Température plat chaud < 63°C au service', 'Remettre le plat en température à > 63°C dans les 30 minutes. Si impossible, jeter et renouveler la préparation', 'cuisinier', 1, 'Alerter le responsable si la non-conformité est récurrente', 'Fiche de relevé température, fiche de non-conformité');
+    insertTpl.run('reception', 'Température réception viande > 4°C', 'Refuser la livraison, noter la non-conformité sur le bon de livraison, contacter le fournisseur immédiatement', 'cuisinier', 0, 'Notifier le responsable achats et enregistrer dans le registre fournisseurs', 'Bon de livraison annoté, fiche de non-conformité fournisseur');
+    insertTpl.run('cleaning', 'Nettoyage non-conforme (contrôle visuel ou ATP)', 'Refaire le nettoyage et la désinfection, réaliser un contrôle visuel, re-valider sur le plan de nettoyage', 'cuisinier', 2, 'Si récidive, revoir le protocole avec le responsable HACCP', 'Plan de nettoyage, fiche de validation nettoyage');
+    insertTpl.run('storage', 'Présence de nuisible constatée', 'Isoler la zone concernée, contacter le prestataire de lutte contre les nuisibles sous 24h, renforcer les contrôles visuels', 'gerant', 24, 'Alerter immédiatement le responsable et documenter les preuves (photos)', 'Fiche de signalement nuisible, rapport prestataire');
+    insertTpl.run('reception', 'Réception non-conforme — DLC dépassée', "Refuser l'intégralité du lot, notifier le fournisseur par écrit, enregistrer la non-conformité dans le registre", 'cuisinier', 0, 'Informer le responsable achats pour suivi fournisseur', 'Bon de livraison, fiche de non-conformité, courrier fournisseur');
+    insertTpl.run('reception', 'Réception non-conforme — emballage détérioré', 'Refuser le lot concerné, vérifier les autres colis, notifier le fournisseur', 'cuisinier', 0, 'Consigner dans le registre de réception', 'Bon de livraison annoté, photos si possible, fiche NC');
+    insertTpl.run('storage', 'Denrée sans étiquetage ou traçabilité manquante', 'Identifier le produit par recoupement. Apposer une étiquette provisoire ou jeter si non identifiable', 'cuisinier', 4, 'Signaler au responsable si le produit non traçable a déjà été utilisé', 'Fiche de traçabilité, étiquette provisoire');
+    insertTpl.run('temperature', 'Rupture de la chaîne du froid (denrée hors froid)', 'Évaluer la durée et la température atteinte. Jeter si > 2h hors froid ou si température > 8°C', 'cuisinier', 0, 'Alerter le responsable si la rupture est due à une panne équipement', 'Fiche de non-conformité, enregistrement température');
+    insertTpl.run('preparation', 'Contamination croisée suspectée', 'Isoler les denrées potentiellement contaminées, nettoyer et désinfecter les surfaces et ustensiles, alerter le responsable', 'cuisinier', 1, 'Si consommation déjà effectuée, alerter le responsable pour évaluer le risque sanitaire', 'Fiche de non-conformité, liste des denrées concernées');
+    insertTpl.run('service', 'Allergène non déclaré identifié dans un plat servi', "Retirer immédiatement le plat du service, alerter l'équipe en salle, informer les clients concernés", 'gerant', 0, 'Contacter le service sanitaire si un client a consommé le produit et présente des symptômes', "Fiche de non-conformité, liste clients informés, rapport d'incident");
+    insertTpl.run('preparation', 'Huile de friture dégradée (TPC > 25%)', 'Arrêter immédiatement, vidanger et remplacer l\'huile, ne pas servir les produits frits en attente', 'cuisinier', 0, 'Si la mesure TPC n\'est pas réalisée quotidiennement, revoir la procédure', 'Test TPC enregistré, bon de vidange huile');
+    insertTpl.run('service', 'Plat non servi dans les temps (> 2h à température ambiante)', 'Jeter les denrées non servies dans le délai réglementaire, renouveler la préparation', 'cuisinier', 0, 'Analyser la cause et mettre en place des mesures préventives', 'Fiche de perte, fiche de non-conformité');
+    insertTpl.run('cleaning', 'Désinfectant hors concentration requise', 'Préparer une nouvelle solution à la concentration correcte, re-désinfecter toutes les surfaces traitées', 'cuisinier', 1, 'Vérifier et renouveler le stock de produits désinfectants', 'Fiche de préparation désinfectant, plan de nettoyage');
+    insertTpl.run('temperature', 'Relevé de température manquant (oubli de saisie)', "Retrouver l'information par tout moyen disponible ou reconstituer avec mention 'reconstitué'. Renforcer les contrôles", 'cuisinier', 4, 'Si manquant > 3 fois par mois, mettre en place un système d\'alerte automatique', 'Fiche de relevé complétée, action préventive documentée');
+    console.log("✅ Seed: 15 modèles d'actions correctives insérés");
+  }
+} catch (e) {
+  console.error('Seed corrective_actions_templates error:', e.message);
+}
+
 module.exports = { db, all, get, run };

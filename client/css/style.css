@@ -5250,3 +5250,148 @@ button.nav-link {
   background: rgba(59,130,246,0.15);
   color: #3B82F6;
 }
+
+/* ─── Plans & Pricing ─── */
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.plan-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: box-shadow 0.2s;
+}
+.plan-card:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+.plan-card--current {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(232,114,42,0.2);
+}
+.plan-card--highlighted {
+  border-color: var(--color-primary);
+}
+.plan-card__current-badge {
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 10px;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  text-transform: uppercase;
+}
+.plan-card__badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+}
+.plan-card__header {
+  margin-bottom: var(--space-4);
+}
+.plan-card__name {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.plan-card__price {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 6px;
+}
+.plan-card__desc {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+.plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.plan-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.plan-feature--section {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 4px;
+}
+.plan-card__footer {
+  margin-top: auto;
+}
+.plan-card__footer .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.plans-upgrade-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(232,114,42,0.1);
+  border: 1px solid rgba(232,114,42,0.3);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  margin-bottom: var(--space-4);
+}
+
+.plans-loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-8);
+}
+
+/* Nav lock badge */
+.nav-panel-item--locked {
+  opacity: 0.65;
+}
+.nav-plan-badge {
+  margin-left: auto;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--color-primary);
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .plans-grid {
+    grid-template-columns: 1fr;
+  }
+}

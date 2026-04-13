@@ -689,6 +689,16 @@ const API = {
   },
   importMercuriale(data) {
     return this.request("/ai/import-mercuriale", { method: "POST", body: data });
+  },
+  // Plans & Pricing
+  getPlans() {
+    return this.request("/plans");
+  },
+  getCurrentPlan() {
+    return this.request("/plans/current");
+  },
+  upgradePlan(plan) {
+    return this.request("/plans/upgrade", { method: "POST", body: { plan } });
   }
 };
 function showToast(message, type = "info") {
@@ -3598,6 +3608,7 @@ const HACCP_SUBNAV_FULL = `
     <a href="#/haccp/pest-control" class="haccp-subnav__link">Nuisibles</a>
     <a href="#/haccp/maintenance" class="haccp-subnav__link">Maintenance</a>
     <a href="#/haccp/waste" class="haccp-subnav__link">D\xE9chets</a>
+    <a href="#/haccp/corrective-actions" class="haccp-subnav__link">Actions correctives</a>
   </div>
 `;
 async function renderHACCPDashboard() {
@@ -16466,6 +16477,125 @@ function renderQRGrid(gridEl, tables) {
     </div>
   `).join("");
 }
+async function renderPlans(highlightPlan) {
+  const app = document.getElementById("app");
+  const account = getAccount();
+  if (!account || account.role !== "gerant") {
+    app.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon"><i data-lucide="lock"></i></div>
+        <p>Acc\xE8s r\xE9serv\xE9 au g\xE9rant</p>
+        <a href="#/" class="btn btn-primary">Retour</a>
+      </div>`;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+  app.innerHTML = `
+    <div class="view-header">
+      <h1><i data-lucide="layers" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Plans & Tarifs</h1>
+      <p class="text-secondary">Choisissez le plan adapt\xE9 \xE0 votre restaurant</p>
+    </div>
+    <div class="plans-loading">
+      <div class="spinner"></div>
+    </div>`;
+  if (window.lucide) lucide.createIcons();
+  try {
+    let planRank2 = function(p) {
+      return PLAN_ORDER.indexOf(p);
+    }, renderFeature2 = function(f) {
+      const isSectionTitle = f.startsWith("Tout ");
+      return `<li class="plan-feature${isSectionTitle ? " plan-feature--section" : ""}">
+        ${isSectionTitle ? "" : '<i data-lucide="check" style="width:14px;height:14px;flex-shrink:0;color:var(--color-success)"></i>'}
+        <span>${escapeHtml(f)}</span>
+      </li>`;
+    };
+    var planRank = planRank2, renderFeature = renderFeature2;
+    const [{ items: plans }, { plan: currentPlan }] = await Promise.all([
+      API.getPlans(),
+      API.getCurrentPlan()
+    ]);
+    const target = highlightPlan || currentPlan;
+    const PLAN_ORDER = ["discovery", "essential", "professional", "premium", "enterprise"];
+    const cardsHtml = plans.map((plan) => {
+      const isCurrent = plan.id === currentPlan;
+      const isHighlighted = plan.id === target;
+      const isDowngrade = planRank2(plan.id) < planRank2(currentPlan);
+      const isEnterprise = plan.id === "enterprise";
+      let btnHtml;
+      if (isCurrent) {
+        btnHtml = `<button class="btn btn-secondary btn-sm" disabled>Plan actuel</button>`;
+      } else if (isEnterprise) {
+        btnHtml = `<a href="mailto:contact@restosuite.fr?subject=Plan Enterprise" class="btn btn-outline btn-sm">Nous contacter</a>`;
+      } else {
+        const btnClass = isDowngrade ? "btn-outline" : "btn-primary";
+        const label = isDowngrade ? "Passer \xE0 ce plan" : `Choisir ${escapeHtml(plan.name)}`;
+        btnHtml = `<button class="btn ${btnClass} btn-sm plan-upgrade-btn" data-plan="${escapeHtml(plan.id)}">${label}</button>`;
+      }
+      return `
+        <div class="plan-card${isCurrent ? " plan-card--current" : ""}${isHighlighted && !isCurrent ? " plan-card--highlighted" : ""}">
+          ${isCurrent ? '<div class="plan-card__current-badge">Plan actuel</div>' : ""}
+          ${plan.badge && !isCurrent ? `<div class="plan-card__badge">${escapeHtml(plan.badge)}</div>` : ""}
+          <div class="plan-card__header">
+            <h2 class="plan-card__name">${escapeHtml(plan.name)}</h2>
+            <div class="plan-card__price">${escapeHtml(plan.label)}</div>
+            <p class="plan-card__desc">${escapeHtml(plan.description)}</p>
+          </div>
+          <ul class="plan-features">
+            ${plan.features.map(renderFeature2).join("")}
+          </ul>
+          <div class="plan-card__footer">
+            ${btnHtml}
+          </div>
+        </div>`;
+    }).join("");
+    app.innerHTML = `
+      <div class="view-header">
+        <h1><i data-lucide="layers" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Plans & Tarifs</h1>
+        <p class="text-secondary">Choisissez le plan adapt\xE9 \xE0 votre restaurant</p>
+      </div>
+
+      ${highlightPlan && highlightPlan !== currentPlan ? `
+        <div class="plans-upgrade-notice">
+          <i data-lucide="lock" style="width:16px;height:16px"></i>
+          Cette fonctionnalit\xE9 n\xE9cessite le plan <strong>${escapeHtml(highlightPlan)}</strong> ou sup\xE9rieur.
+          Votre plan actuel : <strong>${escapeHtml(currentPlan)}</strong>.
+        </div>` : ""}
+
+      <div class="plans-grid">
+        ${cardsHtml}
+      </div>
+
+      <p class="plans-note text-secondary" style="text-align:center;margin-top:24px;font-size:0.85rem">
+        Les changements de plan sont instantan\xE9s. Pas de paiement requis en phase b\xEAta.
+      </p>`;
+    if (window.lucide) lucide.createIcons();
+    app.querySelectorAll(".plan-upgrade-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const plan = btn.dataset.plan;
+        btn.disabled = true;
+        btn.textContent = "Activation\u2026";
+        try {
+          await API.upgradePlan(plan);
+          _currentPlan = plan;
+          showToast(`Plan ${plan} activ\xE9 avec succ\xE8s`, "success");
+          renderPlans();
+        } catch (e) {
+          showToast(e.message || "Erreur lors du changement de plan", "error");
+          btn.disabled = false;
+          btn.textContent = "R\xE9essayer";
+        }
+      });
+    });
+  } catch (e) {
+    app.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon"><i data-lucide="wifi-off"></i></div>
+        <p>Impossible de charger les plans</p>
+        <button class="btn btn-primary" onclick="renderPlans()">R\xE9essayer</button>
+      </div>`;
+    if (window.lucide) lucide.createIcons();
+  }
+}
 let _commandPaletteOpen = false;
 const _commands = [
   { name: "Nouvelle fiche technique", icon: "plus", hash: "#/new", category: "Fiches" },
@@ -17322,6 +17452,16 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e)
     document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
   }
 });
+const PLAN_ORDER_CLIENT = ["discovery", "essential", "professional", "premium", "enterprise"];
+let _currentPlan = "discovery";
+function planRankClient(plan) {
+  const idx = PLAN_ORDER_CLIENT.indexOf(plan);
+  return idx === -1 ? 0 : idx;
+}
+function isPlanUnlocked(minPlan) {
+  if (!minPlan) return true;
+  return planRankClient(_currentPlan) >= planRankClient(minPlan);
+}
 const NAV_GROUPS = {
   cuisine: {
     label: "Cuisine",
@@ -17334,9 +17474,9 @@ const NAV_GROUPS = {
   operations: {
     label: "Op\xE9rations",
     items: [
-      { label: "Commandes fournisseurs", route: "/orders", icon: "clipboard-pen", roles: ["gerant"] },
-      { label: "Fournisseurs", route: "/suppliers", icon: "truck", roles: ["gerant"] },
-      { label: "Livraisons", route: "/deliveries", icon: "package-check", roles: ["gerant", "cuisinier"] },
+      { label: "Commandes fournisseurs", route: "/orders", icon: "clipboard-pen", roles: ["gerant"], minPlan: "essential" },
+      { label: "Fournisseurs", route: "/suppliers", icon: "truck", roles: ["gerant"], minPlan: "essential" },
+      { label: "Livraisons", route: "/deliveries", icon: "package-check", roles: ["gerant", "cuisinier"], minPlan: "essential" },
       { label: "Service (Salle)", route: "/service", icon: "concierge-bell", roles: ["gerant", "salle"] },
       { label: "Cuisine (\xE9cran)", route: "/kitchen", icon: "chef-hat", roles: ["gerant", "cuisinier"] }
     ]
@@ -17345,13 +17485,14 @@ const NAV_GROUPS = {
     label: "Param\xE8tres",
     items: [
       { label: "\xC9quipe", route: "/team", icon: "users", roles: ["gerant"] },
-      { label: "CRM & Fid\xE9lit\xE9", route: "/crm", icon: "heart", roles: ["gerant"] },
-      { label: "Int\xE9grations", route: "/integrations", icon: "plug", roles: ["gerant"] },
-      { label: "QR Codes", route: "/qrcodes", icon: "qr-code", roles: ["gerant"] },
-      { label: "Bilan Carbone", route: "/carbon", icon: "leaf", roles: ["gerant"] },
-      { label: "Multi-Sites", route: "/multi-site", icon: "building-2", roles: ["gerant"] },
-      { label: "API", route: "/api-keys", icon: "key", roles: ["gerant"] },
-      { label: "Portail Fournisseur", route: "/supplier-portal", icon: "truck", roles: ["gerant"] },
+      { label: "Plans & Tarifs", route: "/settings/plans", icon: "layers", roles: ["gerant"] },
+      { label: "CRM & Fid\xE9lit\xE9", route: "/crm", icon: "heart", roles: ["gerant"], minPlan: "essential" },
+      { label: "Int\xE9grations", route: "/integrations", icon: "plug", roles: ["gerant"], minPlan: "professional" },
+      { label: "QR Codes", route: "/qrcodes", icon: "qr-code", roles: ["gerant"], minPlan: "essential" },
+      { label: "Bilan Carbone", route: "/carbon", icon: "leaf", roles: ["gerant"], minPlan: "professional" },
+      { label: "Multi-Sites", route: "/multi-site", icon: "building-2", roles: ["gerant"], minPlan: "premium" },
+      { label: "API", route: "/api-keys", icon: "key", roles: ["gerant"], minPlan: "enterprise" },
+      { label: "Portail Fournisseur", route: "/supplier-portal", icon: "truck", roles: ["gerant"], minPlan: "essential" },
       { label: "Journal erreurs", route: "/errors-log", icon: "bug", roles: ["gerant"] },
       { label: "Se d\xE9connecter", route: null, icon: "log-out", roles: ["gerant", "cuisinier", "equipier"], action: "logout" }
     ]
@@ -17359,10 +17500,10 @@ const NAV_GROUPS = {
   pilotage: {
     label: "Pilotage",
     items: [
-      { label: "Pilotage", route: "/analytics", icon: "bar-chart-3", roles: ["gerant"] },
-      { label: "Menu Engineering", route: "/menu-engineering", icon: "target", roles: ["gerant"] },
-      { label: "Pr\xE9dictions IA", route: "/predictions", icon: "brain", roles: ["gerant"] },
-      { label: "Mercuriale", route: "/mercuriale", icon: "trending-up", roles: ["gerant"] }
+      { label: "Pilotage", route: "/analytics", icon: "bar-chart-3", roles: ["gerant"], minPlan: "professional" },
+      { label: "Menu Engineering", route: "/menu-engineering", icon: "target", roles: ["gerant"], minPlan: "professional" },
+      { label: "Pr\xE9dictions IA", route: "/predictions", icon: "brain", roles: ["gerant"], minPlan: "professional" },
+      { label: "Mercuriale", route: "/mercuriale", icon: "trending-up", roles: ["gerant"], minPlan: "essential" }
     ]
   }
 };
@@ -17394,7 +17535,8 @@ const ROUTE_TO_GROUP = {
   "/supplier-portal": "config",
   "/errors-log": "config",
   "/crm": "config",
-  "/subscribe": "config"
+  "/subscribe": "config",
+  "/settings/plans": "config"
 };
 document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -17565,6 +17707,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/pest-control$/, renderHACCPPestControl);
   Router.add(/^\/haccp\/maintenance$/, renderHACCPMaintenance);
   Router.add(/^\/haccp\/waste$/, renderHACCPWaste);
+  Router.add(/^\/haccp\/corrective-actions$/, renderCorrectiveActions);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, () => {
     location.hash = "#/analytics";
@@ -17586,6 +17729,7 @@ function registerRoutes() {
   Router.add(/^\/crm$/, renderCRM);
   Router.add(/^\/api-keys$/, renderAPIKeys);
   Router.add(/^\/qrcodes$/, renderQRCodes);
+  Router.add(/^\/settings\/plans$/, (highlightPlan) => renderPlans(highlightPlan));
   Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
 }
 function bootApp(role, account, opts = {}) {
@@ -17618,6 +17762,10 @@ function bootApp(role, account, opts = {}) {
   const displayName = account ? account.name : role;
   console.log("%c RestoSuite ", "background:#E8722A;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600", `loaded (${displayName})`);
   fetchTrialStatus().then(() => renderTrialBanner());
+  API.getCurrentPlan().then((data) => {
+    _currentPlan = data.plan || "discovery";
+  }).catch(() => {
+  });
   clearTrialStatusInterval();
   _trialStatusIntervalId = setInterval(() => fetchTrialStatus().then(() => renderTrialBanner()), 5 * 60 * 1e3);
 }
@@ -17669,7 +17817,17 @@ function initNavGroups(role) {
             ${escapeHtml(item.label)}
           </button>`;
       }
-      const isActive = currentPath === item.route || item.route !== "/" && currentPath.startsWith(item.route);
+      const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
+      const isActive = !locked && (currentPath === item.route || item.route !== "/" && currentPath.startsWith(item.route));
+      if (locked) {
+        const PLAN_LABELS = { essential: "Essential", professional: "Pro", premium: "Premium", enterprise: "Enterprise" };
+        const badge = PLAN_LABELS[item.minPlan] || item.minPlan;
+        return `<a href="#/settings/plans" class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}">
+            <i data-lucide="${item.icon}"></i>
+            ${escapeHtml(item.label)}
+            <span class="nav-plan-badge">${escapeHtml(badge)}</span>
+          </a>`;
+      }
       return `<a href="#${item.route}" class="nav-panel-item${isActive ? " active" : ""}">
           <i data-lucide="${item.icon}"></i>
           ${escapeHtml(item.label)}

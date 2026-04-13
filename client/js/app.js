@@ -21,6 +21,20 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
   }
 });
 
+// ─── Plan hierarchy ───
+const PLAN_ORDER_CLIENT = ['discovery', 'essential', 'professional', 'premium', 'enterprise'];
+let _currentPlan = 'discovery';
+
+function planRankClient(plan) {
+  const idx = PLAN_ORDER_CLIENT.indexOf(plan);
+  return idx === -1 ? 0 : idx;
+}
+
+function isPlanUnlocked(minPlan) {
+  if (!minPlan) return true;
+  return planRankClient(_currentPlan) >= planRankClient(minPlan);
+}
+
 // ─── Nav group definitions ───
 const NAV_GROUPS = {
   cuisine: {
@@ -34,9 +48,9 @@ const NAV_GROUPS = {
   operations: {
     label: 'Opérations',
     items: [
-      { label: 'Commandes fournisseurs', route: '/orders',    icon: 'clipboard-pen',  roles: ['gerant'] },
-      { label: 'Fournisseurs',           route: '/suppliers', icon: 'truck',          roles: ['gerant'] },
-      { label: 'Livraisons',             route: '/deliveries',icon: 'package-check',  roles: ['gerant','cuisinier'] },
+      { label: 'Commandes fournisseurs', route: '/orders',    icon: 'clipboard-pen',  roles: ['gerant'],              minPlan: 'essential' },
+      { label: 'Fournisseurs',           route: '/suppliers', icon: 'truck',          roles: ['gerant'],              minPlan: 'essential' },
+      { label: 'Livraisons',             route: '/deliveries',icon: 'package-check',  roles: ['gerant','cuisinier'], minPlan: 'essential' },
       { label: 'Service (Salle)',        route: '/service',   icon: 'concierge-bell', roles: ['gerant','salle'] },
       { label: 'Cuisine (écran)',        route: '/kitchen',   icon: 'chef-hat',       roles: ['gerant','cuisinier'] },
     ]
@@ -45,13 +59,14 @@ const NAV_GROUPS = {
     label: 'Paramètres',
     items: [
       { label: 'Équipe',              route: '/team',            icon: 'users',        roles: ['gerant'] },
-      { label: 'CRM & Fidélité',      route: '/crm',             icon: 'heart',        roles: ['gerant'] },
-      { label: 'Intégrations',        route: '/integrations',    icon: 'plug',         roles: ['gerant'] },
-      { label: 'QR Codes',            route: '/qrcodes',         icon: 'qr-code',      roles: ['gerant'] },
-      { label: 'Bilan Carbone',       route: '/carbon',          icon: 'leaf',         roles: ['gerant'] },
-      { label: 'Multi-Sites',         route: '/multi-site',      icon: 'building-2',   roles: ['gerant'] },
-      { label: 'API',                 route: '/api-keys',        icon: 'key',          roles: ['gerant'] },
-      { label: 'Portail Fournisseur', route: '/supplier-portal', icon: 'truck',        roles: ['gerant'] },
+      { label: 'Plans & Tarifs',      route: '/settings/plans',  icon: 'layers',       roles: ['gerant'] },
+      { label: 'CRM & Fidélité',      route: '/crm',             icon: 'heart',        roles: ['gerant'], minPlan: 'essential' },
+      { label: 'Intégrations',        route: '/integrations',    icon: 'plug',         roles: ['gerant'], minPlan: 'professional' },
+      { label: 'QR Codes',            route: '/qrcodes',         icon: 'qr-code',      roles: ['gerant'], minPlan: 'essential' },
+      { label: 'Bilan Carbone',       route: '/carbon',          icon: 'leaf',         roles: ['gerant'], minPlan: 'professional' },
+      { label: 'Multi-Sites',         route: '/multi-site',      icon: 'building-2',   roles: ['gerant'], minPlan: 'premium' },
+      { label: 'API',                 route: '/api-keys',        icon: 'key',          roles: ['gerant'], minPlan: 'enterprise' },
+      { label: 'Portail Fournisseur', route: '/supplier-portal', icon: 'truck',        roles: ['gerant'], minPlan: 'essential' },
       { label: 'Journal erreurs',     route: '/errors-log',      icon: 'bug',          roles: ['gerant'] },
       { label: 'Se déconnecter',      route: null,               icon: 'log-out',      roles: ['gerant','cuisinier','equipier'], action: 'logout' },
     ]
@@ -59,10 +74,10 @@ const NAV_GROUPS = {
   pilotage: {
     label: 'Pilotage',
     items: [
-      { label: 'Pilotage',             route: '/analytics',        icon: 'bar-chart-3',  roles: ['gerant'] },
-      { label: 'Menu Engineering',    route: '/menu-engineering', icon: 'target',       roles: ['gerant'] },
-      { label: 'Prédictions IA',      route: '/predictions',      icon: 'brain',        roles: ['gerant'] },
-      { label: 'Mercuriale',          route: '/mercuriale',       icon: 'trending-up',  roles: ['gerant'] },
+      { label: 'Pilotage',          route: '/analytics',        icon: 'bar-chart-3',  roles: ['gerant'], minPlan: 'professional' },
+      { label: 'Menu Engineering',  route: '/menu-engineering', icon: 'target',       roles: ['gerant'], minPlan: 'professional' },
+      { label: 'Prédictions IA',    route: '/predictions',      icon: 'brain',        roles: ['gerant'], minPlan: 'professional' },
+      { label: 'Mercuriale',        route: '/mercuriale',       icon: 'trending-up',  roles: ['gerant'], minPlan: 'essential' },
     ]
   },
 };
@@ -79,7 +94,7 @@ const ROUTE_TO_GROUP = {
   '/more': 'config', '/team': 'config', '/integrations': 'config',
   '/multi-site': 'config', '/api-keys': 'config', '/qrcodes': 'config',
   '/carbon': 'config', '/supplier-portal': 'config', '/errors-log': 'config',
-  '/crm': 'config', '/subscribe': 'config',
+  '/crm': 'config', '/subscribe': 'config', '/settings/plans': 'config',
 };
 
 // ─── Command Palette shortcut ───
@@ -281,6 +296,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/pest-control$/, renderHACCPPestControl);
   Router.add(/^\/haccp\/maintenance$/, renderHACCPMaintenance);
   Router.add(/^\/haccp\/waste$/, renderHACCPWaste);
+  Router.add(/^\/haccp\/corrective-actions$/, renderCorrectiveActions);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, () => { location.hash = '#/analytics'; });
   Router.add(/^\/more$/, () => new MoreView().render());
@@ -300,6 +316,7 @@ function registerRoutes() {
   Router.add(/^\/crm$/, renderCRM);
   Router.add(/^\/api-keys$/, renderAPIKeys);
   Router.add(/^\/qrcodes$/, renderQRCodes);
+  Router.add(/^\/settings\/plans$/, (highlightPlan) => renderPlans(highlightPlan));
   Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
 }
 
@@ -337,8 +354,9 @@ function bootApp(role, account, opts = {}) {
   const displayName = account ? account.name : role;
   console.log('%c RestoSuite ', 'background:#E8722A;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600', `loaded (${displayName})`);
 
-  // Fetch trial status and render banner
+  // Fetch trial status and plan in parallel
   fetchTrialStatus().then(() => renderTrialBanner());
+  API.getCurrentPlan().then(data => { _currentPlan = data.plan || 'discovery'; }).catch(() => {});
 
   // Refresh trial status every 5 minutes (store interval ID for cleanup on logout)
   clearTrialStatusInterval();
@@ -408,7 +426,17 @@ function initNavGroups(role) {
             ${escapeHtml(item.label)}
           </button>`;
         }
-        const isActive = currentPath === item.route || (item.route !== '/' && currentPath.startsWith(item.route));
+        const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
+        const isActive = !locked && (currentPath === item.route || (item.route !== '/' && currentPath.startsWith(item.route)));
+        if (locked) {
+          const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Enterprise' };
+          const badge = PLAN_LABELS[item.minPlan] || item.minPlan;
+          return `<a href="#/settings/plans" class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}">
+            <i data-lucide="${item.icon}"></i>
+            ${escapeHtml(item.label)}
+            <span class="nav-plan-badge">${escapeHtml(badge)}</span>
+          </a>`;
+        }
         return `<a href="#${item.route}" class="nav-panel-item${isActive ? ' active' : ''}">
           <i data-lucide="${item.icon}"></i>
           ${escapeHtml(item.label)}
