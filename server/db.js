@@ -730,4 +730,103 @@ try {
   console.error('Seed ingredients error:', e.message);
 }
 
+// ─── Migration: HACCP Refroidissements rapides ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cooling_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_name TEXT NOT NULL,
+      quantity REAL,
+      unit TEXT DEFAULT 'kg',
+      start_time DATETIME NOT NULL,
+      temp_start REAL NOT NULL,
+      time_at_63c DATETIME,
+      time_at_10c DATETIME,
+      is_compliant INTEGER,
+      notes TEXT,
+      recorded_by INTEGER REFERENCES accounts(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_cooling_logs_start_time ON cooling_logs(start_time);
+  `);
+  console.log('✅ Migration: cooling_logs table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration cooling_logs error:', e.message);
+}
+
+// ─── Migration: HACCP Remises en température ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reheating_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_name TEXT NOT NULL,
+      quantity REAL,
+      unit TEXT DEFAULT 'kg',
+      start_time DATETIME NOT NULL,
+      temp_start REAL NOT NULL,
+      time_at_63c DATETIME,
+      is_compliant INTEGER,
+      notes TEXT,
+      recorded_by INTEGER REFERENCES accounts(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_reheating_logs_start_time ON reheating_logs(start_time);
+  `);
+  console.log('✅ Migration: reheating_logs table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration reheating_logs error:', e.message);
+}
+
+// ─── Migration: HACCP Gestion huiles de friture ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS fryers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS fryer_checks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fryer_id INTEGER NOT NULL REFERENCES fryers(id),
+      action_type TEXT NOT NULL,
+      action_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      polar_value REAL,
+      notes TEXT,
+      recorded_by INTEGER REFERENCES accounts(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_fryer_checks_fryer_id ON fryer_checks(fryer_id);
+    CREATE INDEX IF NOT EXISTS idx_fryer_checks_action_date ON fryer_checks(action_date);
+  `);
+  console.log('✅ Migration: fryers + fryer_checks tables ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration fryers error:', e.message);
+}
+
+// ─── Migration: HACCP Non-conformités ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS non_conformities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT,
+      category TEXT DEFAULT 'autre',
+      severity TEXT DEFAULT 'mineure',
+      status TEXT DEFAULT 'ouvert',
+      corrective_action TEXT,
+      detected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      detected_by INTEGER REFERENCES accounts(id),
+      resolved_at DATETIME,
+      resolved_by INTEGER REFERENCES accounts(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_non_conformities_status ON non_conformities(status);
+    CREATE INDEX IF NOT EXISTS idx_non_conformities_detected_at ON non_conformities(detected_at);
+  `);
+  console.log('✅ Migration: non_conformities table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration non_conformities error:', e.message);
+}
+
 module.exports = { db, all, get, run };
