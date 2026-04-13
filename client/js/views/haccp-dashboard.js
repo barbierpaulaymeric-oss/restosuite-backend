@@ -20,6 +20,7 @@ const HACCP_SUBNAV_FULL = `
     <a href="#/haccp/pest-control" class="haccp-subnav__link">Nuisibles</a>
     <a href="#/haccp/maintenance" class="haccp-subnav__link">Maintenance</a>
     <a href="#/haccp/waste" class="haccp-subnav__link">Déchets</a>
+    <a href="#/haccp/corrective-actions" class="haccp-subnav__link">Actions correctives</a>
   </div>
 `;
 
