@@ -40,6 +40,7 @@ const JS_FILES = [
   'js/views/haccp-maintenance.js',
   'js/views/haccp-waste.js',
   'js/views/corrective-actions.js',
+  'js/views/traceability-downstream.js',
   'js/views/orders.js',
   'js/views/service.js',
   'js/views/kitchen.js',

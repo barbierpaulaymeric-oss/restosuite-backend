@@ -1262,4 +1262,52 @@ try {
   console.error('Seed corrective_actions_templates error:', e.message);
 }
 
+// ─── Migration: Traçabilité aval ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS downstream_traceability (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_name TEXT NOT NULL,
+      batch_number TEXT,
+      production_date TEXT,
+      destination_type TEXT CHECK(destination_type IN ('salle','livraison','traiteur','autre')),
+      destination_name TEXT,
+      quantity REAL,
+      unit TEXT DEFAULT 'kg',
+      dispatch_date TEXT,
+      dispatch_time TEXT,
+      temperature_at_dispatch REAL,
+      responsible_person TEXT,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_dt_dispatch_date ON downstream_traceability(dispatch_date);
+    CREATE INDEX IF NOT EXISTS idx_dt_batch_number ON downstream_traceability(batch_number);
+    CREATE INDEX IF NOT EXISTS idx_dt_product_name ON downstream_traceability(product_name);
+  `);
+  console.log('✅ Migration: downstream_traceability table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration downstream_traceability error:', e.message);
+}
+
+// ─── Seed: Traçabilité aval ───
+try {
+  const dtCount = get("SELECT COUNT(*) as c FROM downstream_traceability");
+  if (dtCount && dtCount.c === 0) {
+    const insertDT = db.prepare(`
+      INSERT INTO downstream_traceability
+        (product_name, batch_number, production_date, destination_type, destination_name, quantity, unit, dispatch_date, dispatch_time, temperature_at_dispatch, responsible_person, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertDT.run('Blanquette de veau', 'BV-2026-04-13-001', '2026-04-13', 'salle', 'Salle principale', 8.5, 'kg', '2026-04-13', '11:45', 63.2, 'Marie Dupont', 'Service déjeuner — plat du jour');
+    insertDT.run('Tarte aux pommes', 'TAP-2026-04-12-003', '2026-04-12', 'livraison', 'Livraison bureau Michelin', 2.4, 'kg', '2026-04-12', '09:30', 6.1, 'Thomas Bernard', 'Commande spéciale — 8 portions');
+    insertDT.run('Saumon gravlax', 'SG-2026-04-11-002', '2026-04-10', 'traiteur', 'Événement Mairie de Paris', 5.0, 'kg', '2026-04-11', '14:00', 4.8, 'Sophie Martin', 'Prestation traiteur 50 couverts — lot vérifié OK');
+    insertDT.run('Fond de veau brun', 'FV-2026-04-10-001', '2026-04-09', 'salle', 'Cuisine chaude', 3.0, 'L', '2026-04-10', '10:15', 65.0, 'Lucas Girard', 'Base sauce — sortie stock journalier');
+    insertDT.run('Mousse au chocolat', 'MC-2026-04-09-004', '2026-04-09', 'autre', 'Livraison hôpital Lariboisière', 1.8, 'kg', '2026-04-09', '08:00', 5.2, 'Marie Dupont', 'Commande institutionnelle hebdomadaire');
+    console.log("✅ Seed: 5 entrées traçabilité aval insérées");
+  }
+} catch (e) {
+  console.error('Seed downstream_traceability error:', e.message);
+}
+
 module.exports = { db, all, get, run };

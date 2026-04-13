@@ -80,6 +80,12 @@ const NAV_GROUPS = {
       { label: 'Mercuriale',        route: '/mercuriale',       icon: 'trending-up',  roles: ['gerant'], minPlan: 'essential' },
     ]
   },
+  traceability: {
+    label: 'Traçabilité',
+    items: [
+      { label: 'Traçabilité aval', route: '/traceability/downstream', icon: 'package-check', roles: ['gerant', 'cuisinier'] },
+    ]
+  },
 };
 
 const ROUTE_TO_GROUP = {
@@ -95,6 +101,7 @@ const ROUTE_TO_GROUP = {
   '/multi-site': 'config', '/api-keys': 'config', '/qrcodes': 'config',
   '/carbon': 'config', '/supplier-portal': 'config', '/errors-log': 'config',
   '/crm': 'config', '/subscribe': 'config', '/settings/plans': 'config',
+  '/traceability/downstream': 'traceability',
 };
 
 // ─── Command Palette shortcut ───
@@ -318,6 +325,7 @@ function registerRoutes() {
   Router.add(/^\/qrcodes$/, renderQRCodes);
   Router.add(/^\/settings\/plans$/, (highlightPlan) => renderPlans(highlightPlan));
   Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
+  Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
 }
 
 function bootApp(role, account, opts = {}) {
