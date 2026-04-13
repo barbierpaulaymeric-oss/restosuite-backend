@@ -30,6 +30,7 @@ const ROUTE_ROLES = {
   '/mercuriale': ['gerant'],
   '/qrcodes': ['gerant'],
   '/errors-log': ['gerant'],
+  '/fabrication-diagrams': ['gerant'],
 };
 
 function isRouteAllowed(path, role) {

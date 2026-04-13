@@ -23,6 +23,7 @@ const HACCP_SUBNAV_ITEMS = [
   { href: '#/haccp/allergens-plan',        label: 'Plan allergènes' },
   { href: '#/haccp/water',                 label: 'Eau' },
   { href: '#/haccp/pms-audit',             label: 'Audits PMS' },
+  { href: '#/haccp/tiac',                  label: 'TIAC' },
   { href: '#/pms/export',                  label: 'Export PMS', extra: ' haccp-subnav__link--export' },
 ];
 

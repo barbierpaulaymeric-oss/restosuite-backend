@@ -3615,6 +3615,7 @@ const HACCP_SUBNAV_ITEMS = [
   { href: "#/haccp/allergens-plan", label: "Plan allerg\xE8nes" },
   { href: "#/haccp/water", label: "Eau" },
   { href: "#/haccp/pms-audit", label: "Audits PMS" },
+  { href: "#/haccp/tiac", label: "TIAC" },
   { href: "#/pms/export", label: "Export PMS", extra: " haccp-subnav__link--export" }
 ];
 const HACCP_SUBNAV_FULL = {
@@ -4201,8 +4202,12 @@ async function renderHACCPCleaning() {
                 <span class="card-category">${freqLabels[task.frequency] || task.frequency}</span>
               </div>
               <p class="text-secondary text-sm">\u{1F4CD} ${escapeHtml(task.zone)}</p>
-              ${task.product ? `<p class="text-secondary text-sm">\u{1F9F4} ${escapeHtml(task.product)}</p>` : ""}
-              ${task.method ? `<p class="text-secondary text-sm" style="font-style:italic">\u{1F4CB} ${escapeHtml(task.method)}</p>` : ""}
+              ${task.product ? `<p class="text-secondary text-sm">\u{1F9F4} <strong>Produit :</strong> ${escapeHtml(task.product)}${task.concentration ? ` \u2014 <em>${escapeHtml(task.concentration)}</em>` : ""}</p>` : ""}
+              ${task.temperature_eau ? `<p class="text-secondary text-sm">\u{1F321}\uFE0F <strong>Eau :</strong> ${escapeHtml(task.temperature_eau)}</p>` : ""}
+              ${task.temps_contact ? `<p class="text-secondary text-sm">\u23F1\uFE0F <strong>Temps de contact :</strong> ${escapeHtml(task.temps_contact)}</p>` : ""}
+              ${task.rincage ? `<p class="text-secondary text-sm">\u{1F4A7} <strong>Rin\xE7age :</strong> ${escapeHtml(task.rincage)}</p>` : ""}
+              ${task.epi ? `<p class="text-secondary text-sm">\u{1F97D} <strong>EPI :</strong> ${escapeHtml(task.epi)}</p>` : ""}
+              ${task.method ? `<p class="text-secondary text-sm" style="font-style:italic;margin-top:var(--space-2)">\u{1F4CB} ${escapeHtml(task.method)}</p>` : ""}
               ${isGerant ? `
               <div class="actions-row" style="margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border-light)">
                 <button class="btn btn-ghost btn-sm btn-edit-task" data-id="${task.id}">\u270F\uFE0F Modifier</button>
@@ -4300,12 +4305,36 @@ function showCleaningTaskModal(task) {
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label>Produit</label>
-        <input type="text" class="form-control" id="task-product" value="${isEdit && task.product ? escapeHtml(task.product) : ""}" placeholder="ex: D\xE9graissant + d\xE9sinfectant">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Produit</label>
+          <input type="text" class="form-control" id="task-product" value="${isEdit && task.product ? escapeHtml(task.product) : ""}" placeholder="ex: D\xE9graissant + d\xE9sinfectant">
+        </div>
+        <div class="form-group">
+          <label>Concentration</label>
+          <input type="text" class="form-control" id="task-concentration" value="${isEdit && task.concentration ? escapeHtml(task.concentration) : ""}" placeholder="ex: 5ml/L ou dilution 1:20">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Temp\xE9rature de l'eau</label>
+          <input type="text" class="form-control" id="task-temperature_eau" value="${isEdit && task.temperature_eau ? escapeHtml(task.temperature_eau) : ""}" placeholder="ex: 60\xB0C">
+        </div>
+        <div class="form-group">
+          <label>Temps de contact</label>
+          <input type="text" class="form-control" id="task-temps_contact" value="${isEdit && task.temps_contact ? escapeHtml(task.temps_contact) : ""}" placeholder="ex: 15 minutes">
+        </div>
       </div>
       <div class="form-group">
-        <label>M\xE9thode</label>
+        <label>Rin\xE7age</label>
+        <input type="text" class="form-control" id="task-rincage" value="${isEdit && task.rincage ? escapeHtml(task.rincage) : ""}" placeholder="ex: Rin\xE7age eau claire obligatoire">
+      </div>
+      <div class="form-group">
+        <label>EPI n\xE9cessaires</label>
+        <input type="text" class="form-control" id="task-epi" value="${isEdit && task.epi ? escapeHtml(task.epi) : ""}" placeholder="ex: Gants nitrile, lunettes de protection">
+      </div>
+      <div class="form-group">
+        <label>M\xE9thode g\xE9n\xE9rale</label>
         <textarea class="form-control" id="task-method" rows="2" placeholder="ex: Nettoyer, rincer, d\xE9sinfecter">${isEdit && task.method ? escapeHtml(task.method) : ""}</textarea>
       </div>
       <div class="actions-row" style="justify-content:flex-end">
@@ -4325,6 +4354,11 @@ function showCleaningTaskModal(task) {
       zone: document.getElementById("task-zone").value.trim(),
       frequency: document.getElementById("task-frequency").value,
       product: document.getElementById("task-product").value.trim() || null,
+      concentration: document.getElementById("task-concentration").value.trim() || null,
+      temperature_eau: document.getElementById("task-temperature_eau").value.trim() || null,
+      temps_contact: document.getElementById("task-temps_contact").value.trim() || null,
+      rincage: document.getElementById("task-rincage").value.trim() || null,
+      epi: document.getElementById("task-epi").value.trim() || null,
       method: document.getElementById("task-method").value.trim() || null
     };
     if (!payload.name || !payload.zone) {
@@ -4406,10 +4440,14 @@ async function renderHACCPTraceability() {
               <tr>
                 <th>Date</th>
                 <th>Produit</th>
+                <th>N\xB0 BL</th>
                 <th>Fournisseur</th>
                 <th>N\xB0 Lot</th>
                 <th>DLC</th>
+                <th>DDM</th>
                 <th>T\xB0 R\xE9c.</th>
+                <th>Emballage</th>
+                <th>Aspect organo.</th>
                 <th>Quantit\xE9</th>
                 <th>Re\xE7u par</th>
               </tr>
@@ -4437,6 +4475,7 @@ function renderTraceRows(logs) {
       <tr>
         <td>${date.toLocaleDateString("fr-FR")}</td>
         <td style="font-weight:500">${escapeHtml(log.product_name)}</td>
+        <td class="mono">${escapeHtml(log.numero_bl || "\u2014")}</td>
         <td>${escapeHtml(log.supplier || "\u2014")}</td>
         <td class="mono">${escapeHtml(log.batch_number || "\u2014")}</td>
         <td class="${dlcClass}" style="font-weight:${dlcDays !== null && dlcDays <= 3 ? "600" : "400"}">
@@ -4444,7 +4483,10 @@ function renderTraceRows(logs) {
           ${dlcDays !== null && dlcDays <= 3 && dlcDays >= 0 ? ` <span class="badge badge--warning">J-${dlcDays}</span>` : ""}
           ${dlcDays !== null && dlcDays < 0 ? ' <span class="badge badge--danger">D\xE9pass\xE9e</span>' : ""}
         </td>
+        <td>${log.ddm ? new Date(log.ddm).toLocaleDateString("fr-FR") : "\u2014"}</td>
         <td class="mono">${log.temperature_at_reception != null ? log.temperature_at_reception + "\xB0C" : "\u2014"}</td>
+        <td>${escapeHtml(log.etat_emballage || "\u2014")}</td>
+        <td>${escapeHtml(log.conformite_organoleptique || "\u2014")}</td>
         <td class="mono">${log.quantity != null ? `${log.quantity} ${log.unit || ""}` : "\u2014"}</td>
         <td>${escapeHtml(log.received_by_name || "\u2014")}</td>
       </tr>
@@ -4504,12 +4546,22 @@ function showReceptionModal() {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>DLC</label>
-          <input type="date" class="form-control" id="rec-dlc" lang="fr">
+          <label>N\xB0 Bon de livraison</label>
+          <input type="text" class="form-control" id="rec-numero-bl" placeholder="ex: BL-2026-04512">
         </div>
         <div class="form-group">
           <label>T\xB0 \xE0 r\xE9ception (\xB0C)</label>
           <input type="number" step="0.1" class="form-control" id="rec-temp" placeholder="ex: 3.5" inputmode="decimal">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>DLC</label>
+          <input type="date" class="form-control" id="rec-dlc" lang="fr">
+        </div>
+        <div class="form-group">
+          <label>DDM (Date de Durabilit\xE9 Minimale)</label>
+          <input type="date" class="form-control" id="rec-ddm" lang="fr">
         </div>
       </div>
       <div class="form-row">
@@ -4530,8 +4582,30 @@ function showReceptionModal() {
         </div>
       </div>
       <div class="form-group">
+        <label>\xC9tat de l'emballage</label>
+        <select class="form-control" id="rec-emballage">
+          <option value="">\u2014 S\xE9lectionner \u2014</option>
+          <option value="Conforme">Conforme</option>
+          <option value="L\xE9g\xE8rement ab\xEEm\xE9">L\xE9g\xE8rement ab\xEEm\xE9</option>
+          <option value="Ab\xEEm\xE9 \u2014 refus\xE9">Ab\xEEm\xE9 \u2014 refus\xE9</option>
+          <option value="Gonfl\xE9">Gonfl\xE9</option>
+          <option value="Ouvert">Ouvert</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Conformit\xE9 organoleptique (aspect, odeur, couleur)</label>
+        <select class="form-control" id="rec-organo">
+          <option value="">\u2014 S\xE9lectionner \u2014</option>
+          <option value="Conforme">Conforme</option>
+          <option value="Odeur anormale">Odeur anormale</option>
+          <option value="Couleur anormale">Couleur anormale</option>
+          <option value="Texture anormale">Texture anormale</option>
+          <option value="Non conforme \u2014 refus\xE9">Non conforme \u2014 refus\xE9</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="rec-notes" placeholder="ex: Emballage l\xE9g\xE8rement ab\xEEm\xE9">
+        <input type="text" class="form-control" id="rec-notes" placeholder="ex: Remarque compl\xE9mentaire">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="rec-cancel">Annuler</button>
@@ -4557,10 +4631,14 @@ function showReceptionModal() {
       product_name,
       supplier: document.getElementById("rec-supplier").value.trim() || null,
       batch_number: document.getElementById("rec-batch").value.trim() || null,
+      numero_bl: document.getElementById("rec-numero-bl").value.trim() || null,
       dlc: document.getElementById("rec-dlc").value || null,
+      ddm: document.getElementById("rec-ddm").value || null,
       temperature_at_reception: document.getElementById("rec-temp").value ? parseFloat(document.getElementById("rec-temp").value) : null,
       quantity: document.getElementById("rec-qty").value ? parseFloat(document.getElementById("rec-qty").value) : null,
       unit: document.getElementById("rec-unit").value,
+      etat_emballage: document.getElementById("rec-emballage").value || null,
+      conformite_organoleptique: document.getElementById("rec-organo").value || null,
       received_by: account ? account.id : null,
       notes: document.getElementById("rec-notes").value.trim() || null
     };
@@ -6262,6 +6340,222 @@ async function deletePmsAudit(id) {
   } catch (err) {
     alert("Erreur : " + err.message);
   }
+}
+async function renderHACCPTIAC() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const procedures = await API.request("/tiac");
+    const account = getAccount();
+    const isGerant = account && account.role === "gerant";
+    const statutColors = {
+      "en_cours": "var(--color-danger)",
+      "en_investigation": "var(--color-warning)",
+      "clos": "var(--color-success)"
+    };
+    const statutLabels = {
+      "en_cours": "En cours",
+      "en_investigation": "En investigation",
+      "clos": "Clos"
+    };
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="alert-octagon" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Proc\xE9dures TIAC</h1>
+          ${isGerant ? `
+          <button class="btn btn-primary" id="btn-new-tiac">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle proc\xE9dure
+          </button>
+          ` : ""}
+        </div>
+
+        ${HACCP_SUBNAV_FULL}
+
+        <div class="haccp-info-banner" style="background:var(--color-danger-light,rgba(239,68,68,0.08));border:1px solid var(--color-danger);border-radius:8px;padding:var(--space-3) var(--space-4);margin-bottom:var(--space-4);display:flex;gap:var(--space-3);align-items:flex-start">
+          <i data-lucide="info" style="width:20px;height:20px;color:var(--color-danger);flex-shrink:0;margin-top:2px"></i>
+          <div>
+            <strong style="color:var(--color-danger)">Obligations l\xE9gales TIAC</strong>
+            <p class="text-secondary text-sm" style="margin-top:4px">Toute suspicion de TIAC doit \xEAtre signal\xE9e sans d\xE9lai \xE0 l'ARS (Agence R\xE9gionale de Sant\xE9) et \xE0 la DDPP. Les plats t\xE9moins doivent \xEAtre conserv\xE9s 5 jours. La tra\xE7abilit\xE9 compl\xE8te des aliments suspects est obligatoire.</p>
+          </div>
+        </div>
+
+        ${procedures.length === 0 ? `
+          <div class="empty-state">
+            <div class="empty-icon"><i data-lucide="shield-check" style="width:48px;height:48px;color:var(--color-success)"></i></div>
+            <p>Aucune proc\xE9dure TIAC enregistr\xE9e</p>
+            <p class="text-secondary text-sm">En cas d'incident, d\xE9clarez une proc\xE9dure imm\xE9diatement.</p>
+          </div>
+        ` : `
+          <div class="haccp-tasks-grid">
+            ${procedures.map((p) => `
+              <div class="card" style="border-left:4px solid ${statutColors[p.statut] || "var(--border-light)"}">
+                <div class="card-header">
+                  <span class="card-title">${escapeHtml(new Date(p.date_incident).toLocaleDateString("fr-FR"))} \u2014 ${escapeHtml(p.nb_personnes)} personne(s) touch\xE9e(s)</span>
+                  <span class="badge" style="background:${statutColors[p.statut] || "var(--color-info)"};color:white;font-size:11px;padding:2px 8px;border-radius:20px">${statutLabels[p.statut] || p.statut}</span>
+                </div>
+                <p class="text-sm" style="margin:var(--space-2) 0">${escapeHtml(p.description)}</p>
+                ${p.aliments_suspects ? `<p class="text-secondary text-sm">\u{1F37D}\uFE0F <strong>Aliments suspects :</strong> ${escapeHtml(p.aliments_suspects)}</p>` : ""}
+                ${p.symptomes ? `<p class="text-secondary text-sm">\u{1F912} <strong>Sympt\xF4mes :</strong> ${escapeHtml(p.symptomes)}</p>` : ""}
+                <div class="tiac-checks" style="display:flex;gap:var(--space-3);margin-top:var(--space-3);flex-wrap:wrap">
+                  <span class="tiac-check ${p.declaration_ars ? "tiac-check--ok" : "tiac-check--nok"}">
+                    ${p.declaration_ars ? "\u2705" : "\u274C"} D\xE9claration ARS
+                  </span>
+                  <span class="tiac-check ${p.plats_temoins_conserves ? "tiac-check--ok" : "tiac-check--nok"}">
+                    ${p.plats_temoins_conserves ? "\u2705" : "\u274C"} Plats t\xE9moins conserv\xE9s
+                  </span>
+                </div>
+                ${p.contact_ddpp ? `<p class="text-secondary text-sm" style="margin-top:var(--space-2)">\u{1F4DE} DDPP : ${escapeHtml(p.contact_ddpp)}</p>` : ""}
+                ${isGerant ? `
+                <div class="actions-row" style="margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border-light)">
+                  <button class="btn btn-ghost btn-sm btn-edit-tiac" data-id="${p.id}">\u270F\uFE0F Modifier</button>
+                  <button class="btn btn-ghost btn-sm btn-delete-tiac" data-id="${p.id}">\u{1F5D1}\uFE0F Supprimer</button>
+                </div>
+                ` : ""}
+              </div>
+            `).join("")}
+          </div>
+        `}
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupTIACEvents(procedures);
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function setupTIACEvents(procedures) {
+  var _a;
+  (_a = document.getElementById("btn-new-tiac")) == null ? void 0 : _a.addEventListener("click", () => showTIACModal(null));
+  document.querySelectorAll(".btn-edit-tiac").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const p = procedures.find((x) => x.id === Number(btn.dataset.id));
+      if (p) showTIACModal(p);
+    });
+  });
+  document.querySelectorAll(".btn-delete-tiac").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      showConfirmModal("Supprimer la proc\xE9dure", "\xCAtes-vous s\xFBr de vouloir supprimer cette proc\xE9dure TIAC ?", async () => {
+        try {
+          await API.request(`/tiac/${btn.dataset.id}`, { method: "DELETE" });
+          showToast("Proc\xE9dure supprim\xE9e", "success");
+          renderHACCPTIAC();
+        } catch (err) {
+          showToast("Erreur : " + err.message, "error");
+        }
+      }, { confirmText: "Supprimer", confirmClass: "btn btn-danger" });
+    });
+  });
+}
+function showTIACModal(procedure) {
+  const isEdit = !!procedure;
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:640px">
+      <h2><i data-lucide="${isEdit ? "pencil" : "plus"}" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>${isEdit ? "Modifier la proc\xE9dure TIAC" : "Nouvelle proc\xE9dure TIAC"}</h2>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date de l'incident *</label>
+          <input type="date" class="form-control" id="tiac-date" value="${isEdit && procedure.date_incident ? procedure.date_incident.slice(0, 10) : ""}">
+        </div>
+        <div class="form-group">
+          <label>Nombre de personnes touch\xE9es</label>
+          <input type="number" class="form-control" id="tiac-nb" min="0" value="${isEdit ? procedure.nb_personnes || 0 : ""}">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Description de l'incident *</label>
+        <textarea class="form-control" id="tiac-description" rows="3" placeholder="D\xE9crivez le contexte, les repas concern\xE9s...">${isEdit ? escapeHtml(procedure.description || "") : ""}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Sympt\xF4mes observ\xE9s</label>
+        <input type="text" class="form-control" id="tiac-symptomes" value="${isEdit ? escapeHtml(procedure.symptomes || "") : ""}" placeholder="ex: Naus\xE9es, vomissements, diarrh\xE9es (apparition 4-6h)">
+      </div>
+
+      <div class="form-group">
+        <label>Aliments suspects</label>
+        <input type="text" class="form-control" id="tiac-aliments" value="${isEdit ? escapeHtml(procedure.aliments_suspects || "") : ""}" placeholder="ex: Poulet r\xF4ti \u2014 lot LOT-2026-0312">
+      </div>
+
+      <div class="form-group">
+        <label>Mesures conservatoires prises</label>
+        <textarea class="form-control" id="tiac-mesures" rows="2" placeholder="ex: Mise en quarantaine du stock, arr\xEAt du service, nettoyage...">${isEdit ? escapeHtml(procedure.mesures_conservatoires || "") : ""}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Contact DDPP</label>
+        <input type="text" class="form-control" id="tiac-contact" value="${isEdit ? escapeHtml(procedure.contact_ddpp || "") : ""}" placeholder="ex: DDPP 75 \u2014 T\xE9l : 01 40 07 22 00">
+      </div>
+
+      <div class="form-row" style="margin-top:var(--space-3)">
+        <label class="checkbox-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="tiac-ars" ${isEdit && procedure.declaration_ars ? "checked" : ""}>
+          <span>D\xE9claration ARS effectu\xE9e</span>
+        </label>
+        <label class="checkbox-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="tiac-plats" ${isEdit && procedure.plats_temoins_conserves ? "checked" : ""}>
+          <span>Plats t\xE9moins conserv\xE9s</span>
+        </label>
+      </div>
+
+      <div class="form-group" style="margin-top:var(--space-3)">
+        <label>Statut</label>
+        <select class="form-control" id="tiac-statut">
+          <option value="en_cours" ${isEdit && procedure.statut === "en_cours" ? "selected" : ""}>En cours</option>
+          <option value="en_investigation" ${isEdit && procedure.statut === "en_investigation" ? "selected" : ""}>En investigation</option>
+          <option value="clos" ${isEdit && procedure.statut === "clos" ? "selected" : ""}>Clos</option>
+        </select>
+      </div>
+
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="tiac-cancel">Annuler</button>
+        <button class="btn btn-primary" id="tiac-save">${isEdit ? "Modifier" : "Cr\xE9er"}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("tiac-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("tiac-save").addEventListener("click", async () => {
+    const date_incident = document.getElementById("tiac-date").value;
+    const description = document.getElementById("tiac-description").value.trim();
+    if (!date_incident || !description) {
+      showToast("La date et la description sont requises", "error");
+      return;
+    }
+    const payload = {
+      date_incident,
+      description,
+      nb_personnes: parseInt(document.getElementById("tiac-nb").value) || 0,
+      symptomes: document.getElementById("tiac-symptomes").value.trim() || null,
+      aliments_suspects: document.getElementById("tiac-aliments").value.trim() || null,
+      mesures_conservatoires: document.getElementById("tiac-mesures").value.trim() || null,
+      contact_ddpp: document.getElementById("tiac-contact").value.trim() || null,
+      declaration_ars: document.getElementById("tiac-ars").checked,
+      plats_temoins_conserves: document.getElementById("tiac-plats").checked,
+      statut: document.getElementById("tiac-statut").value
+    };
+    try {
+      if (isEdit) {
+        await API.request(`/tiac/${procedure.id}`, { method: "PUT", body: JSON.stringify(payload) });
+      } else {
+        await API.request("/tiac", { method: "POST", body: JSON.stringify(payload) });
+      }
+      overlay.remove();
+      showToast(isEdit ? "Proc\xE9dure modifi\xE9e \u2713" : "Proc\xE9dure cr\xE9\xE9e \u2713", "success");
+      renderHACCPTIAC();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
 }
 async function renderSanitaryApproval() {
   const app = document.getElementById("app");
@@ -9378,6 +9672,245 @@ Cette action est irr\xE9versible.`)) return;
     }
   }
   renderPage(allItems, null);
+}
+async function renderFabricationDiagrams() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const diagrams = await API.request("/fabrication-diagrams");
+    const account = getAccount();
+    const isGerant = account && account.role === "gerant";
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="git-branch" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Diagrammes de fabrication</h1>
+          ${isGerant ? `
+          <button class="btn btn-primary" id="btn-new-diagram">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau diagramme
+          </button>
+          ` : ""}
+        </div>
+
+        <p class="text-secondary text-sm" style="margin-bottom:var(--space-4)">
+          Les diagrammes de fabrication repr\xE9sentent le flux de production de vos plats, du r\xE9ception \xE0 la mise en service. Ils constituent un \xE9l\xE9ment essentiel du Plan de Ma\xEEtrise Sanitaire (PMS).
+        </p>
+
+        ${diagrams.length === 0 ? `
+          <div class="empty-state">
+            <div class="empty-icon"><i data-lucide="git-branch" style="width:48px;height:48px;color:var(--text-tertiary)"></i></div>
+            <p>Aucun diagramme de fabrication</p>
+          </div>
+        ` : diagrams.map((d) => renderDiagram(d, isGerant)).join("")}
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupDiagramEvents(diagrams);
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function renderDiagram(diagram, isGerant) {
+  const etapes = Array.isArray(diagram.etapes) ? diagram.etapes : [];
+  const etapesSorted = etapes.slice().sort((a, b) => a.ordre - b.ordre);
+  return `
+    <div class="card" style="margin-bottom:var(--space-4)">
+      <div class="card-header" style="margin-bottom:var(--space-3)">
+        <div>
+          <span class="card-title" style="font-size:1.1rem">${escapeHtml(diagram.nom)}</span>
+          ${diagram.description ? `<p class="text-secondary text-sm" style="margin-top:4px">${escapeHtml(diagram.description)}</p>` : ""}
+        </div>
+        ${isGerant ? `
+        <div class="actions-row" style="gap:var(--space-2)">
+          <button class="btn btn-ghost btn-sm btn-edit-diagram" data-id="${diagram.id}">\u270F\uFE0F Modifier</button>
+          <button class="btn btn-ghost btn-sm btn-delete-diagram" data-id="${diagram.id}" data-name="${escapeHtml(diagram.nom)}">\u{1F5D1}\uFE0F</button>
+        </div>
+        ` : ""}
+      </div>
+
+      <div class="fabrication-flow">
+        ${etapesSorted.map((etape, idx) => `
+          <div class="fabrication-step ${etape.ccp ? "fabrication-step--ccp" : ""}">
+            <div class="fabrication-step__number">${etape.ordre || idx + 1}</div>
+            <div class="fabrication-step__content">
+              <div class="fabrication-step__name">
+                ${escapeHtml(etape.nom)}
+                ${etape.ccp ? '<span class="badge" style="background:var(--color-danger);color:white;font-size:10px;padding:1px 6px;border-radius:20px;margin-left:6px">CCP</span>' : ""}
+              </div>
+              ${etape.description ? `<div class="fabrication-step__desc text-secondary text-sm">${escapeHtml(etape.description)}</div>` : ""}
+              ${etape.point_maitrise ? `
+                <div class="fabrication-step__pm text-sm" style="margin-top:4px;color:${etape.ccp ? "var(--color-danger)" : "var(--color-info)"};font-style:italic">
+                  \u26A0\uFE0F ${escapeHtml(etape.point_maitrise)}
+                </div>
+              ` : ""}
+            </div>
+          </div>
+          ${idx < etapesSorted.length - 1 ? `<div class="fabrication-arrow">\u25BC</div>` : ""}
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+function setupDiagramEvents(diagrams) {
+  var _a;
+  (_a = document.getElementById("btn-new-diagram")) == null ? void 0 : _a.addEventListener("click", () => showDiagramModal(null));
+  document.querySelectorAll(".btn-edit-diagram").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const d = diagrams.find((x) => x.id === Number(btn.dataset.id));
+      if (d) showDiagramModal(d);
+    });
+  });
+  document.querySelectorAll(".btn-delete-diagram").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const name = btn.dataset.name;
+      showConfirmModal("Supprimer le diagramme", `\xCAtes-vous s\xFBr de vouloir supprimer "${name}" ?`, async () => {
+        try {
+          await API.request(`/fabrication-diagrams/${btn.dataset.id}`, { method: "DELETE" });
+          showToast("Diagramme supprim\xE9", "success");
+          renderFabricationDiagrams();
+        } catch (err) {
+          showToast("Erreur : " + err.message, "error");
+        }
+      }, { confirmText: "Supprimer", confirmClass: "btn btn-danger" });
+    });
+  });
+}
+function showDiagramModal(diagram) {
+  const isEdit = !!diagram;
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const etapes = isEdit && Array.isArray(diagram.etapes) ? diagram.etapes.slice().sort((a, b) => a.ordre - b.ordre) : [
+    { ordre: 1, nom: "", description: "", ccp: false, point_maitrise: "" }
+  ];
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  const renderEtapeRows = (etapesList2) => etapesList2.map((e, i) => `
+    <div class="diagram-etape-row" data-idx="${i}" style="background:var(--bg-secondary,var(--bg-card));border:1px solid var(--border-light);border-radius:8px;padding:var(--space-3);margin-bottom:var(--space-2)">
+      <div class="form-row" style="align-items:center;margin-bottom:var(--space-2)">
+        <span style="font-weight:600;min-width:28px;color:var(--text-tertiary)">${i + 1}.</span>
+        <div class="form-group" style="flex:2;margin-bottom:0">
+          <input type="text" class="form-control etape-nom" placeholder="Nom de l'\xE9tape *" value="${escapeHtml(e.nom || "")}">
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;white-space:nowrap">
+          <input type="checkbox" class="etape-ccp" ${e.ccp ? "checked" : ""}> CCP
+        </label>
+        <button class="btn btn-ghost btn-sm btn-remove-etape" ${etapesList2.length <= 1 ? "disabled" : ""} style="padding:4px 8px;color:var(--color-danger)">\u2715</button>
+      </div>
+      <div class="form-group" style="margin-bottom:var(--space-2)">
+        <input type="text" class="form-control etape-desc" placeholder="Description de l'\xE9tape" value="${escapeHtml(e.description || "")}">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <input type="text" class="form-control etape-pm" placeholder="Point de ma\xEEtrise / limite critique" value="${escapeHtml(e.point_maitrise || "")}">
+      </div>
+    </div>
+  `).join("");
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:680px;max-height:90vh;overflow-y:auto">
+      <h2><i data-lucide="${isEdit ? "pencil" : "plus"}" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>${isEdit ? "Modifier le diagramme" : "Nouveau diagramme"}</h2>
+
+      <div class="form-group">
+        <label>Nom du diagramme *</label>
+        <input type="text" class="form-control" id="diag-nom" value="${isEdit ? escapeHtml(diagram.nom) : ""}" placeholder="ex: Service restaurant \u2014 liaison chaude">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea class="form-control" id="diag-desc" rows="2" placeholder="Description du diagramme...">${isEdit ? escapeHtml(diagram.description || "") : ""}</textarea>
+      </div>
+
+      <div style="margin-bottom:var(--space-3)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2)">
+          <label style="margin:0;font-weight:600">\xC9tapes</label>
+          <button class="btn btn-secondary btn-sm" id="btn-add-etape"><i data-lucide="plus" style="width:14px;height:14px"></i> Ajouter une \xE9tape</button>
+        </div>
+        <div id="etapes-container">
+          ${renderEtapeRows(etapes)}
+        </div>
+      </div>
+
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="diag-cancel">Annuler</button>
+        <button class="btn btn-primary" id="diag-save">${isEdit ? "Modifier" : "Cr\xE9er"}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  let etapesList = etapes.map((e) => __spreadValues({}, e));
+  function refreshEtapes() {
+    document.getElementById("etapes-container").innerHTML = renderEtapeRows(etapesList);
+    document.querySelectorAll(".btn-remove-etape").forEach((btn, i) => {
+      btn.addEventListener("click", () => {
+        if (etapesList.length <= 1) return;
+        etapesList.splice(i, 1);
+        etapesList.forEach((e, idx) => {
+          e.ordre = idx + 1;
+        });
+        refreshEtapes();
+      });
+    });
+  }
+  document.querySelectorAll(".btn-remove-etape").forEach((btn, i) => {
+    btn.addEventListener("click", () => {
+      if (etapesList.length <= 1) return;
+      etapesList.splice(i, 1);
+      etapesList.forEach((e, idx) => {
+        e.ordre = idx + 1;
+      });
+      refreshEtapes();
+    });
+  });
+  document.getElementById("btn-add-etape").addEventListener("click", () => {
+    etapesList.push({ ordre: etapesList.length + 1, nom: "", description: "", ccp: false, point_maitrise: "" });
+    refreshEtapes();
+  });
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("diag-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("diag-save").addEventListener("click", async () => {
+    const nom = document.getElementById("diag-nom").value.trim();
+    if (!nom) {
+      showToast("Le nom est requis", "error");
+      return;
+    }
+    const rows = document.querySelectorAll(".diagram-etape-row");
+    const finalEtapes = [];
+    let valid = true;
+    rows.forEach((row, i) => {
+      const etapeNom = row.querySelector(".etape-nom").value.trim();
+      if (!etapeNom) {
+        valid = false;
+        return;
+      }
+      finalEtapes.push({
+        ordre: i + 1,
+        nom: etapeNom,
+        description: row.querySelector(".etape-desc").value.trim() || "",
+        ccp: row.querySelector(".etape-ccp").checked,
+        point_maitrise: row.querySelector(".etape-pm").value.trim() || ""
+      });
+    });
+    if (!valid || finalEtapes.length === 0) {
+      showToast("Chaque \xE9tape doit avoir un nom", "error");
+      return;
+    }
+    const payload = {
+      nom,
+      description: document.getElementById("diag-desc").value.trim() || null,
+      etapes: finalEtapes
+    };
+    try {
+      if (isEdit) {
+        await API.request(`/fabrication-diagrams/${diagram.id}`, { method: "PUT", body: JSON.stringify(payload) });
+      } else {
+        await API.request("/fabrication-diagrams", { method: "POST", body: JSON.stringify(payload) });
+      }
+      overlay.remove();
+      showToast(isEdit ? "Diagramme modifi\xE9 \u2713" : "Diagramme cr\xE9\xE9 \u2713", "success");
+      renderFabricationDiagrams();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
 }
 let _pmsPeriod = "3m";
 let _pmsData = null;
@@ -20698,7 +21231,8 @@ const ROUTE_ROLES = {
   "/scan-invoice": ["gerant"],
   "/mercuriale": ["gerant"],
   "/qrcodes": ["gerant"],
-  "/errors-log": ["gerant"]
+  "/errors-log": ["gerant"],
+  "/fabrication-diagrams": ["gerant"]
 };
 function isRouteAllowed(path, role) {
   if (ROUTE_ROLES[path]) {
@@ -20841,6 +21375,7 @@ const NAV_GROUPS = {
   documents: {
     label: "Documents",
     items: [
+      { label: "Diagrammes de fabrication", route: "/fabrication-diagrams", icon: "git-branch", roles: ["gerant"] },
       { label: "Export PMS complet", route: "/pms/export", icon: "file-text", roles: ["gerant"] }
     ]
   }
@@ -20878,6 +21413,7 @@ const ROUTE_TO_GROUP = {
   "/settings": "config",
   "/settings/sanitary-approval": "config",
   "/traceability/downstream": "traceability",
+  "/fabrication-diagrams": "documents",
   "/pms/export": "documents"
 };
 document.addEventListener("keydown", (e) => {
@@ -21053,6 +21589,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/allergens-plan$/, renderHACCPAllergensplan);
   Router.add(/^\/haccp\/water$/, renderHACCPWater);
   Router.add(/^\/haccp\/pms-audit$/, renderHACCPPmsAudit);
+  Router.add(/^\/haccp\/tiac$/, renderHACCPTIAC);
   Router.add(/^\/settings\/sanitary-approval$/, renderSanitaryApproval);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, () => {
@@ -21081,6 +21618,7 @@ function registerRoutes() {
   Router.add(/^\/settings\/plans$/, (highlightPlan) => renderPlans(highlightPlan));
   Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
   Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
+  Router.add(/^\/fabrication-diagrams$/, renderFabricationDiagrams);
   Router.add(/^\/pms\/export$/, renderPMSExport);
 }
 function showPlanGateModal(planLabel) {

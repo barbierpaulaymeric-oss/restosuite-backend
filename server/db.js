@@ -1587,4 +1587,191 @@ try {
   if (!e.message.includes('already exists')) console.error('Migration sanitary_settings error:', e.message);
 }
 
+// ─── Migration: Protocoles nettoyage enrichis ───
+try {
+  const cleaningCols = all('PRAGMA table_info(cleaning_tasks)');
+  const cleaningColNames = cleaningCols.map(c => c.name);
+  if (!cleaningColNames.includes('concentration')) {
+    db.exec("ALTER TABLE cleaning_tasks ADD COLUMN concentration TEXT");
+    console.log('✅ Migration: cleaning_tasks.concentration ajouté');
+  }
+  if (!cleaningColNames.includes('temps_contact')) {
+    db.exec("ALTER TABLE cleaning_tasks ADD COLUMN temps_contact TEXT");
+    console.log('✅ Migration: cleaning_tasks.temps_contact ajouté');
+  }
+  if (!cleaningColNames.includes('temperature_eau')) {
+    db.exec("ALTER TABLE cleaning_tasks ADD COLUMN temperature_eau TEXT");
+    console.log('✅ Migration: cleaning_tasks.temperature_eau ajouté');
+  }
+  if (!cleaningColNames.includes('rincage')) {
+    db.exec("ALTER TABLE cleaning_tasks ADD COLUMN rincage TEXT");
+    console.log('✅ Migration: cleaning_tasks.rincage ajouté');
+  }
+  if (!cleaningColNames.includes('epi')) {
+    db.exec("ALTER TABLE cleaning_tasks ADD COLUMN epi TEXT");
+    console.log('✅ Migration: cleaning_tasks.epi ajouté');
+  }
+
+  // Enrichir les tâches de nettoyage existantes si elles n'ont pas encore de protocole
+  const existingTasks = all('SELECT * FROM cleaning_tasks');
+  const enrichedProtocols = {
+    'Plans de travail': {
+      concentration: '5ml/L',
+      temps_contact: '5 minutes',
+      temperature_eau: '40°C',
+      rincage: 'Rinçage eau claire obligatoire',
+      epi: 'Gants nitrile, tablier imperméable',
+    },
+    'Sols cuisine': {
+      concentration: 'Dilution 1:20',
+      temps_contact: '10 minutes',
+      temperature_eau: '50°C',
+      rincage: 'Rinçage eau claire après désinfection',
+      epi: 'Gants de ménage, bottes antidérapantes',
+    },
+    'Frigos': {
+      concentration: '10ml/L',
+      temps_contact: '15 minutes',
+      temperature_eau: '30°C (eau tiède)',
+      rincage: 'Rinçage eau claire + séchage obligatoire',
+      epi: 'Gants nitrile, lunettes de protection',
+    },
+    'Hotte et filtres': {
+      concentration: 'Pur (dégraissant concentré)',
+      temps_contact: '20 minutes (trempage)',
+      temperature_eau: '60°C',
+      rincage: 'Rinçage eau chaude sous pression',
+      epi: 'Gants résistants aux produits chimiques, lunettes, tablier',
+    },
+    'Congélateur': {
+      concentration: '10ml/L',
+      temps_contact: '15 minutes',
+      temperature_eau: 'Température ambiante',
+      rincage: 'Rinçage eau claire + séchage complet avant remise en froid',
+      epi: 'Gants nitrile, vêtements chauds',
+    },
+  };
+
+  const updateProtocol = db.prepare(
+    'UPDATE cleaning_tasks SET concentration = ?, temps_contact = ?, temperature_eau = ?, rincage = ?, epi = ? WHERE name = ? AND concentration IS NULL'
+  );
+  for (const [name, proto] of Object.entries(enrichedProtocols)) {
+    updateProtocol.run(proto.concentration, proto.temps_contact, proto.temperature_eau, proto.rincage, proto.epi, name);
+  }
+  console.log('✅ Migration: protocoles nettoyage enrichis');
+} catch (e) {
+  console.error('Migration cleaning protocols error:', e.message);
+}
+
+// ─── Migration: Traçabilité réception enrichie ───
+try {
+  const traceCols = all('PRAGMA table_info(traceability_logs)');
+  const traceColNames = traceCols.map(c => c.name);
+  if (!traceColNames.includes('etat_emballage')) {
+    db.exec("ALTER TABLE traceability_logs ADD COLUMN etat_emballage TEXT");
+    console.log('✅ Migration: traceability_logs.etat_emballage ajouté');
+  }
+  if (!traceColNames.includes('conformite_organoleptique')) {
+    db.exec("ALTER TABLE traceability_logs ADD COLUMN conformite_organoleptique TEXT");
+    console.log('✅ Migration: traceability_logs.conformite_organoleptique ajouté');
+  }
+  if (!traceColNames.includes('numero_bl')) {
+    db.exec("ALTER TABLE traceability_logs ADD COLUMN numero_bl TEXT");
+    console.log('✅ Migration: traceability_logs.numero_bl ajouté');
+  }
+  if (!traceColNames.includes('ddm')) {
+    db.exec("ALTER TABLE traceability_logs ADD COLUMN ddm DATE");
+    console.log('✅ Migration: traceability_logs.ddm ajouté');
+  }
+  console.log('✅ Migration: traçabilité réception enrichie');
+} catch (e) {
+  console.error('Migration traceability enrichie error:', e.message);
+}
+
+// ─── Migration: TIAC (Toxi-Infections Alimentaires Collectives) ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tiac_procedures (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date_incident DATE NOT NULL,
+      description TEXT NOT NULL,
+      nb_personnes INTEGER DEFAULT 0,
+      symptomes TEXT,
+      aliments_suspects TEXT,
+      mesures_conservatoires TEXT,
+      declaration_ars INTEGER DEFAULT 0,
+      plats_temoins_conserves INTEGER DEFAULT 0,
+      contact_ddpp TEXT,
+      statut TEXT DEFAULT 'en_cours',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('✅ Migration: tiac_procedures table ready');
+
+  const tiacCount = get('SELECT COUNT(*) as c FROM tiac_procedures');
+  if (tiacCount && tiacCount.c === 0) {
+    run(
+      `INSERT INTO tiac_procedures
+        (date_incident, description, nb_personnes, symptomes, aliments_suspects, mesures_conservatoires, declaration_ars, plats_temoins_conserves, contact_ddpp, statut)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        '2026-03-15',
+        'Signalement de 3 clients présentant des symptômes gastro-entérites après le service du midi. Repas identique : menu du jour (entrée salade César, plat poulet rôti-légumes, dessert tarte citron).',
+        3,
+        'Nausées, vomissements, diarrhées — apparition 4 à 6h après le repas',
+        'Poulet rôti (cuisson insuffisante suspectée) — lot LOT-2026-0312',
+        'Mise en quarantaine du stock de poulet concerné. Arrêt du service poulet. Nettoyage et désinfection complète de la cuisine. Convocation de l\'équipe.',
+        1,
+        1,
+        'DDPP 75 — Tél : 01 40 07 22 00 — Réf. dossier : TIAC-2026-042',
+        'clos',
+      ]
+    );
+    console.log('✅ Seed: 1 procédure TIAC insérée');
+  }
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration tiac_procedures error:', e.message);
+}
+
+// ─── Migration: Diagrammes de fabrication ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS fabrication_diagrams (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nom TEXT NOT NULL,
+      description TEXT,
+      etapes TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('✅ Migration: fabrication_diagrams table ready');
+
+  const diagCount = get('SELECT COUNT(*) as c FROM fabrication_diagrams');
+  if (diagCount && diagCount.c === 0) {
+    const etapesServiceRestaurant = JSON.stringify([
+      { ordre: 1, nom: 'Réception', description: 'Réception des marchandises — contrôle température, état emballage, DDM/DLC, n° lot', ccp: false, point_maitrise: 'Vérification T° : viandes <4°C, surgelés <-18°C' },
+      { ordre: 2, nom: 'Stockage', description: 'Stockage en chambre froide positive ou négative selon nature du produit', ccp: false, point_maitrise: 'Respect de la chaîne du froid, FIFO, séparation cru/cuit' },
+      { ordre: 3, nom: 'Préparation', description: 'Préparation et mise en place — découpe, assemblage, mise en portion', ccp: false, point_maitrise: 'Hygiène des mains, propreté du matériel, T° ambiante <18°C' },
+      { ordre: 4, nom: 'Cuisson', description: 'Cuisson des aliments selon les procédures définies par type de produit', ccp: true, point_maitrise: 'CCP : T° à cœur ≥70°C pendant 2 min (volailles : 75°C)' },
+      { ordre: 5, nom: 'Refroidissement', description: 'Refroidissement rapide si préparation à l\'avance (liaison froide)', ccp: true, point_maitrise: 'CCP : passage de +63°C à +10°C en moins de 2h' },
+      { ordre: 6, nom: 'Remise en température', description: 'Remise en température des plats préparés à l\'avance (liaison froide)', ccp: true, point_maitrise: 'CCP : T° à cœur ≥63°C en moins d\'1h, service immédiat' },
+      { ordre: 7, nom: 'Service', description: 'Dressage et envoi des assiettes en salle — temps d\'attente limité', ccp: false, point_maitrise: 'Plats chauds maintenus à ≥63°C, plats froids à ≤10°C' },
+    ]);
+    run(
+      `INSERT INTO fabrication_diagrams (nom, description, etapes)
+       VALUES (?, ?, ?)`,
+      [
+        'Service restaurant — liaison chaude',
+        'Diagramme de fabrication pour le service en salle en liaison chaude. Couvre l\'ensemble du flux de production depuis la réception des matières premières jusqu\'au service client.',
+        etapesServiceRestaurant,
+      ]
+    );
+    console.log('✅ Seed: 1 diagramme de fabrication inséré');
+  }
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration fabrication_diagrams error:', e.message);
+}
+
 module.exports = { db, all, get, run };

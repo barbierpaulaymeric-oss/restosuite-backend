@@ -65,10 +65,14 @@ async function renderHACCPTraceability() {
               <tr>
                 <th>Date</th>
                 <th>Produit</th>
+                <th>N° BL</th>
                 <th>Fournisseur</th>
                 <th>N° Lot</th>
                 <th>DLC</th>
+                <th>DDM</th>
                 <th>T° Réc.</th>
+                <th>Emballage</th>
+                <th>Aspect organo.</th>
                 <th>Quantité</th>
                 <th>Reçu par</th>
               </tr>
@@ -98,6 +102,7 @@ function renderTraceRows(logs) {
       <tr>
         <td>${date.toLocaleDateString('fr-FR')}</td>
         <td style="font-weight:500">${escapeHtml(log.product_name)}</td>
+        <td class="mono">${escapeHtml(log.numero_bl || '—')}</td>
         <td>${escapeHtml(log.supplier || '—')}</td>
         <td class="mono">${escapeHtml(log.batch_number || '—')}</td>
         <td class="${dlcClass}" style="font-weight:${dlcDays !== null && dlcDays <= 3 ? '600' : '400'}">
@@ -105,7 +110,10 @@ function renderTraceRows(logs) {
           ${dlcDays !== null && dlcDays <= 3 && dlcDays >= 0 ? ` <span class="badge badge--warning">J-${dlcDays}</span>` : ''}
           ${dlcDays !== null && dlcDays < 0 ? ' <span class="badge badge--danger">Dépassée</span>' : ''}
         </td>
+        <td>${log.ddm ? new Date(log.ddm).toLocaleDateString('fr-FR') : '—'}</td>
         <td class="mono">${log.temperature_at_reception != null ? log.temperature_at_reception + '°C' : '—'}</td>
+        <td>${escapeHtml(log.etat_emballage || '—')}</td>
+        <td>${escapeHtml(log.conformite_organoleptique || '—')}</td>
         <td class="mono">${log.quantity != null ? `${log.quantity} ${log.unit || ''}` : '—'}</td>
         <td>${escapeHtml(log.received_by_name || '—')}</td>
       </tr>
@@ -172,12 +180,22 @@ function showReceptionModal() {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>DLC</label>
-          <input type="date" class="form-control" id="rec-dlc" lang="fr">
+          <label>N° Bon de livraison</label>
+          <input type="text" class="form-control" id="rec-numero-bl" placeholder="ex: BL-2026-04512">
         </div>
         <div class="form-group">
           <label>T° à réception (°C)</label>
           <input type="number" step="0.1" class="form-control" id="rec-temp" placeholder="ex: 3.5" inputmode="decimal">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>DLC</label>
+          <input type="date" class="form-control" id="rec-dlc" lang="fr">
+        </div>
+        <div class="form-group">
+          <label>DDM (Date de Durabilité Minimale)</label>
+          <input type="date" class="form-control" id="rec-ddm" lang="fr">
         </div>
       </div>
       <div class="form-row">
@@ -198,8 +216,30 @@ function showReceptionModal() {
         </div>
       </div>
       <div class="form-group">
+        <label>État de l'emballage</label>
+        <select class="form-control" id="rec-emballage">
+          <option value="">— Sélectionner —</option>
+          <option value="Conforme">Conforme</option>
+          <option value="Légèrement abîmé">Légèrement abîmé</option>
+          <option value="Abîmé — refusé">Abîmé — refusé</option>
+          <option value="Gonflé">Gonflé</option>
+          <option value="Ouvert">Ouvert</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Conformité organoleptique (aspect, odeur, couleur)</label>
+        <select class="form-control" id="rec-organo">
+          <option value="">— Sélectionner —</option>
+          <option value="Conforme">Conforme</option>
+          <option value="Odeur anormale">Odeur anormale</option>
+          <option value="Couleur anormale">Couleur anormale</option>
+          <option value="Texture anormale">Texture anormale</option>
+          <option value="Non conforme — refusé">Non conforme — refusé</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="rec-notes" placeholder="ex: Emballage légèrement abîmé">
+        <input type="text" class="form-control" id="rec-notes" placeholder="ex: Remarque complémentaire">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="rec-cancel">Annuler</button>
@@ -225,10 +265,14 @@ function showReceptionModal() {
       product_name,
       supplier: document.getElementById('rec-supplier').value.trim() || null,
       batch_number: document.getElementById('rec-batch').value.trim() || null,
+      numero_bl: document.getElementById('rec-numero-bl').value.trim() || null,
       dlc: document.getElementById('rec-dlc').value || null,
+      ddm: document.getElementById('rec-ddm').value || null,
       temperature_at_reception: document.getElementById('rec-temp').value ? parseFloat(document.getElementById('rec-temp').value) : null,
       quantity: document.getElementById('rec-qty').value ? parseFloat(document.getElementById('rec-qty').value) : null,
       unit: document.getElementById('rec-unit').value,
+      etat_emballage: document.getElementById('rec-emballage').value || null,
+      conformite_organoleptique: document.getElementById('rec-organo').value || null,
       received_by: account ? account.id : null,
       notes: document.getElementById('rec-notes').value.trim() || null,
     };

@@ -5395,3 +5395,81 @@ button.nav-link {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Diagrammes de fabrication ── */
+.fabrication-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: var(--space-2) 0;
+}
+.fabrication-step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  background: var(--bg-secondary, var(--bg-card));
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: var(--space-3) var(--space-4);
+  width: 100%;
+  max-width: 680px;
+  position: relative;
+}
+.fabrication-step--ccp {
+  border-color: var(--color-danger);
+  background: rgba(239,68,68,0.04);
+}
+.fabrication-step__number {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.fabrication-step--ccp .fabrication-step__number {
+  background: var(--color-danger);
+}
+.fabrication-step__content {
+  flex: 1;
+}
+.fabrication-step__name {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.fabrication-step__desc {
+  color: var(--text-secondary);
+}
+.fabrication-step__pm {
+  font-style: italic;
+}
+.fabrication-arrow {
+  color: var(--text-tertiary);
+  padding: 4px 0 4px 12px;
+  font-size: 16px;
+}
+
+/* ── TIAC checks ── */
+.tiac-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: var(--bg-secondary, var(--bg-card));
+  border: 1px solid var(--border-light);
+}
+.tiac-check--ok {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+.tiac-check--nok {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}

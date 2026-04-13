@@ -202,11 +202,12 @@ router.get('/cleaning', (req, res) => {
 });
 
 router.post('/cleaning', (req, res) => {
-  const { name, zone, frequency, product, method } = req.body;
+  const { name, zone, frequency, product, method, concentration, temps_contact, temperature_eau, rincage, epi } = req.body;
   if (!name || !zone) return res.status(400).json({ error: 'name et zone sont requis' });
   const info = run(
-    'INSERT INTO cleaning_tasks (name, zone, frequency, product, method) VALUES (?, ?, ?, ?, ?)',
-    [name, zone, frequency || 'daily', product || null, method || null]
+    'INSERT INTO cleaning_tasks (name, zone, frequency, product, method, concentration, temps_contact, temperature_eau, rincage, epi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [name, zone, frequency || 'daily', product || null, method || null,
+     concentration || null, temps_contact || null, temperature_eau || null, rincage || null, epi || null]
   );
   res.status(201).json(get('SELECT * FROM cleaning_tasks WHERE id = ?', [info.lastInsertRowid]));
 });
@@ -215,11 +216,16 @@ router.put('/cleaning/:id', (req, res) => {
   const id = Number(req.params.id);
   const existing = get('SELECT * FROM cleaning_tasks WHERE id = ?', [id]);
   if (!existing) return res.status(404).json({ error: 'Tâche introuvable' });
-  const { name, zone, frequency, product, method } = req.body;
+  const { name, zone, frequency, product, method, concentration, temps_contact, temperature_eau, rincage, epi } = req.body;
   run(
-    'UPDATE cleaning_tasks SET name = ?, zone = ?, frequency = ?, product = ?, method = ? WHERE id = ?',
+    'UPDATE cleaning_tasks SET name = ?, zone = ?, frequency = ?, product = ?, method = ?, concentration = ?, temps_contact = ?, temperature_eau = ?, rincage = ?, epi = ? WHERE id = ?',
     [name || existing.name, zone || existing.zone, frequency || existing.frequency,
-     product !== undefined ? product : existing.product, method !== undefined ? method : existing.method, id]
+     product !== undefined ? product : existing.product, method !== undefined ? method : existing.method,
+     concentration !== undefined ? concentration : existing.concentration,
+     temps_contact !== undefined ? temps_contact : existing.temps_contact,
+     temperature_eau !== undefined ? temperature_eau : existing.temperature_eau,
+     rincage !== undefined ? rincage : existing.rincage,
+     epi !== undefined ? epi : existing.epi, id]
   );
   res.json(get('SELECT * FROM cleaning_tasks WHERE id = ?', [id]));
 });
@@ -304,13 +310,14 @@ router.get('/traceability', (req, res) => {
 });
 
 router.post('/traceability', (req, res) => {
-  const { product_name, supplier, batch_number, dlc, temperature_at_reception, quantity, unit, received_by, notes } = req.body;
+  const { product_name, supplier, batch_number, dlc, ddm, temperature_at_reception, quantity, unit, received_by, notes, etat_emballage, conformite_organoleptique, numero_bl } = req.body;
   if (!product_name) return res.status(400).json({ error: 'Le nom du produit est requis' });
   const info = run(
-    `INSERT INTO traceability_logs (product_name, supplier, batch_number, dlc, temperature_at_reception, quantity, unit, received_by, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [product_name, supplier || null, batch_number || null, dlc || null,
-     temperature_at_reception ?? null, quantity ?? null, unit || 'kg', received_by || null, notes || null]
+    `INSERT INTO traceability_logs (product_name, supplier, batch_number, dlc, ddm, temperature_at_reception, quantity, unit, received_by, notes, etat_emballage, conformite_organoleptique, numero_bl)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [product_name, supplier || null, batch_number || null, dlc || null, ddm || null,
+     temperature_at_reception ?? null, quantity ?? null, unit || 'kg', received_by || null, notes || null,
+     etat_emballage || null, conformite_organoleptique || null, numero_bl || null]
   );
   const log = get(`
     SELECT tl.*, a.name as received_by_name

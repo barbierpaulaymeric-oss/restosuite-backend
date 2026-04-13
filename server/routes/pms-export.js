@@ -159,6 +159,15 @@ router.get('/export', (req, res) => {
       SELECT * FROM non_conformities WHERE created_at >= ? ORDER BY detected_at DESC LIMIT 100
     `, [periodSince]);
 
+    // ── 20. Procédures TIAC ──
+    const tiacProcedures = all('SELECT * FROM tiac_procedures ORDER BY date_incident DESC');
+
+    // ── 21. Diagrammes de fabrication ──
+    const fabricationDiagrams = all('SELECT * FROM fabrication_diagrams ORDER BY nom ASC').map(d => ({
+      ...d,
+      etapes: JSON.parse(d.etapes || '[]'),
+    }));
+
     res.json({
       generated_at: new Date().toISOString(),
       period,
@@ -227,6 +236,8 @@ router.get('/export', (req, res) => {
       pms_audits: { items: pmsAudits },
       fryers: { items: fryers, checks: fryerChecks },
       non_conformities: { items: nonConformities },
+      tiac_procedures: { items: tiacProcedures, total: tiacProcedures.length },
+      fabrication_diagrams: { items: fabricationDiagrams, total: fabricationDiagrams.length },
     });
   } catch (e) {
     console.error('PMS export error:', e.message);

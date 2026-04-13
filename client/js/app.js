@@ -90,6 +90,7 @@ const NAV_GROUPS = {
   documents: {
     label: 'Documents',
     items: [
+      { label: 'Diagrammes de fabrication', route: '/fabrication-diagrams', icon: 'git-branch', roles: ['gerant'] },
       { label: 'Export PMS complet', route: '/pms/export', icon: 'file-text', roles: ['gerant'] },
     ]
   },
@@ -111,6 +112,7 @@ const ROUTE_TO_GROUP = {
   '/settings': 'config',
   '/settings/sanitary-approval': 'config',
   '/traceability/downstream': 'traceability',
+  '/fabrication-diagrams': 'documents',
   '/pms/export': 'documents',
 };
 
@@ -317,6 +319,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/allergens-plan$/, renderHACCPAllergensplan);
   Router.add(/^\/haccp\/water$/, renderHACCPWater);
   Router.add(/^\/haccp\/pms-audit$/, renderHACCPPmsAudit);
+  Router.add(/^\/haccp\/tiac$/, renderHACCPTIAC);
   Router.add(/^\/settings\/sanitary-approval$/, renderSanitaryApproval);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, () => { location.hash = '#/analytics'; });
@@ -341,6 +344,7 @@ function registerRoutes() {
   Router.add(/^\/settings\/plans$/, (highlightPlan) => renderPlans(highlightPlan));
   Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
   Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
+  Router.add(/^\/fabrication-diagrams$/, renderFabricationDiagrams);
   Router.add(/^\/pms\/export$/, renderPMSExport);
 }
 

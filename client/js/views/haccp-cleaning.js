@@ -73,8 +73,12 @@ async function renderHACCPCleaning() {
                 <span class="card-category">${freqLabels[task.frequency] || task.frequency}</span>
               </div>
               <p class="text-secondary text-sm">📍 ${escapeHtml(task.zone)}</p>
-              ${task.product ? `<p class="text-secondary text-sm">🧴 ${escapeHtml(task.product)}</p>` : ''}
-              ${task.method ? `<p class="text-secondary text-sm" style="font-style:italic">📋 ${escapeHtml(task.method)}</p>` : ''}
+              ${task.product ? `<p class="text-secondary text-sm">🧴 <strong>Produit :</strong> ${escapeHtml(task.product)}${task.concentration ? ` — <em>${escapeHtml(task.concentration)}</em>` : ''}</p>` : ''}
+              ${task.temperature_eau ? `<p class="text-secondary text-sm">🌡️ <strong>Eau :</strong> ${escapeHtml(task.temperature_eau)}</p>` : ''}
+              ${task.temps_contact ? `<p class="text-secondary text-sm">⏱️ <strong>Temps de contact :</strong> ${escapeHtml(task.temps_contact)}</p>` : ''}
+              ${task.rincage ? `<p class="text-secondary text-sm">💧 <strong>Rinçage :</strong> ${escapeHtml(task.rincage)}</p>` : ''}
+              ${task.epi ? `<p class="text-secondary text-sm">🥽 <strong>EPI :</strong> ${escapeHtml(task.epi)}</p>` : ''}
+              ${task.method ? `<p class="text-secondary text-sm" style="font-style:italic;margin-top:var(--space-2)">📋 ${escapeHtml(task.method)}</p>` : ''}
               ${isGerant ? `
               <div class="actions-row" style="margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border-light)">
                 <button class="btn btn-ghost btn-sm btn-edit-task" data-id="${task.id}">✏️ Modifier</button>
@@ -184,12 +188,36 @@ function showCleaningTaskModal(task) {
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label>Produit</label>
-        <input type="text" class="form-control" id="task-product" value="${isEdit && task.product ? escapeHtml(task.product) : ''}" placeholder="ex: Dégraissant + désinfectant">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Produit</label>
+          <input type="text" class="form-control" id="task-product" value="${isEdit && task.product ? escapeHtml(task.product) : ''}" placeholder="ex: Dégraissant + désinfectant">
+        </div>
+        <div class="form-group">
+          <label>Concentration</label>
+          <input type="text" class="form-control" id="task-concentration" value="${isEdit && task.concentration ? escapeHtml(task.concentration) : ''}" placeholder="ex: 5ml/L ou dilution 1:20">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Température de l'eau</label>
+          <input type="text" class="form-control" id="task-temperature_eau" value="${isEdit && task.temperature_eau ? escapeHtml(task.temperature_eau) : ''}" placeholder="ex: 60°C">
+        </div>
+        <div class="form-group">
+          <label>Temps de contact</label>
+          <input type="text" class="form-control" id="task-temps_contact" value="${isEdit && task.temps_contact ? escapeHtml(task.temps_contact) : ''}" placeholder="ex: 15 minutes">
+        </div>
       </div>
       <div class="form-group">
-        <label>Méthode</label>
+        <label>Rinçage</label>
+        <input type="text" class="form-control" id="task-rincage" value="${isEdit && task.rincage ? escapeHtml(task.rincage) : ''}" placeholder="ex: Rinçage eau claire obligatoire">
+      </div>
+      <div class="form-group">
+        <label>EPI nécessaires</label>
+        <input type="text" class="form-control" id="task-epi" value="${isEdit && task.epi ? escapeHtml(task.epi) : ''}" placeholder="ex: Gants nitrile, lunettes de protection">
+      </div>
+      <div class="form-group">
+        <label>Méthode générale</label>
         <textarea class="form-control" id="task-method" rows="2" placeholder="ex: Nettoyer, rincer, désinfecter">${isEdit && task.method ? escapeHtml(task.method) : ''}</textarea>
       </div>
       <div class="actions-row" style="justify-content:flex-end">
@@ -208,6 +236,11 @@ function showCleaningTaskModal(task) {
       zone: document.getElementById('task-zone').value.trim(),
       frequency: document.getElementById('task-frequency').value,
       product: document.getElementById('task-product').value.trim() || null,
+      concentration: document.getElementById('task-concentration').value.trim() || null,
+      temperature_eau: document.getElementById('task-temperature_eau').value.trim() || null,
+      temps_contact: document.getElementById('task-temps_contact').value.trim() || null,
+      rincage: document.getElementById('task-rincage').value.trim() || null,
+      epi: document.getElementById('task-epi').value.trim() || null,
       method: document.getElementById('task-method').value.trim() || null,
     };
     if (!payload.name || !payload.zone) {

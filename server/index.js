@@ -210,6 +210,8 @@ app.use('/api/water', require('./routes/water'));
 app.use('/api/pms-audit', require('./routes/pms-audit'));
 app.use('/api/sanitary', require('./routes/sanitary-settings'));
 app.use('/api/pms', require('./routes/pms-export'));
+app.use('/api/tiac', require('./routes/tiac'));
+app.use('/api/fabrication-diagrams', require('./routes/fabrication-diagrams'));
 app.use('/api/errors', require('./routes/errors').router);
 
 // Admin endpoints — JWT required (gérant only)
