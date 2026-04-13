@@ -152,7 +152,7 @@ app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
 
 // Trial write-protection middleware for write operations
 // Excludes: accounts (create/login), stripe, and GET requests
-const trialProtectedPaths = ['/api/ingredients', '/api/suppliers', '/api/prices', '/api/recipes', '/api/ai', '/api/haccp', '/api/stock', '/api/orders', '/api/deliveries', '/api/purchase-orders', '/api/allergens'];
+const trialProtectedPaths = ['/api/ingredients', '/api/suppliers', '/api/prices', '/api/recipes', '/api/ai', '/api/haccp', '/api/haccp-plan', '/api/stock', '/api/orders', '/api/deliveries', '/api/purchase-orders', '/api/allergens'];
 app.use(trialProtectedPaths, (req, res, next) => {
   if (req.method === 'GET') return next();
   // Allow HACCP PDF exports (GET only anyway) and pdf-export routes
@@ -176,6 +176,7 @@ app.use('/api/recipes', require('./routes/recipes'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/haccp', require('./routes/haccp'));
+app.use('/api/haccp-plan', require('./routes/haccp-plan'));
 app.use('/api/stock', require('./routes/stock'));
 app.use('/api/stripe', require('./routes/stripe'));
 app.use('/api/supplier-portal', require('./routes/supplier-portal'));

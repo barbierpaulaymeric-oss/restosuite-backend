@@ -275,6 +275,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/fryers$/, renderHACCPFryers);
   Router.add(/^\/haccp\/non-conformities$/, renderHACCPNonConformities);
   Router.add(/^\/haccp\/allergens$/, renderHACCPAllergens);
+  Router.add(/^\/haccp\/plan$/, renderHACCPPlan);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, () => { location.hash = '#/analytics'; });
   Router.add(/^\/more$/, () => new MoreView().render());

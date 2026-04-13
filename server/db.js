@@ -829,4 +829,82 @@ try {
   if (!e.message.includes('already exists')) console.error('Migration non_conformities error:', e.message);
 }
 
+// ─── Migration: HACCP Plan formalisé ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS haccp_hazard_analysis (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      step_name TEXT NOT NULL,
+      hazard_type TEXT NOT NULL DEFAULT 'B',
+      hazard_description TEXT NOT NULL,
+      severity INTEGER NOT NULL DEFAULT 3,
+      probability INTEGER NOT NULL DEFAULT 3,
+      is_ccp INTEGER DEFAULT 0,
+      preventive_measures TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS haccp_ccp (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hazard_analysis_id INTEGER NOT NULL REFERENCES haccp_hazard_analysis(id) ON DELETE CASCADE,
+      ccp_number TEXT NOT NULL,
+      critical_limits TEXT,
+      monitoring_procedure TEXT,
+      monitoring_frequency TEXT,
+      corrective_actions TEXT,
+      verification_procedure TEXT,
+      records_kept TEXT,
+      responsible_person TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS haccp_decision_tree_results (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hazard_analysis_id INTEGER NOT NULL REFERENCES haccp_hazard_analysis(id) ON DELETE CASCADE,
+      q1_preventive_measure INTEGER,
+      q2_step_designed_eliminate INTEGER,
+      q3_contamination_possible INTEGER,
+      q4_subsequent_step_eliminate INTEGER,
+      result TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_haccp_hazard_step ON haccp_hazard_analysis(step_name);
+    CREATE INDEX IF NOT EXISTS idx_haccp_ccp_hazard ON haccp_ccp(hazard_analysis_id);
+    CREATE INDEX IF NOT EXISTS idx_haccp_dt_hazard ON haccp_decision_tree_results(hazard_analysis_id);
+  `);
+  console.log('✅ Migration: HACCP Plan tables ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration haccp plan error:', e.message);
+}
+
+// ─── Seed: HACCP default hazard analysis ───
+try {
+  const existingHazards = get("SELECT COUNT(*) as count FROM haccp_hazard_analysis");
+  if (existingHazards && existingHazards.count === 0) {
+    const defaultHazards = [
+      { step_name: 'Réception', hazard_type: 'B', hazard_description: 'Contamination par Salmonella spp. via viandes ou œufs', severity: 5, probability: 3, is_ccp: 0, preventive_measures: 'Contrôle température à réception (<4°C), vérification certificats fournisseur, audit fournisseur annuel' },
+      { step_name: 'Réception', hazard_type: 'C', hazard_description: 'Résidus de pesticides sur légumes et fruits', severity: 3, probability: 2, is_ccp: 0, preventive_measures: 'Fournisseurs certifiés, fiche de conformité, analyses périodiques' },
+      { step_name: 'Réception', hazard_type: 'P', hazard_description: 'Corps étrangers (éclats de verre, métal) dans les emballages', severity: 4, probability: 2, is_ccp: 0, preventive_measures: 'Inspection visuelle à réception, procédure de refus des emballages détériorés' },
+      { step_name: 'Stockage', hazard_type: 'B', hazard_description: 'Prolifération de Listeria monocytogenes en chambre froide', severity: 5, probability: 3, is_ccp: 1, preventive_measures: 'Température maintenue <4°C, surveillance 2×/jour, séparation cru/cuit' },
+      { step_name: 'Stockage', hazard_type: 'C', hazard_description: 'Contamination croisée par allergènes (gluten, lait, noix)', severity: 4, probability: 3, is_ccp: 0, preventive_measures: 'Stockage séparé allergènes, emballages hermétiques, étiquetage rigoureux' },
+      { step_name: 'Préparation', hazard_type: 'B', hazard_description: 'Contamination croisée via surfaces et ustensiles souillés', severity: 4, probability: 4, is_ccp: 0, preventive_measures: 'Nettoyage-désinfection des plans de travail, planches colorées HACCP, lavage mains fréquent' },
+      { step_name: 'Préparation', hazard_type: 'P', hazard_description: 'Corps étrangers issus du personnel (bijoux, cheveux)', severity: 3, probability: 3, is_ccp: 0, preventive_measures: 'Port de toque et filet, interdiction bijoux, contrôle encadrement' },
+      { step_name: 'Cuisson', hazard_type: 'B', hazard_description: 'Survie de pathogènes (Salmonella, E. coli) si température insuffisante', severity: 5, probability: 3, is_ccp: 1, preventive_measures: 'Cuisson à cœur ≥75°C, contrôle thermomètre sonde, fiche de validation cuisson' },
+      { step_name: 'Refroidissement', hazard_type: 'B', hazard_description: 'Prolifération de Clostridium perfringens lors du refroidissement lent', severity: 4, probability: 4, is_ccp: 1, preventive_measures: 'Refroidissement 63°C→10°C en <2h par cellule de refroidissement, enregistrement des temps' },
+      { step_name: 'Service', hazard_type: 'B', hazard_description: 'Contamination par le personnel lors du service (mains, toux)', severity: 3, probability: 3, is_ccp: 0, preventive_measures: 'Formation hygiène, port de gants si contact direct, service chaud >63°C ou froid <4°C' },
+      { step_name: 'Service', hazard_type: 'C', hazard_description: 'Non-déclaration allergènes INCO (EU 1169/2011)', severity: 5, probability: 2, is_ccp: 0, preventive_measures: 'Affichage carte allergènes, formation équipe salle, procédure alerte cuisine' },
+    ];
+    const insertHazard = db.prepare(
+      `INSERT INTO haccp_hazard_analysis (step_name, hazard_type, hazard_description, severity, probability, is_ccp, preventive_measures)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+    for (const h of defaultHazards) {
+      insertHazard.run(h.step_name, h.hazard_type, h.hazard_description, h.severity, h.probability, h.is_ccp, h.preventive_measures);
+    }
+    console.log(`✅ Seed: ${defaultHazards.length} dangers HACCP par défaut insérés`);
+  }
+} catch (e) {
+  console.error('Seed haccp hazards error:', e.message);
+}
+
 module.exports = { db, all, get, run };

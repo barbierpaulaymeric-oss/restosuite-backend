@@ -265,6 +265,18 @@ const API = {
     return URL.createObjectURL(blob);
   },
 
+  // ─── HACCP Plan formalisé ───
+  getHACCPHazards() { return this.request('/haccp-plan/hazards'); },
+  createHACCPHazard(data) { return this.request('/haccp-plan/hazards', { method: 'POST', body: data }); },
+  updateHACCPHazard(id, data) { return this.request(`/haccp-plan/hazards/${id}`, { method: 'PUT', body: data }); },
+  deleteHACCPHazard(id) { return this.request(`/haccp-plan/hazards/${id}`, { method: 'DELETE' }); },
+  getHACCPCCPs() { return this.request('/haccp-plan/ccps'); },
+  saveHACCPCCP(data) { return this.request('/haccp-plan/ccps', { method: 'POST', body: data }); },
+  deleteHACCPCCP(id) { return this.request(`/haccp-plan/ccps/${id}`, { method: 'DELETE' }); },
+  getHACCPDecisionTree(hazardId) { return this.request(`/haccp-plan/decision-tree/${hazardId}`); },
+  saveHACCPDecisionTree(hazardId, data) { return this.request(`/haccp-plan/decision-tree/${hazardId}`, { method: 'POST', body: data }); },
+  getHACCPPlanSummary() { return this.request('/haccp-plan/summary'); },
+
   // ─── Stock ───
   getStock(q) {
     const qs = q ? `?q=${encodeURIComponent(q)}` : '';

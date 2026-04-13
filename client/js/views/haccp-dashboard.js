@@ -14,6 +14,7 @@ const HACCP_SUBNAV_FULL = `
     <a href="#/haccp/fryers" class="haccp-subnav__link">Friteuses</a>
     <a href="#/haccp/non-conformities" class="haccp-subnav__link">Non-conf.</a>
     <a href="#/haccp/allergens" class="haccp-subnav__link">Allergènes</a>
+    <a href="#/haccp/plan" class="haccp-subnav__link">Plan HACCP</a>
   </div>
 `;
 

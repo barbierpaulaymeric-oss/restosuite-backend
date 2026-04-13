@@ -33,6 +33,7 @@ const JS_FILES = [
   'js/views/haccp-fryers.js',
   'js/views/haccp-non-conformities.js',
   'js/views/haccp-allergens.js',
+  'js/views/haccp-plan.js',
   'js/views/orders.js',
   'js/views/service.js',
   'js/views/kitchen.js',
