@@ -24,8 +24,8 @@ async function renderHACCPFryers() {
           </button>
         </div>
         ${HACCP_SUBNAV_FULL}
-        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
-          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+        <div style="background:rgba(59,158,222,0.12);border:1px solid rgba(59,158,222,0.45);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;color:var(--text-primary)">
+          <i data-lucide="info" style="width:18px;height:18px;color:var(--color-info);flex-shrink:0;margin-top:1px"></i>
           <span class="text-sm">Seuil légal : <strong>25% de composés polaires</strong>. Au-delà, changement obligatoire.</span>
         </div>
         <div id="fryers-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">

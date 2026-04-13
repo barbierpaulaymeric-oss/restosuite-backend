@@ -3595,30 +3595,39 @@ async function showSupplierDetail(id) {
   if (!sup) return;
   showSupplierModal(sup);
 }
-const HACCP_SUBNAV_FULL = `
-  <div class="haccp-subnav">
-    <a href="#/haccp" class="haccp-subnav__link" id="haccp-nav-dashboard">Dashboard</a>
-    <a href="#/haccp/temperatures" class="haccp-subnav__link">Temp\xE9ratures</a>
-    <a href="#/haccp/cleaning" class="haccp-subnav__link">Nettoyage</a>
-    <a href="#/haccp/traceability" class="haccp-subnav__link">Tra\xE7abilit\xE9</a>
-    <a href="#/haccp/cooling" class="haccp-subnav__link">Refroidissement</a>
-    <a href="#/haccp/reheating" class="haccp-subnav__link">Remise en T\xB0</a>
-    <a href="#/haccp/fryers" class="haccp-subnav__link">Friteuses</a>
-    <a href="#/haccp/non-conformities" class="haccp-subnav__link">Non-conf.</a>
-    <a href="#/haccp/allergens" class="haccp-subnav__link">Allerg\xE8nes</a>
-    <a href="#/haccp/plan" class="haccp-subnav__link">Plan HACCP</a>
-    <a href="#/haccp/recall" class="haccp-subnav__link">Retrait/Rappel</a>
-    <a href="#/haccp/training" class="haccp-subnav__link">Formation</a>
-    <a href="#/haccp/pest-control" class="haccp-subnav__link">Nuisibles</a>
-    <a href="#/haccp/maintenance" class="haccp-subnav__link">Maintenance</a>
-    <a href="#/haccp/waste" class="haccp-subnav__link">D\xE9chets</a>
-    <a href="#/haccp/corrective-actions" class="haccp-subnav__link">Actions correctives</a>
-    <a href="#/haccp/allergens-plan" class="haccp-subnav__link">Plan allerg\xE8nes</a>
-    <a href="#/haccp/water" class="haccp-subnav__link">Eau</a>
-    <a href="#/haccp/pms-audit" class="haccp-subnav__link">Audits PMS</a>
-    <a href="#/pms/export" class="haccp-subnav__link haccp-subnav__link--export">Export PMS</a>
-  </div>
-`;
+const HACCP_SUBNAV_ITEMS = [
+  { href: "#/haccp", label: "Dashboard" },
+  { href: "#/haccp/temperatures", label: "Temp\xE9ratures" },
+  { href: "#/haccp/cleaning", label: "Nettoyage" },
+  { href: "#/haccp/traceability", label: "Tra\xE7abilit\xE9" },
+  { href: "#/haccp/cooling", label: "Refroidissement" },
+  { href: "#/haccp/reheating", label: "Remise en T\xB0" },
+  { href: "#/haccp/fryers", label: "Friteuses" },
+  { href: "#/haccp/non-conformities", label: "Non-conf." },
+  { href: "#/haccp/allergens", label: "Allerg\xE8nes" },
+  { href: "#/haccp/plan", label: "Plan HACCP" },
+  { href: "#/haccp/recall", label: "Retrait/Rappel" },
+  { href: "#/haccp/training", label: "Formation" },
+  { href: "#/haccp/pest-control", label: "Nuisibles" },
+  { href: "#/haccp/maintenance", label: "Maintenance" },
+  { href: "#/haccp/waste", label: "D\xE9chets" },
+  { href: "#/haccp/corrective-actions", label: "Actions correctives" },
+  { href: "#/haccp/allergens-plan", label: "Plan allerg\xE8nes" },
+  { href: "#/haccp/water", label: "Eau" },
+  { href: "#/haccp/pms-audit", label: "Audits PMS" },
+  { href: "#/pms/export", label: "Export PMS", extra: " haccp-subnav__link--export" }
+];
+const HACCP_SUBNAV_FULL = {
+  toString() {
+    const current = location.hash.replace("#", "") || "/";
+    const links = HACCP_SUBNAV_ITEMS.map((item) => {
+      const route = item.href.replace("#", "");
+      const isActive = route === current;
+      return `<a href="${item.href}" class="haccp-subnav__link${item.extra || ""}${isActive ? " active" : ""}">${item.label}</a>`;
+    }).join("");
+    return `<div class="haccp-subnav">${links}</div>`;
+  }
+};
 async function renderHACCPDashboard() {
   const app = document.getElementById("app");
   app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
@@ -3639,7 +3648,7 @@ async function renderHACCPDashboard() {
         </div>
 
         <!-- HACCP Sub-navigation -->
-        ${HACCP_SUBNAV_FULL.replace('id="haccp-nav-dashboard"', 'id="haccp-nav-dashboard" style="font-weight:700"')}
+        ${HACCP_SUBNAV_FULL}
 
         <!-- SECTION: Temp\xE9ratures du jour -->
         <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
@@ -4579,8 +4588,8 @@ async function renderHACCPCooling() {
           </button>
         </div>
         ${HACCP_SUBNAV_FULL}
-        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
-          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+        <div style="background:rgba(59,158,222,0.12);border:1px solid rgba(59,158,222,0.45);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;color:var(--text-primary)">
+          <i data-lucide="info" style="width:18px;height:18px;color:var(--color-info);flex-shrink:0;margin-top:1px"></i>
           <span class="text-sm">R\xE9glementation : passage de <strong>+63\xB0C \xE0 +10\xB0C en moins de 2h</strong>.</span>
         </div>
         <div class="table-container">
@@ -4980,8 +4989,8 @@ async function renderHACCPFryers() {
           </button>
         </div>
         ${HACCP_SUBNAV_FULL}
-        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
-          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+        <div style="background:rgba(59,158,222,0.12);border:1px solid rgba(59,158,222,0.45);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;color:var(--text-primary)">
+          <i data-lucide="info" style="width:18px;height:18px;color:var(--color-info);flex-shrink:0;margin-top:1px"></i>
           <span class="text-sm">Seuil l\xE9gal : <strong>25% de compos\xE9s polaires</strong>. Au-del\xE0, changement obligatoire.</span>
         </div>
         <div id="fryers-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
@@ -20866,6 +20875,7 @@ const ROUTE_TO_GROUP = {
   "/crm": "config",
   "/subscribe": "config",
   "/settings/plans": "config",
+  "/settings": "config",
   "/settings/sanitary-approval": "config",
   "/traceability/downstream": "traceability",
   "/pms/export": "documents"
@@ -21065,10 +21075,39 @@ function registerRoutes() {
   Router.add(/^\/crm$/, renderCRM);
   Router.add(/^\/api-keys$/, renderAPIKeys);
   Router.add(/^\/qrcodes$/, renderQRCodes);
+  Router.add(/^\/settings$/, () => {
+    location.hash = "#/settings/plans";
+  });
   Router.add(/^\/settings\/plans$/, (highlightPlan) => renderPlans(highlightPlan));
   Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
   Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
   Router.add(/^\/pms\/export$/, renderPMSExport);
+}
+function showPlanGateModal(planLabel) {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:420px;text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:var(--space-3)">\u{1F512}</div>
+      <h2 style="margin-bottom:var(--space-3)">Fonctionnalit\xE9 ${escapeHtml(planLabel)}</h2>
+      <p class="text-secondary" style="margin-bottom:var(--space-5)">
+        Cette fonctionnalit\xE9 n\xE9cessite le plan <strong>${escapeHtml(planLabel)}</strong>.<br>
+        Passez \xE0 un plan sup\xE9rieur pour y acc\xE9der.
+      </p>
+      <div class="actions-row" style="justify-content:center;gap:var(--space-3)">
+        <button class="btn btn-secondary" id="plan-gate-cancel">Fermer</button>
+        <a href="#/settings/plans" class="btn btn-primary" id="plan-gate-go">Voir les tarifs \u2192</a>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("plan-gate-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("plan-gate-go").addEventListener("click", () => overlay.remove());
 }
 function bootApp(role, account, opts = {}) {
   applyRole(role);
@@ -21160,11 +21199,11 @@ function initNavGroups(role) {
       if (locked) {
         const PLAN_LABELS = { essential: "Essential", professional: "Pro", premium: "Premium", enterprise: "Enterprise" };
         const badge = PLAN_LABELS[item.minPlan] || item.minPlan;
-        return `<a href="#/settings/plans" class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}">
+        return `<button class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}" data-action="plan-gate">
             <i data-lucide="${item.icon}"></i>
             ${escapeHtml(item.label)}
             <span class="nav-plan-badge">${escapeHtml(badge)}</span>
-          </a>`;
+          </button>`;
       }
       return `<a href="#${item.route}" class="nav-panel-item${isActive ? " active" : ""}">
           <i data-lucide="${item.icon}"></i>
@@ -21183,6 +21222,15 @@ function initNavGroups(role) {
     activeGroupKey = groupKey;
     panelContent.querySelectorAll(".nav-panel-item").forEach((item) => {
       item.addEventListener("click", closePanel, { once: true });
+    });
+    panelContent.querySelectorAll('[data-action="plan-gate"]').forEach((btn2) => {
+      btn2.addEventListener("click", (e) => {
+        e.stopImmediatePropagation();
+        const plan = btn2.dataset.requiredPlan;
+        const PLAN_LABELS = { essential: "Essential", professional: "Pro", premium: "Premium", enterprise: "Enterprise" };
+        const label = PLAN_LABELS[plan] || plan;
+        showPlanGateModal(label);
+      });
     });
   }
   document.querySelectorAll(".nav-link[data-group]").forEach((btn) => {

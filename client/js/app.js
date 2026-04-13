@@ -108,6 +108,7 @@ const ROUTE_TO_GROUP = {
   '/multi-site': 'config', '/api-keys': 'config', '/qrcodes': 'config',
   '/carbon': 'config', '/supplier-portal': 'config', '/errors-log': 'config',
   '/crm': 'config', '/subscribe': 'config', '/settings/plans': 'config',
+  '/settings': 'config',
   '/settings/sanitary-approval': 'config',
   '/traceability/downstream': 'traceability',
   '/pms/export': 'documents',
@@ -336,10 +337,36 @@ function registerRoutes() {
   Router.add(/^\/crm$/, renderCRM);
   Router.add(/^\/api-keys$/, renderAPIKeys);
   Router.add(/^\/qrcodes$/, renderQRCodes);
+  Router.add(/^\/settings$/, () => { location.hash = '#/settings/plans'; });
   Router.add(/^\/settings\/plans$/, (highlightPlan) => renderPlans(highlightPlan));
   Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
   Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
   Router.add(/^\/pms\/export$/, renderPMSExport);
+}
+
+function showPlanGateModal(planLabel) {
+  const existing = document.querySelector('.modal-overlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:420px;text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:var(--space-3)">🔒</div>
+      <h2 style="margin-bottom:var(--space-3)">Fonctionnalité ${escapeHtml(planLabel)}</h2>
+      <p class="text-secondary" style="margin-bottom:var(--space-5)">
+        Cette fonctionnalité nécessite le plan <strong>${escapeHtml(planLabel)}</strong>.<br>
+        Passez à un plan supérieur pour y accéder.
+      </p>
+      <div class="actions-row" style="justify-content:center;gap:var(--space-3)">
+        <button class="btn btn-secondary" id="plan-gate-cancel">Fermer</button>
+        <a href="#/settings/plans" class="btn btn-primary" id="plan-gate-go">Voir les tarifs →</a>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.getElementById('plan-gate-cancel').addEventListener('click', () => overlay.remove());
+  document.getElementById('plan-gate-go').addEventListener('click', () => overlay.remove());
 }
 
 function bootApp(role, account, opts = {}) {
@@ -453,11 +480,11 @@ function initNavGroups(role) {
         if (locked) {
           const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Enterprise' };
           const badge = PLAN_LABELS[item.minPlan] || item.minPlan;
-          return `<a href="#/settings/plans" class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}">
+          return `<button class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}" data-action="plan-gate">
             <i data-lucide="${item.icon}"></i>
             ${escapeHtml(item.label)}
             <span class="nav-plan-badge">${escapeHtml(badge)}</span>
-          </a>`;
+          </button>`;
         }
         return `<a href="#${item.route}" class="nav-panel-item${isActive ? ' active' : ''}">
           <i data-lucide="${item.icon}"></i>
@@ -481,6 +508,17 @@ function initNavGroups(role) {
 
     panelContent.querySelectorAll('.nav-panel-item').forEach(item => {
       item.addEventListener('click', closePanel, { once: true });
+    });
+
+    // Plan gate : intercepte les clics sur fonctionnalités verrouillées
+    panelContent.querySelectorAll('[data-action="plan-gate"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopImmediatePropagation();
+        const plan = btn.dataset.requiredPlan;
+        const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Enterprise' };
+        const label = PLAN_LABELS[plan] || plan;
+        showPlanGateModal(label);
+      });
     });
   }
 

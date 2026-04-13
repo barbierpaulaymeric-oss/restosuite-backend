@@ -2,31 +2,41 @@
 // HACCP Dashboard — Route #/haccp
 // ═══════════════════════════════════════════
 
-// Shared subnav for all HACCP pages (9 sections)
-const HACCP_SUBNAV_FULL = `
-  <div class="haccp-subnav">
-    <a href="#/haccp" class="haccp-subnav__link" id="haccp-nav-dashboard">Dashboard</a>
-    <a href="#/haccp/temperatures" class="haccp-subnav__link">Températures</a>
-    <a href="#/haccp/cleaning" class="haccp-subnav__link">Nettoyage</a>
-    <a href="#/haccp/traceability" class="haccp-subnav__link">Traçabilité</a>
-    <a href="#/haccp/cooling" class="haccp-subnav__link">Refroidissement</a>
-    <a href="#/haccp/reheating" class="haccp-subnav__link">Remise en T°</a>
-    <a href="#/haccp/fryers" class="haccp-subnav__link">Friteuses</a>
-    <a href="#/haccp/non-conformities" class="haccp-subnav__link">Non-conf.</a>
-    <a href="#/haccp/allergens" class="haccp-subnav__link">Allergènes</a>
-    <a href="#/haccp/plan" class="haccp-subnav__link">Plan HACCP</a>
-    <a href="#/haccp/recall" class="haccp-subnav__link">Retrait/Rappel</a>
-    <a href="#/haccp/training" class="haccp-subnav__link">Formation</a>
-    <a href="#/haccp/pest-control" class="haccp-subnav__link">Nuisibles</a>
-    <a href="#/haccp/maintenance" class="haccp-subnav__link">Maintenance</a>
-    <a href="#/haccp/waste" class="haccp-subnav__link">Déchets</a>
-    <a href="#/haccp/corrective-actions" class="haccp-subnav__link">Actions correctives</a>
-    <a href="#/haccp/allergens-plan" class="haccp-subnav__link">Plan allergènes</a>
-    <a href="#/haccp/water" class="haccp-subnav__link">Eau</a>
-    <a href="#/haccp/pms-audit" class="haccp-subnav__link">Audits PMS</a>
-    <a href="#/pms/export" class="haccp-subnav__link haccp-subnav__link--export">Export PMS</a>
-  </div>
-`;
+// Shared subnav for all HACCP pages — actif dynamique selon la route courante
+const HACCP_SUBNAV_ITEMS = [
+  { href: '#/haccp',                       label: 'Dashboard' },
+  { href: '#/haccp/temperatures',          label: 'Températures' },
+  { href: '#/haccp/cleaning',              label: 'Nettoyage' },
+  { href: '#/haccp/traceability',          label: 'Traçabilité' },
+  { href: '#/haccp/cooling',               label: 'Refroidissement' },
+  { href: '#/haccp/reheating',             label: 'Remise en T°' },
+  { href: '#/haccp/fryers',                label: 'Friteuses' },
+  { href: '#/haccp/non-conformities',      label: 'Non-conf.' },
+  { href: '#/haccp/allergens',             label: 'Allergènes' },
+  { href: '#/haccp/plan',                  label: 'Plan HACCP' },
+  { href: '#/haccp/recall',                label: 'Retrait/Rappel' },
+  { href: '#/haccp/training',              label: 'Formation' },
+  { href: '#/haccp/pest-control',          label: 'Nuisibles' },
+  { href: '#/haccp/maintenance',           label: 'Maintenance' },
+  { href: '#/haccp/waste',                 label: 'Déchets' },
+  { href: '#/haccp/corrective-actions',    label: 'Actions correctives' },
+  { href: '#/haccp/allergens-plan',        label: 'Plan allergènes' },
+  { href: '#/haccp/water',                 label: 'Eau' },
+  { href: '#/haccp/pms-audit',             label: 'Audits PMS' },
+  { href: '#/pms/export',                  label: 'Export PMS', extra: ' haccp-subnav__link--export' },
+];
+
+const HACCP_SUBNAV_FULL = {
+  toString() {
+    const current = location.hash.replace('#', '') || '/';
+    const links = HACCP_SUBNAV_ITEMS.map(item => {
+      const route = item.href.replace('#', '');
+      const isActive = route === current;
+      return `<a href="${item.href}" class="haccp-subnav__link${item.extra || ''}${isActive ? ' active' : ''}">${item.label}</a>`;
+    }).join('');
+    return `<div class="haccp-subnav">${links}</div>`;
+  }
+};
 
 async function renderHACCPDashboard() {
   const app = document.getElementById('app');
@@ -51,7 +61,7 @@ async function renderHACCPDashboard() {
         </div>
 
         <!-- HACCP Sub-navigation -->
-        ${HACCP_SUBNAV_FULL.replace('id="haccp-nav-dashboard"', 'id="haccp-nav-dashboard" style="font-weight:700"')}
+        ${HACCP_SUBNAV_FULL}
 
         <!-- SECTION: Températures du jour -->
         <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
