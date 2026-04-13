@@ -24,6 +24,7 @@ const HACCP_SUBNAV_FULL = `
     <a href="#/haccp/allergens-plan" class="haccp-subnav__link">Plan allergènes</a>
     <a href="#/haccp/water" class="haccp-subnav__link">Eau</a>
     <a href="#/haccp/pms-audit" class="haccp-subnav__link">Audits PMS</a>
+    <a href="#/pms/export" class="haccp-subnav__link haccp-subnav__link--export">Export PMS</a>
   </div>
 `;
 
