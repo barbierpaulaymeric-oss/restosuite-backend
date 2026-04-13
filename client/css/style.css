@@ -5178,6 +5178,8 @@ button.nav-link {
 .nav-panel-item:active,
 .nav-panel-item:hover { background: var(--color-accent-light); color: var(--color-accent); }
 .nav-panel-item.active { background: var(--color-accent-light); color: var(--color-accent); }
+.nav-panel-item--danger { color: var(--color-error, #DC2626); width: 100%; text-align: left; background: none; border: none; cursor: pointer; }
+.nav-panel-item--danger:hover { background: rgba(220,38,38,0.08); color: var(--color-error, #DC2626); }
 
 @media (min-width: 768px) {
   .nav-panel-sheet {

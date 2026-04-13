@@ -41,11 +41,19 @@ const NAV_GROUPS = {
       { label: 'Cuisine (écran)',        route: '/kitchen',   icon: 'chef-hat',       roles: ['gerant','cuisinier'] },
     ]
   },
-  conformite: {
-    label: 'Conformité',
+  config: {
+    label: 'Paramètres',
     items: [
-      { label: 'HACCP',      route: '/haccp',           icon: 'shield-check',   roles: ['gerant','cuisinier'] },
-      { label: 'Allergènes', route: '/haccp/allergens', icon: 'triangle-alert', roles: ['gerant','cuisinier'] },
+      { label: 'Équipe',              route: '/team',            icon: 'users',        roles: ['gerant'] },
+      { label: 'CRM & Fidélité',      route: '/crm',             icon: 'heart',        roles: ['gerant'] },
+      { label: 'Intégrations',        route: '/integrations',    icon: 'plug',         roles: ['gerant'] },
+      { label: 'QR Codes',            route: '/qrcodes',         icon: 'qr-code',      roles: ['gerant'] },
+      { label: 'Bilan Carbone',       route: '/carbon',          icon: 'leaf',         roles: ['gerant'] },
+      { label: 'Multi-Sites',         route: '/multi-site',      icon: 'building-2',   roles: ['gerant'] },
+      { label: 'API',                 route: '/api-keys',        icon: 'key',          roles: ['gerant'] },
+      { label: 'Portail Fournisseur', route: '/supplier-portal', icon: 'truck',        roles: ['gerant'] },
+      { label: 'Journal erreurs',     route: '/errors-log',      icon: 'bug',          roles: ['gerant'] },
+      { label: 'Se déconnecter',      route: null,               icon: 'log-out',      roles: ['gerant','cuisinier','equipier'], action: 'logout' },
     ]
   },
   pilotage: {
@@ -66,15 +74,13 @@ const ROUTE_TO_GROUP = {
   '/orders': 'operations', '/suppliers': 'operations',
   '/deliveries': 'operations', '/service': 'operations',
   '/kitchen': 'operations', '/scan-invoice': 'operations',
-  '/haccp': 'conformite',
   '/analytics': 'pilotage', '/health': 'pilotage',
   '/menu-engineering': 'pilotage', '/predictions': 'pilotage',
   '/mercuriale': 'pilotage', '/import-mercuriale': 'pilotage',
-  '/chef': 'ia', '/ia': 'ia',
-  '/more': 'plus', '/team': 'plus', '/integrations': 'plus',
-  '/multi-site': 'plus', '/api-keys': 'plus', '/qrcodes': 'plus',
-  '/carbon': 'plus', '/supplier-portal': 'plus', '/errors-log': 'plus',
-  '/crm': 'plus', '/subscribe': 'plus',
+  '/more': 'config', '/team': 'config', '/integrations': 'config',
+  '/multi-site': 'config', '/api-keys': 'config', '/qrcodes': 'config',
+  '/carbon': 'config', '/supplier-portal': 'config', '/errors-log': 'config',
+  '/crm': 'config', '/subscribe': 'config',
 };
 
 // ─── Command Palette shortcut ───
@@ -391,6 +397,12 @@ function initNavGroups(role) {
     panelContent.innerHTML = `
       <div class="nav-panel-title">${escapeHtml(group.label)}</div>
       ${accessible.map(item => {
+        if (item.action === 'logout') {
+          return `<button class="nav-panel-item nav-panel-item--danger" onclick="logout()">
+            <i data-lucide="${item.icon}"></i>
+            ${escapeHtml(item.label)}
+          </button>`;
+        }
         const isActive = currentPath === item.route || (item.route !== '/' && currentPath.startsWith(item.route));
         return `<a href="#${item.route}" class="nav-panel-item${isActive ? ' active' : ''}">
           <i data-lucide="${item.icon}"></i>
