@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { all, get, run } = require('../db');
+const { db, all, get, run } = require('../db');
 const PDFDocument = require('pdfkit');
 const { requireAuth } = require('./auth');
 const router = Router();
@@ -613,6 +613,271 @@ router.get('/export/traceability', (req, res) => {
   }
 
   doc.end();
+});
+
+// ─── Refroidissements rapides ───
+
+router.get('/cooling', requireAuth, (req, res) => {
+  try {
+    const { from, to, limit = 50, offset = 0 } = req.query;
+    let sql = `
+      SELECT cl.*, a.name as recorded_by_name
+      FROM cooling_logs cl
+      LEFT JOIN accounts a ON cl.recorded_by = a.id
+    `;
+    const params = [];
+    const conditions = [];
+    if (from) { conditions.push("DATE(cl.start_time) >= DATE(?)"); params.push(from); }
+    if (to)   { conditions.push("DATE(cl.start_time) <= DATE(?)"); params.push(to); }
+    if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
+    sql += ' ORDER BY cl.start_time DESC';
+    const total = db.prepare(`SELECT COUNT(*) as c FROM cooling_logs cl ${conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''}`).get(...params).c;
+    sql += ` LIMIT ? OFFSET ?`;
+    params.push(Number(limit), Number(offset));
+    const items = db.prepare(sql).all(...params);
+    res.json({ items, total, limit: Number(limit), offset: Number(offset) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/cooling', requireAuth, (req, res) => {
+  try {
+    const { product_name, quantity, unit, start_time, temp_start, time_at_63c, time_at_10c, notes, recorded_by } = req.body;
+    if (!product_name || !start_time || temp_start == null) {
+      return res.status(400).json({ error: 'product_name, start_time et temp_start sont obligatoires' });
+    }
+    let is_compliant = null;
+    if (time_at_63c && time_at_10c) {
+      const diffMs = new Date(time_at_10c) - new Date(time_at_63c);
+      is_compliant = diffMs <= 2 * 60 * 60 * 1000 ? 1 : 0;
+    }
+    const result = db.prepare(`
+      INSERT INTO cooling_logs (product_name, quantity, unit, start_time, temp_start, time_at_63c, time_at_10c, is_compliant, notes, recorded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(product_name, quantity ?? null, unit ?? 'kg', start_time, temp_start, time_at_63c ?? null, time_at_10c ?? null, is_compliant, notes ?? null, recorded_by ?? null);
+    res.status(201).json({ id: result.lastInsertRowid });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.put('/cooling/:id', requireAuth, (req, res) => {
+  try {
+    const { time_at_63c, time_at_10c, notes } = req.body;
+    let is_compliant = null;
+    if (time_at_63c && time_at_10c) {
+      const diffMs = new Date(time_at_10c) - new Date(time_at_63c);
+      is_compliant = diffMs <= 2 * 60 * 60 * 1000 ? 1 : 0;
+    }
+    db.prepare(`
+      UPDATE cooling_logs SET time_at_63c = ?, time_at_10c = ?, is_compliant = ?, notes = ?
+      WHERE id = ?
+    `).run(time_at_63c ?? null, time_at_10c ?? null, is_compliant, notes ?? null, req.params.id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── Remises en température ───
+
+router.get('/reheating', requireAuth, (req, res) => {
+  try {
+    const { from, to, limit = 50, offset = 0 } = req.query;
+    let sql = `
+      SELECT rl.*, a.name as recorded_by_name
+      FROM reheating_logs rl
+      LEFT JOIN accounts a ON rl.recorded_by = a.id
+    `;
+    const params = [];
+    const conditions = [];
+    if (from) { conditions.push("DATE(rl.start_time) >= DATE(?)"); params.push(from); }
+    if (to)   { conditions.push("DATE(rl.start_time) <= DATE(?)"); params.push(to); }
+    if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
+    sql += ' ORDER BY rl.start_time DESC';
+    const total = db.prepare(`SELECT COUNT(*) as c FROM reheating_logs rl ${conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''}`).get(...params).c;
+    sql += ` LIMIT ? OFFSET ?`;
+    params.push(Number(limit), Number(offset));
+    const items = db.prepare(sql).all(...params);
+    res.json({ items, total, limit: Number(limit), offset: Number(offset) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/reheating', requireAuth, (req, res) => {
+  try {
+    const { product_name, quantity, unit, start_time, temp_start, time_at_63c, notes, recorded_by } = req.body;
+    if (!product_name || !start_time || temp_start == null) {
+      return res.status(400).json({ error: 'product_name, start_time et temp_start sont obligatoires' });
+    }
+    let is_compliant = null;
+    if (time_at_63c) {
+      const diffMs = new Date(time_at_63c) - new Date(start_time);
+      is_compliant = diffMs <= 1 * 60 * 60 * 1000 ? 1 : 0;
+    }
+    const result = db.prepare(`
+      INSERT INTO reheating_logs (product_name, quantity, unit, start_time, temp_start, time_at_63c, is_compliant, notes, recorded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(product_name, quantity ?? null, unit ?? 'kg', start_time, temp_start, time_at_63c ?? null, is_compliant, notes ?? null, recorded_by ?? null);
+    res.status(201).json({ id: result.lastInsertRowid });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.put('/reheating/:id', requireAuth, (req, res) => {
+  try {
+    const { time_at_63c, notes } = req.body;
+    const existing = db.prepare('SELECT start_time FROM reheating_logs WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Enregistrement non trouvé' });
+    let is_compliant = null;
+    if (time_at_63c) {
+      const diffMs = new Date(time_at_63c) - new Date(existing.start_time);
+      is_compliant = diffMs <= 1 * 60 * 60 * 1000 ? 1 : 0;
+    }
+    db.prepare(`UPDATE reheating_logs SET time_at_63c = ?, is_compliant = ?, notes = ? WHERE id = ?`)
+      .run(time_at_63c ?? null, is_compliant, notes ?? null, req.params.id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── Huiles de friture ───
+
+router.get('/fryers', requireAuth, (req, res) => {
+  try {
+    const fryers = db.prepare('SELECT * FROM fryers WHERE is_active = 1 ORDER BY name').all();
+    const result = fryers.map(fryer => {
+      const lastCheck = db.prepare(`
+        SELECT * FROM fryer_checks WHERE fryer_id = ? ORDER BY action_date DESC LIMIT 1
+      `).get(fryer.id);
+      const lastFilter = db.prepare(`
+        SELECT action_date FROM fryer_checks WHERE fryer_id = ? AND action_type = 'filtrage' ORDER BY action_date DESC LIMIT 1
+      `).get(fryer.id);
+      const lastChange = db.prepare(`
+        SELECT action_date FROM fryer_checks WHERE fryer_id = ? AND action_type = 'changement' ORDER BY action_date DESC LIMIT 1
+      `).get(fryer.id);
+      const serviceStart = db.prepare(`
+        SELECT action_date FROM fryer_checks WHERE fryer_id = ? AND action_type = 'mise_en_service' ORDER BY action_date DESC LIMIT 1
+      `).get(fryer.id);
+      return { ...fryer, last_check: lastCheck, last_filter: lastFilter, last_change: lastChange, service_start: serviceStart };
+    });
+    res.json({ items: result, total: result.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/fryers', requireAuth, (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'name est obligatoire' });
+    const result = db.prepare('INSERT INTO fryers (name) VALUES (?)').run(name);
+    res.status(201).json({ id: result.lastInsertRowid });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get('/fryers/:id/checks', requireAuth, (req, res) => {
+  try {
+    const items = db.prepare(`
+      SELECT fc.*, a.name as recorded_by_name
+      FROM fryer_checks fc
+      LEFT JOIN accounts a ON fc.recorded_by = a.id
+      WHERE fc.fryer_id = ?
+      ORDER BY fc.action_date DESC
+      LIMIT 100
+    `).all(req.params.id);
+    res.json({ items, total: items.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/fryers/:id/checks', requireAuth, (req, res) => {
+  try {
+    const { action_type, action_date, polar_value, notes, recorded_by } = req.body;
+    const VALID_TYPES = ['mise_en_service', 'controle_polaire', 'filtrage', 'changement'];
+    if (!action_type || !VALID_TYPES.includes(action_type)) {
+      return res.status(400).json({ error: `action_type doit être l'un de: ${VALID_TYPES.join(', ')}` });
+    }
+    if (action_type === 'controle_polaire' && polar_value == null) {
+      return res.status(400).json({ error: 'polar_value est obligatoire pour un contrôle polaire' });
+    }
+    const result = db.prepare(`
+      INSERT INTO fryer_checks (fryer_id, action_type, action_date, polar_value, notes, recorded_by)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(req.params.id, action_type, action_date || new Date().toISOString(), polar_value ?? null, notes ?? null, recorded_by ?? null);
+    res.status(201).json({ id: result.lastInsertRowid });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── Non-conformités ───
+
+router.get('/non-conformities', requireAuth, (req, res) => {
+  try {
+    const { status, limit = 50, offset = 0 } = req.query;
+    let sql = `
+      SELECT nc.*,
+        a1.name as detected_by_name,
+        a2.name as resolved_by_name
+      FROM non_conformities nc
+      LEFT JOIN accounts a1 ON nc.detected_by = a1.id
+      LEFT JOIN accounts a2 ON nc.resolved_by = a2.id
+    `;
+    const params = [];
+    if (status) { sql += ' WHERE nc.status = ?'; params.push(status); }
+    const total = db.prepare(`SELECT COUNT(*) as c FROM non_conformities nc ${status ? 'WHERE nc.status = ?' : ''}`).get(...(status ? [status] : [])).c;
+    sql += ' ORDER BY nc.detected_at DESC LIMIT ? OFFSET ?';
+    params.push(Number(limit), Number(offset));
+    const items = db.prepare(sql).all(...params);
+    res.json({ items, total, limit: Number(limit), offset: Number(offset) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/non-conformities', requireAuth, (req, res) => {
+  try {
+    const { title, description, category, severity, detected_by } = req.body;
+    if (!title) return res.status(400).json({ error: 'title est obligatoire' });
+    const result = db.prepare(`
+      INSERT INTO non_conformities (title, description, category, severity, detected_by)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(title, description ?? null, category ?? 'autre', severity ?? 'mineure', detected_by ?? null);
+    res.status(201).json({ id: result.lastInsertRowid });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.put('/non-conformities/:id', requireAuth, (req, res) => {
+  try {
+    const { corrective_action, status, resolved_by } = req.body;
+    const existing = db.prepare('SELECT * FROM non_conformities WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Non-conformité non trouvée' });
+    const resolved_at = status === 'resolu' ? new Date().toISOString() : existing.resolved_at;
+    db.prepare(`
+      UPDATE non_conformities
+      SET corrective_action = ?, status = ?, resolved_at = ?, resolved_by = ?
+      WHERE id = ?
+    `).run(
+      corrective_action ?? existing.corrective_action,
+      status ?? existing.status,
+      resolved_at,
+      resolved_by ?? existing.resolved_by,
+      req.params.id
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;
