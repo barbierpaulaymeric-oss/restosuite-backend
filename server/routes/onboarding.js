@@ -53,6 +53,24 @@ router.get('/status', (req, res) => {
   });
 });
 
+// ─── GET /api/onboarding/checklist — post-wizard activation checklist ───
+router.get('/checklist', (req, res) => {
+  const recipeRow   = get('SELECT COUNT(*) as c FROM recipes');
+  const supplierRow = get('SELECT COUNT(*) as c FROM suppliers');
+  const zoneRow     = get('SELECT COUNT(*) as c FROM temperature_zones');
+  const logRow      = get('SELECT COUNT(*) as c FROM temperature_logs');
+
+  const steps = [
+    { id: 'recipe',      label: 'Créez votre première fiche technique vocale', route: '#/new',                done: recipeRow.c > 0 },
+    { id: 'supplier',    label: 'Ajoutez un fournisseur',                      route: '#/suppliers',          done: supplierRow.c > 0 },
+    { id: 'temp_zone',   label: 'Configurez vos zones de température',         route: '#/haccp/temperatures', done: zoneRow.c > 0 },
+    { id: 'temp_record', label: 'Faites votre premier relevé de température',  route: '#/haccp',              done: logRow.c > 0 },
+  ];
+
+  const doneCount = steps.filter(s => s.done).length;
+  res.json({ steps, progress: doneCount / steps.length });
+});
+
 // ─── PUT /api/onboarding/step/1 — Profil gérant ───
 router.put('/step/1', (req, res) => {
   const { first_name, last_name, phone } = req.body;
