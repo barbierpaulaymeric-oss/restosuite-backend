@@ -1501,6 +1501,154 @@
       color: var(--text-tertiary);
     }
 
+    /* ============================================
+       PILLARS SECTION
+       ============================================ */
+    .pillars__grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    @media (min-width: 640px) {
+      .pillars__grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (min-width: 1024px) {
+      .pillars__grid { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    .pillar-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-xl);
+      padding: 28px 24px;
+      transition: border-color var(--transition-base), transform var(--transition-base);
+    }
+
+    .pillar-card:hover {
+      border-color: var(--color-accent);
+      transform: translateY(-3px);
+    }
+
+    .pillar-card__icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: var(--color-accent-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      color: var(--color-accent);
+    }
+
+    .pillar-card__icon i { width: 22px; height: 22px; }
+
+    .pillar-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+
+    .pillar-card__list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .pillar-card__list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .pillar-card__list li i {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      margin-top: 2px;
+      color: var(--color-success);
+    }
+
+    .pillar-card__list li strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    /* ============================================
+       COMPARISON TABLE
+       ============================================ */
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      font-size: 0.9375rem;
+    }
+
+    .compare-table th {
+      padding: 16px 20px;
+      text-align: left;
+      font-weight: 700;
+      font-size: 0.875rem;
+      background: var(--bg-sunken);
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .compare-table th:first-child { width: 40%; }
+    .compare-table th.col-us {
+      color: var(--color-accent);
+      background: rgba(232,114,42,0.08);
+    }
+
+    .compare-table td {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border-light);
+      color: var(--text-secondary);
+      vertical-align: middle;
+    }
+
+    .compare-table td:first-child {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .compare-table td.col-us {
+      background: rgba(232,114,42,0.04);
+      color: var(--color-accent);
+      font-weight: 600;
+    }
+
+    .compare-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .compare-table tr:hover td.col-us { background: rgba(232,114,42,0.07); }
+
+    .compare-icon--yes { color: var(--color-success); }
+    .compare-icon--partial { color: #F59E0B; }
+    .compare-icon--no { color: var(--color-danger); opacity: 0.7; }
+
+    .compare-price-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: var(--color-accent-light);
+      color: var(--color-accent);
+      border-radius: 999px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+    }
+
+    @media (max-width: 639px) {
+      .compare-table { font-size: 0.8125rem; }
+      .compare-table th, .compare-table td { padding: 12px 12px; }
+    }
+
     /* Reduced motion */
     @media (prefers-reduced-motion: reduce) {
       .reveal {
@@ -1615,10 +1763,10 @@
       <div class="hero__inner">
         <div class="hero__content">
           <div class="hero__badge">
-            <span class="badge badge--accent"><i data-lucide="mic" style="width:14px;height:14px"></i> Saisie vocale propulsée par l'IA</span>
+            <span class="badge badge--accent"><i data-lucide="sparkles" style="width:14px;height:14px"></i> Propulsé par l'IA</span>
           </div>
-          <h1>Vos fiches techniques en <span class="accent">30 secondes</span></h1>
-          <p class="hero__subtitle">Dictez votre recette, l'IA calcule les coûts. Le premier assistant cuisine pensé par un chef.</p>
+          <h1>Le premier assistant cuisine <span class="accent">tout-en-un</span> propulsé par l'IA</h1>
+          <p class="hero__subtitle">Fiches techniques vocales, HACCP complet, commandes fournisseurs, analytics — tout ce dont votre restaurant a besoin, dans un seul outil.</p>
           <div class="hero__actions">
             <a href="/app" class="btn btn--primary btn--large">Démarrer gratuitement</a>
             <a href="#fonctionnalites" class="btn btn--secondary btn--large">Découvrir</a>
@@ -1654,6 +1802,126 @@
           </div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ========== PILLARS ========== -->
+  <section class="section section--elevated" id="fonctionnalites-piliers">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>Tout ce que RestoSuite fait pour vous</h2>
+        <p>23 modules intégrés, une seule app. Du rush du soir à l'audit sanitaire.</p>
+      </div>
+      <div class="pillars__grid">
+        <!-- Pilier 1 -->
+        <div class="pillar-card reveal reveal-delay-1">
+          <div class="pillar-card__icon"><i data-lucide="chef-hat"></i></div>
+          <h3>Cuisine &amp; Production</h3>
+          <ul class="pillar-card__list">
+            <li><i data-lucide="check"></i><span><strong>Fiches techniques par saisie vocale</strong> — le différenciateur</span></li>
+            <li><i data-lucide="check"></i><span>Gestion des stocks et réceptions</span></li>
+            <li><i data-lucide="check"></i><span>Base ingrédients et allergènes INCO</span></li>
+          </ul>
+        </div>
+        <!-- Pilier 2 -->
+        <div class="pillar-card reveal reveal-delay-2">
+          <div class="pillar-card__icon"><i data-lucide="truck"></i></div>
+          <h3>Commandes &amp; Fournisseurs</h3>
+          <ul class="pillar-card__list">
+            <li><i data-lucide="check"></i><span>Bons de commande avec workflow complet</span></li>
+            <li><i data-lucide="check"></i><span>Suggestions de réapprovisionnement intelligentes</span></li>
+            <li><i data-lucide="check"></i><span>Mercuriale et suivi des prix</span></li>
+          </ul>
+        </div>
+        <!-- Pilier 3 -->
+        <div class="pillar-card reveal reveal-delay-3">
+          <div class="pillar-card__icon"><i data-lucide="shield-check"></i></div>
+          <h3>HACCP &amp; Conformité</h3>
+          <ul class="pillar-card__list">
+            <li><i data-lucide="check"></i><span><strong>9 modules HACCP</strong> : températures, nettoyage, traçabilité, refroidissement, remise en T°, friteuses, non-conformités, allergènes</span></li>
+            <li><i data-lucide="check"></i><span>Export PDF horodaté pour les contrôles</span></li>
+            <li><i data-lucide="check"></i><span>Score de conformité en temps réel</span></li>
+          </ul>
+        </div>
+        <!-- Pilier 4 -->
+        <div class="pillar-card reveal reveal-delay-1">
+          <div class="pillar-card__icon"><i data-lucide="bar-chart-3"></i></div>
+          <h3>Pilotage &amp; Intelligence</h3>
+          <ul class="pillar-card__list">
+            <li><i data-lucide="check"></i><span>Analytics : food cost, marges, tendances</span></li>
+            <li><i data-lucide="check"></i><span>Menu Engineering (matrice BCG)</span></li>
+            <li><i data-lucide="check"></i><span>Prédictions IA de la demande</span></li>
+            <li><i data-lucide="check"></i><span>Assistant IA chef expert</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== COMPARISON ========== -->
+  <section class="section section--base">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>Pourquoi RestoSuite vs les autres ?</h2>
+        <p>Les logiciels spécialisés font bien une chose. RestoSuite fait tout.</p>
+      </div>
+      <div class="reveal" style="overflow-x:auto;">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Fonctionnalité</th>
+              <th class="col-us">RestoSuite</th>
+              <th>Koust / Melba</th>
+              <th>Zenchef</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Saisie vocale IA</td>
+              <td class="col-us"><i data-lucide="check-circle" class="compare-icon--yes" style="width:18px;height:18px"></i> Inclus</td>
+              <td><i data-lucide="x-circle" class="compare-icon--no" style="width:18px;height:18px"></i></td>
+              <td><i data-lucide="x-circle" class="compare-icon--no" style="width:18px;height:18px"></i></td>
+            </tr>
+            <tr>
+              <td>HACCP complet (9 modules)</td>
+              <td class="col-us"><i data-lucide="check-circle" class="compare-icon--yes" style="width:18px;height:18px"></i> Inclus</td>
+              <td><i data-lucide="minus-circle" class="compare-icon--partial" style="width:18px;height:18px"></i> Partiel</td>
+              <td><i data-lucide="minus-circle" class="compare-icon--partial" style="width:18px;height:18px"></i> Partiel</td>
+            </tr>
+            <tr>
+              <td>Commandes fournisseurs</td>
+              <td class="col-us"><i data-lucide="check-circle" class="compare-icon--yes" style="width:18px;height:18px"></i> Inclus</td>
+              <td><i data-lucide="check-circle" class="compare-icon--yes" style="width:18px;height:18px"></i></td>
+              <td><i data-lucide="x-circle" class="compare-icon--no" style="width:18px;height:18px"></i></td>
+            </tr>
+            <tr>
+              <td>Menu Engineering (matrice BCG)</td>
+              <td class="col-us"><i data-lucide="check-circle" class="compare-icon--yes" style="width:18px;height:18px"></i> Inclus</td>
+              <td><i data-lucide="minus-circle" class="compare-icon--partial" style="width:18px;height:18px"></i> Partiel</td>
+              <td><i data-lucide="x-circle" class="compare-icon--no" style="width:18px;height:18px"></i></td>
+            </tr>
+            <tr>
+              <td>Bilan carbone</td>
+              <td class="col-us"><i data-lucide="check-circle" class="compare-icon--yes" style="width:18px;height:18px"></i> Inclus</td>
+              <td><i data-lucide="x-circle" class="compare-icon--no" style="width:18px;height:18px"></i></td>
+              <td><i data-lucide="x-circle" class="compare-icon--no" style="width:18px;height:18px"></i></td>
+            </tr>
+            <tr>
+              <td>Prédictions IA de la demande</td>
+              <td class="col-us"><i data-lucide="check-circle" class="compare-icon--yes" style="width:18px;height:18px"></i> Inclus</td>
+              <td><i data-lucide="x-circle" class="compare-icon--no" style="width:18px;height:18px"></i></td>
+              <td><i data-lucide="x-circle" class="compare-icon--no" style="width:18px;height:18px"></i></td>
+            </tr>
+            <tr>
+              <td>Prix d'entrée</td>
+              <td class="col-us"><span class="compare-price-badge">29€/mois</span></td>
+              <td>~79€/mois</td>
+              <td>~59€/mois</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="reveal" style="text-align:center;margin-top:20px;font-size:0.8125rem;color:var(--text-tertiary)">Comparatif indicatif basé sur les offres publiques. Tarifs susceptibles d'évoluer.</p>
     </div>
   </section>
 
