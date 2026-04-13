@@ -346,6 +346,7 @@ function registerRoutes() {
   Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
   Router.add(/^\/fabrication-diagrams$/, renderFabricationDiagrams);
   Router.add(/^\/pms\/export$/, renderPMSExport);
+  Router.add(/^\/admin$/, renderAdmin);
 }
 
 function showPlanGateModal(planLabel) {
@@ -389,6 +390,12 @@ function bootApp(role, account, opts = {}) {
       link.style.display = '';
     }
   });
+
+  // Show admin nav link only for admin users
+  const adminNavLink = document.getElementById('nav-admin-link');
+  if (adminNavLink) {
+    adminNavLink.style.display = isAdminUser(account) ? '' : 'none';
+  }
 
   // Role-based redirect: salle goes to service view, cuisine goes to kitchen
   if (role === 'salle') {

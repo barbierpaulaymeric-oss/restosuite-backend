@@ -213,6 +213,7 @@ app.use('/api/pms', require('./routes/pms-export'));
 app.use('/api/tiac', require('./routes/tiac'));
 app.use('/api/fabrication-diagrams', require('./routes/fabrication-diagrams'));
 app.use('/api/errors', require('./routes/errors').router);
+app.use('/api/admin', require('./routes/admin'));
 
 // Admin endpoints — JWT required (gérant only)
 app.post('/api/admin/backup', requireAuth, (req, res) => {
