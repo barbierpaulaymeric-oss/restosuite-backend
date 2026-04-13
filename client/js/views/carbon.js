@@ -163,21 +163,21 @@ function renderCarbonGlobal(data) {
       <h3 style="margin-bottom:var(--space-3)">Équivalences</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--space-3)">
         <div style="display:flex;align-items:center;gap:var(--space-2)">
-          <span style="font-size:1.5rem">🚗</span>
+          <i data-lucide="car" style="width:24px;height:24px;vertical-align:middle"></i>
           <div>
             <div style="font-weight:600">${data.equivalents.car_km.toLocaleString('fr-FR')} km</div>
             <div class="text-secondary text-sm">en voiture</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:var(--space-2)">
-          <span style="font-size:1.5rem">🌳</span>
+          <i data-lucide="tree-pine" style="width:24px;height:24px;vertical-align:middle"></i>
           <div>
             <div style="font-weight:600">${data.equivalents.tree_days.toLocaleString('fr-FR')} jours-arbre</div>
             <div class="text-secondary text-sm">pour compenser</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:var(--space-2)">
-          <span style="font-size:1.5rem">✈️</span>
+          <i data-lucide="plane" style="width:24px;height:24px;vertical-align:middle"></i>
           <div>
             <div style="font-weight:600">${data.equivalents.flights_paris_marseille} vols</div>
             <div class="text-secondary text-sm">Paris → Marseille</div>

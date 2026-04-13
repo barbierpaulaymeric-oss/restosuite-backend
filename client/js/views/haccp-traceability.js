@@ -15,7 +15,7 @@ async function renderHACCPTraceability() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>📦 Traçabilité</h1>
+          <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Traçabilité</h1>
           <button class="btn btn-primary" id="btn-new-reception">
             <i data-lucide="plus" style="width:18px;height:18px"></i> Réception
           </button>
@@ -155,7 +155,7 @@ function showReceptionModal() {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal" style="max-width:560px">
-      <h2>📦 Réception marchandise</h2>
+      <h2><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Réception marchandise</h2>
       <div class="form-group">
         <label>Produit *</label>
         <input type="text" class="form-control" id="rec-product" placeholder="ex: Filet de bœuf" autofocus>

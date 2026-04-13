@@ -30,7 +30,7 @@ async function renderStockReception() {
       <div style="display:flex;align-items:center;gap:var(--space-3)">
         <a href="#/stock" style="color:var(--text-secondary);text-decoration:none;font-size:1.5rem">←</a>
         <div>
-          <h1>📥 Réception marchandise</h1>
+          <h1><i data-lucide="download" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Réception marchandise</h1>
           <p class="text-secondary">Enregistrez la réception d'une commande</p>
         </div>
       </div>

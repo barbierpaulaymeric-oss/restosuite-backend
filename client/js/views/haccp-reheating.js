@@ -11,7 +11,7 @@ async function renderHACCPReheating() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>🔥 Remises en température</h1>
+          <h1><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Remises en température</h1>
           <button class="btn btn-primary" id="btn-new-reheat">
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau
           </button>
@@ -93,7 +93,7 @@ function showReheatingModal() {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal" style="max-width:540px">
-      <h2>🔥 Nouvelle remise en température</h2>
+      <h2><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouvelle remise en température</h2>
       <p class="text-secondary text-sm" style="margin-bottom:16px">Complétez quand +63°C est atteint.</p>
       <div class="form-group">
         <label>Produit *</label>
@@ -153,7 +153,7 @@ function showReheatingUpdateModal(id, productName) {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal" style="max-width:440px">
-      <h2>🔥 Compléter — ${escapeHtml(productName)}</h2>
+      <h2><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Compléter — ${escapeHtml(productName)}</h2>
       <div class="form-group">
         <label>Heure atteinte 63°C *</label>
         <input type="datetime-local" class="form-control" id="reheat-u-63c" value="${now}">

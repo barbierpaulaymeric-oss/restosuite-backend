@@ -10,7 +10,7 @@ async function renderStockMovements() {
       <div style="display:flex;align-items:center;gap:var(--space-3)">
         <a href="#/stock" style="color:var(--text-secondary);text-decoration:none;font-size:1.5rem">←</a>
         <div>
-          <h1>📊 Mouvements de stock</h1>
+          <h1><i data-lucide="trending-up" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Mouvements de stock</h1>
           <p class="text-secondary">Historique des entrées et sorties</p>
         </div>
       </div>

@@ -42,7 +42,7 @@ async function renderIngredients() {
           <p>Aucun résultat</p>
         </div>` : `
         <div class="empty-state">
-          <div class="empty-icon">🥕</div>
+          <div class="empty-icon"><i data-lucide="leaf"></i></div>
           <h3>Aucun ingrédient</h3>
           <p>Ajoutez vos premiers ingrédients pour calculer vos coûts.</p>
         </div>`;
@@ -200,7 +200,7 @@ function showCSVImportModal() {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal" style="max-width:600px">
-      <h2>📥 Importer des ingrédients (CSV)</h2>
+      <h2><i data-lucide="upload" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Importer des ingrédients (CSV)</h2>
       <p class="text-muted" style="font-size:var(--text-sm);margin-bottom:12px">Format attendu : <code>nom;catégorie;unité;prix_unitaire;pourcentage_perte</code><br>Séparateur : <code>;</code> ou <code>,</code></p>
       <div class="form-group">
         <input type="file" id="csv-file-input" accept=".csv,.txt" class="form-control">

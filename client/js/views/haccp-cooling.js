@@ -11,7 +11,7 @@ async function renderHACCPCooling() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>❄️ Refroidissements rapides</h1>
+          <h1><i data-lucide="snowflake" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Refroidissements rapides</h1>
           <button class="btn btn-primary" id="btn-new-cooling">
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau
           </button>
@@ -99,7 +99,7 @@ function showCoolingModal() {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal" style="max-width:540px">
-      <h2>❄️ Nouveau refroidissement</h2>
+      <h2><i data-lucide="snowflake" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouveau refroidissement</h2>
       <p class="text-secondary text-sm" style="margin-bottom:16px">Enregistrez le début. Complétez les temps de passage ultérieurement.</p>
       <div class="form-group">
         <label>Produit *</label>
@@ -159,7 +159,7 @@ function showCoolingUpdateModal(id, productName) {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal" style="max-width:480px">
-      <h2>❄️ Compléter — ${escapeHtml(productName)}</h2>
+      <h2><i data-lucide="snowflake" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Compléter — ${escapeHtml(productName)}</h2>
       <div class="form-group">
         <label>Heure passage 63°C ↓</label>
         <input type="datetime-local" class="form-control" id="cool-u-63c" value="${now}">

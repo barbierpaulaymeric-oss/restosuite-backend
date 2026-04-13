@@ -22,7 +22,7 @@ class ErrorsLogView {
     } catch (e) {
       document.getElementById('errors-log-content').innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">⚠️</div>
+          <div class="empty-icon"><i data-lucide="alert-triangle"></i></div>
           <p>Impossible de charger les erreurs : ${escapeHtml(e.message)}</p>
         </div>
       `;
@@ -35,7 +35,7 @@ class ErrorsLogView {
     if (!errors.length) {
       container.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">✅</div>
+          <div class="empty-icon"><i data-lucide="check-circle"></i></div>
           <p>Aucune erreur enregistrée.</p>
         </div>
       `;

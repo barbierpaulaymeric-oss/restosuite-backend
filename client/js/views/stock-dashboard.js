@@ -9,7 +9,7 @@ async function renderStockDashboard() {
 
   app.innerHTML = `
     <div class="view-header">
-      <h1>📦 Stock</h1>
+      <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Stock</h1>
       <p class="text-secondary">Vue d'ensemble du stock actuel</p>
     </div>
     <div id="delivery-pending-banner" style="margin-bottom:var(--space-4)"></div>
@@ -90,7 +90,7 @@ async function loadStock(query) {
     if (alerts.length > 0 && !query) {
       alertsSection.innerHTML = `
         <div class="stock-alert-banner" style="background:var(--color-danger-light);border:1px solid var(--color-danger);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-5)">
-          <h3 style="color:var(--color-danger);margin-bottom:var(--space-2)">⚠️ ${alerts.length} alerte${alerts.length > 1 ? 's' : ''} stock bas</h3>
+          <h3 style="color:var(--color-danger);margin-bottom:var(--space-2)"><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>${alerts.length} alerte${alerts.length > 1 ? 's' : ''} stock bas</h3>
           <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
             ${alerts.map(a => `
               <span class="badge badge--danger" style="font-size:var(--text-sm)">
@@ -129,12 +129,12 @@ async function loadStock(query) {
     if (stock.length === 0) {
       content.innerHTML = query ? `
         <div class="empty-state">
-          <div class="empty-icon">📦</div>
+          <div class="empty-icon"><i data-lucide="package"></i></div>
           <p>Aucun résultat</p>
         </div>
       ` : `
         <div class="empty-state">
-          <div class="empty-icon">📦</div>
+          <div class="empty-icon"><i data-lucide="package"></i></div>
           <h3>Votre stock est vide</h3>
           <p>Enregistrez votre première réception pour commencer le suivi.</p>
           <a href="#/stock/reception" class="btn btn-primary">Réception marchandise</a>
@@ -215,7 +215,7 @@ async function showInventoryModal() {
 
   overlay.innerHTML = `
     <div class="modal" style="background:var(--bg-elevated);border-radius:var(--radius-xl);padding:var(--space-6);max-width:500px;width:100%;max-height:80vh;overflow-y:auto">
-      <h2 style="margin-bottom:var(--space-4)">📋 Inventaire</h2>
+      <h2 style="margin-bottom:var(--space-4)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Inventaire</h2>
       <div class="form-group" style="margin-bottom:var(--space-4)">
         <label class="form-label">Ingrédient</label>
         <select id="inv-ingredient" class="input">

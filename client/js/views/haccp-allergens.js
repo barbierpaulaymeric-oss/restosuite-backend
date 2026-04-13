@@ -35,7 +35,7 @@ async function renderHACCPAllergens() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>⚠️ Allergènes — Affichage INCO</h1>
+          <h1><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Allergènes — Affichage INCO</h1>
           <button class="btn btn-secondary" onclick="window.print()">
             <i data-lucide="printer" style="width:18px;height:18px"></i> Imprimer
           </button>

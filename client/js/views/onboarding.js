@@ -535,7 +535,7 @@ class OnboardingWizard {
         <p class="ob-desc">Tout est prêt. Commencez à utiliser RestoSuite.</p>
 
         <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-4);margin-top:var(--space-4);text-align:left;width:100%">
-          <h3 style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-3)">📋 Récapitulatif</h3>
+          <h3 style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-3)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Récapitulatif</h3>
           ${r.name ? `<p style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Restaurant :</strong> ${escapeHtml(r.name)}</p>` : ''}
           ${r.city ? `<p style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Ville :</strong> ${escapeHtml(r.city)}</p>` : ''}
           ${this.tables.length ? `<p style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Tables :</strong> ${this.tables.length}</p>` : ''}

@@ -31,7 +31,7 @@ async function renderQRCodes() {
     <div class="qr-header page-header">
       <div>
         <a href="#/more" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px"></i> Plus</a>
-        <h1 style="margin-top:4px">📱 QR Codes — Menu</h1>
+        <h1 style="margin-top:4px"><i data-lucide="qr-code" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>QR Codes — Menu</h1>
       </div>
       <button class="btn btn-primary qr-print-hide" onclick="window.print()">
         <i data-lucide="printer" style="width:18px;height:18px"></i> Imprimer
@@ -63,7 +63,7 @@ async function renderQRCodes() {
   } catch (e) {
     document.getElementById('qr-grid').innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">⚠️</div>
+        <div class="empty-icon"><i data-lucide="alert-triangle"></i></div>
         <p>Erreur de chargement des QR codes</p>
       </div>
     `;

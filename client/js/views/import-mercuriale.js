@@ -13,7 +13,7 @@ async function renderImportMercuriale() {
       <a href="#/mercuriale" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-2);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)">
         <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Mercuriale
       </a>
-      <h1>📷 Import mercuriale IA</h1>
+      <h1><i data-lucide="camera" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Import mercuriale IA</h1>
       <p class="text-secondary">Scannez une liste de prix fournisseur et mettez à jour vos prix automatiquement</p>
     </div>
 

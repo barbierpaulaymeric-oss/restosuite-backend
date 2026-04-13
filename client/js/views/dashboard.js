@@ -131,7 +131,7 @@ async function renderDashboard() {
         </div>
       ` : `
         <div class="empty-state">
-          <div class="empty-icon">🎤</div>
+          <div class="empty-icon"><i data-lucide="mic"></i></div>
           <h3>Créez votre première fiche technique</h3>
           <p>Dictez votre recette, l'IA fait le reste — coûts, portions, procédure.</p>
           ${perms.edit_recipes ? '<a href="#/new" class="btn btn-primary">Nouvelle fiche</a>' : ''}
@@ -270,7 +270,7 @@ async function loadAISuggestions() {
   container.innerHTML = `
     <div style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-        <h3 style="margin:0">💡 Suggestions IA</h3>
+        <h3 style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Suggestions IA</h3>
       </div>
       <p class="text-secondary text-sm" style="text-align:center;padding:var(--space-4)">Analyse en cours…</p>
     </div>
@@ -348,7 +348,7 @@ function renderAISuggestions(container, data) {
   container.innerHTML = `
     <div style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-        <h3 style="margin:0">💡 Suggestions IA</h3>
+        <h3 style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Suggestions IA</h3>
         <button class="btn btn-secondary btn-sm" onclick="refreshAISuggestions()" title="Rafraîchir" style="padding:4px 8px">🔄</button>
       </div>
       ${topHtml}${improveHtml}${dailyHtml}

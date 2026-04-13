@@ -19,7 +19,7 @@ async function renderHACCPCleaning() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>🧹 Plan de nettoyage</h1>
+          <h1><i data-lucide="sparkles" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Plan de nettoyage</h1>
           ${isGerant ? `
           <button class="btn btn-primary" id="btn-add-task">
             <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter
@@ -165,7 +165,7 @@ function showCleaningTaskModal(task) {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal">
-      <h2>${isEdit ? '✏️ Modifier la tâche' : '➕ Nouvelle tâche'}</h2>
+      <h2>${isEdit ? '<i data-lucide="pencil" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Modifier la tâche' : '<i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouvelle tâche'}</h2>
       <div class="form-group">
         <label>Nom de la tâche</label>
         <input type="text" class="form-control" id="task-name" value="${isEdit ? escapeHtml(task.name) : ''}" placeholder="ex: Nettoyage plan de travail">

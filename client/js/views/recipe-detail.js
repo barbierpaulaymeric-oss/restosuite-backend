@@ -291,7 +291,7 @@ async function printAllergenSheet(recipeId, recipeName) {
   </style>
 </head>
 <body>
-  <h1>🍽️ ${recipeName}</h1>
+  <h1><i data-lucide="utensils" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>${recipeName}</h1>
   <p class="subtitle">Fiche allergènes — Imprimée le ${today}</p>
   <div class="inco-badge">📋 Règlement INCO (UE) — 14 allergènes réglementaires</div>
   <div>${allergensHtml}</div>

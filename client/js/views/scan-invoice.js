@@ -7,7 +7,7 @@ async function renderScanInvoice() {
   app.innerHTML = `
     <div class="page-header">
       <a href="#/stock" class="btn btn-secondary btn-sm">← Stock</a>
-      <h1>📷 Scanner une facture</h1>
+      <h1><i data-lucide="camera" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Scanner une facture</h1>
     </div>
 
     <div class="card" style="padding:var(--space-4);text-align:center">

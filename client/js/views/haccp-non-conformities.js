@@ -29,7 +29,7 @@ async function renderHACCPNonConformities() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>⚠️ Non-conformités</h1>
+          <h1><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Non-conformités</h1>
           <button class="btn btn-primary" id="btn-new-nc">
             <i data-lucide="plus" style="width:18px;height:18px"></i> Déclarer
           </button>
@@ -100,7 +100,7 @@ function showNCModal() {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal" style="max-width:540px">
-      <h2>⚠️ Déclarer une non-conformité</h2>
+      <h2><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Déclarer une non-conformité</h2>
       <div class="form-group">
         <label>Titre *</label>
         <input type="text" class="form-control" id="nc-title" placeholder="ex: Température frigo hors norme" autofocus>
@@ -161,7 +161,7 @@ function showNCResolveModal(id, title) {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal" style="max-width:480px">
-      <h2>✅ Résoudre — ${escapeHtml(title)}</h2>
+      <h2><i data-lucide="check-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Résoudre — ${escapeHtml(title)}</h2>
       <div class="form-group">
         <label>Action corrective *</label>
         <textarea class="form-control" id="nc-corrective" rows="4" placeholder="Décrivez l'action corrective mise en place..." autofocus></textarea>

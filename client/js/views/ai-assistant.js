@@ -15,7 +15,7 @@ async function renderAIAssistant() {
     <div style="display:flex;flex-direction:column;height:calc(100vh - 80px);max-width:900px;margin:0 auto;padding:var(--space-3)">
       <div class="view-header" style="flex-shrink:0;margin-bottom:var(--space-4)">
         <h1 style="display:flex;align-items:center;gap:8px;margin:0">
-          <span style="font-size:1.8rem">🧠</span> Assistant IA
+          <i data-lucide="brain" style="width:28px;height:28px;vertical-align:middle;margin-right:8px"></i>Assistant IA
         </h1>
         <p class="text-secondary" style="font-size:var(--text-sm);margin-top:4px">Chef expert · Recommandations intelligentes · Actions confirmées</p>
       </div>
@@ -27,10 +27,10 @@ async function renderAIAssistant() {
             <p>Bonjour ! Je suis votre <strong>Assistant IA</strong> RestoSuite.</p>
             <p style="margin-top:8px">Je connais vos fiches techniques, vos stocks, vos fournisseurs et vos données HACCP. Je peux vous aider et exécuter des actions avec votre confirmation.</p>
             <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
-              <button class="ai-suggestion" onclick="sendAISuggestion('Quel est mon food cost moyen et comment l\\'améliorer ?')">📊 Food cost</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Quels ingrédients sont en stock bas ?')">📦 Stock</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Optimise les marges de mes plats')">💰 Marges</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Enregistre une température de 5°C en chambre froide')">🌡️ HACCP</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Quel est mon food cost moyen et comment l\\'améliorer ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Food cost</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Quels ingrédients sont en stock bas ?')"><i data-lucide="package" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Stock</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Optimise les marges de mes plats')"><i data-lucide="dollar-sign" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Marges</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Enregistre une température de 5°C en chambre froide')"><i data-lucide="thermometer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>HACCP</button>
             </div>
           </div>
         </div>

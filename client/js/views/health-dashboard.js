@@ -10,7 +10,7 @@ async function renderHealthDashboard() {
   if (!perms.view_costs) {
     app.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">🔒</div>
+        <div class="empty-icon"><i data-lucide="lock"></i></div>
         <p>Accès réservé au gérant</p>
         <a href="#/" class="btn btn-primary">Retour</a>
       </div>
@@ -23,7 +23,7 @@ async function renderHealthDashboard() {
       <a href="#/" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-2);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)">
         <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Accueil
       </a>
-      <h1>🏥 Santé du restaurant</h1>
+      <h1><i data-lucide="heart-pulse" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Santé du restaurant</h1>
       <p class="text-secondary">Vue d'ensemble de la performance opérationnelle</p>
     </div>
     <div id="health-content">
@@ -48,7 +48,7 @@ async function renderHealthDashboard() {
   } catch (e) {
     document.getElementById('health-content').innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">⚠️</div>
+        <div class="empty-icon"><i data-lucide="alert-triangle"></i></div>
         <p>Erreur de chargement</p>
         <p class="text-secondary text-sm">${escapeHtml(e.message)}</p>
         <button class="btn btn-primary" onclick="renderHealthDashboard()">Réessayer</button>
@@ -186,7 +186,7 @@ function renderHealthContent(kpis, variance, alerts, haccp, stockAlerts, availab
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--space-4);margin-bottom:var(--space-5)">
       <!-- HACCP Compliance -->
       <div class="card" style="padding:var(--space-4)">
-        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)">🛡️ Conformité HACCP</h3>
+        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)"><i data-lucide="shield" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Conformité HACCP</h3>
         ${haccp ? `
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
             <div style="text-align:center">
@@ -205,7 +205,7 @@ function renderHealthContent(kpis, variance, alerts, haccp, stockAlerts, availab
 
       <!-- Stock Health -->
       <div class="card" style="padding:var(--space-4)">
-        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)">📦 État des stocks</h3>
+        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)"><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>État des stocks</h3>
         ${stockAlerts.length > 0 ? `
           <div style="max-height:180px;overflow-y:auto">
             ${stockAlerts.slice(0, 8).map(a => `
@@ -222,7 +222,7 @@ function renderHealthContent(kpis, variance, alerts, haccp, stockAlerts, availab
 
       <!-- Recipe Availability -->
       <div class="card" style="padding:var(--space-4)">
-        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)">🍽️ Disponibilité des plats</h3>
+        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)"><i data-lucide="utensils" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Disponibilité des plats</h3>
         ${availability && availability.summary ? `
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-2);text-align:center;margin-bottom:var(--space-3)">
             <div>
@@ -248,7 +248,7 @@ function renderHealthContent(kpis, variance, alerts, haccp, stockAlerts, availab
 
       <!-- Variance Summary -->
       <div class="card" style="padding:var(--space-4)">
-        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)">📊 Analyse des écarts (30j)</h3>
+        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)"><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Analyse des écarts (30j)</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);text-align:center">
           <div>
             <div style="font-size:var(--text-xl);font-weight:700;color:${variance.health === 'good' ? 'var(--color-success)' : variance.health === 'warning' ? 'var(--color-warning)' : 'var(--color-danger)'}">

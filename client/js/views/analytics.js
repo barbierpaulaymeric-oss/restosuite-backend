@@ -14,7 +14,7 @@ async function renderAnalytics() {
   if (!canView) {
     app.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">🔒</div>
+        <div class="empty-icon"><i data-lucide="lock"></i></div>
         <p>Accès réservé au gérant</p>
         <a href="#/" class="btn btn-primary">Retour</a>
       </div>
@@ -24,7 +24,7 @@ async function renderAnalytics() {
 
   app.innerHTML = `
     <div class="view-header">
-      <h1>📊 Pilotage</h1>
+      <h1><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Pilotage</h1>
       <p class="text-secondary">Score de santé · Food cost · Stock · HACCP · Fournisseurs · IA</p>
     </div>
     <div class="analytics-loading">
@@ -53,10 +53,10 @@ async function renderAnalytics() {
     console.error('Pilotage error:', e);
     app.innerHTML = `
       <div class="view-header">
-        <h1>📊 Pilotage</h1>
+        <h1><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Pilotage</h1>
       </div>
       <div class="empty-state">
-        <div class="empty-icon">⚠️</div>
+        <div class="empty-icon"><i data-lucide="alert-triangle"></i></div>
         <p>Erreur de chargement</p>
         <p class="text-secondary text-sm">${escapeHtml(e.message)}</p>
         <button class="btn btn-primary" onclick="renderAnalytics()">Réessayer</button>
@@ -135,7 +135,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
 
   app.innerHTML = `
     <div class="view-header">
-      <h1>📊 Pilotage</h1>
+      <h1><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Pilotage</h1>
       <p class="text-secondary">Score de santé · Food cost · Stock · HACCP · Fournisseurs · IA</p>
     </div>
 
@@ -155,10 +155,10 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
           </div>
         </div>
         <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
-          <a href="#/stock/reception" class="btn btn-secondary" style="font-size:var(--text-sm)">📥 Réception</a>
-          <a href="#/stock/variance" class="btn btn-secondary" style="font-size:var(--text-sm)">📊 Écarts</a>
-          <a href="#/haccp" class="btn btn-secondary" style="font-size:var(--text-sm)">🛡️ HACCP</a>
-          <a href="#/orders" class="btn btn-secondary" style="font-size:var(--text-sm)">📋 Commandes</a>
+          <a href="#/stock/reception" class="btn btn-secondary" style="font-size:var(--text-sm)"><i data-lucide="download" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Réception</a>
+          <a href="#/stock/variance" class="btn btn-secondary" style="font-size:var(--text-sm)"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Écarts</a>
+          <a href="#/haccp" class="btn btn-secondary" style="font-size:var(--text-sm)"><i data-lucide="shield" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>HACCP</a>
+          <a href="#/orders" class="btn btn-secondary" style="font-size:var(--text-sm)"><i data-lucide="clipboard-list" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Commandes</a>
         </div>
       </div>
       <div style="margin-top:var(--space-3);background:var(--bg-sunken);border-radius:6px;height:8px;overflow:hidden">
@@ -178,25 +178,25 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
     <!-- ═══ KPIs principaux ═══ -->
     <div class="analytics-kpis">
       <div class="kpi-card ${fcClass} anim-fadeIn" style="--delay:0">
-        <div class="kpi-icon">📊</div>
+        <div class="kpi-icon"><i data-lucide="bar-chart-2" style="width:28px;height:28px"></i></div>
         <div class="kpi-value font-mono">${kpis.avg_food_cost_pct}%</div>
         <div class="kpi-label">Food Cost moyen</div>
         <div class="kpi-detail">${kpis.total_recipes} recettes</div>
       </div>
       <div class="kpi-card anim-fadeIn" style="--delay:1">
-        <div class="kpi-icon">💰</div>
+        <div class="kpi-icon"><i data-lucide="dollar-sign" style="width:28px;height:28px"></i></div>
         <div class="kpi-value font-mono">${formatCurrency(kpis.total_stock_value)}</div>
         <div class="kpi-label">Valeur du stock</div>
         <div class="kpi-detail">${kpis.low_stock_count} alerte${kpis.low_stock_count > 1 ? 's' : ''}</div>
       </div>
       <div class="kpi-card ${haccpPct >= 90 ? 'kpi--success' : haccpPct >= 70 ? 'kpi--warning' : 'kpi--danger'} anim-fadeIn" style="--delay:2">
-        <div class="kpi-icon">🌡️</div>
+        <div class="kpi-icon"><i data-lucide="thermometer" style="width:28px;height:28px"></i></div>
         <div class="kpi-value font-mono">${haccpPct}%</div>
         <div class="kpi-label">Conformité HACCP</div>
         <div class="kpi-detail">${haccpTemp.done}/${haccpTemp.total} temp · ${haccpClean.done}/${haccpClean.total} nett.</div>
       </div>
       <div class="kpi-card ${activeAlerts > 0 ? 'kpi--danger' : 'kpi--success'} anim-fadeIn" style="--delay:3">
-        <div class="kpi-icon">⚠️</div>
+        <div class="kpi-icon"><i data-lucide="alert-triangle" style="width:28px;height:28px"></i></div>
         <div class="kpi-value font-mono">${activeAlerts}</div>
         <div class="kpi-label">Alertes actives</div>
         <div class="kpi-detail">${kpis.price_changes_30d} chgmt prix/30j</div>
@@ -205,7 +205,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
 
     <!-- ═══ Section Food Cost ═══ -->
     <section class="analytics-section anim-fadeIn" style="--delay:4">
-      <h2>🍽️ Food Cost par recette</h2>
+      <h2><i data-lucide="utensils" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Food Cost par recette</h2>
       ${foodCost.best_margin ? `
       <div class="analytics-highlights">
         <div class="highlight highlight--success">
@@ -247,7 +247,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
 
     <!-- ═══ Section Stock ═══ -->
     <section class="analytics-section anim-fadeIn" style="--delay:5">
-      <h2>📦 Stock</h2>
+      <h2><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Stock</h2>
       <div class="analytics-row">
         <div class="analytics-col">
           <h3>Valeur par catégorie</h3>
@@ -280,7 +280,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
             `).join('')}</div>`
           }
           ${stockData.alerts.length > 0 ? `
-          <h3 style="margin-top:var(--space-4)">⚠️ Alertes stock bas</h3>
+          <h3 style="margin-top:var(--space-4)"><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Alertes stock bas</h3>
           <div class="stock-alerts-list">
             ${stockData.alerts.slice(0, 5).map(a => `
               <div class="stock-alert-item stock-alert--${a.urgency}">
@@ -301,7 +301,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
 
     <!-- ═══ Section HACCP ═══ -->
     <section class="analytics-section anim-fadeIn" style="--delay:6">
-      <h2>🛡️ HACCP Compliance</h2>
+      <h2><i data-lucide="shield" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>HACCP Compliance</h2>
       <div class="analytics-row">
         <div class="analytics-col">
           <h3>Conformité 7 jours</h3>
@@ -348,7 +348,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
 
     <!-- ═══ Section Fournisseurs ═══ -->
     <section class="analytics-section anim-fadeIn" style="--delay:7">
-      <h2>💲 Prix Fournisseurs</h2>
+      <h2><i data-lucide="dollar-sign" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Prix Fournisseurs</h2>
       <div class="analytics-row">
         <div class="analytics-col">
           <div class="inflation-indicator ${pricesData.inflation_30d > 0 ? 'inflation--up' : pricesData.inflation_30d < 0 ? 'inflation--down' : ''}">
@@ -369,7 +369,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
           }
         </div>
         <div class="analytics-col">
-          <h3>💡 Suggestions d'économies</h3>
+          <h3><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Suggestions d'économies</h3>
           ${pricesData.suggestions.length === 0 ? '<p class="text-secondary text-sm">Aucune suggestion</p>' :
             `<div class="savings-list">${pricesData.suggestions.slice(0, 5).map(s => `
               <div class="savings-item">
@@ -389,7 +389,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
     <!-- ═══ Section Insights IA ═══ -->
     <section class="analytics-section analytics-section--ai anim-fadeIn" style="--delay:8">
       <div class="ai-section-header">
-        <h2>🧠 Insights IA</h2>
+        <h2><i data-lucide="brain" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Insights IA</h2>
         <button class="btn btn-secondary btn-sm" id="refresh-insights-btn" onclick="refreshInsights()">
           <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualiser
         </button>
@@ -402,15 +402,15 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
 
     <!-- ═══ Actions rapides ═══ -->
     <section class="analytics-section anim-fadeIn" style="--delay:9">
-      <h2>⚡ Actions rapides</h2>
+      <h2><i data-lucide="zap" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Actions rapides</h2>
       <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
-        <a href="#/stock/reception" class="btn btn-secondary">📥 Réception stock</a>
-        <a href="#/stock/variance" class="btn btn-secondary">📊 Analyse écarts</a>
-        <a href="#/haccp" class="btn btn-secondary">🛡️ HACCP</a>
-        <a href="#/orders" class="btn btn-secondary">📋 Commandes fournisseurs</a>
-        <a href="#/menu-engineering" class="btn btn-secondary">🎯 Menu Engineering</a>
-        <a href="#/predictions" class="btn btn-secondary">🧠 Prédictions IA</a>
-        <a href="#/suppliers" class="btn btn-secondary">🏭 Fournisseurs</a>
+        <a href="#/stock/reception" class="btn btn-secondary"><i data-lucide="download" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Réception stock</a>
+        <a href="#/stock/variance" class="btn btn-secondary"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Analyse écarts</a>
+        <a href="#/haccp" class="btn btn-secondary"><i data-lucide="shield" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>HACCP</a>
+        <a href="#/orders" class="btn btn-secondary"><i data-lucide="clipboard-list" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Commandes fournisseurs</a>
+        <a href="#/menu-engineering" class="btn btn-secondary"><i data-lucide="target" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Menu Engineering</a>
+        <a href="#/predictions" class="btn btn-secondary"><i data-lucide="brain" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Prédictions IA</a>
+        <a href="#/suppliers" class="btn btn-secondary"><i data-lucide="factory" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Fournisseurs</a>
       </div>
     </section>
   `;

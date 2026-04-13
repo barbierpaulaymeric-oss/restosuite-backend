@@ -23,7 +23,7 @@ async function renderHACCPTemperatures() {
           <span class="breadcrumb-current">Températures</span>
         </nav>
         <div class="page-header">
-          <h1>🌡️ Températures</h1>
+          <h1><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Températures</h1>
           <button class="btn btn-primary" id="btn-new-temp">
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau relevé
           </button>
@@ -190,7 +190,7 @@ function showNewTempModal(zones) {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal">
-      <h2>🌡️ Nouveau relevé</h2>
+      <h2><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouveau relevé</h2>
       <div class="form-group">
         <label>Zone</label>
         <select class="form-control" id="modal-zone">
@@ -253,7 +253,7 @@ function showZoneModal(data) {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal">
-      <h2>${isEdit ? '✏️ Modifier la zone' : '➕ Nouvelle zone'}</h2>
+      <h2>${isEdit ? '<i data-lucide="pencil" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Modifier la zone' : '<i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouvelle zone'}</h2>
       <div class="form-group">
         <label>Nom</label>
         <input type="text" class="form-control" id="zone-name" value="${isEdit ? escapeHtml(data.name) : ''}" placeholder="ex: Frigo 3">

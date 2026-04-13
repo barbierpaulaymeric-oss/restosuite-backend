@@ -6,7 +6,7 @@ async function renderDeliveries() {
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="view-header">
-      <h1>🚚 Livraisons</h1>
+      <h1><i data-lucide="truck" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Livraisons</h1>
       <p class="text-secondary">Réception et suivi des bons de livraison</p>
     </div>
     <div class="delivery-tabs" style="display:flex;gap:var(--space-2);margin-bottom:var(--space-5);flex-wrap:wrap">
@@ -44,7 +44,7 @@ async function renderDeliveries() {
     if (alerts.length > 0) {
       banner.innerHTML = `
         <div style="background:var(--color-warning-light, #fff3cd);border:1px solid var(--color-warning, #ffc107);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-5)">
-          <h3 style="color:var(--color-warning-dark, #856404);margin-bottom:var(--space-2)">⚠️ ${alerts.length} produit${alerts.length > 1 ? 's' : ''} avec DLC proche</h3>
+          <h3 style="color:var(--color-warning-dark, #856404);margin-bottom:var(--space-2)"><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>${alerts.length} produit${alerts.length > 1 ? 's' : ''} avec DLC proche</h3>
           <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
             ${alerts.map(a => `
               <span class="badge" style="background:${a.days_remaining <= 1 ? 'var(--color-danger)' : 'var(--color-warning)'};color:white;font-size:var(--text-sm);padding:4px 10px;border-radius:var(--radius-md)">
@@ -137,7 +137,7 @@ async function renderDeliveryDetail(id) {
           <button class="btn btn-secondary btn-sm" id="back-deliveries" style="margin-bottom:var(--space-2)">
             ← Retour
           </button>
-          <h1>🚚 Bon #${d.id} — ${escapeHtml(d.supplier_name)}</h1>
+          <h1><i data-lucide="truck" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Bon #${d.id} — ${escapeHtml(d.supplier_name)}</h1>
           <p class="text-secondary">
             ${d.delivery_date ? `Livraison prévue : ${d.delivery_date}` : `Créé le ${new Date(d.created_at).toLocaleDateString('fr-FR')}`}
             ${d.received_at ? ` — Réceptionné le ${new Date(d.received_at).toLocaleDateString('fr-FR')} par ${escapeHtml(d.received_by_name || '?')}` : ''}

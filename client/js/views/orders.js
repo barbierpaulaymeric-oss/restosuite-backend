@@ -44,7 +44,7 @@ async function renderOrdersDashboard() {
     if (orders.length === 0) {
       gridEl.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">📦</div>
+          <div class="empty-icon"><i data-lucide="package"></i></div>
           <h3>Aucune commande</h3>
           <p>Créez une nouvelle commande fournisseur pour commencer.</p>
           <a href="#/orders/new" class="btn btn-primary">Nouvelle commande</a>
@@ -143,7 +143,7 @@ async function showSuggestionsModal() {
     if (!suggestions || suggestions.length === 0) {
       loadingEl.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">✅</div>
+          <div class="empty-icon"><i data-lucide="check-circle"></i></div>
           <p>Tous les stocks sont corrects. Aucun réapprovisionnement nécessaire.</p>
         </div>
       `;
@@ -764,7 +764,7 @@ async function showPOAnalyticsModal() {
   overlay.innerHTML = `
     <div class="modal" style="max-width:700px;max-height:80vh;overflow-y:auto;padding:var(--space-5)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-4)">
-        <h2 style="margin:0">📊 Statistiques d'achat</h2>
+        <h2 style="margin:0"><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Statistiques d'achat</h2>
         <button class="btn btn-ghost btn-sm" onclick="this.closest('.modal-overlay').remove()">✕</button>
       </div>
       <div id="po-analytics-content"><div class="loading"><div class="spinner"></div></div></div>

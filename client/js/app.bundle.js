@@ -905,7 +905,7 @@ async function renderDashboard() {
         </div>
       ` : `
         <div class="empty-state">
-          <div class="empty-icon">\u{1F3A4}</div>
+          <div class="empty-icon"><i data-lucide="mic"></i></div>
           <h3>Cr\xE9ez votre premi\xE8re fiche technique</h3>
           <p>Dictez votre recette, l'IA fait le reste \u2014 co\xFBts, portions, proc\xE9dure.</p>
           ${perms.edit_recipes ? '<a href="#/new" class="btn btn-primary">Nouvelle fiche</a>' : ""}
@@ -1019,7 +1019,7 @@ async function loadAISuggestions() {
   container.innerHTML = `
     <div style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-        <h3 style="margin:0">\u{1F4A1} Suggestions IA</h3>
+        <h3 style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Suggestions IA</h3>
       </div>
       <p class="text-secondary text-sm" style="text-align:center;padding:var(--space-4)">Analyse en cours\u2026</p>
     </div>
@@ -1090,7 +1090,7 @@ function renderAISuggestions(container, data) {
   container.innerHTML = `
     <div style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-        <h3 style="margin:0">\u{1F4A1} Suggestions IA</h3>
+        <h3 style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Suggestions IA</h3>
         <button class="btn btn-secondary btn-sm" onclick="refreshAISuggestions()" title="Rafra\xEEchir" style="padding:4px 8px">\u{1F504}</button>
       </div>
       ${topHtml}${improveHtml}${dailyHtml}
@@ -1448,7 +1448,7 @@ async function printAllergenSheet(recipeId, recipeName) {
   </style>
 </head>
 <body>
-  <h1>\u{1F37D}\uFE0F ${recipeName}</h1>
+  <h1><i data-lucide="utensils" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>${recipeName}</h1>
   <p class="subtitle">Fiche allerg\xE8nes \u2014 Imprim\xE9e le ${today}</p>
   <div class="inco-badge">\u{1F4CB} R\xE8glement INCO (UE) \u2014 14 allerg\xE8nes r\xE9glementaires</div>
   <div>${allergensHtml}</div>
@@ -2331,7 +2331,7 @@ async function renderIngredients() {
           <p>Aucun r\xE9sultat</p>
         </div>` : `
         <div class="empty-state">
-          <div class="empty-icon">\u{1F955}</div>
+          <div class="empty-icon"><i data-lucide="leaf"></i></div>
           <h3>Aucun ingr\xE9dient</h3>
           <p>Ajoutez vos premiers ingr\xE9dients pour calculer vos co\xFBts.</p>
         </div>`;
@@ -2490,7 +2490,7 @@ function showCSVImportModal() {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal" style="max-width:600px">
-      <h2>\u{1F4E5} Importer des ingr\xE9dients (CSV)</h2>
+      <h2><i data-lucide="upload" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Importer des ingr\xE9dients (CSV)</h2>
       <p class="text-muted" style="font-size:var(--text-sm);margin-bottom:12px">Format attendu : <code>nom;cat\xE9gorie;unit\xE9;prix_unitaire;pourcentage_perte</code><br>S\xE9parateur : <code>;</code> ou <code>,</code></p>
       <div class="form-group">
         <input type="file" id="csv-file-input" accept=".csv,.txt" class="form-control">
@@ -2637,7 +2637,7 @@ async function renderStockDashboard() {
   const isGerant = account && account.role === "gerant";
   app.innerHTML = `
     <div class="view-header">
-      <h1>\u{1F4E6} Stock</h1>
+      <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Stock</h1>
       <p class="text-secondary">Vue d'ensemble du stock actuel</p>
     </div>
     <div id="delivery-pending-banner" style="margin-bottom:var(--space-4)"></div>
@@ -2710,7 +2710,7 @@ async function loadStock(query) {
     if (alerts.length > 0 && !query) {
       alertsSection.innerHTML = `
         <div class="stock-alert-banner" style="background:var(--color-danger-light);border:1px solid var(--color-danger);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-5)">
-          <h3 style="color:var(--color-danger);margin-bottom:var(--space-2)">\u26A0\uFE0F ${alerts.length} alerte${alerts.length > 1 ? "s" : ""} stock bas</h3>
+          <h3 style="color:var(--color-danger);margin-bottom:var(--space-2)"><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>${alerts.length} alerte${alerts.length > 1 ? "s" : ""} stock bas</h3>
           <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
             ${alerts.map((a) => `
               <span class="badge badge--danger" style="font-size:var(--text-sm)">
@@ -2750,12 +2750,12 @@ async function loadStock(query) {
     if (stock.length === 0) {
       content.innerHTML = query ? `
         <div class="empty-state">
-          <div class="empty-icon">\u{1F4E6}</div>
+          <div class="empty-icon"><i data-lucide="package"></i></div>
           <p>Aucun r\xE9sultat</p>
         </div>
       ` : `
         <div class="empty-state">
-          <div class="empty-icon">\u{1F4E6}</div>
+          <div class="empty-icon"><i data-lucide="package"></i></div>
           <h3>Votre stock est vide</h3>
           <p>Enregistrez votre premi\xE8re r\xE9ception pour commencer le suivi.</p>
           <a href="#/stock/reception" class="btn btn-primary">R\xE9ception marchandise</a>
@@ -2829,7 +2829,7 @@ async function showInventoryModal() {
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:var(--z-modal-backdrop);display:flex;align-items:center;justify-content:center;padding:var(--space-4)";
   overlay.innerHTML = `
     <div class="modal" style="background:var(--bg-elevated);border-radius:var(--radius-xl);padding:var(--space-6);max-width:500px;width:100%;max-height:80vh;overflow-y:auto">
-      <h2 style="margin-bottom:var(--space-4)">\u{1F4CB} Inventaire</h2>
+      <h2 style="margin-bottom:var(--space-4)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Inventaire</h2>
       <div class="form-group" style="margin-bottom:var(--space-4)">
         <label class="form-label">Ingr\xE9dient</label>
         <select id="inv-ingredient" class="input">
@@ -2910,7 +2910,7 @@ async function renderStockReception() {
       <div style="display:flex;align-items:center;gap:var(--space-3)">
         <a href="#/stock" style="color:var(--text-secondary);text-decoration:none;font-size:1.5rem">\u2190</a>
         <div>
-          <h1>\u{1F4E5} R\xE9ception marchandise</h1>
+          <h1><i data-lucide="download" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>R\xE9ception marchandise</h1>
           <p class="text-secondary">Enregistrez la r\xE9ception d'une commande</p>
         </div>
       </div>
@@ -3099,7 +3099,7 @@ async function renderStockMovements() {
       <div style="display:flex;align-items:center;gap:var(--space-3)">
         <a href="#/stock" style="color:var(--text-secondary);text-decoration:none;font-size:1.5rem">\u2190</a>
         <div>
-          <h1>\u{1F4CA} Mouvements de stock</h1>
+          <h1><i data-lucide="trending-up" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Mouvements de stock</h1>
           <p class="text-secondary">Historique des entr\xE9es et sorties</p>
         </div>
       </div>
@@ -3706,7 +3706,7 @@ function showTemperatureModal(zoneId, zoneName, minTemp, maxTemp) {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal">
-      <h2>\u{1F321}\uFE0F Relev\xE9 \u2014 ${escapeHtml(zoneName)}</h2>
+      <h2><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Relev\xE9 \u2014 ${escapeHtml(zoneName)}</h2>
       <p class="text-secondary text-sm" style="margin-bottom:var(--space-4)">Plage normale : ${minTemp}\xB0C \xE0 ${maxTemp}\xB0C</p>
       <div class="form-group">
         <label>Temp\xE9rature (\xB0C)</label>
@@ -3778,7 +3778,7 @@ async function renderHACCPTemperatures() {
           <span class="breadcrumb-current">Temp\xE9ratures</span>
         </nav>
         <div class="page-header">
-          <h1>\u{1F321}\uFE0F Temp\xE9ratures</h1>
+          <h1><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Temp\xE9ratures</h1>
           <button class="btn btn-primary" id="btn-new-temp">
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau relev\xE9
           </button>
@@ -3932,7 +3932,7 @@ function showNewTempModal(zones) {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal">
-      <h2>\u{1F321}\uFE0F Nouveau relev\xE9</h2>
+      <h2><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouveau relev\xE9</h2>
       <div class="form-group">
         <label>Zone</label>
         <select class="form-control" id="modal-zone">
@@ -3993,7 +3993,7 @@ function showZoneModal(data) {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal">
-      <h2>${isEdit ? "\u270F\uFE0F Modifier la zone" : "\u2795 Nouvelle zone"}</h2>
+      <h2>${isEdit ? '<i data-lucide="pencil" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Modifier la zone' : '<i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouvelle zone'}</h2>
       <div class="form-group">
         <label>Nom</label>
         <input type="text" class="form-control" id="zone-name" value="${isEdit ? escapeHtml(data.name) : ""}" placeholder="ex: Frigo 3">
@@ -4066,7 +4066,7 @@ async function renderHACCPCleaning() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>\u{1F9F9} Plan de nettoyage</h1>
+          <h1><i data-lucide="sparkles" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Plan de nettoyage</h1>
           ${isGerant ? `
           <button class="btn btn-primary" id="btn-add-task">
             <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter
@@ -4200,7 +4200,7 @@ function showCleaningTaskModal(task) {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal">
-      <h2>${isEdit ? "\u270F\uFE0F Modifier la t\xE2che" : "\u2795 Nouvelle t\xE2che"}</h2>
+      <h2>${isEdit ? '<i data-lucide="pencil" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Modifier la t\xE2che' : '<i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouvelle t\xE2che'}</h2>
       <div class="form-group">
         <label>Nom de la t\xE2che</label>
         <input type="text" class="form-control" id="task-name" value="${isEdit ? escapeHtml(task.name) : ""}" placeholder="ex: Nettoyage plan de travail">
@@ -4275,7 +4275,7 @@ async function renderHACCPTraceability() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>\u{1F4E6} Tra\xE7abilit\xE9</h1>
+          <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Tra\xE7abilit\xE9</h1>
           <button class="btn btn-primary" id="btn-new-reception">
             <i data-lucide="plus" style="width:18px;height:18px"></i> R\xE9ception
           </button>
@@ -4406,7 +4406,7 @@ function showReceptionModal() {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal" style="max-width:560px">
-      <h2>\u{1F4E6} R\xE9ception marchandise</h2>
+      <h2><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>R\xE9ception marchandise</h2>
       <div class="form-group">
         <label>Produit *</label>
         <input type="text" class="form-control" id="rec-product" placeholder="ex: Filet de b\u0153uf" autofocus>
@@ -4501,7 +4501,7 @@ async function renderHACCPCooling() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>\u2744\uFE0F Refroidissements rapides</h1>
+          <h1><i data-lucide="snowflake" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Refroidissements rapides</h1>
           <button class="btn btn-primary" id="btn-new-cooling">
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau
           </button>
@@ -4583,7 +4583,7 @@ function showCoolingModal() {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal" style="max-width:540px">
-      <h2>\u2744\uFE0F Nouveau refroidissement</h2>
+      <h2><i data-lucide="snowflake" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouveau refroidissement</h2>
       <p class="text-secondary text-sm" style="margin-bottom:16px">Enregistrez le d\xE9but. Compl\xE9tez les temps de passage ult\xE9rieurement.</p>
       <div class="form-group">
         <label>Produit *</label>
@@ -4652,7 +4652,7 @@ function showCoolingUpdateModal(id, productName) {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal" style="max-width:480px">
-      <h2>\u2744\uFE0F Compl\xE9ter \u2014 ${escapeHtml(productName)}</h2>
+      <h2><i data-lucide="snowflake" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Compl\xE9ter \u2014 ${escapeHtml(productName)}</h2>
       <div class="form-group">
         <label>Heure passage 63\xB0C \u2193</label>
         <input type="datetime-local" class="form-control" id="cool-u-63c" value="${now}">
@@ -4706,7 +4706,7 @@ async function renderHACCPReheating() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>\u{1F525} Remises en temp\xE9rature</h1>
+          <h1><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Remises en temp\xE9rature</h1>
           <button class="btn btn-primary" id="btn-new-reheat">
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau
           </button>
@@ -4782,7 +4782,7 @@ function showReheatingModal() {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal" style="max-width:540px">
-      <h2>\u{1F525} Nouvelle remise en temp\xE9rature</h2>
+      <h2><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouvelle remise en temp\xE9rature</h2>
       <p class="text-secondary text-sm" style="margin-bottom:16px">Compl\xE9tez quand +63\xB0C est atteint.</p>
       <div class="form-group">
         <label>Produit *</label>
@@ -4851,7 +4851,7 @@ function showReheatingUpdateModal(id, productName) {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal" style="max-width:440px">
-      <h2>\u{1F525} Compl\xE9ter \u2014 ${escapeHtml(productName)}</h2>
+      <h2><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Compl\xE9ter \u2014 ${escapeHtml(productName)}</h2>
       <div class="form-group">
         <label>Heure atteinte 63\xB0C *</label>
         <input type="datetime-local" class="form-control" id="reheat-u-63c" value="${now}">
@@ -4902,7 +4902,7 @@ async function renderHACCPFryers() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>\u{1F35F} Huiles de friture</h1>
+          <h1><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Huiles de friture</h1>
           <button class="btn btn-primary" id="btn-new-fryer">
             <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter friteuse
           </button>
@@ -4969,7 +4969,7 @@ function showNewFryerModal() {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal" style="max-width:400px">
-      <h2>\u{1F35F} Ajouter une friteuse</h2>
+      <h2><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Ajouter une friteuse</h2>
       <div class="form-group">
         <label>Nom *</label>
         <input type="text" class="form-control" id="fryer-name-input" placeholder="ex: Friteuse 1, Grande friteuse" autofocus>
@@ -5080,7 +5080,7 @@ async function showFryerHistoryModal(fryerId, fryerName) {
     overlay.className = "modal-overlay";
     overlay.innerHTML = `
       <div class="modal" style="max-width:600px">
-        <h2>\u{1F4CB} Historique \u2014 ${escapeHtml(fryerName)}</h2>
+        <h2><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Historique \u2014 ${escapeHtml(fryerName)}</h2>
         <div class="table-container" style="max-height:400px;overflow-y:auto">
           <table>
             <thead><tr><th>Date</th><th>Action</th><th>Polaire</th><th>Notes</th><th>Op\xE9rateur</th></tr></thead>
@@ -5137,7 +5137,7 @@ async function renderHACCPNonConformities() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>\u26A0\uFE0F Non-conformit\xE9s</h1>
+          <h1><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Non-conformit\xE9s</h1>
           <button class="btn btn-primary" id="btn-new-nc">
             <i data-lucide="plus" style="width:18px;height:18px"></i> D\xE9clarer
           </button>
@@ -5206,7 +5206,7 @@ function showNCModal() {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal" style="max-width:540px">
-      <h2>\u26A0\uFE0F D\xE9clarer une non-conformit\xE9</h2>
+      <h2><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>D\xE9clarer une non-conformit\xE9</h2>
       <div class="form-group">
         <label>Titre *</label>
         <input type="text" class="form-control" id="nc-title" placeholder="ex: Temp\xE9rature frigo hors norme" autofocus>
@@ -5273,7 +5273,7 @@ function showNCResolveModal(id, title) {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal" style="max-width:480px">
-      <h2>\u2705 R\xE9soudre \u2014 ${escapeHtml(title)}</h2>
+      <h2><i data-lucide="check-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>R\xE9soudre \u2014 ${escapeHtml(title)}</h2>
       <div class="form-group">
         <label>Action corrective *</label>
         <textarea class="form-control" id="nc-corrective" rows="4" placeholder="D\xE9crivez l'action corrective mise en place..." autofocus></textarea>
@@ -5342,7 +5342,7 @@ async function renderHACCPAllergens() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>\u26A0\uFE0F Allerg\xE8nes \u2014 Affichage INCO</h1>
+          <h1><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Allerg\xE8nes \u2014 Affichage INCO</h1>
           <button class="btn btn-secondary" onclick="window.print()">
             <i data-lucide="printer" style="width:18px;height:18px"></i> Imprimer
           </button>
@@ -5428,7 +5428,7 @@ async function renderOrdersDashboard() {
     if (orders.length === 0) {
       gridEl.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">\u{1F4E6}</div>
+          <div class="empty-icon"><i data-lucide="package"></i></div>
           <h3>Aucune commande</h3>
           <p>Cr\xE9ez une nouvelle commande fournisseur pour commencer.</p>
           <a href="#/orders/new" class="btn btn-primary">Nouvelle commande</a>
@@ -5514,7 +5514,7 @@ async function showSuggestionsModal() {
     if (!suggestions || suggestions.length === 0) {
       loadingEl.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">\u2705</div>
+          <div class="empty-icon"><i data-lucide="check-circle"></i></div>
           <p>Tous les stocks sont corrects. Aucun r\xE9approvisionnement n\xE9cessaire.</p>
         </div>
       `;
@@ -6075,7 +6075,7 @@ async function showPOAnalyticsModal() {
   overlay.innerHTML = `
     <div class="modal" style="max-width:700px;max-height:80vh;overflow-y:auto;padding:var(--space-5)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-4)">
-        <h2 style="margin:0">\u{1F4CA} Statistiques d'achat</h2>
+        <h2 style="margin:0"><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Statistiques d'achat</h2>
         <button class="btn btn-ghost btn-sm" onclick="this.closest('.modal-overlay').remove()">\u2715</button>
       </div>
       <div id="po-analytics-content"><div class="loading"><div class="spinner"></div></div></div>
@@ -7069,7 +7069,7 @@ async function loadKitchenTickets() {
   if (orders.length === 0) {
     el.innerHTML = `
       <div class="empty-state" style="padding-top:120px">
-        <div class="empty-icon" style="font-size:4rem">\u2705</div>
+        <div class="empty-icon" style="font-size:4rem"><i data-lucide="check-circle"></i></div>
         <h3>Pas de commande en attente</h3>
         <p>Les nouvelles commandes appara\xEEtront ici automatiquement.</p>
       </div>
@@ -7166,7 +7166,7 @@ async function renderAnalytics() {
   if (!canView) {
     app.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">\u{1F512}</div>
+        <div class="empty-icon"><i data-lucide="lock"></i></div>
         <p>Acc\xE8s r\xE9serv\xE9 au g\xE9rant</p>
         <a href="#/" class="btn btn-primary">Retour</a>
       </div>
@@ -7175,7 +7175,7 @@ async function renderAnalytics() {
   }
   app.innerHTML = `
     <div class="view-header">
-      <h1>\u{1F4CA} Pilotage</h1>
+      <h1><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Pilotage</h1>
       <p class="text-secondary">Score de sant\xE9 \xB7 Food cost \xB7 Stock \xB7 HACCP \xB7 Fournisseurs \xB7 IA</p>
     </div>
     <div class="analytics-loading">
@@ -7201,10 +7201,10 @@ async function renderAnalytics() {
     console.error("Pilotage error:", e);
     app.innerHTML = `
       <div class="view-header">
-        <h1>\u{1F4CA} Pilotage</h1>
+        <h1><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Pilotage</h1>
       </div>
       <div class="empty-state">
-        <div class="empty-icon">\u26A0\uFE0F</div>
+        <div class="empty-icon"><i data-lucide="alert-triangle"></i></div>
         <p>Erreur de chargement</p>
         <p class="text-secondary text-sm">${escapeHtml(e.message)}</p>
         <button class="btn btn-primary" onclick="renderAnalytics()">R\xE9essayer</button>
@@ -7267,7 +7267,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
   const fcClass = kpis.avg_food_cost_pct < 30 ? "kpi--success" : kpis.avg_food_cost_pct <= 35 ? "kpi--warning" : "kpi--danger";
   app.innerHTML = `
     <div class="view-header">
-      <h1>\u{1F4CA} Pilotage</h1>
+      <h1><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Pilotage</h1>
       <p class="text-secondary">Score de sant\xE9 \xB7 Food cost \xB7 Stock \xB7 HACCP \xB7 Fournisseurs \xB7 IA</p>
     </div>
 
@@ -7287,10 +7287,10 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
           </div>
         </div>
         <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
-          <a href="#/stock/reception" class="btn btn-secondary" style="font-size:var(--text-sm)">\u{1F4E5} R\xE9ception</a>
-          <a href="#/stock/variance" class="btn btn-secondary" style="font-size:var(--text-sm)">\u{1F4CA} \xC9carts</a>
-          <a href="#/haccp" class="btn btn-secondary" style="font-size:var(--text-sm)">\u{1F6E1}\uFE0F HACCP</a>
-          <a href="#/orders" class="btn btn-secondary" style="font-size:var(--text-sm)">\u{1F4CB} Commandes</a>
+          <a href="#/stock/reception" class="btn btn-secondary" style="font-size:var(--text-sm)"><i data-lucide="download" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>R\xE9ception</a>
+          <a href="#/stock/variance" class="btn btn-secondary" style="font-size:var(--text-sm)"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>\xC9carts</a>
+          <a href="#/haccp" class="btn btn-secondary" style="font-size:var(--text-sm)"><i data-lucide="shield" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>HACCP</a>
+          <a href="#/orders" class="btn btn-secondary" style="font-size:var(--text-sm)"><i data-lucide="clipboard-list" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Commandes</a>
         </div>
       </div>
       <div style="margin-top:var(--space-3);background:var(--bg-sunken);border-radius:6px;height:8px;overflow:hidden">
@@ -7310,25 +7310,25 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
     <!-- \u2550\u2550\u2550 KPIs principaux \u2550\u2550\u2550 -->
     <div class="analytics-kpis">
       <div class="kpi-card ${fcClass} anim-fadeIn" style="--delay:0">
-        <div class="kpi-icon">\u{1F4CA}</div>
+        <div class="kpi-icon"><i data-lucide="bar-chart-2" style="width:28px;height:28px"></i></div>
         <div class="kpi-value font-mono">${kpis.avg_food_cost_pct}%</div>
         <div class="kpi-label">Food Cost moyen</div>
         <div class="kpi-detail">${kpis.total_recipes} recettes</div>
       </div>
       <div class="kpi-card anim-fadeIn" style="--delay:1">
-        <div class="kpi-icon">\u{1F4B0}</div>
+        <div class="kpi-icon"><i data-lucide="dollar-sign" style="width:28px;height:28px"></i></div>
         <div class="kpi-value font-mono">${formatCurrency(kpis.total_stock_value)}</div>
         <div class="kpi-label">Valeur du stock</div>
         <div class="kpi-detail">${kpis.low_stock_count} alerte${kpis.low_stock_count > 1 ? "s" : ""}</div>
       </div>
       <div class="kpi-card ${haccpPct >= 90 ? "kpi--success" : haccpPct >= 70 ? "kpi--warning" : "kpi--danger"} anim-fadeIn" style="--delay:2">
-        <div class="kpi-icon">\u{1F321}\uFE0F</div>
+        <div class="kpi-icon"><i data-lucide="thermometer" style="width:28px;height:28px"></i></div>
         <div class="kpi-value font-mono">${haccpPct}%</div>
         <div class="kpi-label">Conformit\xE9 HACCP</div>
         <div class="kpi-detail">${haccpTemp.done}/${haccpTemp.total} temp \xB7 ${haccpClean.done}/${haccpClean.total} nett.</div>
       </div>
       <div class="kpi-card ${activeAlerts > 0 ? "kpi--danger" : "kpi--success"} anim-fadeIn" style="--delay:3">
-        <div class="kpi-icon">\u26A0\uFE0F</div>
+        <div class="kpi-icon"><i data-lucide="alert-triangle" style="width:28px;height:28px"></i></div>
         <div class="kpi-value font-mono">${activeAlerts}</div>
         <div class="kpi-label">Alertes actives</div>
         <div class="kpi-detail">${kpis.price_changes_30d} chgmt prix/30j</div>
@@ -7337,7 +7337,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
 
     <!-- \u2550\u2550\u2550 Section Food Cost \u2550\u2550\u2550 -->
     <section class="analytics-section anim-fadeIn" style="--delay:4">
-      <h2>\u{1F37D}\uFE0F Food Cost par recette</h2>
+      <h2><i data-lucide="utensils" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Food Cost par recette</h2>
       ${foodCost.best_margin ? `
       <div class="analytics-highlights">
         <div class="highlight highlight--success">
@@ -7374,7 +7374,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
 
     <!-- \u2550\u2550\u2550 Section Stock \u2550\u2550\u2550 -->
     <section class="analytics-section anim-fadeIn" style="--delay:5">
-      <h2>\u{1F4E6} Stock</h2>
+      <h2><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Stock</h2>
       <div class="analytics-row">
         <div class="analytics-col">
           <h3>Valeur par cat\xE9gorie</h3>
@@ -7403,7 +7403,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
               </div>
             `).join("")}</div>`}
           ${stockData.alerts.length > 0 ? `
-          <h3 style="margin-top:var(--space-4)">\u26A0\uFE0F Alertes stock bas</h3>
+          <h3 style="margin-top:var(--space-4)"><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Alertes stock bas</h3>
           <div class="stock-alerts-list">
             ${stockData.alerts.slice(0, 5).map((a) => `
               <div class="stock-alert-item stock-alert--${a.urgency}">
@@ -7424,7 +7424,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
 
     <!-- \u2550\u2550\u2550 Section HACCP \u2550\u2550\u2550 -->
     <section class="analytics-section anim-fadeIn" style="--delay:6">
-      <h2>\u{1F6E1}\uFE0F HACCP Compliance</h2>
+      <h2><i data-lucide="shield" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>HACCP Compliance</h2>
       <div class="analytics-row">
         <div class="analytics-col">
           <h3>Conformit\xE9 7 jours</h3>
@@ -7471,7 +7471,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
 
     <!-- \u2550\u2550\u2550 Section Fournisseurs \u2550\u2550\u2550 -->
     <section class="analytics-section anim-fadeIn" style="--delay:7">
-      <h2>\u{1F4B2} Prix Fournisseurs</h2>
+      <h2><i data-lucide="dollar-sign" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Prix Fournisseurs</h2>
       <div class="analytics-row">
         <div class="analytics-col">
           <div class="inflation-indicator ${pricesData.inflation_30d > 0 ? "inflation--up" : pricesData.inflation_30d < 0 ? "inflation--down" : ""}">
@@ -7490,7 +7490,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
             `).join("")}</div>`}
         </div>
         <div class="analytics-col">
-          <h3>\u{1F4A1} Suggestions d'\xE9conomies</h3>
+          <h3><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Suggestions d'\xE9conomies</h3>
           ${pricesData.suggestions.length === 0 ? '<p class="text-secondary text-sm">Aucune suggestion</p>' : `<div class="savings-list">${pricesData.suggestions.slice(0, 5).map((s) => `
               <div class="savings-item">
                 <div class="savings-product">${escapeHtml(s.product)}</div>
@@ -7508,7 +7508,7 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
     <!-- \u2550\u2550\u2550 Section Insights IA \u2550\u2550\u2550 -->
     <section class="analytics-section analytics-section--ai anim-fadeIn" style="--delay:8">
       <div class="ai-section-header">
-        <h2>\u{1F9E0} Insights IA</h2>
+        <h2><i data-lucide="brain" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Insights IA</h2>
         <button class="btn btn-secondary btn-sm" id="refresh-insights-btn" onclick="refreshInsights()">
           <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Actualiser
         </button>
@@ -7521,15 +7521,15 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
 
     <!-- \u2550\u2550\u2550 Actions rapides \u2550\u2550\u2550 -->
     <section class="analytics-section anim-fadeIn" style="--delay:9">
-      <h2>\u26A1 Actions rapides</h2>
+      <h2><i data-lucide="zap" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Actions rapides</h2>
       <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
-        <a href="#/stock/reception" class="btn btn-secondary">\u{1F4E5} R\xE9ception stock</a>
-        <a href="#/stock/variance" class="btn btn-secondary">\u{1F4CA} Analyse \xE9carts</a>
-        <a href="#/haccp" class="btn btn-secondary">\u{1F6E1}\uFE0F HACCP</a>
-        <a href="#/orders" class="btn btn-secondary">\u{1F4CB} Commandes fournisseurs</a>
-        <a href="#/menu-engineering" class="btn btn-secondary">\u{1F3AF} Menu Engineering</a>
-        <a href="#/predictions" class="btn btn-secondary">\u{1F9E0} Pr\xE9dictions IA</a>
-        <a href="#/suppliers" class="btn btn-secondary">\u{1F3ED} Fournisseurs</a>
+        <a href="#/stock/reception" class="btn btn-secondary"><i data-lucide="download" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>R\xE9ception stock</a>
+        <a href="#/stock/variance" class="btn btn-secondary"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Analyse \xE9carts</a>
+        <a href="#/haccp" class="btn btn-secondary"><i data-lucide="shield" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>HACCP</a>
+        <a href="#/orders" class="btn btn-secondary"><i data-lucide="clipboard-list" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Commandes fournisseurs</a>
+        <a href="#/menu-engineering" class="btn btn-secondary"><i data-lucide="target" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Menu Engineering</a>
+        <a href="#/predictions" class="btn btn-secondary"><i data-lucide="brain" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Pr\xE9dictions IA</a>
+        <a href="#/suppliers" class="btn btn-secondary"><i data-lucide="factory" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Fournisseurs</a>
       </div>
     </section>
   `;
@@ -7591,7 +7591,7 @@ async function renderHealthDashboard() {
   if (!perms.view_costs) {
     app.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">\u{1F512}</div>
+        <div class="empty-icon"><i data-lucide="lock"></i></div>
         <p>Acc\xE8s r\xE9serv\xE9 au g\xE9rant</p>
         <a href="#/" class="btn btn-primary">Retour</a>
       </div>
@@ -7603,7 +7603,7 @@ async function renderHealthDashboard() {
       <a href="#/" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-2);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)">
         <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Accueil
       </a>
-      <h1>\u{1F3E5} Sant\xE9 du restaurant</h1>
+      <h1><i data-lucide="heart-pulse" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Sant\xE9 du restaurant</h1>
       <p class="text-secondary">Vue d'ensemble de la performance op\xE9rationnelle</p>
     </div>
     <div id="health-content">
@@ -7626,7 +7626,7 @@ async function renderHealthDashboard() {
   } catch (e) {
     document.getElementById("health-content").innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">\u26A0\uFE0F</div>
+        <div class="empty-icon"><i data-lucide="alert-triangle"></i></div>
         <p>Erreur de chargement</p>
         <p class="text-secondary text-sm">${escapeHtml(e.message)}</p>
         <button class="btn btn-primary" onclick="renderHealthDashboard()">R\xE9essayer</button>
@@ -7754,7 +7754,7 @@ function renderHealthContent(kpis, variance, alerts, haccp, stockAlerts, availab
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--space-4);margin-bottom:var(--space-5)">
       <!-- HACCP Compliance -->
       <div class="card" style="padding:var(--space-4)">
-        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)">\u{1F6E1}\uFE0F Conformit\xE9 HACCP</h3>
+        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)"><i data-lucide="shield" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Conformit\xE9 HACCP</h3>
         ${haccp ? `
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
             <div style="text-align:center">
@@ -7773,7 +7773,7 @@ function renderHealthContent(kpis, variance, alerts, haccp, stockAlerts, availab
 
       <!-- Stock Health -->
       <div class="card" style="padding:var(--space-4)">
-        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)">\u{1F4E6} \xC9tat des stocks</h3>
+        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)"><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>\xC9tat des stocks</h3>
         ${stockAlerts.length > 0 ? `
           <div style="max-height:180px;overflow-y:auto">
             ${stockAlerts.slice(0, 8).map((a) => `
@@ -7790,7 +7790,7 @@ function renderHealthContent(kpis, variance, alerts, haccp, stockAlerts, availab
 
       <!-- Recipe Availability -->
       <div class="card" style="padding:var(--space-4)">
-        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)">\u{1F37D}\uFE0F Disponibilit\xE9 des plats</h3>
+        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)"><i data-lucide="utensils" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Disponibilit\xE9 des plats</h3>
         ${availability && availability.summary ? `
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-2);text-align:center;margin-bottom:var(--space-3)">
             <div>
@@ -7816,7 +7816,7 @@ function renderHealthContent(kpis, variance, alerts, haccp, stockAlerts, availab
 
       <!-- Variance Summary -->
       <div class="card" style="padding:var(--space-4)">
-        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)">\u{1F4CA} Analyse des \xE9carts (30j)</h3>
+        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)"><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Analyse des \xE9carts (30j)</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);text-align:center">
           <div>
             <div style="font-size:var(--text-xl);font-weight:700;color:${variance.health === "good" ? "var(--color-success)" : variance.health === "warning" ? "var(--color-warning)" : "var(--color-danger)"}">
@@ -8512,7 +8512,7 @@ class OnboardingWizard {
         <p class="ob-desc">Tout est pr\xEAt. Commencez \xE0 utiliser RestoSuite.</p>
 
         <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-4);margin-top:var(--space-4);text-align:left;width:100%">
-          <h3 style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-3)">\u{1F4CB} R\xE9capitulatif</h3>
+          <h3 style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-3)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>R\xE9capitulatif</h3>
           ${r.name ? `<p style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Restaurant :</strong> ${escapeHtml(r.name)}</p>` : ""}
           ${r.city ? `<p style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Ville :</strong> ${escapeHtml(r.city)}</p>` : ""}
           ${this.tables.length ? `<p style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Tables :</strong> ${this.tables.length}</p>` : ""}
@@ -10204,7 +10204,7 @@ async function renderDeliveries() {
   const app = document.getElementById("app");
   app.innerHTML = `
     <div class="view-header">
-      <h1>\u{1F69A} Livraisons</h1>
+      <h1><i data-lucide="truck" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Livraisons</h1>
       <p class="text-secondary">R\xE9ception et suivi des bons de livraison</p>
     </div>
     <div class="delivery-tabs" style="display:flex;gap:var(--space-2);margin-bottom:var(--space-5);flex-wrap:wrap">
@@ -10238,7 +10238,7 @@ async function renderDeliveries() {
     if (alerts.length > 0) {
       banner.innerHTML = `
         <div style="background:var(--color-warning-light, #fff3cd);border:1px solid var(--color-warning, #ffc107);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-5)">
-          <h3 style="color:var(--color-warning-dark, #856404);margin-bottom:var(--space-2)">\u26A0\uFE0F ${alerts.length} produit${alerts.length > 1 ? "s" : ""} avec DLC proche</h3>
+          <h3 style="color:var(--color-warning-dark, #856404);margin-bottom:var(--space-2)"><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>${alerts.length} produit${alerts.length > 1 ? "s" : ""} avec DLC proche</h3>
           <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
             ${alerts.map((a) => `
               <span class="badge" style="background:${a.days_remaining <= 1 ? "var(--color-danger)" : "var(--color-warning)"};color:white;font-size:var(--text-sm);padding:4px 10px;border-radius:var(--radius-md)">
@@ -10322,7 +10322,7 @@ async function renderDeliveryDetail(id) {
           <button class="btn btn-secondary btn-sm" id="back-deliveries" style="margin-bottom:var(--space-2)">
             \u2190 Retour
           </button>
-          <h1>\u{1F69A} Bon #${d.id} \u2014 ${escapeHtml(d.supplier_name)}</h1>
+          <h1><i data-lucide="truck" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Bon #${d.id} \u2014 ${escapeHtml(d.supplier_name)}</h1>
           <p class="text-secondary">
             ${d.delivery_date ? `Livraison pr\xE9vue : ${d.delivery_date}` : `Cr\xE9\xE9 le ${new Date(d.created_at).toLocaleDateString("fr-FR")}`}
             ${d.received_at ? ` \u2014 R\xE9ceptionn\xE9 le ${new Date(d.received_at).toLocaleDateString("fr-FR")} par ${escapeHtml(d.received_by_name || "?")}` : ""}
@@ -11275,7 +11275,7 @@ async function renderScanInvoice() {
   app.innerHTML = `
     <div class="page-header">
       <a href="#/stock" class="btn btn-secondary btn-sm">\u2190 Stock</a>
-      <h1>\u{1F4F7} Scanner une facture</h1>
+      <h1><i data-lucide="camera" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Scanner une facture</h1>
     </div>
 
     <div class="card" style="padding:var(--space-4);text-align:center">
@@ -11447,20 +11447,20 @@ async function renderMercuriale() {
     <div class="page-header">
       <div>
         <a href="#/analytics" class="btn btn-secondary btn-sm">\u2190 Analytics</a>
-        <h1 style="margin-top:4px">\u{1F4CA} Mercuriale</h1>
+        <h1 style="margin-top:4px"><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Mercuriale</h1>
       </div>
       <a href="#/import-mercuriale" class="btn btn-primary"><i data-lucide="camera" style="width:16px;height:16px"></i> Scanner une mercuriale</a>
     </div>
 
     <div id="price-alerts-section">
-      <h2 style="margin-bottom:var(--space-3)">\u26A0\uFE0F Alertes prix</h2>
+      <h2 style="margin-bottom:var(--space-3)"><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Alertes prix</h2>
       <div id="price-alerts-list">
         <div class="skeleton skeleton-card"></div>
       </div>
     </div>
 
     <div style="margin-top:var(--space-5)">
-      <h2 style="margin-bottom:var(--space-3)">\u{1F4CB} Tous les ingr\xE9dients</h2>
+      <h2 style="margin-bottom:var(--space-3)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Tous les ingr\xE9dients</h2>
       <div id="mercuriale-table">
         <div class="skeleton skeleton-card"></div>
       </div>
@@ -11667,7 +11667,7 @@ async function renderImportMercuriale() {
       <a href="#/mercuriale" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-2);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)">
         <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Mercuriale
       </a>
-      <h1>\u{1F4F7} Import mercuriale IA</h1>
+      <h1><i data-lucide="camera" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Import mercuriale IA</h1>
       <p class="text-secondary">Scannez une liste de prix fournisseur et mettez \xE0 jour vos prix automatiquement</p>
     </div>
 
@@ -11895,7 +11895,7 @@ async function renderAIChef() {
           <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Accueil
         </a>
         <h1 style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:1.5rem">\u{1F468}\u200D\u{1F373}</span> Chef IA
+          <i data-lucide="chef-hat" style="width:28px;height:28px;vertical-align:middle;margin-right:8px"></i>Chef IA
         </h1>
         <p class="text-secondary" style="font-size:var(--text-sm)">Assistant expert qui conna\xEEt votre restaurant</p>
       </div>
@@ -11907,11 +11907,11 @@ async function renderAIChef() {
             <p>Bonjour ! Je suis <strong>Chef</strong>, votre assistant IA RestoSuite.</p>
             <p style="margin-top:8px">Je connais vos fiches techniques, vos stocks, vos fournisseurs et vos donn\xE9es HACCP. Posez-moi vos questions !</p>
             <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
-              <button class="chef-suggestion" onclick="sendChefSuggestion('Quel est mon food cost moyen et comment l\\'am\xE9liorer ?')">\u{1F4CA} Food cost</button>
-              <button class="chef-suggestion" onclick="sendChefSuggestion('Quels ingr\xE9dients sont en stock bas ?')">\u{1F4E6} Stock bas</button>
-              <button class="chef-suggestion" onclick="sendChefSuggestion('Analyse mes pertes sur les 30 derniers jours')">\u{1F4C9} Pertes</button>
-              <button class="chef-suggestion" onclick="sendChefSuggestion('Quels plats ont la meilleure marge ?')">\u{1F4B0} Marges</button>
-              <button class="chef-suggestion" onclick="sendChefSuggestion('Donne-moi des conseils HACCP pour cette semaine')">\u{1F6E1}\uFE0F HACCP</button>
+              <button class="chef-suggestion" onclick="sendChefSuggestion('Quel est mon food cost moyen et comment l\\'am\xE9liorer ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Food cost</button>
+              <button class="chef-suggestion" onclick="sendChefSuggestion('Quels ingr\xE9dients sont en stock bas ?')"><i data-lucide="package" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Stock bas</button>
+              <button class="chef-suggestion" onclick="sendChefSuggestion('Analyse mes pertes sur les 30 derniers jours')"><i data-lucide="trending-down" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Pertes</button>
+              <button class="chef-suggestion" onclick="sendChefSuggestion('Quels plats ont la meilleure marge ?')"><i data-lucide="dollar-sign" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Marges</button>
+              <button class="chef-suggestion" onclick="sendChefSuggestion('Donne-moi des conseils HACCP pour cette semaine')"><i data-lucide="shield" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>HACCP</button>
             </div>
           </div>
         </div>
@@ -12031,7 +12031,7 @@ async function renderAIAssistant() {
     <div style="display:flex;flex-direction:column;height:calc(100vh - 80px);max-width:900px;margin:0 auto;padding:var(--space-3)">
       <div class="view-header" style="flex-shrink:0;margin-bottom:var(--space-4)">
         <h1 style="display:flex;align-items:center;gap:8px;margin:0">
-          <span style="font-size:1.8rem">\u{1F9E0}</span> Assistant IA
+          <i data-lucide="brain" style="width:28px;height:28px;vertical-align:middle;margin-right:8px"></i>Assistant IA
         </h1>
         <p class="text-secondary" style="font-size:var(--text-sm);margin-top:4px">Chef expert \xB7 Recommandations intelligentes \xB7 Actions confirm\xE9es</p>
       </div>
@@ -12043,10 +12043,10 @@ async function renderAIAssistant() {
             <p>Bonjour ! Je suis votre <strong>Assistant IA</strong> RestoSuite.</p>
             <p style="margin-top:8px">Je connais vos fiches techniques, vos stocks, vos fournisseurs et vos donn\xE9es HACCP. Je peux vous aider et ex\xE9cuter des actions avec votre confirmation.</p>
             <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
-              <button class="ai-suggestion" onclick="sendAISuggestion('Quel est mon food cost moyen et comment l\\'am\xE9liorer ?')">\u{1F4CA} Food cost</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Quels ingr\xE9dients sont en stock bas ?')">\u{1F4E6} Stock</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Optimise les marges de mes plats')">\u{1F4B0} Marges</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Enregistre une temp\xE9rature de 5\xB0C en chambre froide')">\u{1F321}\uFE0F HACCP</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Quel est mon food cost moyen et comment l\\'am\xE9liorer ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Food cost</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Quels ingr\xE9dients sont en stock bas ?')"><i data-lucide="package" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Stock</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Optimise les marges de mes plats')"><i data-lucide="dollar-sign" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Marges</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Enregistre une temp\xE9rature de 5\xB0C en chambre froide')"><i data-lucide="thermometer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>HACCP</button>
             </div>
           </div>
         </div>
@@ -12705,21 +12705,21 @@ function renderCarbonGlobal(data) {
       <h3 style="margin-bottom:var(--space-3)">\xC9quivalences</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--space-3)">
         <div style="display:flex;align-items:center;gap:var(--space-2)">
-          <span style="font-size:1.5rem">\u{1F697}</span>
+          <i data-lucide="car" style="width:24px;height:24px;vertical-align:middle"></i>
           <div>
             <div style="font-weight:600">${data.equivalents.car_km.toLocaleString("fr-FR")} km</div>
             <div class="text-secondary text-sm">en voiture</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:var(--space-2)">
-          <span style="font-size:1.5rem">\u{1F333}</span>
+          <i data-lucide="tree-pine" style="width:24px;height:24px;vertical-align:middle"></i>
           <div>
             <div style="font-weight:600">${data.equivalents.tree_days.toLocaleString("fr-FR")} jours-arbre</div>
             <div class="text-secondary text-sm">pour compenser</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:var(--space-2)">
-          <span style="font-size:1.5rem">\u2708\uFE0F</span>
+          <i data-lucide="plane" style="width:24px;height:24px;vertical-align:middle"></i>
           <div>
             <div style="font-weight:600">${data.equivalents.flights_paris_marseille} vols</div>
             <div class="text-secondary text-sm">Paris \u2192 Marseille</div>
@@ -14153,7 +14153,7 @@ async function renderQRCodes() {
     <div class="qr-header page-header">
       <div>
         <a href="#/more" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px"></i> Plus</a>
-        <h1 style="margin-top:4px">\u{1F4F1} QR Codes \u2014 Menu</h1>
+        <h1 style="margin-top:4px"><i data-lucide="qr-code" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>QR Codes \u2014 Menu</h1>
       </div>
       <button class="btn btn-primary qr-print-hide" onclick="window.print()">
         <i data-lucide="printer" style="width:18px;height:18px"></i> Imprimer
@@ -14182,7 +14182,7 @@ async function renderQRCodes() {
   } catch (e) {
     document.getElementById("qr-grid").innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">\u26A0\uFE0F</div>
+        <div class="empty-icon"><i data-lucide="alert-triangle"></i></div>
         <p>Erreur de chargement des QR codes</p>
       </div>
     `;
@@ -14401,7 +14401,7 @@ class ErrorsLogView {
     } catch (e) {
       document.getElementById("errors-log-content").innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">\u26A0\uFE0F</div>
+          <div class="empty-icon"><i data-lucide="alert-triangle"></i></div>
           <p>Impossible de charger les erreurs : ${escapeHtml(e.message)}</p>
         </div>
       `;
@@ -14412,7 +14412,7 @@ class ErrorsLogView {
     if (!errors.length) {
       container.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">\u2705</div>
+          <div class="empty-icon"><i data-lucide="check-circle"></i></div>
           <p>Aucune erreur enregistr\xE9e.</p>
         </div>
       `;

@@ -17,7 +17,7 @@ async function renderAIChef() {
           <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Accueil
         </a>
         <h1 style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:1.5rem">👨‍🍳</span> Chef IA
+          <i data-lucide="chef-hat" style="width:28px;height:28px;vertical-align:middle;margin-right:8px"></i>Chef IA
         </h1>
         <p class="text-secondary" style="font-size:var(--text-sm)">Assistant expert qui connaît votre restaurant</p>
       </div>
@@ -29,11 +29,11 @@ async function renderAIChef() {
             <p>Bonjour ! Je suis <strong>Chef</strong>, votre assistant IA RestoSuite.</p>
             <p style="margin-top:8px">Je connais vos fiches techniques, vos stocks, vos fournisseurs et vos données HACCP. Posez-moi vos questions !</p>
             <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
-              <button class="chef-suggestion" onclick="sendChefSuggestion('Quel est mon food cost moyen et comment l\\'améliorer ?')">📊 Food cost</button>
-              <button class="chef-suggestion" onclick="sendChefSuggestion('Quels ingrédients sont en stock bas ?')">📦 Stock bas</button>
-              <button class="chef-suggestion" onclick="sendChefSuggestion('Analyse mes pertes sur les 30 derniers jours')">📉 Pertes</button>
-              <button class="chef-suggestion" onclick="sendChefSuggestion('Quels plats ont la meilleure marge ?')">💰 Marges</button>
-              <button class="chef-suggestion" onclick="sendChefSuggestion('Donne-moi des conseils HACCP pour cette semaine')">🛡️ HACCP</button>
+              <button class="chef-suggestion" onclick="sendChefSuggestion('Quel est mon food cost moyen et comment l\\'améliorer ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Food cost</button>
+              <button class="chef-suggestion" onclick="sendChefSuggestion('Quels ingrédients sont en stock bas ?')"><i data-lucide="package" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Stock bas</button>
+              <button class="chef-suggestion" onclick="sendChefSuggestion('Analyse mes pertes sur les 30 derniers jours')"><i data-lucide="trending-down" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Pertes</button>
+              <button class="chef-suggestion" onclick="sendChefSuggestion('Quels plats ont la meilleure marge ?')"><i data-lucide="dollar-sign" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Marges</button>
+              <button class="chef-suggestion" onclick="sendChefSuggestion('Donne-moi des conseils HACCP pour cette semaine')"><i data-lucide="shield" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>HACCP</button>
             </div>
           </div>
         </div>

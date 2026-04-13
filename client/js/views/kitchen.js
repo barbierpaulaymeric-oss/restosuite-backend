@@ -106,7 +106,7 @@ async function loadKitchenTickets() {
   if (orders.length === 0) {
     el.innerHTML = `
       <div class="empty-state" style="padding-top:120px">
-        <div class="empty-icon" style="font-size:4rem">✅</div>
+        <div class="empty-icon" style="font-size:4rem"><i data-lucide="check-circle"></i></div>
         <h3>Pas de commande en attente</h3>
         <p>Les nouvelles commandes apparaîtront ici automatiquement.</p>
       </div>

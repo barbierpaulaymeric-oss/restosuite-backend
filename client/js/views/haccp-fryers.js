@@ -18,7 +18,7 @@ async function renderHACCPFryers() {
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
-          <h1>🍟 Huiles de friture</h1>
+          <h1><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Huiles de friture</h1>
           <button class="btn btn-primary" id="btn-new-fryer">
             <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter friteuse
           </button>
@@ -87,7 +87,7 @@ function showNewFryerModal() {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal" style="max-width:400px">
-      <h2>🍟 Ajouter une friteuse</h2>
+      <h2><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Ajouter une friteuse</h2>
       <div class="form-group">
         <label>Nom *</label>
         <input type="text" class="form-control" id="fryer-name-input" placeholder="ex: Friteuse 1, Grande friteuse" autofocus>
@@ -186,7 +186,7 @@ async function showFryerHistoryModal(fryerId, fryerName) {
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
       <div class="modal" style="max-width:600px">
-        <h2>📋 Historique — ${escapeHtml(fryerName)}</h2>
+        <h2><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Historique — ${escapeHtml(fryerName)}</h2>
         <div class="table-container" style="max-height:400px;overflow-y:auto">
           <table>
             <thead><tr><th>Date</th><th>Action</th><th>Polaire</th><th>Notes</th><th>Opérateur</th></tr></thead>

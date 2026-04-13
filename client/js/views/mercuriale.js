@@ -8,20 +8,20 @@ async function renderMercuriale() {
     <div class="page-header">
       <div>
         <a href="#/analytics" class="btn btn-secondary btn-sm">← Analytics</a>
-        <h1 style="margin-top:4px">📊 Mercuriale</h1>
+        <h1 style="margin-top:4px"><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Mercuriale</h1>
       </div>
       <a href="#/import-mercuriale" class="btn btn-primary"><i data-lucide="camera" style="width:16px;height:16px"></i> Scanner une mercuriale</a>
     </div>
 
     <div id="price-alerts-section">
-      <h2 style="margin-bottom:var(--space-3)">⚠️ Alertes prix</h2>
+      <h2 style="margin-bottom:var(--space-3)"><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Alertes prix</h2>
       <div id="price-alerts-list">
         <div class="skeleton skeleton-card"></div>
       </div>
     </div>
 
     <div style="margin-top:var(--space-5)">
-      <h2 style="margin-bottom:var(--space-3)">📋 Tous les ingrédients</h2>
+      <h2 style="margin-bottom:var(--space-3)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Tous les ingrédients</h2>
       <div id="mercuriale-table">
         <div class="skeleton skeleton-card"></div>
       </div>

@@ -191,7 +191,7 @@ function showTemperatureModal(zoneId, zoneName, minTemp, maxTemp) {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal">
-      <h2>🌡️ Relevé — ${escapeHtml(zoneName)}</h2>
+      <h2><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Relevé — ${escapeHtml(zoneName)}</h2>
       <p class="text-secondary text-sm" style="margin-bottom:var(--space-4)">Plage normale : ${minTemp}°C à ${maxTemp}°C</p>
       <div class="form-group">
         <label>Température (°C)</label>
