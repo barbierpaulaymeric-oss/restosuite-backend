@@ -5,8 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 require('./db'); // initializes tables synchronously
-const { requireWriteAccess } = require('./middleware/trial');
 const { requireAuth } = require('./routes/auth');
+const { planGate } = require('./middleware/plan-gate');
 const { backupDatabase } = require('./backup');
 const { appendError, LOG_PATH, MAX_LINES } = require('./routes/errors');
 
@@ -150,21 +150,59 @@ app.get('/manifest.json', (req, res) => {
 // Static files from client directory (but skip index.html for root)
 app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
 
-// Trial write-protection middleware for write operations
-// Excludes: accounts (create/login), stripe, and GET requests
-const trialProtectedPaths = ['/api/ingredients', '/api/suppliers', '/api/prices', '/api/recipes', '/api/ai', '/api/haccp', '/api/haccp-plan', '/api/stock', '/api/orders', '/api/deliveries', '/api/purchase-orders', '/api/allergens'];
-app.use(trialProtectedPaths, (req, res, next) => {
-  if (req.method === 'GET') return next();
-  // Allow HACCP PDF exports (GET only anyway) and pdf-export routes
-  return requireWriteAccess(req, res, next);
-});
-// Also protect account updates/deletes (but not create/login)
-app.use('/api/accounts/:id', (req, res, next) => {
-  if (req.method === 'GET') return next();
-  // Skip the status endpoint
-  if (req.path.endsWith('/status')) return next();
-  return requireWriteAccess(req, res, next);
-});
+// ─── Plan Gating ─────────────────────────────────────────────────────────────
+// Rules: active trial = full access; expired trial = GET/HEAD-only; paid = plan rank
+// Routes not listed here are public or separately protected (auth, admin, stripe, etc.)
+
+// discovery — free tier
+app.use('/api/ingredients', planGate('discovery'));
+app.use('/api/recipes', planGate('discovery'));
+app.use('/api/stock', planGate('discovery'));
+app.use('/api/prices', planGate('discovery'));
+app.use('/api/variance', planGate('discovery'));
+
+// essential — 29€/month
+app.use('/api/haccp', planGate('essential'));
+app.use('/api/suppliers', planGate('essential'));
+app.use('/api/orders', planGate('essential'));
+app.use('/api/deliveries', planGate('essential'));
+app.use('/api/purchase-orders', planGate('essential'));
+app.use('/api/allergens', planGate('essential'));
+app.use('/api/qrcode', planGate('essential'));
+app.use('/api/menu', planGate('essential'));
+app.use('/api/alerts', planGate('essential'));
+app.use('/api/service', planGate('essential'));
+app.use('/api/crm', planGate('essential'));
+
+// professional — 59€/month
+app.use('/api/haccp-plan', planGate('professional'));
+app.use('/api/analytics', planGate('professional'));
+app.use('/api/ai', planGate('professional'));
+app.use('/api/predictions', planGate('professional'));
+app.use('/api/carbon', planGate('professional'));
+app.use('/api/integrations', planGate('professional'));
+app.use('/api/training', planGate('professional'));
+app.use('/api/pest-control', planGate('professional'));
+app.use('/api/maintenance', planGate('professional'));
+app.use('/api/waste', planGate('professional'));
+app.use('/api/corrective-actions', planGate('professional'));
+app.use('/api/pms-audit', planGate('professional'));
+app.use('/api/pms', planGate('professional'));
+app.use('/api/sanitary', planGate('professional'));
+
+// premium — 99€/month
+app.use('/api/traceability', planGate('premium'));
+app.use('/api/recall', planGate('premium'));
+app.use('/api/allergen-plan', planGate('premium'));
+app.use('/api/fabrication-diagrams', planGate('premium'));
+app.use('/api/tiac', planGate('premium'));
+app.use('/api/pdf-export', planGate('premium'));
+app.use('/api/sites', planGate('premium'));
+
+// enterprise — sur devis
+app.use('/api/public', planGate('enterprise'));
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 // API routes
 app.use('/api/auth', require('./routes/auth'));
