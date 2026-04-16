@@ -150,6 +150,20 @@ app.get('/manifest.json', (req, res) => {
 // Static files from client directory (but skip index.html for root)
 app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
 
+// ─── Soft JWT decode (populates req.user for planGate without enforcing auth) ──
+// requireAuth inside each route module remains the authoritative auth check.
+{
+  const _jwt = require('jsonwebtoken');
+  const _jwtSecret = process.env.JWT_SECRET || 'restosuite-dev-secret-2026';
+  app.use((req, res, next) => {
+    const auth = req.headers.authorization;
+    if (auth && auth.startsWith('Bearer ')) {
+      try { req.user = _jwt.verify(auth.split(' ')[1], _jwtSecret); } catch {}
+    }
+    next();
+  });
+}
+
 // ─── Plan Gating ─────────────────────────────────────────────────────────────
 // Rules: active trial = full access; expired trial = GET/HEAD-only; paid = plan rank
 // Routes not listed here are public or separately protected (auth, admin, stripe, etc.)
@@ -187,7 +201,7 @@ app.use('/api/maintenance', planGate('professional'));
 app.use('/api/waste', planGate('professional'));
 app.use('/api/corrective-actions', planGate('professional'));
 app.use('/api/pms-audit', planGate('professional'));
-app.use('/api/pms', planGate('professional'));
+app.use('/api/pms', planGate('professional')); // pms-audit must appear first (prefix match)
 app.use('/api/sanitary', planGate('professional'));
 app.use('/api/water', planGate('professional'));
 
@@ -198,9 +212,6 @@ app.use('/api/allergen-plan', planGate('premium'));
 app.use('/api/fabrication-diagrams', planGate('premium'));
 app.use('/api/tiac', planGate('premium'));
 app.use('/api/sites', planGate('premium'));
-
-// enterprise — sur devis
-app.use('/api/public', planGate('enterprise'));
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -246,8 +257,8 @@ app.use('/api/plans', require('./routes/plans'));
 app.use('/api/allergen-plan', require('./routes/allergen-plan'));
 app.use('/api/water', require('./routes/water'));
 app.use('/api/pms-audit', require('./routes/pms-audit'));
+app.use('/api/pms', require('./routes/pms-export')); // pms-audit must appear first (prefix match)
 app.use('/api/sanitary', require('./routes/sanitary-settings'));
-app.use('/api/pms', require('./routes/pms-export'));
 app.use('/api/tiac', require('./routes/tiac'));
 app.use('/api/fabrication-diagrams', require('./routes/fabrication-diagrams'));
 app.use('/api/errors', require('./routes/errors').router);
