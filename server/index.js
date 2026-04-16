@@ -189,6 +189,7 @@ app.use('/api/corrective-actions', planGate('professional'));
 app.use('/api/pms-audit', planGate('professional'));
 app.use('/api/pms', planGate('professional'));
 app.use('/api/sanitary', planGate('professional'));
+app.use('/api/water', planGate('professional'));
 
 // premium — 99€/month
 app.use('/api/traceability', planGate('premium'));
@@ -196,7 +197,6 @@ app.use('/api/recall', planGate('premium'));
 app.use('/api/allergen-plan', planGate('premium'));
 app.use('/api/fabrication-diagrams', planGate('premium'));
 app.use('/api/tiac', planGate('premium'));
-app.use('/api/pdf-export', planGate('premium'));
 app.use('/api/sites', planGate('premium'));
 
 // enterprise — sur devis
