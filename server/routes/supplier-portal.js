@@ -492,7 +492,7 @@ router.post('/delivery-notes', requireSupplierAuth, (req, res) => {
     const result = transaction();
     res.status(201).json(result);
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    res.status(400).json({ error: 'Erreur interne du serveur' });
   }
 });
 

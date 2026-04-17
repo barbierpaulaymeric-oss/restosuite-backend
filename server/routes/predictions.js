@@ -289,7 +289,7 @@ router.post('/accuracy', (req, res) => {
 
     res.json({ ok: true, date, predicted_orders: predicted, actual_orders: actual, accuracy_pct });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -313,7 +313,7 @@ router.get('/accuracy', (req, res) => {
 
     res.json({ days, avg_accuracy_pct: avgAccuracy, records });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 

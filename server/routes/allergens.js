@@ -37,7 +37,7 @@ router.get('/ingredients/:id', requireAuth, (req, res) => {
     const parsed = parseAllergenText(ingredient.allergens);
     res.json({ ingredient_id: Number(req.params.id), allergens: parsed });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -75,7 +75,7 @@ router.put('/ingredients/:id', requireAuth, (req, res) => {
       allergen_codes
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -95,7 +95,7 @@ router.get('/recipes/:id', requireAuth, (req, res) => {
       allergen_count: allergens.length
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -111,7 +111,7 @@ router.get('/menu', (req, res) => {
     }));
     res.json(result);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -212,7 +212,7 @@ router.get('/menu-display', requireAuth, (req, res) => {
 
     res.json({ items: result, total: result.length });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 

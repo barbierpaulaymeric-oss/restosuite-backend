@@ -270,7 +270,7 @@ router.get('/global', (req, res) => {
     });
   } catch (e) {
     console.error('Carbon global error:', e);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -280,7 +280,7 @@ router.get('/targets', (req, res) => {
     const targets = all('SELECT * FROM carbon_targets ORDER BY created_at DESC');
     res.json(targets);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -315,7 +315,7 @@ router.post('/targets', (req, res) => {
       res.json({ ok: true, id: Number(result.lastInsertRowid), updated: false });
     }
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 

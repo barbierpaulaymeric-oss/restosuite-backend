@@ -118,7 +118,7 @@ router.post('/', (req, res) => {
     const noteId = transaction();
     res.json({ ok: true, id: noteId });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    res.status(400).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -224,7 +224,7 @@ router.put('/:id/receive', (req, res) => {
     const result = transaction();
     res.json({ success: true, ...result });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    res.status(400).json({ error: 'Erreur interne du serveur' });
   }
 });
 

@@ -35,7 +35,7 @@ router.post('/score', requireAuth, (req, res) => {
 
     res.json({ ok: true, score: s });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -54,7 +54,7 @@ router.get('/history', requireAuth, (req, res) => {
 
     res.json({ days, history });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 

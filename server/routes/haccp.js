@@ -346,7 +346,7 @@ router.get('/traceability/dlc-alerts', requireAuth, (req, res) => {
     }));
     res.json(categorized);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -652,7 +652,7 @@ router.get('/cooling', requireAuth, (req, res) => {
     const items = db.prepare(sql).all(...params);
     res.json({ items, total, limit: Number(limit), offset: Number(offset) });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -673,7 +673,7 @@ router.post('/cooling', requireAuth, (req, res) => {
     `).run(product_name, quantity ?? null, unit ?? 'kg', start_time, temp_start, time_at_63c ?? null, time_at_10c ?? null, is_compliant, notes ?? null, recorded_by ?? null);
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -691,7 +691,7 @@ router.put('/cooling/:id', requireAuth, (req, res) => {
     `).run(time_at_63c ?? null, time_at_10c ?? null, is_compliant, notes ?? null, req.params.id);
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -717,7 +717,7 @@ router.get('/reheating', requireAuth, (req, res) => {
     const items = db.prepare(sql).all(...params);
     res.json({ items, total, limit: Number(limit), offset: Number(offset) });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -738,7 +738,7 @@ router.post('/reheating', requireAuth, (req, res) => {
     `).run(product_name, quantity ?? null, unit ?? 'kg', start_time, temp_start, time_at_63c ?? null, is_compliant, notes ?? null, recorded_by ?? null);
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -756,7 +756,7 @@ router.put('/reheating/:id', requireAuth, (req, res) => {
       .run(time_at_63c ?? null, is_compliant, notes ?? null, req.params.id);
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -782,7 +782,7 @@ router.get('/fryers', requireAuth, (req, res) => {
     });
     res.json({ items: result, total: result.length });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -793,7 +793,7 @@ router.post('/fryers', requireAuth, (req, res) => {
     const result = db.prepare('INSERT INTO fryers (name) VALUES (?)').run(name);
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -809,7 +809,7 @@ router.get('/fryers/:id/checks', requireAuth, (req, res) => {
     `).all(req.params.id);
     res.json({ items, total: items.length });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -829,7 +829,7 @@ router.post('/fryers/:id/checks', requireAuth, (req, res) => {
     `).run(req.params.id, action_type, action_date || new Date().toISOString(), polar_value ?? null, notes ?? null, recorded_by ?? null);
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -854,7 +854,7 @@ router.get('/non-conformities', requireAuth, (req, res) => {
     const items = db.prepare(sql).all(...params);
     res.json({ items, total, limit: Number(limit), offset: Number(offset) });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -868,7 +868,7 @@ router.post('/non-conformities', requireAuth, (req, res) => {
     `).run(title, description ?? null, category ?? 'autre', severity ?? 'mineure', detected_by ?? null);
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -891,7 +891,7 @@ router.put('/non-conformities/:id', requireAuth, (req, res) => {
     );
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 

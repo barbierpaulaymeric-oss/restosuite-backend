@@ -201,7 +201,7 @@ router.post('/parse-voice', async (req, res) => {
     res.json(parsed);
   } catch (e) {
     console.error('AI parse error:', e);
-    res.status(500).json({ error: 'Failed to parse voice input', details: e.message });
+    res.status(500).json({ error: 'Failed to parse voice input' });
   }
 });
 
@@ -350,7 +350,7 @@ router.post('/modify-voice', async (req, res) => {
     res.json(actions);
   } catch (e) {
     console.error('AI modify error:', e);
-    res.status(500).json({ error: 'Failed to process voice command', details: e.message });
+    res.status(500).json({ error: 'Failed to process voice command' });
   }
 });
 
@@ -481,7 +481,7 @@ router.post('/scan-invoice', upload.single('invoice'), async (req, res) => {
     if (filePath) {
       try { fs.unlinkSync(filePath); } catch {}
     }
-    res.status(500).json({ error: 'Erreur scan facture', details: e.message });
+    res.status(500).json({ error: 'Erreur scan facture' });
   } finally {
     // Final cleanup to ensure file is always deleted
     if (filePath) {
@@ -631,7 +631,7 @@ Si un champ n'est pas visible, mets null. Extrais TOUS les produits listés, mê
     if (filePath) {
       try { fs.unlinkSync(filePath); } catch {}
     }
-    res.status(500).json({ error: 'Erreur scan mercuriale', details: e.message });
+    res.status(500).json({ error: 'Erreur scan mercuriale' });
   } finally {
     // Final cleanup to ensure file is always deleted
     if (filePath) {
@@ -700,7 +700,7 @@ router.post('/import-mercuriale', (req, res) => {
       total: items.length
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur import', details: e.message });
+    res.status(500).json({ error: 'Erreur import' });
   }
 });
 
@@ -797,7 +797,7 @@ Réponds en JSON avec cette structure :
     res.json(suggestions);
   } catch (e) {
     console.error('Menu suggestions error:', e);
-    res.status(500).json({ error: 'Erreur suggestions menu', details: e.message });
+    res.status(500).json({ error: 'Erreur suggestions menu' });
   }
 });
 
@@ -891,7 +891,7 @@ DOMAINES D'EXPERTISE :
     res.json({ reply });
   } catch (e) {
     console.error('Chef AI error:', e);
-    res.status(500).json({ error: 'Erreur assistant', details: e.message });
+    res.status(500).json({ error: 'Erreur assistant' });
   }
 });
 
@@ -1055,7 +1055,7 @@ DOMAINES D'EXPERTISE :
     res.json(result);
   } catch (e) {
     console.error('Chef AI error:', e);
-    res.status(500).json({ error: 'Erreur assistant', details: e.message });
+    res.status(500).json({ error: 'Erreur assistant' });
   }
 });
 
@@ -1233,7 +1233,7 @@ router.post('/execute-action', async (req, res) => {
     res.json(result);
   } catch (e) {
     console.error('Execute action error:', e);
-    res.status(500).json({ error: 'Erreur exécution action', details: e.message });
+    res.status(500).json({ error: 'Erreur exécution action' });
   }
 });
 

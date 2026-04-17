@@ -84,7 +84,7 @@ router.get('/', (req, res) => {
 
     res.json(result);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -116,7 +116,7 @@ router.put('/:provider', (req, res) => {
       res.json({ ok: true, message: 'Intégration créée' });
     }
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -176,7 +176,7 @@ router.post('/thefork/sync', async (req, res) => {
     });
   } catch (e) {
     try { run(`UPDATE integrations SET sync_status = 'error', updated_at = datetime('now') WHERE provider = 'thefork' AND restaurant_id = 1`); } catch {}
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -228,7 +228,7 @@ router.post('/pos/sync', async (req, res) => {
     });
   } catch (e) {
     try { run(`UPDATE integrations SET sync_status = 'error', updated_at = datetime('now') WHERE provider = 'pos_caisse' AND restaurant_id = 1`); } catch {}
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -253,7 +253,7 @@ router.get('/reservations', (req, res) => {
     sql += ' ORDER BY r.reservation_date, r.reservation_time';
     res.json(all(sql, params));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -273,7 +273,7 @@ router.post('/reservations', (req, res) => {
 
     res.json({ ok: true, id: result.lastInsertRowid });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -295,7 +295,7 @@ router.put('/reservations/:id', (req, res) => {
 
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -305,7 +305,7 @@ router.delete('/reservations/:id', (req, res) => {
     run('DELETE FROM reservations WHERE id = ?', [Number(req.params.id)]);
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -332,7 +332,7 @@ router.get('/reservations/stats', (req, res) => {
 
     res.json({ today_count: todayCount, today_covers: todayCovers, week_count: weekCount, no_show_rate_pct: noShowRate, by_source: bySource });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
