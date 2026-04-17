@@ -221,8 +221,9 @@ router.post('/pin-login', (req, res) => {
     return res.status(400).json({ error: 'PIN à 4 chiffres requis' });
   }
 
-  // Check for brute-force lockout using generic identifier
-  const lockoutCheck = checkPinLockout('pin_login');
+  // Check for brute-force lockout — keyed per IP to prevent global DoS
+  const lockoutKey = `pin_login:${req.ip}`;
+  const lockoutCheck = checkPinLockout(lockoutKey);
   if (lockoutCheck.locked) {
     const minutesRemaining = Math.ceil(lockoutCheck.remainingMs / 60000);
     return res.status(429).json({ error: `Trop de tentatives. Veuillez réessayer dans ${minutesRemaining} minutes.` });
@@ -239,12 +240,12 @@ router.post('/pin-login', (req, res) => {
   }
 
   if (!account) {
-    recordPinAttempt('pin_login', false);
+    recordPinAttempt(lockoutKey, false);
     return res.status(401).json({ error: 'PIN incorrect' });
   }
 
   // Record successful attempt
-  recordPinAttempt('pin_login', true);
+  recordPinAttempt(lockoutKey, true);
 
   // Update last_login
   run('UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [account.id]);
@@ -351,6 +352,14 @@ router.post('/staff-pin', (req, res) => {
     return res.status(400).json({ error: 'Le PIN doit être 4 chiffres' });
   }
 
+  // Brute-force protection — keyed per IP + account to prevent targeted DoS
+  const staffLockoutKey = `staff_pin:${req.ip}:${account_id}`;
+  const staffLockout = checkPinLockout(staffLockoutKey);
+  if (staffLockout.locked) {
+    const minutesRemaining = Math.ceil(staffLockout.remainingMs / 60000);
+    return res.status(429).json({ error: `Trop de tentatives. Veuillez réessayer dans ${minutesRemaining} minutes.` });
+  }
+
   const account = get('SELECT * FROM accounts WHERE id = ?', [account_id]);
   if (!account) {
     return res.status(404).json({ error: 'Compte introuvable' });
@@ -368,8 +377,10 @@ router.post('/staff-pin', (req, res) => {
   } else {
     // Normal PIN validation
     if (!account.pin || !verifyPin(pin, account.pin)) {
+      recordPinAttempt(staffLockoutKey, false);
       return res.status(401).json({ error: 'PIN incorrect' });
     }
+    recordPinAttempt(staffLockoutKey, true);
   }
 
   // Update last_login
