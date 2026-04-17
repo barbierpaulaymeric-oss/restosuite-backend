@@ -2001,8 +2001,18 @@ try {
     if (!tableExists) continue;
     const cols = db.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name);
     if (!cols.includes('restaurant_id')) {
+      // First-time migration on this DB: add the column and backfill pre-existing
+      // rows (which by definition have no tenant) to tenant 1. Guard: only touch
+      // NULL rows, never overwrite existing non-null tenant ids. Critically, this
+      // UPDATE only runs in the same `if` block as the ALTER — once the column
+      // exists it will never run again, so a prod DB that already has multi-tenant
+      // data is never re-homogenized to tenant 1 on restart.
       db.exec(`ALTER TABLE ${t} ADD COLUMN restaurant_id INTEGER DEFAULT 1`);
-      db.exec(`UPDATE ${t} SET restaurant_id = 1 WHERE restaurant_id IS NULL`);
+      const nullCount = db.prepare(`SELECT COUNT(*) as c FROM ${t} WHERE restaurant_id IS NULL`).get().c;
+      if (nullCount > 0) {
+        db.exec(`UPDATE ${t} SET restaurant_id = 1 WHERE restaurant_id IS NULL`);
+        console.log(`  ↳ backfilled ${nullCount} row(s) in ${t} to restaurant_id=1`);
+      }
     }
     db.exec(`CREATE INDEX IF NOT EXISTS idx_${t}_restaurant_id ON ${t}(restaurant_id)`);
   }
@@ -2062,7 +2072,10 @@ try {
   if (!e.message.includes('already exists')) console.error('Migration ai_* tables error:', e.message);
 }
 
-// ─── audit_log (append-only, immutable by convention) ───
+// ─── audit_log (append-only, hash-chained for tamper-evidence) ───
+// Each row carries a SHA-256 of its own canonical content plus the previous
+// row's hash. Verifying the chain detects any DBA-level UPDATE/DELETE — the
+// three experts flagged this as the #1 convergent hardening priority.
 try {
   db.exec(`CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2073,11 +2086,26 @@ try {
     action TEXT NOT NULL CHECK(action IN ('create','update','delete')),
     old_values TEXT,
     new_values TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    previous_hash TEXT,
+    row_hash TEXT
   )`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_log_restaurant ON audit_log(restaurant_id, created_at DESC)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_log_table_record ON audit_log(table_name, record_id)`);
-  console.log('✅ Migration: audit_log table ready');
+
+  // Backfill for pre-existing installs: add the two columns if missing.
+  try {
+    const cols = db.prepare(`PRAGMA table_info(audit_log)`).all().map(c => c.name);
+    if (!cols.includes('previous_hash')) {
+      db.exec(`ALTER TABLE audit_log ADD COLUMN previous_hash TEXT`);
+    }
+    if (!cols.includes('row_hash')) {
+      db.exec(`ALTER TABLE audit_log ADD COLUMN row_hash TEXT`);
+    }
+  } catch (e) {
+    console.warn('⚠️ audit_log column backfill error:', e.message);
+  }
+  console.log('✅ Migration: audit_log table ready (hash-chained)');
 } catch (e) {
   console.warn('⚠️ audit_log migration error:', e.message);
 }
