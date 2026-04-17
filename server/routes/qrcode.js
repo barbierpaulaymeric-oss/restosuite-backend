@@ -15,8 +15,10 @@ router.get('/table/:tableNumber', async (req, res) => {
     if (!tableNumber || tableNumber < 1) {
       return res.status(400).json({ error: 'Numéro de table invalide' });
     }
+    const rid = req.user && req.user.restaurant_id;
+    if (!rid) return res.status(400).json({ error: 'restaurant_id manquant dans le contexte' });
 
-    const url = `https://www.restosuite.fr/menu?table=${tableNumber}`;
+    const url = `https://www.restosuite.fr/menu?r=${rid}&table=${tableNumber}`;
     
     const qrBuffer = await QRCode.toBuffer(url, {
       type: 'png',
@@ -44,7 +46,7 @@ router.get('/tables', async (req, res) => {
     
     const qrCodes = [];
     for (const table of tables) {
-      const url = `https://www.restosuite.fr/menu?table=${table.table_number}`;
+      const url = `https://www.restosuite.fr/menu?r=${rid}&table=${table.table_number}`;
       const dataUrl = await QRCode.toDataURL(url, {
         width: 300,
         margin: 2,

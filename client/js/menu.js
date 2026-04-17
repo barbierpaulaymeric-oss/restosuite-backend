@@ -1,6 +1,13 @@
 var params = new URLSearchParams(window.location.search);
 var tableNumber = params.get('table') || '?';
+var restaurantId = parseInt(params.get('r'), 10);
 document.getElementById('table-badge').textContent = 'Table ' + tableNumber;
+
+if (!restaurantId || isNaN(restaurantId)) {
+  document.getElementById('menu-container').innerHTML =
+    '<div class="empty">Lien invalide. Veuillez scanner à nouveau le QR code de la table.</div>';
+  throw new Error('restaurant_id missing in URL');
+}
 
 var cart = {};
 var menuData = {};
@@ -69,7 +76,11 @@ async function submitOrder() {
     var res = await fetch('/api/menu/order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ table_number: Number(tableNumber), items: items })
+      body: JSON.stringify({
+        restaurant_id: restaurantId,
+        table_number: Number(tableNumber),
+        items: items
+      })
     });
     if (res.ok) {
       document.getElementById('success').classList.add('visible');
@@ -89,7 +100,7 @@ async function submitOrder() {
 
 async function loadMenu() {
   try {
-    var res = await fetch('/api/menu');
+    var res = await fetch('/api/menu?r=' + encodeURIComponent(restaurantId));
     var data = await res.json();
 
     var categories = data.menu || data.categories || {};
