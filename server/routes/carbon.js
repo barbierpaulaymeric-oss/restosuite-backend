@@ -274,10 +274,13 @@ router.get('/global', (req, res) => {
   }
 });
 
-// GET /api/carbon/targets — Objectifs carbone
+// GET /api/carbon/targets — Objectifs carbone (tenant-scoped)
 router.get('/targets', (req, res) => {
   try {
-    const targets = all('SELECT * FROM carbon_targets ORDER BY created_at DESC');
+    const targets = all(
+      'SELECT * FROM carbon_targets WHERE restaurant_id = ? ORDER BY created_at DESC',
+      [req.user.restaurant_id]
+    );
     res.json(targets);
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -299,7 +302,8 @@ router.post('/targets', (req, res) => {
     }
 
     // Upsert: one target per period per restaurant
-    const existing = get('SELECT id FROM carbon_targets WHERE period = ? AND restaurant_id = 1', [p]);
+    const rid = req.user.restaurant_id;
+    const existing = get('SELECT id FROM carbon_targets WHERE period = ? AND restaurant_id = ?', [p, rid]);
     if (existing) {
       run(
         `UPDATE carbon_targets SET target_co2_kg = ?, label = ?, updated_at = datetime('now')
@@ -309,8 +313,8 @@ router.post('/targets', (req, res) => {
       res.json({ ok: true, id: existing.id, updated: true });
     } else {
       const result = run(
-        `INSERT INTO carbon_targets (restaurant_id, period, target_co2_kg, label) VALUES (1, ?, ?, ?)`,
-        [p, Number(target_co2_kg), label || null]
+        `INSERT INTO carbon_targets (restaurant_id, period, target_co2_kg, label) VALUES (?, ?, ?, ?)`,
+        [rid, p, Number(target_co2_kg), label || null]
       );
       res.json({ ok: true, id: Number(result.lastInsertRowid), updated: false });
     }

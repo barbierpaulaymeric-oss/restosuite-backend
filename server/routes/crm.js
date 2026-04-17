@@ -69,8 +69,8 @@ try {
 router.get('/customers', (req, res) => {
   try {
     const { search, tag, vip, sort } = req.query;
-    let sql = 'SELECT * FROM customers WHERE restaurant_id = 1';
-    const params = [];
+    let sql = 'SELECT * FROM customers WHERE restaurant_id = ?';
+    const params = [req.user.restaurant_id];
 
     if (search) {
       sql += ' AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)';
@@ -130,8 +130,8 @@ router.post('/customers', validate(customerValidation), (req, res) => {
     }
 
     const result = run(`INSERT INTO customers (restaurant_id, name, email, phone, birthday, notes, tags, first_visit)
-      VALUES (1, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [name, email || null, phone || null, birthday || null, notes || null, JSON.stringify(tags || [])]
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [req.user.restaurant_id, name, email || null, phone || null, birthday || null, notes || null, JSON.stringify(tags || [])]
     );
 
     res.json({ ok: true, id: Number(result.lastInsertRowid) });
@@ -211,7 +211,7 @@ router.post('/customers/:id/visit', (req, res) => {
 // GET /api/crm/rewards
 router.get('/rewards', (req, res) => {
   try {
-    const rewards = all('SELECT * FROM loyalty_rewards WHERE restaurant_id = 1 ORDER BY points_required');
+    const rewards = all('SELECT * FROM loyalty_rewards WHERE restaurant_id = ? ORDER BY points_required', [req.user.restaurant_id]);
     res.json(rewards);
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -225,8 +225,8 @@ router.post('/rewards', (req, res) => {
     if (!name || !points_required) return res.status(400).json({ error: 'Nom et points requis' });
 
     const result = run(`INSERT INTO loyalty_rewards (restaurant_id, name, description, points_required, reward_type, reward_value)
-      VALUES (1, ?, ?, ?, ?, ?)`,
-      [name, description || null, points_required, reward_type || 'discount', reward_value || 0]
+      VALUES (?, ?, ?, ?, ?, ?)`,
+      [req.user.restaurant_id, name, description || null, points_required, reward_type || 'discount', reward_value || 0]
     );
 
     res.json({ ok: true, id: Number(result.lastInsertRowid) });
@@ -271,23 +271,24 @@ router.post('/customers/:id/redeem/:rewardId', (req, res) => {
 // GET /api/crm/stats — CRM statistics
 router.get('/stats', (req, res) => {
   try {
-    const totalCustomers = get('SELECT COUNT(*) as c FROM customers WHERE restaurant_id = 1').c;
-    const vipCustomers = get('SELECT COUNT(*) as c FROM customers WHERE restaurant_id = 1 AND vip = 1').c;
-    const totalPoints = get('SELECT COALESCE(SUM(loyalty_points), 0) as c FROM customers WHERE restaurant_id = 1').c;
-    const avgSpent = get('SELECT COALESCE(AVG(total_spent), 0) as c FROM customers WHERE restaurant_id = 1 AND total_visits > 0').c;
-    const avgVisits = get('SELECT COALESCE(AVG(total_visits), 0) as c FROM customers WHERE restaurant_id = 1 AND total_visits > 0').c;
+    const rid = req.user.restaurant_id;
+    const totalCustomers = get('SELECT COUNT(*) as c FROM customers WHERE restaurant_id = ?', [rid]).c;
+    const vipCustomers = get('SELECT COUNT(*) as c FROM customers WHERE restaurant_id = ? AND vip = 1', [rid]).c;
+    const totalPoints = get('SELECT COALESCE(SUM(loyalty_points), 0) as c FROM customers WHERE restaurant_id = ?', [rid]).c;
+    const avgSpent = get('SELECT COALESCE(AVG(total_spent), 0) as c FROM customers WHERE restaurant_id = ? AND total_visits > 0', [rid]).c;
+    const avgVisits = get('SELECT COALESCE(AVG(total_visits), 0) as c FROM customers WHERE restaurant_id = ? AND total_visits > 0', [rid]).c;
 
     const recentVisitors = all(`
       SELECT name, last_visit, total_visits, loyalty_points, vip
-      FROM customers WHERE restaurant_id = 1 AND last_visit IS NOT NULL
+      FROM customers WHERE restaurant_id = ? AND last_visit IS NOT NULL
       ORDER BY last_visit DESC LIMIT 10
-    `);
+    `, [rid]);
 
     const topSpenders = all(`
       SELECT name, total_spent, total_visits, loyalty_points, vip
-      FROM customers WHERE restaurant_id = 1
+      FROM customers WHERE restaurant_id = ?
       ORDER BY total_spent DESC LIMIT 10
-    `);
+    `, [rid]);
 
     res.json({
       total_customers: totalCustomers,
