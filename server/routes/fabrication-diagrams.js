@@ -6,6 +6,7 @@
 const { Router } = require('express');
 const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
+const { writeAudit } = require('../lib/audit-log');
 const router = Router();
 
 router.use(requireAuth);
@@ -38,6 +39,9 @@ router.post('/', (req, res) => {
     [rid, nom, description || null, JSON.stringify(etapes)]
   );
   const diagram = get('SELECT * FROM fabrication_diagrams WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
+  try {
+    writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'fabrication_diagrams', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: diagram });
+  } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
   res.status(201).json({ ...diagram, etapes: JSON.parse(diagram.etapes) });
 });
 
@@ -59,6 +63,9 @@ router.put('/:id', (req, res) => {
     ]
   );
   const diagram = get('SELECT * FROM fabrication_diagrams WHERE id = ? AND restaurant_id = ?', [id, rid]);
+  try {
+    writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'fabrication_diagrams', record_id: id, action: 'update', old_values: existing, new_values: diagram });
+  } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
   res.json({ ...diagram, etapes: JSON.parse(diagram.etapes) });
 });
 
@@ -66,8 +73,13 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
+  const existing = get('SELECT * FROM fabrication_diagrams WHERE id = ? AND restaurant_id = ?', [id, rid]);
+  if (!existing) return res.status(404).json({ error: 'Diagramme introuvable' });
   const info = run('DELETE FROM fabrication_diagrams WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (info.changes === 0) return res.status(404).json({ error: 'Diagramme introuvable' });
+  try {
+    writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'fabrication_diagrams', record_id: id, action: 'delete', old_values: existing, new_values: null });
+  } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
   res.json({ deleted: true });
 });
 
