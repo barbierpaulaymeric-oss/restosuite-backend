@@ -376,15 +376,26 @@ try {
   console.error('Migration trial_start error:', e.message);
 }
 
-// ─── Migration: Add recipe_type to recipes ───
+// ─── Migration: Add recipe_type / description / photo_url to recipes ───
+// public-api.js (/api/public/v1/menu) selects r.description and r.photo_url.
+// These were added to prod DB manually but missed from base schema — fresh
+// test DBs (and any new install) would error with "no such column".
 try {
   const recipeCols = all("PRAGMA table_info(recipes)");
   if (!recipeCols.some(c => c.name === 'recipe_type')) {
     db.exec("ALTER TABLE recipes ADD COLUMN recipe_type TEXT DEFAULT 'plat'");
     console.log('✅ Migration: added recipe_type to recipes');
   }
+  if (!recipeCols.some(c => c.name === 'description')) {
+    db.exec("ALTER TABLE recipes ADD COLUMN description TEXT");
+    console.log('✅ Migration: added description to recipes');
+  }
+  if (!recipeCols.some(c => c.name === 'photo_url')) {
+    db.exec("ALTER TABLE recipes ADD COLUMN photo_url TEXT");
+    console.log('✅ Migration: added photo_url to recipes');
+  }
 } catch (e) {
-  console.error('Migration recipe_type error:', e.message);
+  console.error('Migration recipes columns error:', e.message);
 }
 
 // ─── Migration: Add sub_recipe_id to recipe_ingredients ───
