@@ -12,7 +12,8 @@ router.use(requireAuth);
 // GET /api/pms-audit — liste tous les audits
 router.get('/', (req, res) => {
   try {
-    const items = all('SELECT * FROM pms_audits ORDER BY audit_date DESC');
+    const rid = req.user.restaurant_id;
+    const items = all('SELECT * FROM pms_audits WHERE restaurant_id = ? ORDER BY audit_date DESC', [rid]);
     res.json({ items, total: items.length });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -22,14 +23,15 @@ router.get('/', (req, res) => {
 // GET /api/pms-audit/schedule — prochains audits planifiés
 router.get('/schedule', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const today = new Date().toISOString().slice(0, 10);
     const upcoming = all(
-      "SELECT * FROM pms_audits WHERE status = 'planifié' AND audit_date >= ? ORDER BY audit_date ASC LIMIT 10",
-      [today]
+      "SELECT * FROM pms_audits WHERE restaurant_id = ? AND status = 'planifié' AND audit_date >= ? ORDER BY audit_date ASC LIMIT 10",
+      [rid, today]
     );
     const overdue = all(
-      "SELECT * FROM pms_audits WHERE status = 'planifié' AND audit_date < ? ORDER BY audit_date ASC",
-      [today]
+      "SELECT * FROM pms_audits WHERE restaurant_id = ? AND status = 'planifié' AND audit_date < ? ORDER BY audit_date ASC",
+      [rid, today]
     );
     res.json({ upcoming, overdue, today });
   } catch (e) {
@@ -40,7 +42,8 @@ router.get('/schedule', (req, res) => {
 // GET /api/pms-audit/:id — détail d'un audit
 router.get('/:id', (req, res) => {
   try {
-    const item = get('SELECT * FROM pms_audits WHERE id = ?', [Number(req.params.id)]);
+    const rid = req.user.restaurant_id;
+    const item = get('SELECT * FROM pms_audits WHERE id = ? AND restaurant_id = ?', [Number(req.params.id), rid]);
     if (!item) return res.status(404).json({ error: 'Audit introuvable' });
     if (item.findings) {
       try { item.findings = JSON.parse(item.findings); } catch (_) {}
@@ -54,6 +57,7 @@ router.get('/:id', (req, res) => {
 // POST /api/pms-audit — créer un audit
 router.post('/', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const {
       audit_date, auditor_name, audit_type, scope,
       findings, overall_score, status, next_audit_date, notes,
@@ -77,9 +81,10 @@ router.post('/', (req, res) => {
     const findingsStr = findings ? JSON.stringify(findings) : null;
     const info = run(
       `INSERT INTO pms_audits
-        (audit_date, auditor_name, audit_type, scope, findings, overall_score, status, next_audit_date, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (restaurant_id, audit_date, auditor_name, audit_type, scope, findings, overall_score, status, next_audit_date, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        rid,
         audit_date, auditor_name,
         audit_type || 'interne',
         scope || 'complet',
@@ -90,7 +95,7 @@ router.post('/', (req, res) => {
         notes || null,
       ]
     );
-    const item = get('SELECT * FROM pms_audits WHERE id = ?', [info.lastInsertRowid]);
+    const item = get('SELECT * FROM pms_audits WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
     if (item && item.findings) {
       try { item.findings = JSON.parse(item.findings); } catch (_) {}
     }
@@ -103,8 +108,9 @@ router.post('/', (req, res) => {
 // PUT /api/pms-audit/:id — mettre à jour
 router.put('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const existing = get('SELECT * FROM pms_audits WHERE id = ?', [id]);
+    const existing = get('SELECT * FROM pms_audits WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Audit introuvable' });
 
     const {
@@ -118,7 +124,7 @@ router.put('/:id', (req, res) => {
       `UPDATE pms_audits SET
         audit_date=?, auditor_name=?, audit_type=?, scope=?,
         findings=?, overall_score=?, status=?, next_audit_date=?, notes=?
-       WHERE id=?`,
+       WHERE id=? AND restaurant_id=?`,
       [
         audit_date || existing.audit_date,
         auditor_name || existing.auditor_name,
@@ -130,9 +136,10 @@ router.put('/:id', (req, res) => {
         next_audit_date !== undefined ? next_audit_date : existing.next_audit_date,
         notes !== undefined ? notes : existing.notes,
         id,
+        rid,
       ]
     );
-    const item = get('SELECT * FROM pms_audits WHERE id = ?', [id]);
+    const item = get('SELECT * FROM pms_audits WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (item && item.findings) {
       try { item.findings = JSON.parse(item.findings); } catch (_) {}
     }
@@ -145,10 +152,11 @@ router.put('/:id', (req, res) => {
 // DELETE /api/pms-audit/:id — supprimer
 router.delete('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const existing = get('SELECT * FROM pms_audits WHERE id = ?', [id]);
+    const existing = get('SELECT * FROM pms_audits WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Audit introuvable' });
-    run('DELETE FROM pms_audits WHERE id = ?', [id]);
+    run('DELETE FROM pms_audits WHERE id = ? AND restaurant_id = ?', [id, rid]);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });

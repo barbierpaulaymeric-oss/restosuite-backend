@@ -12,7 +12,8 @@ router.use(requireAuth);
 // GET /api/training — list all
 router.get('/', (req, res) => {
   try {
-    const items = all('SELECT * FROM training_records ORDER BY training_date DESC');
+    const rid = req.user.restaurant_id;
+    const items = all('SELECT * FROM training_records WHERE restaurant_id = ? ORDER BY training_date DESC', [rid]);
     res.json({ items, total: items.length });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -22,12 +23,15 @@ router.get('/', (req, res) => {
 // GET /api/training/expiring — expiring within 30 days
 router.get('/expiring', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const items = all(
       `SELECT * FROM training_records
-       WHERE next_renewal_date IS NOT NULL
+       WHERE restaurant_id = ?
+         AND next_renewal_date IS NOT NULL
          AND next_renewal_date <= DATE('now', '+30 days')
          AND next_renewal_date >= DATE('now')
-       ORDER BY next_renewal_date ASC`
+       ORDER BY next_renewal_date ASC`,
+      [rid]
     );
     res.json({ items, total: items.length });
   } catch (e) {
@@ -38,6 +42,7 @@ router.get('/expiring', (req, res) => {
 // POST /api/training — create
 router.post('/', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { employee_name, training_topic, trainer, training_date, next_renewal_date, duration_hours, certificate_ref, status, notes } = req.body;
     if (!employee_name) return res.status(400).json({ error: 'employee_name est requis' });
     if (!training_topic) return res.status(400).json({ error: 'training_topic est requis' });
@@ -47,12 +52,12 @@ router.post('/', (req, res) => {
       return res.status(400).json({ error: 'Statut invalide' });
     }
     const info = run(
-      `INSERT INTO training_records (employee_name, training_topic, trainer, training_date, next_renewal_date, duration_hours, certificate_ref, status, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [employee_name, training_topic, trainer || null, training_date, next_renewal_date || null,
+      `INSERT INTO training_records (restaurant_id, employee_name, training_topic, trainer, training_date, next_renewal_date, duration_hours, certificate_ref, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [rid, employee_name, training_topic, trainer || null, training_date, next_renewal_date || null,
        duration_hours ? Number(duration_hours) : null, certificate_ref || null, status || 'planifié', notes || null]
     );
-    res.status(201).json(get('SELECT * FROM training_records WHERE id = ?', [info.lastInsertRowid]));
+    res.status(201).json(get('SELECT * FROM training_records WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]));
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -61,15 +66,16 @@ router.post('/', (req, res) => {
 // PUT /api/training/:id — update
 router.put('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const existing = get('SELECT * FROM training_records WHERE id = ?', [id]);
+    const existing = get('SELECT * FROM training_records WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Formation introuvable' });
     const { employee_name, training_topic, trainer, training_date, next_renewal_date, duration_hours, certificate_ref, status, notes } = req.body;
     run(
       `UPDATE training_records SET
         employee_name=?, training_topic=?, trainer=?, training_date=?, next_renewal_date=?,
         duration_hours=?, certificate_ref=?, status=?, notes=?
-       WHERE id=?`,
+       WHERE id=? AND restaurant_id=?`,
       [
         employee_name || existing.employee_name,
         training_topic || existing.training_topic,
@@ -81,9 +87,10 @@ router.put('/:id', (req, res) => {
         status || existing.status,
         notes !== undefined ? notes : existing.notes,
         id,
+        rid,
       ]
     );
-    res.json(get('SELECT * FROM training_records WHERE id = ?', [id]));
+    res.json(get('SELECT * FROM training_records WHERE id = ? AND restaurant_id = ?', [id, rid]));
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -92,10 +99,11 @@ router.put('/:id', (req, res) => {
 // DELETE /api/training/:id — delete
 router.delete('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const existing = get('SELECT * FROM training_records WHERE id = ?', [id]);
+    const existing = get('SELECT * FROM training_records WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Formation introuvable' });
-    run('DELETE FROM training_records WHERE id = ?', [id]);
+    run('DELETE FROM training_records WHERE id = ? AND restaurant_id = ?', [id, rid]);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });

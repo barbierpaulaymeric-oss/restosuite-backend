@@ -7,24 +7,24 @@ const router = Router();
 router.use(requireAuth);
 
 // Returns { hasPrice: bool, source: 'supplier'|'ingredient'|null }
-function getIngredientPriceSource(ingredientId) {
+function getIngredientPriceSource(ingredientId, rid) {
   const supplierPrice = get(`
-    SELECT price FROM supplier_prices WHERE ingredient_id = ? ORDER BY price ASC LIMIT 1
-  `, [ingredientId]);
+    SELECT price FROM supplier_prices WHERE ingredient_id = ? AND restaurant_id = ? ORDER BY price ASC LIMIT 1
+  `, [ingredientId, rid]);
   if (supplierPrice && supplierPrice.price > 0) return { hasPrice: true, source: 'supplier' };
 
-  const ingredient = get(`SELECT price_per_unit FROM ingredients WHERE id = ?`, [ingredientId]);
+  const ingredient = get(`SELECT price_per_unit FROM ingredients WHERE id = ? AND restaurant_id = ?`, [ingredientId, rid]);
   if (ingredient && ingredient.price_per_unit > 0) return { hasPrice: true, source: 'ingredient' };
 
   return { hasPrice: false, source: null };
 }
 
-function calcIngredientCost(ingredientId, grossQty, unit) {
+function calcIngredientCost(ingredientId, grossQty, unit, rid) {
   // 1. Try supplier_prices first (best price)
   const supplierPrice = get(`
     SELECT sp.price, sp.unit FROM supplier_prices sp
-    WHERE sp.ingredient_id = ? ORDER BY sp.price ASC LIMIT 1
-  `, [ingredientId]);
+    WHERE sp.ingredient_id = ? AND sp.restaurant_id = ? ORDER BY sp.price ASC LIMIT 1
+  `, [ingredientId, rid]);
 
   let p, pu;
 
@@ -34,8 +34,8 @@ function calcIngredientCost(ingredientId, grossQty, unit) {
   } else {
     // 2. Fallback: use ingredient's own price_per_unit
     const ingredient = get(`
-      SELECT price_per_unit, price_unit FROM ingredients WHERE id = ?
-    `, [ingredientId]);
+      SELECT price_per_unit, price_unit FROM ingredients WHERE id = ? AND restaurant_id = ?
+    `, [ingredientId, rid]);
     if (!ingredient || !ingredient.price_per_unit || ingredient.price_per_unit <= 0) return 0;
     p = ingredient.price_per_unit;
     pu = ingredient.price_unit || 'kg';
@@ -60,27 +60,27 @@ function calcIngredientCost(ingredientId, grossQty, unit) {
 }
 
 // Recursive cost calculation for a recipe (returns cost for `portions` portions)
-function calcRecipeCost(recipeId, visited = new Set()) {
+function calcRecipeCost(recipeId, rid, visited = new Set()) {
   if (visited.has(recipeId)) return 0; // prevent infinite loops
   visited.add(recipeId);
 
-  const recipe = get('SELECT * FROM recipes WHERE id = ?', [recipeId]);
+  const recipe = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [recipeId, rid]);
   if (!recipe) return 0;
 
-  const ingredients = all('SELECT * FROM recipe_ingredients WHERE recipe_id = ?', [recipeId]);
+  const ingredients = all('SELECT * FROM recipe_ingredients WHERE recipe_id = ? AND restaurant_id = ?', [recipeId, rid]);
   let totalCost = 0;
 
   for (const ing of ingredients) {
     if (ing.sub_recipe_id) {
       // Sub-recipe: quantity = portions used
-      const subRecipe = get('SELECT * FROM recipes WHERE id = ?', [ing.sub_recipe_id]);
+      const subRecipe = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [ing.sub_recipe_id, rid]);
       if (subRecipe) {
-        const subTotalCost = calcRecipeCost(ing.sub_recipe_id, new Set(visited));
+        const subTotalCost = calcRecipeCost(ing.sub_recipe_id, rid, new Set(visited));
         const costPerPortion = subRecipe.portions > 0 ? subTotalCost / subRecipe.portions : subTotalCost;
         totalCost += costPerPortion * ing.gross_quantity;
       }
     } else if (ing.ingredient_id) {
-      totalCost += calcIngredientCost(ing.ingredient_id, ing.gross_quantity, ing.unit);
+      totalCost += calcIngredientCost(ing.ingredient_id, ing.gross_quantity, ing.unit, rid);
     }
   }
 
@@ -88,23 +88,23 @@ function calcRecipeCost(recipeId, visited = new Set()) {
 }
 
 // Get flat list of all raw ingredients for a recipe (recursive)
-function getFlatIngredients(recipeId, multiplier = 1, visited = new Set()) {
+function getFlatIngredients(recipeId, rid, multiplier = 1, visited = new Set()) {
   if (visited.has(recipeId)) return [];
   visited.add(recipeId);
 
-  const recipe = get('SELECT * FROM recipes WHERE id = ?', [recipeId]);
+  const recipe = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [recipeId, rid]);
   if (!recipe) return [];
 
-  const ingredients = all('SELECT * FROM recipe_ingredients WHERE recipe_id = ?', [recipeId]);
+  const ingredients = all('SELECT * FROM recipe_ingredients WHERE recipe_id = ? AND restaurant_id = ?', [recipeId, rid]);
   const result = [];
 
   for (const ing of ingredients) {
     if (ing.sub_recipe_id) {
-      const subRecipe = get('SELECT * FROM recipes WHERE id = ?', [ing.sub_recipe_id]);
+      const subRecipe = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [ing.sub_recipe_id, rid]);
       if (subRecipe) {
         const portionsUsed = ing.gross_quantity * multiplier;
         const subMultiplier = subRecipe.portions > 0 ? portionsUsed / subRecipe.portions : portionsUsed;
-        const subIngredients = getFlatIngredients(ing.sub_recipe_id, subMultiplier, new Set(visited));
+        const subIngredients = getFlatIngredients(ing.sub_recipe_id, rid, subMultiplier, new Set(visited));
         result.push(...subIngredients);
       }
     } else if (ing.ingredient_id) {
@@ -130,28 +130,28 @@ function getFlatIngredients(recipeId, multiplier = 1, visited = new Set()) {
   return Object.values(merged);
 }
 
-function getFullRecipe(id, depth = 0, visited = new Set()) {
+function getFullRecipe(id, rid, depth = 0, visited = new Set()) {
   if (visited.has(id)) return null;
   visited.add(id);
 
-  const recipe = get('SELECT * FROM recipes WHERE id = ?', [id]);
+  const recipe = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (!recipe) return null;
 
   const rawIngredients = all(`
-    SELECT ri.*, 
+    SELECT ri.*,
            i.name as ingredient_name, i.category as ingredient_category,
            i.default_unit, i.waste_percent as default_waste_percent, i.allergens
     FROM recipe_ingredients ri
-    LEFT JOIN ingredients i ON i.id = ri.ingredient_id
-    WHERE ri.recipe_id = ?
-  `, [id]);
+    LEFT JOIN ingredients i ON i.id = ri.ingredient_id AND i.restaurant_id = ?
+    WHERE ri.recipe_id = ? AND ri.restaurant_id = ?
+  `, [rid, id, rid]);
 
   let totalCost = 0;
   let missingPriceCount = 0;
   const enrichedIngredients = rawIngredients.map(ing => {
     if (ing.sub_recipe_id) {
       // This is a sub-recipe ingredient
-      const subRecipe = depth < 10 ? getFullRecipe(ing.sub_recipe_id, depth + 1, new Set(visited)) : null;
+      const subRecipe = depth < 10 ? getFullRecipe(ing.sub_recipe_id, rid, depth + 1, new Set(visited)) : null;
       let cost = 0;
       if (subRecipe) {
         const costPerPortion = subRecipe.portions > 0 ? subRecipe.total_cost / subRecipe.portions : subRecipe.total_cost;
@@ -168,8 +168,8 @@ function getFullRecipe(id, depth = 0, visited = new Set()) {
         cost: Math.round(cost * 100) / 100
       };
     } else {
-      const priceSource = getIngredientPriceSource(ing.ingredient_id);
-      const cost = calcIngredientCost(ing.ingredient_id, ing.gross_quantity, ing.unit);
+      const priceSource = getIngredientPriceSource(ing.ingredient_id, rid);
+      const cost = calcIngredientCost(ing.ingredient_id, ing.gross_quantity, ing.unit, rid);
       totalCost += cost;
       if (!priceSource.hasPrice) missingPriceCount++;
       return {
@@ -182,7 +182,7 @@ function getFullRecipe(id, depth = 0, visited = new Set()) {
     }
   });
 
-  const steps = all('SELECT * FROM recipe_steps WHERE recipe_id = ? ORDER BY step_number', [id]);
+  const steps = all('SELECT * FROM recipe_steps WHERE recipe_id = ? AND restaurant_id = ? ORDER BY step_number', [id, rid]);
 
   totalCost = Math.round(totalCost * 100) / 100;
   const costPerPortion = recipe.portions > 0 ? Math.round((totalCost / recipe.portions) * 100) / 100 : totalCost;
@@ -202,23 +202,24 @@ function getFullRecipe(id, depth = 0, visited = new Set()) {
 }
 
 router.get('/', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { type, limit: limStr, offset: offsetStr } = req.query;
   const limit = Math.min(parseInt(limStr) || 50, 200);
   const offset = Math.max(parseInt(offsetStr) || 0, 0);
 
-  let sql = 'SELECT * FROM recipes';
-  const params = [];
+  let sql = 'SELECT * FROM recipes WHERE restaurant_id = ?';
+  const params = [rid];
   if (type) {
-    sql += ' WHERE recipe_type = ?';
+    sql += ' AND recipe_type = ?';
     params.push(type);
   }
   sql += ' ORDER BY updated_at DESC';
 
   // Get total count
-  let countSql = 'SELECT COUNT(*) as total FROM recipes';
-  const countParams = [];
+  let countSql = 'SELECT COUNT(*) as total FROM recipes WHERE restaurant_id = ?';
+  const countParams = [rid];
   if (type) {
-    countSql += ' WHERE recipe_type = ?';
+    countSql += ' AND recipe_type = ?';
     countParams.push(type);
   }
   const countResult = get(countSql, countParams);
@@ -230,7 +231,7 @@ router.get('/', (req, res) => {
 
   const recipes = all(sql, params);
   const enriched = recipes.map(r => {
-    const full = getFullRecipe(r.id);
+    const full = getFullRecipe(r.id, rid);
     return {
       id: r.id, name: r.name, category: r.category, portions: r.portions,
       selling_price: r.selling_price, total_cost: full.total_cost,
@@ -251,25 +252,26 @@ router.get('/', (req, res) => {
 // ═══════════════════════════════════════════
 router.get('/availability', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { convertUnit } = require('../utils/units');
 
     // Get all sellable recipes (plats with a selling price)
     const recipes = all(`
       SELECT id, name, category, selling_price, portions
       FROM recipes
-      WHERE selling_price > 0 AND recipe_type = 'plat'
+      WHERE selling_price > 0 AND recipe_type = 'plat' AND restaurant_id = ?
       ORDER BY category, name
-    `);
+    `, [rid]);
 
     // Get current stock
-    const stockData = all('SELECT ingredient_id, quantity, unit FROM stock');
+    const stockData = all('SELECT ingredient_id, quantity, unit FROM stock WHERE restaurant_id = ?', [rid]);
     const stockMap = {};
     for (const s of stockData) {
       stockMap[s.ingredient_id] = s;
     }
 
     const availability = recipes.map(recipe => {
-      const flatIngredients = getFlatIngredients(recipe.id, 1);
+      const flatIngredients = getFlatIngredients(recipe.id, rid, 1);
 
       if (flatIngredients.length === 0) {
         return {
@@ -290,7 +292,7 @@ router.get('/availability', (req, res) => {
         const stock = stockMap[fi.ingredient_id];
         if (!stock || stock.quantity <= 0) {
           minPortions = 0;
-          const ing = get('SELECT name FROM ingredients WHERE id = ?', [fi.ingredient_id]);
+          const ing = get('SELECT name FROM ingredients WHERE id = ? AND restaurant_id = ?', [fi.ingredient_id, rid]);
           limitingIngredient = ing ? ing.name : `#${fi.ingredient_id}`;
           break;
         }
@@ -302,7 +304,7 @@ router.get('/availability', (req, res) => {
         const possiblePortions = Math.floor(stock.quantity / neededInStockUnit);
         if (possiblePortions < minPortions) {
           minPortions = possiblePortions;
-          const ing = get('SELECT name FROM ingredients WHERE id = ?', [fi.ingredient_id]);
+          const ing = get('SELECT name FROM ingredients WHERE id = ? AND restaurant_id = ?', [fi.ingredient_id, rid]);
           limitingIngredient = ing ? ing.name : `#${fi.ingredient_id}`;
         }
       }
@@ -339,21 +341,23 @@ router.get('/availability', (req, res) => {
 });
 
 router.get('/:id', (req, res) => {
-  const recipe = getFullRecipe(Number(req.params.id));
+  const rid = req.user.restaurant_id;
+  const recipe = getFullRecipe(Number(req.params.id), rid);
   if (!recipe) return res.status(404).json({ error: 'not found' });
   res.json(recipe);
 });
 
 // Flat ingredients for stock deduction
 router.get('/:id/ingredients-flat', (req, res) => {
+  const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
-  const recipe = get('SELECT * FROM recipes WHERE id = ?', [id]);
+  const recipe = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (!recipe) return res.status(404).json({ error: 'not found' });
 
-  const flat = getFlatIngredients(id);
+  const flat = getFlatIngredients(id, rid);
   // Enrich with names
   const enriched = flat.map(item => {
-    const ing = get('SELECT name, default_unit FROM ingredients WHERE id = ?', [item.ingredient_id]);
+    const ing = get('SELECT name, default_unit FROM ingredients WHERE id = ? AND restaurant_id = ?', [item.ingredient_id, rid]);
     return {
       ...item,
       ingredient_name: ing ? ing.name : `#${item.ingredient_id}`,
@@ -365,6 +369,7 @@ router.get('/:id/ingredients-flat', (req, res) => {
 
 router.post('/', validate(recipeValidation), (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, ingredients, steps, recipe_type } = req.body;
 
     // Validate required fields
@@ -410,8 +415,8 @@ router.post('/', validate(recipeValidation), (req, res) => {
     }
 
     const info = run(
-      'INSERT INTO recipes (name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, recipe_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, category || null, portions || 1, prep_time_min || null, cooking_time_min || null, selling_price || null, notes || null, recipe_type || 'plat']
+      'INSERT INTO recipes (restaurant_id, name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, recipe_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [rid, name, category || null, portions || 1, prep_time_min || null, cooking_time_min || null, selling_price || null, notes || null, recipe_type || 'plat']
     );
     const recipeId = info.lastInsertRowid;
 
@@ -420,8 +425,8 @@ router.post('/', validate(recipeValidation), (req, res) => {
         if (ing.sub_recipe_id) {
           // Sub-recipe ingredient
           run(
-            'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, sub_recipe_id, gross_quantity, net_quantity, unit, notes) VALUES (?, NULL, ?, ?, ?, ?, ?)',
-            [recipeId, ing.sub_recipe_id, ing.gross_quantity || 1, ing.gross_quantity || 1, 'portion', ing.notes || null]
+            'INSERT INTO recipe_ingredients (restaurant_id, recipe_id, ingredient_id, sub_recipe_id, gross_quantity, net_quantity, unit, notes) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)',
+            [rid, recipeId, ing.sub_recipe_id, ing.gross_quantity || 1, ing.gross_quantity || 1, 'portion', ing.notes || null]
           );
           continue;
         }
@@ -429,13 +434,13 @@ router.post('/', validate(recipeValidation), (req, res) => {
         let ingredientId = ing.ingredient_id;
         const ingName = ing.name || ing.ingredient_name;
         if (!ingredientId && ingName) {
-          const existing = get('SELECT id FROM ingredients WHERE name = ?', [ingName.trim().toLowerCase()]);
+          const existing = get('SELECT id FROM ingredients WHERE name = ? AND restaurant_id = ?', [ingName.trim().toLowerCase(), rid]);
           if (existing) {
             ingredientId = existing.id;
           } else {
             const newIng = run(
-              'INSERT INTO ingredients (name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?)',
-              [ingName.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
+              'INSERT INTO ingredients (restaurant_id, name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [rid, ingName.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
             );
             ingredientId = newIng.lastInsertRowid;
           }
@@ -444,8 +449,8 @@ router.post('/', validate(recipeValidation), (req, res) => {
         const grossQty = ing.gross_quantity;
         const netQty = ing.net_quantity ?? (wastePercent != null ? grossQty * (1 - wastePercent / 100) : grossQty);
         run(
-          'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, gross_quantity, net_quantity, unit, custom_waste_percent, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [recipeId, ingredientId, grossQty, netQty, ing.unit || 'g', wastePercent, ing.notes || null]
+          'INSERT INTO recipe_ingredients (restaurant_id, recipe_id, ingredient_id, gross_quantity, net_quantity, unit, custom_waste_percent, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [rid, recipeId, ingredientId, grossQty, netQty, ing.unit || 'g', wastePercent, ing.notes || null]
         );
       }
     }
@@ -453,11 +458,11 @@ router.post('/', validate(recipeValidation), (req, res) => {
     if (steps && steps.length > 0) {
       steps.forEach((step, i) => {
         const instruction = typeof step === 'string' ? step : step.instruction;
-        run('INSERT INTO recipe_steps (recipe_id, step_number, instruction) VALUES (?, ?, ?)', [recipeId, i + 1, instruction]);
+        run('INSERT INTO recipe_steps (restaurant_id, recipe_id, step_number, instruction) VALUES (?, ?, ?, ?)', [rid, recipeId, i + 1, instruction]);
       });
     }
 
-    res.status(201).json(getFullRecipe(recipeId));
+    res.status(201).json(getFullRecipe(recipeId, rid));
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -465,8 +470,9 @@ router.post('/', validate(recipeValidation), (req, res) => {
 
 router.put('/:id', validate(recipeValidation), (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const existing = get('SELECT * FROM recipes WHERE id = ?', [id]);
+    const existing = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'not found' });
 
     const { name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, ingredients, steps, recipe_type } = req.body;
@@ -511,7 +517,7 @@ router.put('/:id', validate(recipeValidation), (req, res) => {
     }
 
     run(
-      'UPDATE recipes SET name = ?, category = ?, portions = ?, prep_time_min = ?, cooking_time_min = ?, selling_price = ?, notes = ?, recipe_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE recipes SET name = ?, category = ?, portions = ?, prep_time_min = ?, cooking_time_min = ?, selling_price = ?, notes = ?, recipe_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?',
       [
         name || existing.name,
         category !== undefined ? category : existing.category,
@@ -521,17 +527,18 @@ router.put('/:id', validate(recipeValidation), (req, res) => {
         selling_price !== undefined ? selling_price : existing.selling_price,
         notes !== undefined ? notes : existing.notes,
         recipe_type !== undefined ? recipe_type : (existing.recipe_type || 'plat'),
-        id
+        id,
+        rid
       ]
     );
 
     if (ingredients) {
-      run('DELETE FROM recipe_ingredients WHERE recipe_id = ?', [id]);
+      run('DELETE FROM recipe_ingredients WHERE recipe_id = ? AND restaurant_id = ?', [id, rid]);
       for (const ing of ingredients) {
         if (ing.sub_recipe_id) {
           run(
-            'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, sub_recipe_id, gross_quantity, net_quantity, unit, notes) VALUES (?, NULL, ?, ?, ?, ?, ?)',
-            [id, ing.sub_recipe_id, ing.gross_quantity || 1, ing.gross_quantity || 1, 'portion', ing.notes || null]
+            'INSERT INTO recipe_ingredients (restaurant_id, recipe_id, ingredient_id, sub_recipe_id, gross_quantity, net_quantity, unit, notes) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)',
+            [rid, id, ing.sub_recipe_id, ing.gross_quantity || 1, ing.gross_quantity || 1, 'portion', ing.notes || null]
           );
           continue;
         }
@@ -539,13 +546,13 @@ router.put('/:id', validate(recipeValidation), (req, res) => {
         let ingredientId = ing.ingredient_id;
         const ingName2 = ing.name || ing.ingredient_name;
         if (!ingredientId && ingName2) {
-          const ex = get('SELECT id FROM ingredients WHERE name = ?', [ingName2.trim().toLowerCase()]);
+          const ex = get('SELECT id FROM ingredients WHERE name = ? AND restaurant_id = ?', [ingName2.trim().toLowerCase(), rid]);
           if (ex) {
             ingredientId = ex.id;
           } else {
             const newIng = run(
-              'INSERT INTO ingredients (name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?)',
-              [ingName2.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
+              'INSERT INTO ingredients (restaurant_id, name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [rid, ingName2.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
             );
             ingredientId = newIng.lastInsertRowid;
           }
@@ -554,37 +561,42 @@ router.put('/:id', validate(recipeValidation), (req, res) => {
         const grossQty = ing.gross_quantity;
         const netQty = ing.net_quantity ?? (wastePercent != null ? grossQty * (1 - wastePercent / 100) : grossQty);
         run(
-          'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, gross_quantity, net_quantity, unit, custom_waste_percent, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [id, ingredientId, grossQty, netQty, ing.unit || 'g', wastePercent, ing.notes || null]
+          'INSERT INTO recipe_ingredients (restaurant_id, recipe_id, ingredient_id, gross_quantity, net_quantity, unit, custom_waste_percent, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [rid, id, ingredientId, grossQty, netQty, ing.unit || 'g', wastePercent, ing.notes || null]
         );
       }
     }
 
     if (steps) {
-      run('DELETE FROM recipe_steps WHERE recipe_id = ?', [id]);
+      run('DELETE FROM recipe_steps WHERE recipe_id = ? AND restaurant_id = ?', [id, rid]);
       steps.forEach((step, i) => {
         const instruction = typeof step === 'string' ? step : step.instruction;
-        run('INSERT INTO recipe_steps (recipe_id, step_number, instruction) VALUES (?, ?, ?)', [id, i + 1, instruction]);
+        run('INSERT INTO recipe_steps (restaurant_id, recipe_id, step_number, instruction) VALUES (?, ?, ?, ?)', [rid, id, i + 1, instruction]);
       });
     }
 
-    res.json(getFullRecipe(id));
+    res.json(getFullRecipe(id, rid));
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
 router.delete('/:id', (req, res) => {
+  const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
-  run('DELETE FROM recipe_ingredients WHERE recipe_id = ?', [id]);
-  run('DELETE FROM recipe_steps WHERE recipe_id = ?', [id]);
-  const info = run('DELETE FROM recipes WHERE id = ?', [id]);
+  // Verify recipe belongs to caller tenant before cascading deletes
+  const existing = get('SELECT id FROM recipes WHERE id = ? AND restaurant_id = ?', [id, rid]);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  run('DELETE FROM recipe_ingredients WHERE recipe_id = ? AND restaurant_id = ?', [id, rid]);
+  run('DELETE FROM recipe_steps WHERE recipe_id = ? AND restaurant_id = ?', [id, rid]);
+  const info = run('DELETE FROM recipes WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (info.changes === 0) return res.status(404).json({ error: 'not found' });
   res.json({ deleted: true });
 });
 
 router.get('/:id/pdf', (req, res) => {
-  const recipe = getFullRecipe(Number(req.params.id));
+  const rid = req.user.restaurant_id;
+  const recipe = getFullRecipe(Number(req.params.id), rid);
   if (!recipe) return res.status(404).json({ error: 'not found' });
   const { generatePDF } = require('./pdf-export');
   generatePDF(recipe, res);
@@ -593,8 +605,9 @@ router.get('/:id/pdf', (req, res) => {
 // GET /api/recipes/:id/allergens — Allergènes calculés automatiquement (INCO)
 router.get('/:id/allergens', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const recipeId = Number(req.params.id);
-    const recipe = get('SELECT * FROM recipes WHERE id = ?', [recipeId]);
+    const recipe = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [recipeId, rid]);
     if (!recipe) return res.status(404).json({ error: 'Recette non trouvée' });
 
     const allergens = getRecipeAllergens(recipeId);

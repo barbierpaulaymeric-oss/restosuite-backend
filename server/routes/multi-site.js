@@ -17,16 +17,18 @@ try { run(`ALTER TABLE restaurants ADD COLUMN is_active INTEGER DEFAULT 1`); } c
 try { run(`ALTER TABLE restaurants ADD COLUMN service_start TEXT DEFAULT '11:30'`); } catch {}
 try { run(`ALTER TABLE restaurants ADD COLUMN service_end TEXT DEFAULT '23:00'`); } catch {}
 
-// GET /api/sites — Liste tous les établissements
+// GET /api/sites — Liste tous les établissements (du tenant courant)
 router.get('/', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const sites = all(`
       SELECT r.*,
         (SELECT COUNT(*) FROM tables t WHERE t.restaurant_id = r.id) as table_count,
         (SELECT COUNT(*) FROM accounts a WHERE a.restaurant_id = r.id) as staff_count
       FROM restaurants r
+      WHERE r.id = ?
       ORDER BY r.id
-    `);
+    `, [rid]);
     res.json(sites);
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -36,7 +38,9 @@ router.get('/', (req, res) => {
 // GET /api/sites/:id — Détail d'un site
 router.get('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
+    if (id !== rid) return res.status(404).json({ error: 'Site non trouvé' });
     const site = get(`
       SELECT r.*,
         (SELECT COUNT(*) FROM tables t WHERE t.restaurant_id = r.id) as table_count,
@@ -78,7 +82,9 @@ router.post('/', (req, res) => {
 // PUT /api/sites/:id — Modifier un site
 router.put('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
+    if (id !== rid) return res.status(404).json({ error: 'Site non trouvé' });
     const { name, type, address, city, postal_code, phone, covers, siret, is_active, service_start, service_end } = req.body;
 
     run(`UPDATE restaurants SET
@@ -106,7 +112,9 @@ router.put('/:id', (req, res) => {
 // DELETE /api/sites/:id — Supprimer un site
 router.delete('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
+    if (id !== rid) return res.status(404).json({ error: 'Site non trouvé' });
     const site = get('SELECT * FROM restaurants WHERE id = ?', [id]);
     if (!site) return res.status(404).json({ error: 'Site non trouvé' });
 
@@ -133,10 +141,11 @@ router.delete('/:id', (req, res) => {
   }
 });
 
-// GET /api/sites/compare — Comparaison multi-sites
+// GET /api/sites/compare — Comparaison multi-sites (restreint au tenant courant)
 router.get('/compare/all', (req, res) => {
   try {
-    const sites = all('SELECT id, name FROM restaurants WHERE is_active = 1 OR is_active IS NULL');
+    const rid = req.user.restaurant_id;
+    const sites = all('SELECT id, name FROM restaurants WHERE id = ? AND (is_active = 1 OR is_active IS NULL)', [rid]);
     const days = Number(req.query.days) || 30;
     const dateFrom = new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
 

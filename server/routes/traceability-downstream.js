@@ -16,11 +16,12 @@ const VALID_DESTINATION_TYPES = ['salle', 'livraison', 'traiteur', 'autre'];
 // GET /api/traceability/downstream/search?batch=X
 router.get('/downstream/search', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { batch } = req.query;
     if (!batch) return res.status(400).json({ error: 'batch est requis' });
     const items = all(
-      `SELECT * FROM downstream_traceability WHERE batch_number LIKE ? ORDER BY dispatch_date DESC, id DESC`,
-      [`%${batch}%`]
+      `SELECT * FROM downstream_traceability WHERE batch_number LIKE ? AND restaurant_id = ? ORDER BY dispatch_date DESC, id DESC`,
+      [`%${batch}%`, rid]
     );
     res.json({ items, total: items.length });
   } catch (e) {
@@ -33,9 +34,10 @@ router.get('/downstream/search', (req, res) => {
 // GET /api/traceability/downstream — list all, newest first; supports ?batch=, ?product=, ?date=
 router.get('/downstream', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { batch, product, date } = req.query;
-    let sql = 'SELECT * FROM downstream_traceability WHERE 1=1';
-    const params = [];
+    let sql = 'SELECT * FROM downstream_traceability WHERE restaurant_id = ?';
+    const params = [rid];
     if (batch) {
       sql += ' AND batch_number LIKE ?';
       params.push(`%${batch}%`);
@@ -59,6 +61,7 @@ router.get('/downstream', (req, res) => {
 // POST /api/traceability/downstream — create entry
 router.post('/downstream', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const {
       product_name, batch_number, production_date,
       destination_type, destination_name,
@@ -75,10 +78,11 @@ router.post('/downstream', (req, res) => {
 
     const info = run(
       `INSERT INTO downstream_traceability
-        (product_name, batch_number, production_date, destination_type, destination_name,
+        (restaurant_id, product_name, batch_number, production_date, destination_type, destination_name,
          quantity, unit, dispatch_date, dispatch_time, temperature_at_dispatch, responsible_person, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        rid,
         product_name.trim(),
         batch_number || null,
         production_date || null,
@@ -93,7 +97,7 @@ router.post('/downstream', (req, res) => {
         notes || null,
       ]
     );
-    const item = get('SELECT * FROM downstream_traceability WHERE id = ?', [info.lastInsertRowid]);
+    const item = get('SELECT * FROM downstream_traceability WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
     res.status(201).json(item);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -105,8 +109,9 @@ router.post('/downstream', (req, res) => {
 // PUT /api/traceability/downstream/:id — update entry
 router.put('/downstream/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { id } = req.params;
-    const existing = get('SELECT * FROM downstream_traceability WHERE id = ?', [id]);
+    const existing = get('SELECT * FROM downstream_traceability WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Entrée introuvable' });
 
     const {
@@ -137,7 +142,7 @@ router.put('/downstream/:id', (req, res) => {
         temperature_at_dispatch = ?,
         responsible_person = ?,
         notes = ?
-       WHERE id = ?`,
+       WHERE id = ? AND restaurant_id = ?`,
       [
         product_name !== undefined ? product_name.trim() : existing.product_name,
         batch_number !== undefined ? (batch_number || null) : existing.batch_number,
@@ -154,9 +159,11 @@ router.put('/downstream/:id', (req, res) => {
         responsible_person !== undefined ? (responsible_person || null) : existing.responsible_person,
         notes !== undefined ? (notes || null) : existing.notes,
         id,
+        rid,
       ]
     );
-    const updated = get('SELECT * FROM downstream_traceability WHERE id = ?', [id]);
+    // Note: UPDATE WHERE id only is safe because existence was checked with restaurant_id above.
+    const updated = get('SELECT * FROM downstream_traceability WHERE id = ? AND restaurant_id = ?', [id, rid]);
     res.json(updated);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -166,10 +173,11 @@ router.put('/downstream/:id', (req, res) => {
 // DELETE /api/traceability/downstream/:id — delete entry
 router.delete('/downstream/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { id } = req.params;
-    const existing = get('SELECT id FROM downstream_traceability WHERE id = ?', [id]);
+    const existing = get('SELECT id FROM downstream_traceability WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Entrée introuvable' });
-    run('DELETE FROM downstream_traceability WHERE id = ?', [id]);
+    run('DELETE FROM downstream_traceability WHERE id = ? AND restaurant_id = ?', [id, rid]);
     res.status(204).end();
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });

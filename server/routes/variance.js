@@ -14,6 +14,7 @@ router.use(requireAuth);
 // GET /api/variance/analysis — Analyse complète de variance sur une période
 router.get('/analysis', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { from, to } = req.query;
 
     // Default: last 7 days
@@ -25,10 +26,10 @@ router.get('/analysis', (req, res) => {
       SELECT sm.ingredient_id, sm.movement_type, sm.quantity, sm.unit, sm.unit_price,
              i.name as ingredient_name, i.default_unit, i.price_per_unit, i.price_unit
       FROM stock_movements sm
-      LEFT JOIN ingredients i ON i.id = sm.ingredient_id
-      WHERE date(sm.recorded_at) BETWEEN ? AND ?
+      LEFT JOIN ingredients i ON i.id = sm.ingredient_id AND i.restaurant_id = ?
+      WHERE sm.restaurant_id = ? AND date(sm.recorded_at) BETWEEN ? AND ?
       ORDER BY sm.ingredient_id
-    `, [dateFrom, dateTo]);
+    `, [rid, rid, dateFrom, dateTo]);
 
     // 2. Get all orders served in the period
     // Orders that were sent to kitchen (stock was deducted at 'envoyé' status)
@@ -38,11 +39,12 @@ router.get('/analysis', (req, res) => {
       ordersServed = all(`
         SELECT oi.recipe_id, SUM(oi.quantity) as qty_served
         FROM order_items oi
-        JOIN orders o ON o.id = oi.order_id
-        WHERE o.status IN ('envoyé', 'prêt', 'servi', 'terminé')
+        JOIN orders o ON o.id = oi.order_id AND o.restaurant_id = ?
+        WHERE oi.restaurant_id = ?
+          AND o.status IN ('envoyé', 'prêt', 'servi', 'terminé')
           AND date(o.created_at) BETWEEN ? AND ?
         GROUP BY oi.recipe_id
-      `, [dateFrom, dateTo]);
+      `, [rid, rid, dateFrom, dateTo]);
     } catch {
       ordersServed = [];
     }
@@ -51,7 +53,7 @@ router.get('/analysis', (req, res) => {
     const theoreticalConsumption = {};
 
     for (const order of ordersServed) {
-      const recipeIngredients = getRecipeFlatIngredients(order.recipe_id);
+      const recipeIngredients = getRecipeFlatIngredients(order.recipe_id, rid);
       for (const ri of recipeIngredients) {
         const key = ri.ingredient_id;
         if (!theoreticalConsumption[key]) {
@@ -101,7 +103,7 @@ router.get('/analysis', (req, res) => {
     }
 
     // 5. Get current stock for each ingredient
-    const stockData = all('SELECT ingredient_id, quantity, unit FROM stock');
+    const stockData = all('SELECT ingredient_id, quantity, unit FROM stock WHERE restaurant_id = ?', [rid]);
     const currentStock = {};
     for (const s of stockData) {
       currentStock[s.ingredient_id] = s;
@@ -119,8 +121,8 @@ router.get('/analysis', (req, res) => {
     if (ingredientIdList.length > 0) {
       const placeholders = ingredientIdList.map(() => '?').join(',');
       const ingredientRows = all(
-        `SELECT id, name, default_unit, price_per_unit, price_unit FROM ingredients WHERE id IN (${placeholders})`,
-        ingredientIdList
+        `SELECT id, name, default_unit, price_per_unit, price_unit FROM ingredients WHERE restaurant_id = ? AND id IN (${placeholders})`,
+        [rid, ...ingredientIdList]
       );
       for (const row of ingredientRows) ingredientMap[row.id] = row;
     }
@@ -189,6 +191,7 @@ router.get('/analysis', (req, res) => {
 // GET /api/variance/summary — Résumé rapide pour le dashboard
 router.get('/summary', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     // Last 30 days
     const dateFrom = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
 
@@ -197,16 +200,16 @@ router.get('/summary', (req, res) => {
       SELECT COALESCE(SUM(ABS(sm.quantity) * COALESCE(i.price_per_unit, 0)), 0) as total_loss_value,
              COUNT(DISTINCT sm.ingredient_id) as ingredients_with_losses
       FROM stock_movements sm
-      LEFT JOIN ingredients i ON i.id = sm.ingredient_id
-      WHERE sm.movement_type = 'perte' AND date(sm.recorded_at) >= ?
-    `, [dateFrom]);
+      LEFT JOIN ingredients i ON i.id = sm.ingredient_id AND i.restaurant_id = ?
+      WHERE sm.restaurant_id = ? AND sm.movement_type = 'perte' AND date(sm.recorded_at) >= ?
+    `, [rid, rid, dateFrom]);
 
     // Total entrées (achats)
     const purchases = get(`
       SELECT COALESCE(SUM(sm.quantity * COALESCE(sm.unit_price, 0)), 0) as total_purchase_value
       FROM stock_movements sm
-      WHERE sm.movement_type IN ('entree', 'reception') AND date(sm.recorded_at) >= ?
-    `, [dateFrom]);
+      WHERE sm.restaurant_id = ? AND sm.movement_type IN ('entree', 'reception') AND date(sm.recorded_at) >= ?
+    `, [rid, dateFrom]);
 
     // Ratio pertes / achats
     const lossRatio = purchases.total_purchase_value > 0
@@ -215,8 +218,8 @@ router.get('/summary', (req, res) => {
 
     // Alertes stock bas
     const lowStockCount = get(`
-      SELECT COUNT(*) as c FROM stock WHERE quantity <= min_quantity AND min_quantity > 0
-    `).c;
+      SELECT COUNT(*) as c FROM stock WHERE restaurant_id = ? AND quantity <= min_quantity AND min_quantity > 0
+    `, [rid]).c;
 
     res.json({
       period_days: 30,
@@ -232,27 +235,33 @@ router.get('/summary', (req, res) => {
   }
 });
 
-// ─── Helper: Get flat ingredient list for a recipe ───
-function getRecipeFlatIngredients(recipeId, multiplier = 1, visited = new Set()) {
+// ─── Helper: Get flat ingredient list for a recipe (tenant-scoped) ───
+function getRecipeFlatIngredients(recipeId, rid, multiplier = 1, visited = new Set()) {
   if (visited.has(recipeId)) return [];
   visited.add(recipeId);
 
-  const recipe = get('SELECT * FROM recipes WHERE id = ?', [recipeId]);
+  const recipe = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [recipeId, rid]);
   if (!recipe) return [];
 
-  const ingredients = all('SELECT * FROM recipe_ingredients WHERE recipe_id = ?', [recipeId]);
+  const ingredients = all(
+    'SELECT * FROM recipe_ingredients WHERE recipe_id = ? AND restaurant_id = ?',
+    [recipeId, rid]
+  );
   const result = [];
 
   for (const ing of ingredients) {
     if (ing.sub_recipe_id) {
-      const subRecipe = get('SELECT * FROM recipes WHERE id = ?', [ing.sub_recipe_id]);
+      const subRecipe = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [ing.sub_recipe_id, rid]);
       if (subRecipe) {
         const portionsUsed = ing.gross_quantity * multiplier;
         const subMult = subRecipe.portions > 0 ? portionsUsed / subRecipe.portions : portionsUsed;
-        result.push(...getRecipeFlatIngredients(ing.sub_recipe_id, subMult, new Set(visited)));
+        result.push(...getRecipeFlatIngredients(ing.sub_recipe_id, rid, subMult, new Set(visited)));
       }
     } else if (ing.ingredient_id) {
-      const ingredient = get('SELECT name, default_unit FROM ingredients WHERE id = ?', [ing.ingredient_id]);
+      const ingredient = get(
+        'SELECT name, default_unit FROM ingredients WHERE id = ? AND restaurant_id = ?',
+        [ing.ingredient_id, rid]
+      );
       result.push({
         ingredient_id: ing.ingredient_id,
         ingredient_name: ingredient ? ingredient.name : `#${ing.ingredient_id}`,
@@ -268,6 +277,7 @@ function getRecipeFlatIngredients(recipeId, multiplier = 1, visited = new Set())
 // GET /api/variance/top-losses — Top pertes pour le dashboard
 router.get('/top-losses', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const days = Number(req.query.days) || 30;
     const dateFrom = new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
 
@@ -278,12 +288,12 @@ router.get('/top-losses', (req, res) => {
              SUM(ABS(sm.quantity) * COALESCE(i.price_per_unit, 0)) as total_loss_value,
              COUNT(*) as loss_events
       FROM stock_movements sm
-      LEFT JOIN ingredients i ON i.id = sm.ingredient_id
-      WHERE sm.movement_type = 'perte' AND date(sm.recorded_at) >= ?
+      LEFT JOIN ingredients i ON i.id = sm.ingredient_id AND i.restaurant_id = ?
+      WHERE sm.restaurant_id = ? AND sm.movement_type = 'perte' AND date(sm.recorded_at) >= ?
       GROUP BY sm.ingredient_id
       ORDER BY total_loss_value DESC
       LIMIT 10
-    `, [dateFrom]);
+    `, [rid, rid, dateFrom]);
 
     res.json({
       period_days: days,
@@ -301,6 +311,7 @@ router.get('/top-losses', (req, res) => {
 // GET /api/variance/trends — Évolution des pertes dans le temps
 router.get('/trends', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const days = Number(req.query.days) || 90;
     const dateFrom = new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
 
@@ -310,20 +321,20 @@ router.get('/trends', (req, res) => {
              COUNT(DISTINCT sm.ingredient_id) as ingredients_impacted,
              COUNT(*) as events
       FROM stock_movements sm
-      LEFT JOIN ingredients i ON i.id = sm.ingredient_id
-      WHERE sm.movement_type = 'perte' AND date(sm.recorded_at) >= ?
+      LEFT JOIN ingredients i ON i.id = sm.ingredient_id AND i.restaurant_id = ?
+      WHERE sm.restaurant_id = ? AND sm.movement_type = 'perte' AND date(sm.recorded_at) >= ?
       GROUP BY week
       ORDER BY week
-    `, [dateFrom]);
+    `, [rid, rid, dateFrom]);
 
     const weeklyPurchases = all(`
       SELECT strftime('%Y-W%W', sm.recorded_at) as week,
              SUM(sm.quantity * COALESCE(sm.unit_price, 0)) as purchase_value
       FROM stock_movements sm
-      WHERE sm.movement_type IN ('entree', 'reception') AND date(sm.recorded_at) >= ?
+      WHERE sm.restaurant_id = ? AND sm.movement_type IN ('entree', 'reception') AND date(sm.recorded_at) >= ?
       GROUP BY week
       ORDER BY week
-    `, [dateFrom]);
+    `, [rid, dateFrom]);
 
     // Merge data
     const purchaseMap = {};

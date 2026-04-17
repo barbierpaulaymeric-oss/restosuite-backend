@@ -15,39 +15,42 @@ router.use(requireAuth);
 // GET /api/pms/export?period=1m|3m|6m|1y
 router.get('/export', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { period = '1m' } = req.query;
 
     const periodDays = { '1m': 30, '3m': 90, '6m': 180, '1y': 365 }[period] || 30;
     const periodSince = new Date(Date.now() - periodDays * 24 * 3600 * 1000).toISOString();
 
     // ── 1. Informations générales ──
-    const restaurant = get('SELECT * FROM restaurants ORDER BY id ASC LIMIT 1') || {};
-    const gerant = get("SELECT * FROM accounts WHERE role = 'gerant' AND is_owner = 1 LIMIT 1")
-                || get("SELECT * FROM accounts WHERE role = 'gerant' LIMIT 1")
+    const restaurant = get('SELECT * FROM restaurants WHERE id = ?', [rid]) || {};
+    const gerant = get("SELECT * FROM accounts WHERE role = 'gerant' AND is_owner = 1 AND restaurant_id = ? LIMIT 1", [rid])
+                || get("SELECT * FROM accounts WHERE role = 'gerant' AND restaurant_id = ? LIMIT 1", [rid])
                 || {};
-    const sanitarySettings = get('SELECT * FROM sanitary_settings ORDER BY id ASC LIMIT 1') || {};
+    const sanitarySettings = get('SELECT * FROM sanitary_settings WHERE restaurant_id = ? ORDER BY id ASC LIMIT 1', [rid]) || {};
 
     // ── 2. Analyse des dangers ──
-    const hazards = all('SELECT * FROM haccp_hazard_analysis ORDER BY step_name ASC, id ASC');
+    const hazards = all('SELECT * FROM haccp_hazard_analysis WHERE restaurant_id = ? ORDER BY step_name ASC, id ASC', [rid]);
 
     // ── 3. Points Critiques de Contrôle (CCP) ──
     const ccps = all(`
       SELECT c.*, h.step_name, h.hazard_description, h.hazard_type
       FROM haccp_ccp c
       JOIN haccp_hazard_analysis h ON h.id = c.hazard_analysis_id
+      WHERE c.restaurant_id = ? AND h.restaurant_id = ?
       ORDER BY c.ccp_number ASC
-    `);
+    `, [rid, rid]);
 
     // ── 4. Arbre de décision ──
     const decisionTree = all(`
       SELECT d.*, h.step_name, h.hazard_description, h.hazard_type, h.severity, h.probability
       FROM haccp_decision_tree_results d
       JOIN haccp_hazard_analysis h ON h.id = d.hazard_analysis_id
+      WHERE d.restaurant_id = ? AND h.restaurant_id = ?
       ORDER BY h.step_name ASC, d.id ASC
-    `);
+    `, [rid, rid]);
 
     // ── 5. Plan de nettoyage ──
-    const cleaningTasks = all('SELECT * FROM cleaning_tasks ORDER BY zone ASC, name ASC');
+    const cleaningTasks = all('SELECT * FROM cleaning_tasks WHERE restaurant_id = ? ORDER BY zone ASC, name ASC', [rid]);
     const cleaningStats = {
       total: cleaningTasks.length,
       daily:   cleaningTasks.filter(t => t.frequency === 'daily').length,
@@ -59,40 +62,40 @@ router.get('/export', (req, res) => {
       FROM cleaning_logs l
       JOIN cleaning_tasks t ON t.id = l.task_id
       LEFT JOIN accounts a ON a.id = l.completed_by
-      WHERE l.completed_at >= ?
+      WHERE l.completed_at >= ? AND l.restaurant_id = ? AND t.restaurant_id = ?
       ORDER BY l.completed_at DESC
       LIMIT 100
-    `, [periodSince]);
+    `, [periodSince, rid, rid]);
 
     // ── 6. Relevés de température ──
-    const temperatureZones = all('SELECT * FROM temperature_zones ORDER BY name ASC');
+    const temperatureZones = all('SELECT * FROM temperature_zones WHERE restaurant_id = ? ORDER BY name ASC', [rid]);
     const temperatureLogs = all(`
       SELECT l.*, z.name as zone_name, z.type as zone_type, z.min_temp, z.max_temp, a.name as recorded_by_name
       FROM temperature_logs l
       JOIN temperature_zones z ON z.id = l.zone_id
       LEFT JOIN accounts a ON a.id = l.recorded_by
-      WHERE l.recorded_at >= ?
+      WHERE l.recorded_at >= ? AND l.restaurant_id = ? AND z.restaurant_id = ?
       ORDER BY l.recorded_at DESC
       LIMIT 500
-    `, [periodSince]);
+    `, [periodSince, rid, rid]);
     const tempAlerts = temperatureLogs.filter(t => t.is_alert);
     const coolingLogs = all(`
-      SELECT * FROM cooling_logs WHERE created_at >= ? ORDER BY created_at DESC LIMIT 100
-    `, [periodSince]);
+      SELECT * FROM cooling_logs WHERE created_at >= ? AND restaurant_id = ? ORDER BY created_at DESC LIMIT 100
+    `, [periodSince, rid]);
     const reheatingLogs = all(`
-      SELECT * FROM reheating_logs WHERE created_at >= ? ORDER BY created_at DESC LIMIT 100
-    `, [periodSince]);
+      SELECT * FROM reheating_logs WHERE created_at >= ? AND restaurant_id = ? ORDER BY created_at DESC LIMIT 100
+    `, [periodSince, rid]);
 
     // ── 7. Traçabilité ──
     const receptionRecords = all(`
-      SELECT * FROM traceability_logs WHERE received_at >= ? ORDER BY received_at DESC LIMIT 200
-    `, [periodSince]);
+      SELECT * FROM traceability_logs WHERE received_at >= ? AND restaurant_id = ? ORDER BY received_at DESC LIMIT 200
+    `, [periodSince, rid]);
     const downstreamRecords = all(`
-      SELECT * FROM downstream_traceability WHERE dispatch_date >= ? ORDER BY dispatch_date DESC LIMIT 200
-    `, [periodSince.slice(0, 10)]);
+      SELECT * FROM downstream_traceability WHERE dispatch_date >= ? AND restaurant_id = ? ORDER BY dispatch_date DESC LIMIT 200
+    `, [periodSince.slice(0, 10), rid]);
 
     // ── 8. Formation du personnel ──
-    const trainingRecords = all('SELECT * FROM training_records ORDER BY training_date DESC');
+    const trainingRecords = all('SELECT * FROM training_records WHERE restaurant_id = ? ORDER BY training_date DESC', [rid]);
     const trainingStats = {
       total:    trainingRecords.length,
       realise:  trainingRecords.filter(t => t.status === 'réalisé').length,
@@ -101,11 +104,11 @@ router.get('/export', (req, res) => {
     };
 
     // ── 9. Lutte contre les nuisibles ──
-    const pestControl = all('SELECT * FROM pest_control ORDER BY visit_date DESC');
+    const pestControl = all('SELECT * FROM pest_control WHERE restaurant_id = ? ORDER BY visit_date DESC', [rid]);
     const lastPestVisit = pestControl[0] || null;
 
     // ── 10. Maintenance des équipements ──
-    const maintenance = all('SELECT * FROM equipment_maintenance ORDER BY next_maintenance_date ASC');
+    const maintenance = all('SELECT * FROM equipment_maintenance WHERE restaurant_id = ? ORDER BY next_maintenance_date ASC', [rid]);
     const maintenanceStats = {
       total:     maintenance.length,
       a_jour:    maintenance.filter(m => m.status === 'à_jour').length,
@@ -114,10 +117,10 @@ router.get('/export', (req, res) => {
     };
 
     // ── 11. Gestion des déchets ──
-    const wasteManagement = all('SELECT * FROM waste_management ORDER BY waste_type ASC');
+    const wasteManagement = all('SELECT * FROM waste_management WHERE restaurant_id = ? ORDER BY waste_type ASC', [rid]);
 
     // ── 12. Procédures retrait/rappel ──
-    const recallProcedures = all('SELECT * FROM recall_procedures ORDER BY alert_date DESC');
+    const recallProcedures = all('SELECT * FROM recall_procedures WHERE restaurant_id = ? ORDER BY alert_date DESC', [rid]);
     const recallStats = {
       total:   recallProcedures.length,
       actifs:  recallProcedures.filter(r => r.status !== 'cloture' && r.status !== 'cloturé').length,
@@ -127,45 +130,45 @@ router.get('/export', (req, res) => {
     // ── 13. Actions correctives ──
     const correctiveActions = all(`
       SELECT * FROM corrective_actions_log
-      WHERE created_at >= ?
+      WHERE created_at >= ? AND restaurant_id = ?
       ORDER BY created_at DESC
       LIMIT 200
-    `, [periodSince]);
-    const correctiveTemplates = all('SELECT * FROM corrective_actions_templates WHERE is_active = 1 ORDER BY category ASC');
+    `, [periodSince, rid]);
+    const correctiveTemplates = all('SELECT * FROM corrective_actions_templates WHERE is_active = 1 AND restaurant_id = ? ORDER BY category ASC', [rid]);
 
     // ── 14. Fournisseurs ──
-    const suppliers = all('SELECT * FROM suppliers ORDER BY name ASC');
+    const suppliers = all('SELECT * FROM suppliers WHERE restaurant_id = ? ORDER BY name ASC', [rid]);
 
     // ── 15. Allergènes INCO ──
-    const allergenPlan = all('SELECT * FROM allergen_management_plan ORDER BY risk_level ASC, allergen_name ASC');
+    const allergenPlan = all('SELECT * FROM allergen_management_plan WHERE restaurant_id = ? ORDER BY risk_level ASC, allergen_name ASC', [rid]);
 
     // ── 16. Gestion de l'eau ──
-    const waterManagement = all('SELECT * FROM water_management ORDER BY analysis_date DESC');
+    const waterManagement = all('SELECT * FROM water_management WHERE restaurant_id = ? ORDER BY analysis_date DESC', [rid]);
 
     // ── 17. Audits PMS ──
-    const pmsAudits = all('SELECT * FROM pms_audits ORDER BY audit_date DESC');
+    const pmsAudits = all('SELECT * FROM pms_audits WHERE restaurant_id = ? ORDER BY audit_date DESC', [rid]);
 
     // ── 18. Friteuses ──
-    const fryers = all('SELECT * FROM fryers WHERE is_active = 1');
+    const fryers = all('SELECT * FROM fryers WHERE is_active = 1 AND restaurant_id = ?', [rid]);
     const fryerChecks = all(`
       SELECT fc.*, f.name as fryer_name
       FROM fryer_checks fc
       JOIN fryers f ON f.id = fc.fryer_id
-      WHERE fc.action_date >= ?
+      WHERE fc.action_date >= ? AND fc.restaurant_id = ? AND f.restaurant_id = ?
       ORDER BY fc.action_date DESC
       LIMIT 100
-    `, [periodSince]);
+    `, [periodSince, rid, rid]);
 
     // ── 19. Non-conformités ──
     const nonConformities = all(`
-      SELECT * FROM non_conformities WHERE created_at >= ? ORDER BY detected_at DESC LIMIT 100
-    `, [periodSince]);
+      SELECT * FROM non_conformities WHERE created_at >= ? AND restaurant_id = ? ORDER BY detected_at DESC LIMIT 100
+    `, [periodSince, rid]);
 
     // ── 20. Procédures TIAC ──
-    const tiacProcedures = all('SELECT * FROM tiac_procedures ORDER BY date_incident DESC');
+    const tiacProcedures = all('SELECT * FROM tiac_procedures WHERE restaurant_id = ? ORDER BY date_incident DESC', [rid]);
 
     // ── 21. Diagrammes de fabrication ──
-    const fabricationDiagrams = all('SELECT * FROM fabrication_diagrams ORDER BY nom ASC').map(d => ({
+    const fabricationDiagrams = all('SELECT * FROM fabrication_diagrams WHERE restaurant_id = ? ORDER BY nom ASC', [rid]).map(d => ({
       ...d,
       etapes: JSON.parse(d.etapes || '[]'),
     }));
@@ -282,32 +285,33 @@ function pmsStat(doc, label, value, y) {
 // GET /api/pms/export/pdf?period=1m|3m|6m|1y
 router.get('/export/pdf', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { period = '1m' } = req.query;
     const periodDays = { '1m': 30, '3m': 90, '6m': 180, '1y': 365 }[period] || 30;
     const periodSince = new Date(Date.now() - periodDays * 24 * 3600 * 1000).toISOString();
     const periodLabel = { '1m': '1 mois', '3m': '3 mois', '6m': '6 mois', '1y': '1 an' }[period] || '1 mois';
 
     // ── Données ──
-    const restaurant = get('SELECT * FROM restaurants ORDER BY id ASC LIMIT 1') || {};
-    const gerant = get("SELECT * FROM accounts WHERE role = 'gerant' AND is_owner = 1 LIMIT 1")
-                || get("SELECT * FROM accounts WHERE role = 'gerant' LIMIT 1") || {};
-    const sanitary = get('SELECT * FROM sanitary_settings ORDER BY id ASC LIMIT 1') || {};
-    const hazards = all('SELECT * FROM haccp_hazard_analysis ORDER BY step_name ASC');
-    const ccps = all('SELECT c.*, h.step_name FROM haccp_ccp c JOIN haccp_hazard_analysis h ON h.id = c.hazard_analysis_id ORDER BY c.ccp_number ASC');
-    const cleaningTasks = all('SELECT * FROM cleaning_tasks ORDER BY zone ASC, name ASC');
-    const cleaningLogs = all(`SELECT l.*, t.name as task_name FROM cleaning_logs l JOIN cleaning_tasks t ON t.id = l.task_id WHERE l.completed_at >= ? ORDER BY l.completed_at DESC LIMIT 200`, [periodSince]);
-    const tempLogs = all(`SELECT tl.*, tz.name as zone_name FROM temperature_logs tl JOIN temperature_zones tz ON tz.id = tl.zone_id WHERE tl.recorded_at >= ? ORDER BY tl.recorded_at DESC LIMIT 300`, [periodSince]);
+    const restaurant = get('SELECT * FROM restaurants WHERE id = ?', [rid]) || {};
+    const gerant = get("SELECT * FROM accounts WHERE role = 'gerant' AND is_owner = 1 AND restaurant_id = ? LIMIT 1", [rid])
+                || get("SELECT * FROM accounts WHERE role = 'gerant' AND restaurant_id = ? LIMIT 1", [rid]) || {};
+    const sanitary = get('SELECT * FROM sanitary_settings WHERE restaurant_id = ? ORDER BY id ASC LIMIT 1', [rid]) || {};
+    const hazards = all('SELECT * FROM haccp_hazard_analysis WHERE restaurant_id = ? ORDER BY step_name ASC', [rid]);
+    const ccps = all('SELECT c.*, h.step_name FROM haccp_ccp c JOIN haccp_hazard_analysis h ON h.id = c.hazard_analysis_id WHERE c.restaurant_id = ? AND h.restaurant_id = ? ORDER BY c.ccp_number ASC', [rid, rid]);
+    const cleaningTasks = all('SELECT * FROM cleaning_tasks WHERE restaurant_id = ? ORDER BY zone ASC, name ASC', [rid]);
+    const cleaningLogs = all(`SELECT l.*, t.name as task_name FROM cleaning_logs l JOIN cleaning_tasks t ON t.id = l.task_id WHERE l.completed_at >= ? AND l.restaurant_id = ? AND t.restaurant_id = ? ORDER BY l.completed_at DESC LIMIT 200`, [periodSince, rid, rid]);
+    const tempLogs = all(`SELECT tl.*, tz.name as zone_name FROM temperature_logs tl JOIN temperature_zones tz ON tz.id = tl.zone_id WHERE tl.recorded_at >= ? AND tl.restaurant_id = ? AND tz.restaurant_id = ? ORDER BY tl.recorded_at DESC LIMIT 300`, [periodSince, rid, rid]);
     const tempAlerts = tempLogs.filter(t => t.is_alert);
-    const receptions = all(`SELECT * FROM traceability_logs WHERE received_at >= ? ORDER BY received_at DESC LIMIT 100`, [periodSince]);
-    const training = all('SELECT * FROM training_records ORDER BY training_date DESC');
-    const pestControl = all('SELECT * FROM pest_control ORDER BY visit_date DESC LIMIT 10');
-    const maintenance = all('SELECT * FROM equipment_maintenance ORDER BY next_maintenance_date ASC');
-    const nonConf = all(`SELECT * FROM non_conformities WHERE created_at >= ? ORDER BY detected_at DESC LIMIT 50`, [periodSince]);
-    const recalls = all('SELECT * FROM recall_procedures ORDER BY alert_date DESC LIMIT 20');
-    const tiac = all('SELECT * FROM tiac_procedures ORDER BY date_incident DESC LIMIT 10');
-    const waterMgmt = all('SELECT * FROM water_management ORDER BY analysis_date DESC LIMIT 5');
-    const staffHealth = (() => { try { return all('SELECT * FROM staff_health_records ORDER BY date_record DESC LIMIT 50'); } catch { return []; } })();
-    const pmsAudits = all('SELECT * FROM pms_audits ORDER BY audit_date DESC LIMIT 5');
+    const receptions = all(`SELECT * FROM traceability_logs WHERE received_at >= ? AND restaurant_id = ? ORDER BY received_at DESC LIMIT 100`, [periodSince, rid]);
+    const training = all('SELECT * FROM training_records WHERE restaurant_id = ? ORDER BY training_date DESC', [rid]);
+    const pestControl = all('SELECT * FROM pest_control WHERE restaurant_id = ? ORDER BY visit_date DESC LIMIT 10', [rid]);
+    const maintenance = all('SELECT * FROM equipment_maintenance WHERE restaurant_id = ? ORDER BY next_maintenance_date ASC', [rid]);
+    const nonConf = all(`SELECT * FROM non_conformities WHERE created_at >= ? AND restaurant_id = ? ORDER BY detected_at DESC LIMIT 50`, [periodSince, rid]);
+    const recalls = all('SELECT * FROM recall_procedures WHERE restaurant_id = ? ORDER BY alert_date DESC LIMIT 20', [rid]);
+    const tiac = all('SELECT * FROM tiac_procedures WHERE restaurant_id = ? ORDER BY date_incident DESC LIMIT 10', [rid]);
+    const waterMgmt = all('SELECT * FROM water_management WHERE restaurant_id = ? ORDER BY analysis_date DESC LIMIT 5', [rid]);
+    const staffHealth = (() => { try { return all('SELECT * FROM staff_health_records WHERE restaurant_id = ? ORDER BY date_record DESC LIMIT 50', [rid]); } catch { return []; } })();
+    const pmsAudits = all('SELECT * FROM pms_audits WHERE restaurant_id = ? ORDER BY audit_date DESC LIMIT 5', [rid]);
 
     // ── PDF ──
     const doc = new PDFDocument({ size: 'A4', margins: { top: PDF_MARGIN, bottom: PDF_MARGIN, left: PDF_MARGIN, right: PDF_MARGIN }, bufferPages: true });

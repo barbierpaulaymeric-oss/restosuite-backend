@@ -8,17 +8,17 @@ router.use(requireAuth);
 // GET /api/purchase-orders — List all purchase orders
 router.get('/', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { status, supplier_id } = req.query;
     let sql = `SELECT po.*, s.name as supplier_name
                FROM purchase_orders po
-               LEFT JOIN suppliers s ON s.id = po.supplier_id`;
-    const conditions = [];
-    const params = [];
+               LEFT JOIN suppliers s ON s.id = po.supplier_id AND s.restaurant_id = ?
+               WHERE po.restaurant_id = ?`;
+    const params = [rid, rid];
 
-    if (status) { conditions.push('po.status = ?'); params.push(status); }
-    if (supplier_id) { conditions.push('po.supplier_id = ?'); params.push(Number(supplier_id)); }
+    if (status) { sql += ' AND po.status = ?'; params.push(status); }
+    if (supplier_id) { sql += ' AND po.supplier_id = ?'; params.push(Number(supplier_id)); }
 
-    if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
     sql += ' ORDER BY po.created_at DESC';
 
     const orders = all(sql, params);
@@ -28,9 +28,9 @@ router.get('/', (req, res) => {
       const items = all(`
         SELECT poi.*, i.name as ingredient_name, i.default_unit as ingredient_unit
         FROM purchase_order_items poi
-        LEFT JOIN ingredients i ON i.id = poi.ingredient_id
-        WHERE poi.purchase_order_id = ?
-      `, [po.id]);
+        LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
+        WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?
+      `, [rid, po.id, rid]);
       return { ...po, items };
     });
 
@@ -44,6 +44,7 @@ router.get('/', (req, res) => {
 // IMPORTANT: Must be BEFORE /:id to avoid Express matching "suggest" as an ID
 router.get('/suggest', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     // Find all ingredients where current stock is below min_quantity
     const lowStock = all(`
       SELECT s.ingredient_id, s.quantity as current_qty, s.min_quantity, s.unit,
@@ -51,12 +52,12 @@ router.get('/suggest', (req, res) => {
              sp.price as last_price, sp.unit as price_unit,
              sup.name as supplier_name, sup.id as supplier_id
       FROM stock s
-      JOIN ingredients i ON i.id = s.ingredient_id
-      LEFT JOIN supplier_prices sp ON sp.ingredient_id = i.id
-      LEFT JOIN suppliers sup ON sup.id = COALESCE(i.preferred_supplier_id, sp.supplier_id)
-      WHERE s.quantity <= s.min_quantity AND s.min_quantity > 0
+      JOIN ingredients i ON i.id = s.ingredient_id AND i.restaurant_id = ?
+      LEFT JOIN supplier_prices sp ON sp.ingredient_id = i.id AND sp.restaurant_id = ?
+      LEFT JOIN suppliers sup ON sup.id = COALESCE(i.preferred_supplier_id, sp.supplier_id) AND sup.restaurant_id = ?
+      WHERE s.restaurant_id = ? AND s.quantity <= s.min_quantity AND s.min_quantity > 0
       ORDER BY (s.min_quantity - s.quantity) DESC
-    `);
+    `, [rid, rid, rid, rid]);
 
     // Group by supplier
     const bySupplier = {};
@@ -94,6 +95,7 @@ router.get('/suggest', (req, res) => {
 // ═══════════════════════════════════════════
 router.get('/analytics', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { period } = req.query;
     const days = period === '90' ? 90 : period === '30' ? 30 : 60;
     const dateFrom = new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
@@ -105,11 +107,11 @@ router.get('/analytics', (req, res) => {
              COALESCE(SUM(po.total_amount), 0) as total_spent,
              AVG(po.total_amount) as avg_order
       FROM purchase_orders po
-      JOIN suppliers s ON s.id = po.supplier_id
-      WHERE po.status = 'réceptionnée' AND date(po.created_at) >= ?
+      JOIN suppliers s ON s.id = po.supplier_id AND s.restaurant_id = ?
+      WHERE po.restaurant_id = ? AND po.status = 'réceptionnée' AND date(po.created_at) >= ?
       GROUP BY s.id
       ORDER BY total_spent DESC
-    `, [dateFrom]);
+    `, [rid, rid, dateFrom]);
 
     // Monthly trend
     const monthlyTrend = all(`
@@ -117,10 +119,10 @@ router.get('/analytics', (req, res) => {
              COUNT(*) as order_count,
              SUM(total_amount) as total_amount
       FROM purchase_orders
-      WHERE status = 'réceptionnée' AND date(created_at) >= ?
+      WHERE restaurant_id = ? AND status = 'réceptionnée' AND date(created_at) >= ?
       GROUP BY month
       ORDER BY month
-    `, [dateFrom]);
+    `, [rid, dateFrom]);
 
     // Top purchased items
     const topItems = all(`
@@ -130,13 +132,13 @@ router.get('/analytics', (req, res) => {
              SUM(poi.total_price) as total_spent,
              COUNT(DISTINCT po.id) as order_count
       FROM purchase_order_items poi
-      JOIN purchase_orders po ON po.id = poi.purchase_order_id
-      LEFT JOIN ingredients i ON i.id = poi.ingredient_id
-      WHERE po.status = 'réceptionnée' AND date(po.created_at) >= ?
+      JOIN purchase_orders po ON po.id = poi.purchase_order_id AND po.restaurant_id = ?
+      LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
+      WHERE poi.restaurant_id = ? AND po.status = 'réceptionnée' AND date(po.created_at) >= ?
       GROUP BY poi.ingredient_id
       ORDER BY total_spent DESC
       LIMIT 20
-    `, [dateFrom]);
+    `, [rid, rid, rid, dateFrom]);
 
     // Overall stats
     const overall = get(`
@@ -145,15 +147,15 @@ router.get('/analytics', (req, res) => {
              COALESCE(AVG(total_amount), 0) as avg_order,
              COUNT(DISTINCT supplier_id) as supplier_count
       FROM purchase_orders
-      WHERE status = 'réceptionnée' AND date(created_at) >= ?
-    `, [dateFrom]);
+      WHERE restaurant_id = ? AND status = 'réceptionnée' AND date(created_at) >= ?
+    `, [rid, dateFrom]);
 
     // Average lead time (sent → received)
     const leadTime = get(`
       SELECT AVG(julianday(received_at) - julianday(sent_at)) as avg_days
       FROM purchase_orders
-      WHERE status = 'réceptionnée' AND sent_at IS NOT NULL AND received_at IS NOT NULL AND date(created_at) >= ?
-    `, [dateFrom]);
+      WHERE restaurant_id = ? AND status = 'réceptionnée' AND sent_at IS NOT NULL AND received_at IS NOT NULL AND date(created_at) >= ?
+    `, [rid, dateFrom]);
 
     // Price trends for key items (last 3 prices)
     const priceChanges = all(`
@@ -163,7 +165,7 @@ router.get('/analytics', (req, res) => {
               WHERE ph2.ingredient_id = ph.ingredient_id
               ORDER BY ph2.recorded_at DESC LIMIT 1 OFFSET 1) as previous_price
       FROM price_history ph
-      JOIN ingredients i ON i.id = ph.ingredient_id
+      JOIN ingredients i ON i.id = ph.ingredient_id AND i.restaurant_id = ?
       WHERE date(ph.recorded_at) >= ?
       GROUP BY ph.ingredient_id
       HAVING COUNT(*) >= 2
@@ -171,7 +173,7 @@ router.get('/analytics', (req, res) => {
         WHERE ph2.ingredient_id = ph.ingredient_id
         ORDER BY ph2.recorded_at DESC LIMIT 1 OFFSET 1), ph.price)) DESC
       LIMIT 10
-    `, [dateFrom]);
+    `, [rid, dateFrom]);
 
     res.json({
       period_days: days,
@@ -199,19 +201,20 @@ router.get('/analytics', (req, res) => {
 // GET /api/purchase-orders/:id — Detail
 router.get('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
     const po = get(`SELECT po.*, s.name as supplier_name, s.email as supplier_email, s.phone as supplier_phone
                      FROM purchase_orders po
-                     LEFT JOIN suppliers s ON s.id = po.supplier_id
-                     WHERE po.id = ?`, [id]);
+                     LEFT JOIN suppliers s ON s.id = po.supplier_id AND s.restaurant_id = ?
+                     WHERE po.id = ? AND po.restaurant_id = ?`, [rid, id, rid]);
     if (!po) return res.status(404).json({ error: 'Commande introuvable' });
 
     const items = all(`
       SELECT poi.*, i.name as ingredient_name, i.default_unit as ingredient_unit
       FROM purchase_order_items poi
-      LEFT JOIN ingredients i ON i.id = poi.ingredient_id
-      WHERE poi.purchase_order_id = ?
-    `, [po.id]);
+      LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
+      WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?
+    `, [rid, po.id, rid]);
 
     res.json({ ...po, items });
   } catch (e) {
@@ -222,6 +225,7 @@ router.get('/:id', (req, res) => {
 // POST /api/purchase-orders — Create a purchase order
 router.post('/', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { supplier_id, items, notes, expected_delivery, reference } = req.body;
 
     if (!supplier_id) return res.status(400).json({ error: 'supplier_id requis' });
@@ -229,8 +233,8 @@ router.post('/', (req, res) => {
       return res.status(400).json({ error: 'Au moins un article requis' });
     }
 
-    // Verify supplier exists
-    const supplier = get('SELECT id FROM suppliers WHERE id = ?', [Number(supplier_id)]);
+    // Verify supplier exists (within tenant)
+    const supplier = get('SELECT id FROM suppliers WHERE id = ? AND restaurant_id = ?', [Number(supplier_id), rid]);
     if (!supplier) return res.status(404).json({ error: 'Fournisseur introuvable' });
 
     // Validate items
@@ -250,7 +254,7 @@ router.post('/', (req, res) => {
       const resolvedItems = items.map(item => {
         let productName = item.product_name;
         if (!productName && item.ingredient_id) {
-          const ing = get('SELECT name FROM ingredients WHERE id = ?', [item.ingredient_id]);
+          const ing = get('SELECT name FROM ingredients WHERE id = ? AND restaurant_id = ?', [item.ingredient_id, rid]);
           productName = ing ? ing.name : `Ingrédient #${item.ingredient_id}`;
         }
         const unitPrice = item.unit_price || 0;
@@ -262,22 +266,25 @@ router.post('/', (req, res) => {
 
       // Generate reference: PO-YYYYMMDD-XXX
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const countToday = get("SELECT COUNT(*) as c FROM purchase_orders WHERE date(created_at) = date('now')");
+      const countToday = get(
+        "SELECT COUNT(*) as c FROM purchase_orders WHERE restaurant_id = ? AND date(created_at) = date('now')",
+        [rid]
+      );
       const seq = String((countToday?.c || 0) + 1).padStart(3, '0');
       const ref = reference || `PO-${today}-${seq}`;
 
       const result = run(
-        `INSERT INTO purchase_orders (supplier_id, reference, notes, total_amount, expected_delivery, status)
-         VALUES (?, ?, ?, ?, ?, 'brouillon')`,
-        [Number(supplier_id), ref, notes || null, Math.round(totalAmount * 100) / 100, expected_delivery || null]
+        `INSERT INTO purchase_orders (supplier_id, reference, notes, total_amount, expected_delivery, status, restaurant_id)
+         VALUES (?, ?, ?, ?, ?, 'brouillon', ?)`,
+        [Number(supplier_id), ref, notes || null, Math.round(totalAmount * 100) / 100, expected_delivery || null, rid]
       );
       const poId = result.lastInsertRowid;
 
       for (const item of resolvedItems) {
         run(
-          `INSERT INTO purchase_order_items (purchase_order_id, ingredient_id, product_name, quantity, unit, unit_price, total_price, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [poId, item.ingredient_id || null, item.product_name, item.quantity, item.unit || 'kg', item.unit_price, item.total_price, item.notes || null]
+          `INSERT INTO purchase_order_items (purchase_order_id, ingredient_id, product_name, quantity, unit, unit_price, total_price, notes, restaurant_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [poId, item.ingredient_id || null, item.product_name, item.quantity, item.unit || 'kg', item.unit_price, item.total_price, item.notes || null, rid]
         );
       }
 
@@ -285,8 +292,20 @@ router.post('/', (req, res) => {
     });
 
     const poId = transaction();
-    const po = get('SELECT po.*, s.name as supplier_name FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id WHERE po.id = ?', [poId]);
-    const poItems = all(`SELECT poi.*, i.name as ingredient_name FROM purchase_order_items poi LEFT JOIN ingredients i ON i.id = poi.ingredient_id WHERE poi.purchase_order_id = ?`, [poId]);
+    const po = get(
+      `SELECT po.*, s.name as supplier_name
+       FROM purchase_orders po
+       LEFT JOIN suppliers s ON s.id = po.supplier_id AND s.restaurant_id = ?
+       WHERE po.id = ? AND po.restaurant_id = ?`,
+      [rid, poId, rid]
+    );
+    const poItems = all(
+      `SELECT poi.*, i.name as ingredient_name
+       FROM purchase_order_items poi
+       LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
+       WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,
+      [rid, poId, rid]
+    );
 
     res.status(201).json({ ...po, items: poItems });
   } catch (e) {
@@ -297,8 +316,9 @@ router.post('/', (req, res) => {
 // PUT /api/purchase-orders/:id — Update a purchase order (only brouillon status)
 router.put('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const po = get('SELECT * FROM purchase_orders WHERE id = ?', [id]);
+    const po = get('SELECT * FROM purchase_orders WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!po) return res.status(404).json({ error: 'Commande introuvable' });
 
     const { status, notes, expected_delivery, items } = req.body;
@@ -322,26 +342,38 @@ router.put('/:id', (req, res) => {
       if (status === 'envoyée') extra = ", sent_at = CURRENT_TIMESTAMP";
       if (status === 'réceptionnée') extra = ", received_at = CURRENT_TIMESTAMP";
 
-      run(`UPDATE purchase_orders SET status = ?, updated_at = CURRENT_TIMESTAMP${extra} WHERE id = ?`, [status, id]);
+      run(
+        `UPDATE purchase_orders SET status = ?, updated_at = CURRENT_TIMESTAMP${extra} WHERE id = ? AND restaurant_id = ?`,
+        [status, id, rid]
+      );
     }
 
     if (notes !== undefined) {
-      run('UPDATE purchase_orders SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [notes, id]);
+      run(
+        'UPDATE purchase_orders SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?',
+        [notes, id, rid]
+      );
     }
     if (expected_delivery !== undefined) {
-      run('UPDATE purchase_orders SET expected_delivery = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [expected_delivery, id]);
+      run(
+        'UPDATE purchase_orders SET expected_delivery = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?',
+        [expected_delivery, id, rid]
+      );
     }
 
     // Update items if provided (only for brouillon)
     if (items && Array.isArray(items) && (po.status === 'brouillon' || status === 'brouillon')) {
       const transaction = db.transaction(() => {
-        run('DELETE FROM purchase_order_items WHERE purchase_order_id = ?', [id]);
+        run(
+          'DELETE FROM purchase_order_items WHERE purchase_order_id = ? AND restaurant_id = ?',
+          [id, rid]
+        );
         let totalAmount = 0;
 
         for (const item of items) {
           let productName = item.product_name;
           if (!productName && item.ingredient_id) {
-            const ing = get('SELECT name FROM ingredients WHERE id = ?', [item.ingredient_id]);
+            const ing = get('SELECT name FROM ingredients WHERE id = ? AND restaurant_id = ?', [item.ingredient_id, rid]);
             productName = ing ? ing.name : `Ingrédient #${item.ingredient_id}`;
           }
           const unitPrice = item.unit_price || 0;
@@ -350,20 +382,35 @@ router.put('/:id', (req, res) => {
           totalAmount += totalPrice;
 
           run(
-            `INSERT INTO purchase_order_items (purchase_order_id, ingredient_id, product_name, quantity, unit, unit_price, total_price, notes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, item.ingredient_id || null, productName, qty, item.unit || 'kg', unitPrice, totalPrice, item.notes || null]
+            `INSERT INTO purchase_order_items (purchase_order_id, ingredient_id, product_name, quantity, unit, unit_price, total_price, notes, restaurant_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, item.ingredient_id || null, productName, qty, item.unit || 'kg', unitPrice, totalPrice, item.notes || null, rid]
           );
         }
 
-        run('UPDATE purchase_orders SET total_amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [Math.round(totalAmount * 100) / 100, id]);
+        run(
+          'UPDATE purchase_orders SET total_amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?',
+          [Math.round(totalAmount * 100) / 100, id, rid]
+        );
       });
       transaction();
     }
 
     // Return updated
-    const updated = get('SELECT po.*, s.name as supplier_name FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id WHERE po.id = ?', [id]);
-    const updatedItems = all(`SELECT poi.*, i.name as ingredient_name FROM purchase_order_items poi LEFT JOIN ingredients i ON i.id = poi.ingredient_id WHERE poi.purchase_order_id = ?`, [id]);
+    const updated = get(
+      `SELECT po.*, s.name as supplier_name
+       FROM purchase_orders po
+       LEFT JOIN suppliers s ON s.id = po.supplier_id AND s.restaurant_id = ?
+       WHERE po.id = ? AND po.restaurant_id = ?`,
+      [rid, id, rid]
+    );
+    const updatedItems = all(
+      `SELECT poi.*, i.name as ingredient_name
+       FROM purchase_order_items poi
+       LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
+       WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,
+      [rid, id, rid]
+    );
     res.json({ ...updated, items: updatedItems });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -373,20 +420,26 @@ router.put('/:id', (req, res) => {
 // POST /api/purchase-orders/:id/receive — Receive a purchase order (creates stock movements)
 router.post('/:id/receive', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const po = get('SELECT * FROM purchase_orders WHERE id = ?', [id]);
+    const po = get('SELECT * FROM purchase_orders WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!po) return res.status(404).json({ error: 'Commande introuvable' });
     if (po.status !== 'confirmée' && po.status !== 'envoyée') {
       return res.status(400).json({ error: 'Cette commande ne peut pas être réceptionnée' });
     }
 
-    const items = all('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?', [id]);
+    const items = all(
+      'SELECT * FROM purchase_order_items WHERE purchase_order_id = ? AND restaurant_id = ?',
+      [id, rid]
+    );
     const { reception_notes } = req.body || {};
 
     const transaction = db.transaction(() => {
       // Update PO status
-      run("UPDATE purchase_orders SET status = 'réceptionnée', received_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP, notes = COALESCE(notes || ' | ', '') || ? WHERE id = ?",
-        [reception_notes ? `Réception: ${reception_notes}` : '', id]);
+      run(
+        "UPDATE purchase_orders SET status = 'réceptionnée', received_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP, notes = COALESCE(notes || ' | ', '') || ? WHERE id = ? AND restaurant_id = ?",
+        [reception_notes ? `Réception: ${reception_notes}` : '', id, rid]
+      );
 
       // Create stock movements for each item with an ingredient_id
       for (const item of items) {
@@ -394,33 +447,47 @@ router.post('/:id/receive', (req, res) => {
 
         // Record stock movement (reception)
         run(
-          `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, supplier_id, unit_price, recorded_at)
-           VALUES (?, 'reception', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-          [item.ingredient_id, item.quantity, item.unit, `Commande ${po.reference}`, po.supplier_id, item.unit_price]
+          `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, supplier_id, unit_price, recorded_at, restaurant_id)
+           VALUES (?, 'reception', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`,
+          [item.ingredient_id, item.quantity, item.unit, `Commande ${po.reference}`, po.supplier_id, item.unit_price, rid]
         );
 
         // Update stock
-        const stock = get('SELECT * FROM stock WHERE ingredient_id = ?', [item.ingredient_id]);
+        const stock = get('SELECT * FROM stock WHERE ingredient_id = ? AND restaurant_id = ?', [item.ingredient_id, rid]);
         if (stock) {
-          run('UPDATE stock SET quantity = quantity + ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
-            [item.quantity, item.ingredient_id]);
+          run(
+            'UPDATE stock SET quantity = quantity + ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ? AND restaurant_id = ?',
+            [item.quantity, item.ingredient_id, rid]
+          );
         } else {
-          run('INSERT INTO stock (ingredient_id, quantity, unit) VALUES (?, ?, ?)',
-            [item.ingredient_id, item.quantity, item.unit]);
+          run(
+            'INSERT INTO stock (ingredient_id, quantity, unit, restaurant_id) VALUES (?, ?, ?, ?)',
+            [item.ingredient_id, item.quantity, item.unit, rid]
+          );
         }
 
-        // Update price history
+        // Update price history (price_history may be tenant-scoped; include if column present)
         if (item.unit_price > 0) {
-          run('INSERT INTO price_history (ingredient_id, supplier_id, price, recorded_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
-            [item.ingredient_id, po.supplier_id, item.unit_price]);
+          run(
+            'INSERT INTO price_history (ingredient_id, supplier_id, price, recorded_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
+            [item.ingredient_id, po.supplier_id, item.unit_price]
+          );
 
-          // Update supplier_prices
-          const existing = get('SELECT id FROM supplier_prices WHERE ingredient_id = ? AND supplier_id = ?', [item.ingredient_id, po.supplier_id]);
+          // Update supplier_prices (tenant-scoped)
+          const existing = get(
+            'SELECT id FROM supplier_prices WHERE ingredient_id = ? AND supplier_id = ? AND restaurant_id = ?',
+            [item.ingredient_id, po.supplier_id, rid]
+          );
           if (existing) {
-            run('UPDATE supplier_prices SET price = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?', [item.unit_price, existing.id]);
+            run(
+              'UPDATE supplier_prices SET price = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?',
+              [item.unit_price, existing.id, rid]
+            );
           } else {
-            run('INSERT INTO supplier_prices (ingredient_id, supplier_id, price, unit) VALUES (?, ?, ?, ?)',
-              [item.ingredient_id, po.supplier_id, item.unit_price, item.unit]);
+            run(
+              'INSERT INTO supplier_prices (ingredient_id, supplier_id, price, unit, restaurant_id) VALUES (?, ?, ?, ?, ?)',
+              [item.ingredient_id, po.supplier_id, item.unit_price, item.unit, rid]
+            );
           }
         }
       }
@@ -428,8 +495,20 @@ router.post('/:id/receive', (req, res) => {
 
     transaction();
 
-    const updated = get('SELECT po.*, s.name as supplier_name FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id WHERE po.id = ?', [id]);
-    const updatedItems = all(`SELECT poi.*, i.name as ingredient_name FROM purchase_order_items poi LEFT JOIN ingredients i ON i.id = poi.ingredient_id WHERE poi.purchase_order_id = ?`, [id]);
+    const updated = get(
+      `SELECT po.*, s.name as supplier_name
+       FROM purchase_orders po
+       LEFT JOIN suppliers s ON s.id = po.supplier_id AND s.restaurant_id = ?
+       WHERE po.id = ? AND po.restaurant_id = ?`,
+      [rid, id, rid]
+    );
+    const updatedItems = all(
+      `SELECT poi.*, i.name as ingredient_name
+       FROM purchase_order_items poi
+       LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
+       WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,
+      [rid, id, rid]
+    );
     res.json({ ...updated, items: updatedItems, stock_updated: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -439,15 +518,16 @@ router.post('/:id/receive', (req, res) => {
 // DELETE /api/purchase-orders/:id — Delete (only brouillon)
 router.delete('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const po = get('SELECT * FROM purchase_orders WHERE id = ?', [id]);
+    const po = get('SELECT * FROM purchase_orders WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!po) return res.status(404).json({ error: 'Commande introuvable' });
     if (po.status !== 'brouillon' && po.status !== 'annulée') {
       return res.status(400).json({ error: 'Seules les commandes brouillon/annulées peuvent être supprimées' });
     }
 
-    run('DELETE FROM purchase_order_items WHERE purchase_order_id = ?', [id]);
-    run('DELETE FROM purchase_orders WHERE id = ?', [id]);
+    run('DELETE FROM purchase_order_items WHERE purchase_order_id = ? AND restaurant_id = ?', [id, rid]);
+    run('DELETE FROM purchase_orders WHERE id = ? AND restaurant_id = ?', [id, rid]);
     res.json({ deleted: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -460,52 +540,79 @@ router.delete('/:id', (req, res) => {
 // ═══════════════════════════════════════════
 router.post('/:id/clone', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const po = get('SELECT * FROM purchase_orders WHERE id = ?', [id]);
+    const po = get('SELECT * FROM purchase_orders WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!po) return res.status(404).json({ error: 'Commande introuvable' });
 
-    const items = all('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?', [id]);
+    const items = all(
+      'SELECT * FROM purchase_order_items WHERE purchase_order_id = ? AND restaurant_id = ?',
+      [id, rid]
+    );
 
     const transaction = db.transaction(() => {
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const countToday = get("SELECT COUNT(*) as c FROM purchase_orders WHERE date(created_at) = date('now')");
+      const countToday = get(
+        "SELECT COUNT(*) as c FROM purchase_orders WHERE restaurant_id = ? AND date(created_at) = date('now')",
+        [rid]
+      );
       const seq = String((countToday?.c || 0) + 1).padStart(3, '0');
       const ref = `PO-${today}-${seq}`;
 
       const result = run(
-        `INSERT INTO purchase_orders (supplier_id, reference, notes, total_amount, status)
-         VALUES (?, ?, ?, ?, 'brouillon')`,
-        [po.supplier_id, ref, `Dupliqué de ${po.reference}`, po.total_amount]
+        `INSERT INTO purchase_orders (supplier_id, reference, notes, total_amount, status, restaurant_id)
+         VALUES (?, ?, ?, ?, 'brouillon', ?)`,
+        [po.supplier_id, ref, `Dupliqué de ${po.reference}`, po.total_amount, rid]
       );
       const newId = result.lastInsertRowid;
 
       for (const item of items) {
-        // Fetch latest price for each ingredient
+        // Fetch latest price for each ingredient (tenant-scoped)
         let latestPrice = item.unit_price;
         if (item.ingredient_id) {
-          const sp = get('SELECT price FROM supplier_prices WHERE ingredient_id = ? AND supplier_id = ? ORDER BY last_updated DESC LIMIT 1',
-            [item.ingredient_id, po.supplier_id]);
+          const sp = get(
+            'SELECT price FROM supplier_prices WHERE ingredient_id = ? AND supplier_id = ? AND restaurant_id = ? ORDER BY last_updated DESC LIMIT 1',
+            [item.ingredient_id, po.supplier_id, rid]
+          );
           if (sp) latestPrice = sp.price;
         }
 
         run(
-          `INSERT INTO purchase_order_items (purchase_order_id, ingredient_id, product_name, quantity, unit, unit_price, total_price, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO purchase_order_items (purchase_order_id, ingredient_id, product_name, quantity, unit, unit_price, total_price, notes, restaurant_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [newId, item.ingredient_id, item.product_name, item.quantity, item.unit, latestPrice,
-           Math.round(latestPrice * item.quantity * 100) / 100, item.notes]
+           Math.round(latestPrice * item.quantity * 100) / 100, item.notes, rid]
         );
       }
 
       // Recalculate total
-      const totalResult = get('SELECT SUM(total_price) as total FROM purchase_order_items WHERE purchase_order_id = ?', [newId]);
-      run('UPDATE purchase_orders SET total_amount = ? WHERE id = ?', [totalResult.total || 0, newId]);
+      const totalResult = get(
+        'SELECT SUM(total_price) as total FROM purchase_order_items WHERE purchase_order_id = ? AND restaurant_id = ?',
+        [newId, rid]
+      );
+      run(
+        'UPDATE purchase_orders SET total_amount = ? WHERE id = ? AND restaurant_id = ?',
+        [totalResult.total || 0, newId, rid]
+      );
 
       return newId;
     });
 
     const newId = transaction();
-    const newPo = get('SELECT po.*, s.name as supplier_name FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id WHERE po.id = ?', [newId]);
-    const newItems = all(`SELECT poi.*, i.name as ingredient_name FROM purchase_order_items poi LEFT JOIN ingredients i ON i.id = poi.ingredient_id WHERE poi.purchase_order_id = ?`, [newId]);
+    const newPo = get(
+      `SELECT po.*, s.name as supplier_name
+       FROM purchase_orders po
+       LEFT JOIN suppliers s ON s.id = po.supplier_id AND s.restaurant_id = ?
+       WHERE po.id = ? AND po.restaurant_id = ?`,
+      [rid, newId, rid]
+    );
+    const newItems = all(
+      `SELECT poi.*, i.name as ingredient_name
+       FROM purchase_order_items poi
+       LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
+       WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,
+      [rid, newId, rid]
+    );
 
     res.status(201).json({ ...newPo, items: newItems });
   } catch (e) {

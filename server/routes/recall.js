@@ -17,12 +17,14 @@ const VALID_STATUSES   = ['alerte', 'en_cours', 'cloture'];
 // GET /api/recall — all procedures (newest first)
 router.get('/', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const items = all(`
       SELECT r.*, s.name as supplier_name
       FROM recall_procedures r
-      LEFT JOIN suppliers s ON s.id = r.supplier_id
+      LEFT JOIN suppliers s ON s.id = r.supplier_id AND s.restaurant_id = ?
+      WHERE r.restaurant_id = ?
       ORDER BY r.alert_date DESC
-    `);
+    `, [rid, rid]);
     res.json({ items, total: items.length });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -32,15 +34,16 @@ router.get('/', (req, res) => {
 // GET /api/recall/active — open procedures only
 router.get('/active', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const items = all(`
       SELECT r.*, s.name as supplier_name
       FROM recall_procedures r
-      LEFT JOIN suppliers s ON s.id = r.supplier_id
-      WHERE r.status IN ('alerte', 'en_cours')
+      LEFT JOIN suppliers s ON s.id = r.supplier_id AND s.restaurant_id = ?
+      WHERE r.restaurant_id = ? AND r.status IN ('alerte', 'en_cours')
       ORDER BY
         CASE r.severity WHEN 'critique' THEN 0 WHEN 'majeur' THEN 1 ELSE 2 END,
         r.alert_date DESC
-    `);
+    `, [rid, rid]);
     res.json({ items, total: items.length });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -50,6 +53,7 @@ router.get('/active', (req, res) => {
 // POST /api/recall — create a new procedure
 router.post('/', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const {
       product_name, lot_number, reason, alert_date, alert_source,
       severity, actions_taken, quantity_affected, quantity_unit, supplier_id,
@@ -67,10 +71,11 @@ router.post('/', (req, res) => {
 
     const info = run(
       `INSERT INTO recall_procedures
-       (product_name, lot_number, reason, alert_date, alert_source, severity, status,
+       (restaurant_id, product_name, lot_number, reason, alert_date, alert_source, severity, status,
         actions_taken, quantity_affected, quantity_unit, supplier_id, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, 'alerte', ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'alerte', ?, ?, ?, ?, ?)`,
       [
+        rid,
         product_name.trim(),
         lot_number || null,
         reason || 'sanitaire',
@@ -84,7 +89,7 @@ router.post('/', (req, res) => {
         callerId,
       ]
     );
-    res.status(201).json(get('SELECT * FROM recall_procedures WHERE id = ?', [info.lastInsertRowid]));
+    res.status(201).json(get('SELECT * FROM recall_procedures WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]));
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -93,8 +98,9 @@ router.post('/', (req, res) => {
 // PUT /api/recall/:id — update (including workflow transitions + closure)
 router.put('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const existing = get('SELECT * FROM recall_procedures WHERE id = ?', [id]);
+    const existing = get('SELECT * FROM recall_procedures WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Procédure introuvable' });
 
     const {
@@ -125,7 +131,7 @@ router.put('/:id', (req, res) => {
         closure_date     = ?,
         closure_notes    = ?,
         updated_at       = CURRENT_TIMESTAMP
-       WHERE id = ?`,
+       WHERE id = ? AND restaurant_id = ?`,
       [
         product_name  !== undefined ? product_name.trim()   : existing.product_name,
         lot_number    !== undefined ? lot_number             : existing.lot_number,
@@ -141,9 +147,10 @@ router.put('/:id', (req, res) => {
         isClosed ? (closure_date || new Date().toISOString()) : existing.closure_date,
         closure_notes !== undefined ? closure_notes          : existing.closure_notes,
         id,
+        rid,
       ]
     );
-    res.json(get('SELECT * FROM recall_procedures WHERE id = ?', [id]));
+    res.json(get('SELECT * FROM recall_procedures WHERE id = ? AND restaurant_id = ?', [id, rid]));
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -152,10 +159,11 @@ router.put('/:id', (req, res) => {
 // DELETE /api/recall/:id
 router.delete('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const existing = get('SELECT id FROM recall_procedures WHERE id = ?', [id]);
+    const existing = get('SELECT id FROM recall_procedures WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Procédure introuvable' });
-    run('DELETE FROM recall_procedures WHERE id = ?', [id]);
+    run('DELETE FROM recall_procedures WHERE id = ? AND restaurant_id = ?', [id, rid]);
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });

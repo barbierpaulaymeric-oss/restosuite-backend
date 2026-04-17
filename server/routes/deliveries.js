@@ -14,19 +14,21 @@ router.use(requireAuth);
 // (must be before /:id to avoid conflict)
 // ═══════════════════════════════════════════
 router.get('/dlc-alerts', (req, res) => {
+  const rid = req.user.restaurant_id;
   const alerts = all(`
     SELECT dni.id, dni.product_name, dni.batch_number, dni.dlc, dni.quantity, dni.unit,
            dn.id as delivery_note_id, s.name as supplier_name,
            CAST(julianday(dni.dlc) - julianday('now') AS INTEGER) as days_remaining
     FROM delivery_note_items dni
-    JOIN delivery_notes dn ON dn.id = dni.delivery_note_id
-    JOIN suppliers s ON s.id = dn.supplier_id
-    WHERE dni.status = 'accepted'
+    JOIN delivery_notes dn ON dn.id = dni.delivery_note_id AND dn.restaurant_id = ?
+    JOIN suppliers s ON s.id = dn.supplier_id AND s.restaurant_id = ?
+    WHERE dni.restaurant_id = ?
+      AND dni.status = 'accepted'
       AND dni.dlc IS NOT NULL
       AND julianday(dni.dlc) - julianday('now') <= 3
       AND julianday(dni.dlc) - julianday('now') >= 0
     ORDER BY dni.dlc ASC
-  `);
+  `, [rid, rid, rid]);
   res.json(alerts);
 });
 
@@ -34,16 +36,18 @@ router.get('/dlc-alerts', (req, res) => {
 // GET /api/deliveries — List delivery notes
 // ═══════════════════════════════════════════
 router.get('/', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { status } = req.query;
   let sql = `
     SELECT dn.*, s.name as supplier_name,
-           (SELECT COUNT(*) FROM delivery_note_items WHERE delivery_note_id = dn.id) as item_count
+           (SELECT COUNT(*) FROM delivery_note_items WHERE delivery_note_id = dn.id AND restaurant_id = ?) as item_count
     FROM delivery_notes dn
-    JOIN suppliers s ON s.id = dn.supplier_id
+    JOIN suppliers s ON s.id = dn.supplier_id AND s.restaurant_id = ?
+    WHERE dn.restaurant_id = ?
   `;
-  const params = [];
+  const params = [rid, rid, rid];
   if (status) {
-    sql += ' WHERE dn.status = ?';
+    sql += ' AND dn.status = ?';
     params.push(status);
   }
   sql += ' ORDER BY dn.created_at DESC';
@@ -54,23 +58,24 @@ router.get('/', (req, res) => {
 // GET /api/deliveries/:id — Delivery note detail
 // ═══════════════════════════════════════════
 router.get('/:id', (req, res) => {
+  const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
   const note = get(`
     SELECT dn.*, s.name as supplier_name, a.name as received_by_name
     FROM delivery_notes dn
-    JOIN suppliers s ON s.id = dn.supplier_id
+    JOIN suppliers s ON s.id = dn.supplier_id AND s.restaurant_id = ?
     LEFT JOIN accounts a ON a.id = dn.received_by
-    WHERE dn.id = ?
-  `, [id]);
+    WHERE dn.id = ? AND dn.restaurant_id = ?
+  `, [rid, id, rid]);
   if (!note) return res.status(404).json({ error: 'Bon de livraison introuvable' });
 
   const items = all(`
     SELECT dni.*, i.name as ingredient_name, i.category as ingredient_category
     FROM delivery_note_items dni
-    LEFT JOIN ingredients i ON i.id = dni.ingredient_id
-    WHERE dni.delivery_note_id = ?
+    LEFT JOIN ingredients i ON i.id = dni.ingredient_id AND i.restaurant_id = ?
+    WHERE dni.delivery_note_id = ? AND dni.restaurant_id = ?
     ORDER BY dni.id
-  `, [id]);
+  `, [rid, id, rid]);
 
   res.json({ ...note, items });
 });
@@ -79,6 +84,7 @@ router.get('/:id', (req, res) => {
 // POST /api/deliveries — Créer un bon de livraison manuellement
 // ═══════════════════════════════════════════
 router.post('/', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { supplier_id, expected_date, notes, items } = req.body;
 
   if (!supplier_id) return res.status(400).json({ error: 'Fournisseur requis' });
@@ -86,14 +92,14 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'Au moins un article requis' });
   }
 
-  const supplier = get('SELECT * FROM suppliers WHERE id = ?', [Number(supplier_id)]);
+  const supplier = get('SELECT * FROM suppliers WHERE id = ? AND restaurant_id = ?', [Number(supplier_id), rid]);
   if (!supplier) return res.status(404).json({ error: 'Fournisseur introuvable' });
 
   const transaction = db.transaction(() => {
     const result = run(
-      `INSERT INTO delivery_notes (supplier_id, status, expected_date, notes)
-       VALUES (?, 'pending', ?, ?)`,
-      [Number(supplier_id), expected_date || null, notes || null]
+      `INSERT INTO delivery_notes (supplier_id, status, expected_date, notes, restaurant_id)
+       VALUES (?, 'pending', ?, ?, ?)`,
+      [Number(supplier_id), expected_date || null, notes || null, rid]
     );
     const noteId = Number(result.lastInsertRowid);
 
@@ -103,11 +109,11 @@ router.post('/', (req, res) => {
 
       run(
         `INSERT INTO delivery_note_items
-           (delivery_note_id, ingredient_id, product_name, quantity, unit, price_per_unit, batch_number, dlc, temperature_required, notes, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+           (delivery_note_id, ingredient_id, product_name, quantity, unit, price_per_unit, batch_number, dlc, temperature_required, notes, status, restaurant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
         [noteId, ingredient_id || null, product_name, quantity, unit,
          price_per_unit || null, batch_number || null, dlc || null,
-         temperature_required || null, itemNotes || null]
+         temperature_required || null, itemNotes || null, rid]
       );
     }
 
@@ -126,11 +132,18 @@ router.post('/', (req, res) => {
 // PUT /api/deliveries/:id/receive — Receive a delivery
 // ═══════════════════════════════════════════
 router.put('/:id/receive', (req, res) => {
+  const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
   const { items, reception_notes } = req.body;
   const account = req.headers['x-account-id'] ? Number(req.headers['x-account-id']) : null;
 
-  const note = get('SELECT dn.*, s.name as supplier_name FROM delivery_notes dn JOIN suppliers s ON s.id = dn.supplier_id WHERE dn.id = ?', [id]);
+  const note = get(
+    `SELECT dn.*, s.name as supplier_name
+     FROM delivery_notes dn
+     JOIN suppliers s ON s.id = dn.supplier_id AND s.restaurant_id = ?
+     WHERE dn.id = ? AND dn.restaurant_id = ?`,
+    [rid, id, rid]
+  );
   if (!note) return res.status(404).json({ error: 'Bon de livraison introuvable' });
   if (note.status === 'received') return res.status(400).json({ error: 'Ce bon a déjà été réceptionné' });
 
@@ -146,13 +159,16 @@ router.put('/:id/receive', (req, res) => {
       const { id: itemId, status: itemStatus, temperature_measured, rejection_reason } = item;
       if (!itemId || !itemStatus) continue;
 
-      const dbItem = get('SELECT * FROM delivery_note_items WHERE id = ? AND delivery_note_id = ?', [itemId, id]);
+      const dbItem = get(
+        'SELECT * FROM delivery_note_items WHERE id = ? AND delivery_note_id = ? AND restaurant_id = ?',
+        [itemId, id, rid]
+      );
       if (!dbItem) continue;
 
       // Update item status
       run(
-        'UPDATE delivery_note_items SET status = ?, temperature_measured = ?, rejection_reason = ? WHERE id = ?',
-        [itemStatus, temperature_measured ?? null, rejection_reason || null, itemId]
+        'UPDATE delivery_note_items SET status = ?, temperature_measured = ?, rejection_reason = ? WHERE id = ? AND restaurant_id = ?',
+        [itemStatus, temperature_measured ?? null, rejection_reason || null, itemId, rid]
       );
 
       if (itemStatus === 'accepted') {
@@ -169,32 +185,42 @@ router.put('/:id/receive', (req, res) => {
         // 2. Create stock_movement if ingredient_id exists
         if (dbItem.ingredient_id) {
           run(
-            `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, supplier_id, batch_number, dlc, unit_price, recorded_by)
-             VALUES (?, 'reception', ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, supplier_id, batch_number, dlc, unit_price, recorded_by, restaurant_id)
+             VALUES (?, 'reception', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [dbItem.ingredient_id, dbItem.quantity, dbItem.unit, 'Réception bon #' + id,
-             note.supplier_id, dbItem.batch_number || null, dbItem.dlc || null, dbItem.price_per_unit || null, account]
+             note.supplier_id, dbItem.batch_number || null, dbItem.dlc || null, dbItem.price_per_unit || null, account, rid]
           );
 
           // 3. Update stock
-          const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [dbItem.ingredient_id]);
+          const existing = get('SELECT * FROM stock WHERE ingredient_id = ? AND restaurant_id = ?', [dbItem.ingredient_id, rid]);
           if (existing) {
-            run('UPDATE stock SET quantity = quantity + ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
-              [dbItem.quantity, dbItem.ingredient_id]);
+            run(
+              'UPDATE stock SET quantity = quantity + ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ? AND restaurant_id = ?',
+              [dbItem.quantity, dbItem.ingredient_id, rid]
+            );
           } else {
-            run('INSERT INTO stock (ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, 0)',
-              [dbItem.ingredient_id, dbItem.quantity, dbItem.unit]);
+            run(
+              'INSERT INTO stock (ingredient_id, quantity, unit, min_quantity, restaurant_id) VALUES (?, ?, ?, 0, ?)',
+              [dbItem.ingredient_id, dbItem.quantity, dbItem.unit, rid]
+            );
           }
 
           // 4. Update supplier_prices if price provided
           if (dbItem.price_per_unit) {
-            const existingPrice = get('SELECT * FROM supplier_prices WHERE ingredient_id = ? AND supplier_id = ?',
-              [dbItem.ingredient_id, note.supplier_id]);
+            const existingPrice = get(
+              'SELECT * FROM supplier_prices WHERE ingredient_id = ? AND supplier_id = ? AND restaurant_id = ?',
+              [dbItem.ingredient_id, note.supplier_id, rid]
+            );
             if (existingPrice) {
-              run('UPDATE supplier_prices SET price = ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ? AND supplier_id = ?',
-                [dbItem.price_per_unit, dbItem.ingredient_id, note.supplier_id]);
+              run(
+                'UPDATE supplier_prices SET price = ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ? AND supplier_id = ? AND restaurant_id = ?',
+                [dbItem.price_per_unit, dbItem.ingredient_id, note.supplier_id, rid]
+              );
             } else {
-              run('INSERT INTO supplier_prices (ingredient_id, supplier_id, price, unit) VALUES (?, ?, ?, ?)',
-                [dbItem.ingredient_id, note.supplier_id, dbItem.price_per_unit, dbItem.unit]);
+              run(
+                'INSERT INTO supplier_prices (ingredient_id, supplier_id, price, unit, restaurant_id) VALUES (?, ?, ?, ?, ?)',
+                [dbItem.ingredient_id, note.supplier_id, dbItem.price_per_unit, dbItem.unit, rid]
+              );
             }
             // Price history
             run('INSERT INTO price_history (ingredient_id, supplier_id, price) VALUES (?, ?, ?)',
@@ -213,8 +239,8 @@ router.put('/:id/receive', (req, res) => {
     else if (rejectedCount > 0 && acceptedCount > 0) overallStatus = 'partial';
 
     run(
-      'UPDATE delivery_notes SET status = ?, received_at = CURRENT_TIMESTAMP, received_by = ?, reception_notes = ? WHERE id = ?',
-      [overallStatus, account, reception_notes || null, id]
+      'UPDATE delivery_notes SET status = ?, received_at = CURRENT_TIMESTAMP, received_by = ?, reception_notes = ? WHERE id = ? AND restaurant_id = ?',
+      [overallStatus, account, reception_notes || null, id, rid]
     );
 
     return { status: overallStatus, accepted: acceptedCount, rejected: rejectedCount };

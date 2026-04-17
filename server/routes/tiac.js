@@ -12,19 +12,22 @@ router.use(requireAuth);
 
 // GET /api/tiac
 router.get('/', (req, res) => {
-  const procedures = all('SELECT * FROM tiac_procedures ORDER BY date_incident DESC');
+  const rid = req.user.restaurant_id;
+  const procedures = all('SELECT * FROM tiac_procedures WHERE restaurant_id = ? ORDER BY date_incident DESC', [rid]);
   res.json(procedures);
 });
 
 // GET /api/tiac/:id
 router.get('/:id', (req, res) => {
-  const procedure = get('SELECT * FROM tiac_procedures WHERE id = ?', [Number(req.params.id)]);
+  const rid = req.user.restaurant_id;
+  const procedure = get('SELECT * FROM tiac_procedures WHERE id = ? AND restaurant_id = ?', [Number(req.params.id), rid]);
   if (!procedure) return res.status(404).json({ error: 'Procédure introuvable' });
   res.json(procedure);
 });
 
 // POST /api/tiac
 router.post('/', (req, res) => {
+  const rid = req.user.restaurant_id;
   const {
     date_incident, description, nb_personnes, symptomes, aliments_suspects,
     mesures_conservatoires, declaration_ars, plats_temoins_conserves, contact_ddpp, statut
@@ -34,20 +37,21 @@ router.post('/', (req, res) => {
   }
   const info = run(
     `INSERT INTO tiac_procedures
-      (date_incident, description, nb_personnes, symptomes, aliments_suspects,
+      (restaurant_id, date_incident, description, nb_personnes, symptomes, aliments_suspects,
        mesures_conservatoires, declaration_ars, plats_temoins_conserves, contact_ddpp, statut)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [date_incident, description, nb_personnes || 0, symptomes || null, aliments_suspects || null,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [rid, date_incident, description, nb_personnes || 0, symptomes || null, aliments_suspects || null,
      mesures_conservatoires || null, declaration_ars ? 1 : 0, plats_temoins_conserves ? 1 : 0,
      contact_ddpp || null, statut || 'en_cours']
   );
-  res.status(201).json(get('SELECT * FROM tiac_procedures WHERE id = ?', [info.lastInsertRowid]));
+  res.status(201).json(get('SELECT * FROM tiac_procedures WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]));
 });
 
 // PUT /api/tiac/:id
 router.put('/:id', (req, res) => {
+  const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
-  const existing = get('SELECT * FROM tiac_procedures WHERE id = ?', [id]);
+  const existing = get('SELECT * FROM tiac_procedures WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (!existing) return res.status(404).json({ error: 'Procédure introuvable' });
   const {
     date_incident, description, nb_personnes, symptomes, aliments_suspects,
@@ -58,7 +62,7 @@ router.put('/:id', (req, res) => {
       date_incident = ?, description = ?, nb_personnes = ?, symptomes = ?, aliments_suspects = ?,
       mesures_conservatoires = ?, declaration_ars = ?, plats_temoins_conserves = ?,
       contact_ddpp = ?, statut = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE id = ?`,
+     WHERE id = ? AND restaurant_id = ?`,
     [
       date_incident || existing.date_incident,
       description || existing.description,
@@ -71,15 +75,17 @@ router.put('/:id', (req, res) => {
       contact_ddpp !== undefined ? contact_ddpp : existing.contact_ddpp,
       statut || existing.statut,
       id,
+      rid,
     ]
   );
-  res.json(get('SELECT * FROM tiac_procedures WHERE id = ?', [id]));
+  res.json(get('SELECT * FROM tiac_procedures WHERE id = ? AND restaurant_id = ?', [id, rid]));
 });
 
 // DELETE /api/tiac/:id
 router.delete('/:id', (req, res) => {
+  const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
-  const info = run('DELETE FROM tiac_procedures WHERE id = ?', [id]);
+  const info = run('DELETE FROM tiac_procedures WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (info.changes === 0) return res.status(404).json({ error: 'Procédure introuvable' });
   res.json({ deleted: true });
 });

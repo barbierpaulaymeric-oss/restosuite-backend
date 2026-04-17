@@ -11,6 +11,7 @@ router.use(requireAuth);
 // GET /api/stock — Stock actuel avec alertes
 // ═══════════════════════════════════════════
 router.get('/', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { q, limit: limStr, offset: offsetStr } = req.query;
   const limit = Math.min(parseInt(limStr) || 50, 200);
   const offset = Math.max(parseInt(offsetStr) || 0, 0);
@@ -20,23 +21,24 @@ router.get('/', (req, res) => {
            CASE WHEN s.quantity <= s.min_quantity AND s.min_quantity > 0 THEN 1 ELSE 0 END as is_alert,
            sup.name as supplier_name
     FROM stock s
-    JOIN ingredients i ON i.id = s.ingredient_id
+    JOIN ingredients i ON i.id = s.ingredient_id AND i.restaurant_id = ?
     LEFT JOIN suppliers sup ON sup.id = COALESCE(
       i.preferred_supplier_id,
-      (SELECT sp.supplier_id FROM supplier_prices sp WHERE sp.ingredient_id = i.id ORDER BY sp.last_updated DESC LIMIT 1)
-    )
+      (SELECT sp.supplier_id FROM supplier_prices sp WHERE sp.ingredient_id = i.id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1)
+    ) AND sup.restaurant_id = ?
+    WHERE s.restaurant_id = ?
   `;
-  const params = [];
+  const params = [rid, rid, rid, rid];
   if (q) {
-    baseSql += ' WHERE i.name LIKE ?';
+    baseSql += ' AND i.name LIKE ?';
     params.push(`%${q}%`);
   }
 
   // Get total count
-  let countSql = 'SELECT COUNT(*) as total FROM stock s JOIN ingredients i ON i.id = s.ingredient_id';
-  const countParams = [];
+  let countSql = 'SELECT COUNT(*) as total FROM stock s JOIN ingredients i ON i.id = s.ingredient_id AND i.restaurant_id = ? WHERE s.restaurant_id = ?';
+  const countParams = [rid, rid];
   if (q) {
-    countSql += ' WHERE i.name LIKE ?';
+    countSql += ' AND i.name LIKE ?';
     countParams.push(`%${q}%`);
   }
   const countResult = get(countSql, countParams);
@@ -46,7 +48,7 @@ router.get('/', (req, res) => {
   params.push(limit, offset);
 
   const items = all(sql, params);
-  const productCount = get('SELECT COUNT(*) as count FROM stock WHERE quantity > 0');
+  const productCount = get('SELECT COUNT(*) as count FROM stock WHERE quantity > 0 AND restaurant_id = ?', [rid]);
 
   res.json({ items, total, limit, offset, product_count: productCount ? productCount.count : 0 });
 });
@@ -55,13 +57,14 @@ router.get('/', (req, res) => {
 // GET /api/stock/alerts — Ingrédients sous le seuil
 // ═══════════════════════════════════════════
 router.get('/alerts', (req, res) => {
+  const rid = req.user.restaurant_id;
   const alerts = all(`
     SELECT s.*, i.name as ingredient_name, i.category
     FROM stock s
-    JOIN ingredients i ON i.id = s.ingredient_id
-    WHERE s.quantity <= s.min_quantity AND s.min_quantity > 0
+    JOIN ingredients i ON i.id = s.ingredient_id AND i.restaurant_id = ?
+    WHERE s.restaurant_id = ? AND s.quantity <= s.min_quantity AND s.min_quantity > 0
     ORDER BY (s.quantity / s.min_quantity) ASC
-  `);
+  `, [rid, rid]);
   res.json(alerts);
 });
 
@@ -70,6 +73,7 @@ router.get('/alerts', (req, res) => {
 // ═══════════════════════════════════════════
 router.post('/reception', validate(stockReceptionValidation), (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { lines, recorded_by } = req.body;
     // lines = [{ ingredient_id, quantity, unit, unit_price, supplier_id, batch_number, dlc, temperature, notes }]
     if (!lines || !Array.isArray(lines) || lines.length === 0) {
@@ -97,32 +101,32 @@ router.post('/reception', validate(stockReceptionValidation), (req, res) => {
       for (const line of lines) {
         const { ingredient_id, quantity, unit, unit_price, supplier_id, batch_number, dlc, temperature, notes } = line;
 
-        const ingredient = get('SELECT * FROM ingredients WHERE id = ?', [ingredient_id]);
+        const ingredient = get('SELECT * FROM ingredients WHERE id = ? AND restaurant_id = ?', [ingredient_id, rid]);
         if (!ingredient) throw new Error(`Ingrédient #${ingredient_id} introuvable`);
 
       // 1. Enregistrer le mouvement
       const mvInfo = run(
-        `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, supplier_id, batch_number, dlc, unit_price, recorded_by)
-         VALUES (?, 'reception', ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [ingredient_id, quantity, unit, notes || null, supplier_id || null, batch_number || null, dlc || null, unit_price || null, recorded_by || null]
+        `INSERT INTO stock_movements (restaurant_id, ingredient_id, movement_type, quantity, unit, reason, supplier_id, batch_number, dlc, unit_price, recorded_by)
+         VALUES (?, ?, 'reception', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [rid, ingredient_id, quantity, unit, notes || null, supplier_id || null, batch_number || null, dlc || null, unit_price || null, recorded_by || null]
       );
 
       // 2. Mettre à jour le stock actuel
-      const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredient_id]);
+      const existing = get('SELECT * FROM stock WHERE ingredient_id = ? AND restaurant_id = ?', [ingredient_id, rid]);
       if (existing) {
         run(
-          'UPDATE stock SET quantity = quantity + ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
-          [quantity, ingredient_id]
+          'UPDATE stock SET quantity = quantity + ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ? AND restaurant_id = ?',
+          [quantity, ingredient_id, rid]
         );
       } else {
         run(
-          'INSERT INTO stock (ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, 0)',
-          [ingredient_id, quantity, unit]
+          'INSERT INTO stock (restaurant_id, ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, ?, 0)',
+          [rid, ingredient_id, quantity, unit]
         );
       }
 
       // 3. Créer une entrée HACCP traçabilité automatiquement
-      const supplier = supplier_id ? get('SELECT name FROM suppliers WHERE id = ?', [supplier_id]) : null;
+      const supplier = supplier_id ? get('SELECT name FROM suppliers WHERE id = ? AND restaurant_id = ?', [supplier_id, rid]) : null;
       run(
         `INSERT INTO traceability_logs (product_name, supplier, batch_number, dlc, temperature_at_reception, quantity, unit, received_by, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -132,9 +136,9 @@ router.post('/reception', validate(stockReceptionValidation), (req, res) => {
       // 4. Track price history for mercuriale
       if (unit_price && unit_price > 0) {
         run(
-          `INSERT INTO price_history (ingredient_id, supplier_id, price, recorded_at)
-           VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
-          [ingredient_id, supplier_id || null, unit_price]
+          `INSERT INTO price_history (restaurant_id, ingredient_id, supplier_id, price, recorded_at)
+           VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+          [rid, ingredient_id, supplier_id || null, unit_price]
         );
       }
 
@@ -155,6 +159,7 @@ router.post('/reception', validate(stockReceptionValidation), (req, res) => {
 // ═══════════════════════════════════════════
 router.post('/loss', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { ingredient_id, quantity, unit, reason, recorded_by } = req.body;
 
     if (!ingredient_id || !quantity || !unit) {
@@ -166,18 +171,18 @@ router.post('/loss', (req, res) => {
       return res.status(400).json({ error: 'quantity must be a positive number' });
     }
 
-    const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredient_id]);
+    const existing = get('SELECT * FROM stock WHERE ingredient_id = ? AND restaurant_id = ?', [ingredient_id, rid]);
     if (!existing) return res.status(404).json({ error: 'Cet ingrédient n\'est pas en stock' });
 
     run(
-      `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, recorded_by)
-       VALUES (?, 'loss', ?, ?, ?, ?)`,
-      [ingredient_id, quantity, unit, reason || 'Perte / casse', recorded_by || null]
+      `INSERT INTO stock_movements (restaurant_id, ingredient_id, movement_type, quantity, unit, reason, recorded_by)
+       VALUES (?, ?, 'loss', ?, ?, ?, ?)`,
+      [rid, ingredient_id, quantity, unit, reason || 'Perte / casse', recorded_by || null]
     );
 
     run(
-      'UPDATE stock SET quantity = MAX(0, quantity - ?), last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
-      [quantity, ingredient_id]
+      'UPDATE stock SET quantity = MAX(0, quantity - ?), last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ? AND restaurant_id = ?',
+      [quantity, ingredient_id, rid]
     );
 
     res.json({ success: true });
@@ -191,6 +196,7 @@ router.post('/loss', (req, res) => {
 // ═══════════════════════════════════════════
 router.post('/adjustment', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { ingredient_id, quantity, unit, reason, recorded_by } = req.body;
 
     if (!ingredient_id || quantity == null || !unit) {
@@ -202,24 +208,24 @@ router.post('/adjustment', (req, res) => {
       return res.status(400).json({ error: 'quantity must be a number' });
     }
 
-    const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredient_id]);
+    const existing = get('SELECT * FROM stock WHERE ingredient_id = ? AND restaurant_id = ?', [ingredient_id, rid]);
 
     // quantity here is the adjustment delta (+/-)
     run(
-      `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, recorded_by)
-       VALUES (?, 'adjustment', ?, ?, ?, ?)`,
-      [ingredient_id, quantity, unit, reason || 'Ajustement inventaire', recorded_by || null]
+      `INSERT INTO stock_movements (restaurant_id, ingredient_id, movement_type, quantity, unit, reason, recorded_by)
+       VALUES (?, ?, 'adjustment', ?, ?, ?, ?)`,
+      [rid, ingredient_id, quantity, unit, reason || 'Ajustement inventaire', recorded_by || null]
     );
 
     if (existing) {
       run(
-        'UPDATE stock SET quantity = MAX(0, quantity + ?), last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
-        [quantity, ingredient_id]
+        'UPDATE stock SET quantity = MAX(0, quantity + ?), last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ? AND restaurant_id = ?',
+        [quantity, ingredient_id, rid]
       );
     } else {
       run(
-        'INSERT INTO stock (ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, 0)',
-        [ingredient_id, Math.max(0, quantity), unit]
+        'INSERT INTO stock (restaurant_id, ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, ?, 0)',
+        [rid, ingredient_id, Math.max(0, quantity), unit]
       );
     }
 
@@ -234,6 +240,7 @@ router.post('/adjustment', (req, res) => {
 // ═══════════════════════════════════════════
 router.post('/inventory', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { ingredient_id, new_quantity, unit, recorded_by } = req.body;
 
     if (!ingredient_id || new_quantity == null || !unit) {
@@ -245,25 +252,25 @@ router.post('/inventory', (req, res) => {
       return res.status(400).json({ error: 'new_quantity must be a non-negative number' });
     }
 
-    const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredient_id]);
+    const existing = get('SELECT * FROM stock WHERE ingredient_id = ? AND restaurant_id = ?', [ingredient_id, rid]);
     const oldQty = existing ? existing.quantity : 0;
     const delta = new_quantity - oldQty;
 
     run(
-      `INSERT INTO stock_movements (ingredient_id, movement_type, quantity, unit, reason, recorded_by)
-       VALUES (?, 'inventory', ?, ?, ?, ?)`,
-      [ingredient_id, delta, unit, `Inventaire : ${oldQty} → ${new_quantity}`, recorded_by || null]
+      `INSERT INTO stock_movements (restaurant_id, ingredient_id, movement_type, quantity, unit, reason, recorded_by)
+       VALUES (?, ?, 'inventory', ?, ?, ?, ?)`,
+      [rid, ingredient_id, delta, unit, `Inventaire : ${oldQty} → ${new_quantity}`, recorded_by || null]
     );
 
     if (existing) {
       run(
-        'UPDATE stock SET quantity = ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ?',
-        [new_quantity, ingredient_id]
+        'UPDATE stock SET quantity = ?, last_updated = CURRENT_TIMESTAMP WHERE ingredient_id = ? AND restaurant_id = ?',
+        [new_quantity, ingredient_id, rid]
       );
     } else {
       run(
-        'INSERT INTO stock (ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, 0)',
-        [ingredient_id, new_quantity, unit]
+        'INSERT INTO stock (restaurant_id, ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, ?, 0)',
+        [rid, ingredient_id, new_quantity, unit]
       );
     }
 
@@ -277,24 +284,26 @@ router.post('/inventory', (req, res) => {
 // GET /api/stock/movements — Historique des mouvements
 // ═══════════════════════════════════════════
 router.get('/movements', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { ingredient_id, type, from, to, limit: lim } = req.query;
   let sql = `
     SELECT sm.*, i.name as ingredient_name, i.category,
            s2.name as supplier_name, a.name as recorded_by_name
     FROM stock_movements sm
-    JOIN ingredients i ON i.id = sm.ingredient_id
-    LEFT JOIN suppliers s2 ON s2.id = sm.supplier_id
+    JOIN ingredients i ON i.id = sm.ingredient_id AND i.restaurant_id = ?
+    LEFT JOIN suppliers s2 ON s2.id = sm.supplier_id AND s2.restaurant_id = ?
     LEFT JOIN accounts a ON a.id = sm.recorded_by
+    WHERE sm.restaurant_id = ?
   `;
   const conditions = [];
-  const params = [];
+  const params = [rid, rid, rid];
 
   if (ingredient_id) { conditions.push('sm.ingredient_id = ?'); params.push(Number(ingredient_id)); }
   if (type) { conditions.push('sm.movement_type = ?'); params.push(type); }
   if (from) { conditions.push("date(sm.recorded_at) >= date(?)"); params.push(from); }
   if (to) { conditions.push("date(sm.recorded_at) <= date(?)"); params.push(to); }
 
-  if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
+  if (conditions.length) sql += ' AND ' + conditions.join(' AND ');
   sql += ' ORDER BY sm.recorded_at DESC';
   sql += ` LIMIT ${parseInt(lim) || 200}`;
 
@@ -305,20 +314,22 @@ router.get('/movements', (req, res) => {
 // GET /api/stock/export/pdf — Export PDF mouvements
 // ═══════════════════════════════════════════
 router.get('/export/pdf', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { from, to } = req.query;
   let sql = `
     SELECT sm.*, i.name as ingredient_name,
            s2.name as supplier_name, a.name as recorded_by_name
     FROM stock_movements sm
-    JOIN ingredients i ON i.id = sm.ingredient_id
-    LEFT JOIN suppliers s2 ON s2.id = sm.supplier_id
+    JOIN ingredients i ON i.id = sm.ingredient_id AND i.restaurant_id = ?
+    LEFT JOIN suppliers s2 ON s2.id = sm.supplier_id AND s2.restaurant_id = ?
     LEFT JOIN accounts a ON a.id = sm.recorded_by
+    WHERE sm.restaurant_id = ?
   `;
   const conditions = [];
-  const params = [];
+  const params = [rid, rid, rid];
   if (from) { conditions.push("date(sm.recorded_at) >= date(?)"); params.push(from); }
   if (to) { conditions.push("date(sm.recorded_at) <= date(?)"); params.push(to); }
-  if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
+  if (conditions.length) sql += ' AND ' + conditions.join(' AND ');
   sql += ' ORDER BY sm.recorded_at DESC';
   const movements = all(sql, params);
 
@@ -425,6 +436,7 @@ router.get('/export/pdf', (req, res) => {
 // ═══════════════════════════════════════════
 router.put('/:ingredientId/min', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const ingredientId = Number(req.params.ingredientId);
     const { min_quantity } = req.body;
 
@@ -435,15 +447,15 @@ router.put('/:ingredientId/min', (req, res) => {
       return res.status(400).json({ error: 'min_quantity must be a non-negative number' });
     }
 
-    const existing = get('SELECT * FROM stock WHERE ingredient_id = ?', [ingredientId]);
+    const existing = get('SELECT * FROM stock WHERE ingredient_id = ? AND restaurant_id = ?', [ingredientId, rid]);
     if (existing) {
-      run('UPDATE stock SET min_quantity = ? WHERE ingredient_id = ?', [min_quantity, ingredientId]);
+      run('UPDATE stock SET min_quantity = ? WHERE ingredient_id = ? AND restaurant_id = ?', [min_quantity, ingredientId, rid]);
     } else {
-      const ingredient = get('SELECT * FROM ingredients WHERE id = ?', [ingredientId]);
+      const ingredient = get('SELECT * FROM ingredients WHERE id = ? AND restaurant_id = ?', [ingredientId, rid]);
       if (!ingredient) return res.status(404).json({ error: 'Ingrédient introuvable' });
       run(
-        'INSERT INTO stock (ingredient_id, quantity, unit, min_quantity) VALUES (?, 0, ?, ?)',
-        [ingredientId, ingredient.default_unit || 'kg', min_quantity]
+        'INSERT INTO stock (restaurant_id, ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, 0, ?, ?)',
+        [rid, ingredientId, ingredient.default_unit || 'kg', min_quantity]
       );
     }
 

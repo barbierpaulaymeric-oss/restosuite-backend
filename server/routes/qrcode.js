@@ -39,7 +39,8 @@ router.get('/table/:tableNumber', async (req, res) => {
 // ═══════════════════════════════════════════
 router.get('/tables', async (req, res) => {
   try {
-    const tables = all('SELECT * FROM tables WHERE active = 1 ORDER BY table_number');
+    const rid = req.user.restaurant_id;
+    const tables = all('SELECT * FROM tables WHERE active = 1 AND restaurant_id = ? ORDER BY table_number', [rid]);
     
     const qrCodes = [];
     for (const table of tables) {

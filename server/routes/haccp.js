@@ -11,12 +11,14 @@ router.use(requireAuth);
 // ═══════════════════════════════════════════
 
 router.get('/zones', (req, res) => {
-  const zones = all('SELECT * FROM temperature_zones ORDER BY name');
+  const rid = req.user.restaurant_id;
+  const zones = all('SELECT * FROM temperature_zones WHERE restaurant_id = ? ORDER BY name', [rid]);
   res.json(zones);
 });
 
 router.post('/zones', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { name, type, min_temp, max_temp } = req.body;
 
     if (!name) return res.status(400).json({ error: 'Le nom est requis' });
@@ -35,10 +37,10 @@ router.post('/zones', (req, res) => {
     }
 
     const info = run(
-      'INSERT INTO temperature_zones (name, type, min_temp, max_temp) VALUES (?, ?, ?, ?)',
-      [name, type || 'fridge', min_temp ?? 0, max_temp ?? 4]
+      'INSERT INTO temperature_zones (restaurant_id, name, type, min_temp, max_temp) VALUES (?, ?, ?, ?, ?)',
+      [rid, name, type || 'fridge', min_temp ?? 0, max_temp ?? 4]
     );
-    const zone = get('SELECT * FROM temperature_zones WHERE id = ?', [info.lastInsertRowid]);
+    const zone = get('SELECT * FROM temperature_zones WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
     res.status(201).json(zone);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -47,8 +49,9 @@ router.post('/zones', (req, res) => {
 
 router.put('/zones/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const existing = get('SELECT * FROM temperature_zones WHERE id = ?', [id]);
+    const existing = get('SELECT * FROM temperature_zones WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Zone introuvable' });
 
     const { name, type, min_temp, max_temp } = req.body;
@@ -67,19 +70,20 @@ router.put('/zones/:id', (req, res) => {
     }
 
     run(
-      'UPDATE temperature_zones SET name = ?, type = ?, min_temp = ?, max_temp = ? WHERE id = ?',
-      [name || existing.name, type || existing.type, min_temp ?? existing.min_temp, max_temp ?? existing.max_temp, id]
+      'UPDATE temperature_zones SET name = ?, type = ?, min_temp = ?, max_temp = ? WHERE id = ? AND restaurant_id = ?',
+      [name || existing.name, type || existing.type, min_temp ?? existing.min_temp, max_temp ?? existing.max_temp, id, rid]
     );
-    res.json(get('SELECT * FROM temperature_zones WHERE id = ?', [id]));
+    res.json(get('SELECT * FROM temperature_zones WHERE id = ? AND restaurant_id = ?', [id, rid]));
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
 router.delete('/zones/:id', (req, res) => {
+  const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
-  run('DELETE FROM temperature_logs WHERE zone_id = ?', [id]);
-  const info = run('DELETE FROM temperature_zones WHERE id = ?', [id]);
+  run('DELETE FROM temperature_logs WHERE zone_id = ? AND restaurant_id = ?', [id, rid]);
+  const info = run('DELETE FROM temperature_zones WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (info.changes === 0) return res.status(404).json({ error: 'Zone introuvable' });
   res.json({ deleted: true });
 });
@@ -89,25 +93,26 @@ router.delete('/zones/:id', (req, res) => {
 // ═══════════════════════════════════════════
 
 router.get('/temperatures', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { zone_id, date } = req.query;
   let sql = `
     SELECT tl.*, tz.name as zone_name, tz.min_temp, tz.max_temp, tz.type as zone_type,
            a.name as recorded_by_name
     FROM temperature_logs tl
-    JOIN temperature_zones tz ON tz.id = tl.zone_id
+    JOIN temperature_zones tz ON tz.id = tl.zone_id AND tz.restaurant_id = ?
     LEFT JOIN accounts a ON a.id = tl.recorded_by
+    WHERE tl.restaurant_id = ?
   `;
-  const conditions = [];
-  const params = [];
-  if (zone_id) { conditions.push('tl.zone_id = ?'); params.push(Number(zone_id)); }
-  if (date) { conditions.push("date(tl.recorded_at) = date(?)"); params.push(date); }
-  if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
+  const params = [rid, rid];
+  if (zone_id) { sql += ' AND tl.zone_id = ?'; params.push(Number(zone_id)); }
+  if (date) { sql += " AND date(tl.recorded_at) = date(?)"; params.push(date); }
   sql += ' ORDER BY tl.recorded_at DESC';
   res.json(all(sql, params));
 });
 
 router.post('/temperatures', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { zone_id, temperature, notes, recorded_by } = req.body;
 
     if (!zone_id || temperature == null) {
@@ -119,22 +124,22 @@ router.post('/temperatures', (req, res) => {
       return res.status(400).json({ error: 'temperature must be a number between -50 and 300°C' });
     }
 
-    const zone = get('SELECT * FROM temperature_zones WHERE id = ?', [zone_id]);
+    const zone = get('SELECT * FROM temperature_zones WHERE id = ? AND restaurant_id = ?', [zone_id, rid]);
     if (!zone) return res.status(404).json({ error: 'Zone introuvable' });
 
     const isAlert = (temperature < zone.min_temp || temperature > zone.max_temp) ? 1 : 0;
     const info = run(
-      'INSERT INTO temperature_logs (zone_id, temperature, recorded_by, notes, is_alert) VALUES (?, ?, ?, ?, ?)',
-      [zone_id, temperature, recorded_by || null, notes || null, isAlert]
+      'INSERT INTO temperature_logs (restaurant_id, zone_id, temperature, recorded_by, notes, is_alert) VALUES (?, ?, ?, ?, ?, ?)',
+      [rid, zone_id, temperature, recorded_by || null, notes || null, isAlert]
     );
     const log = get(`
       SELECT tl.*, tz.name as zone_name, tz.min_temp, tz.max_temp,
              a.name as recorded_by_name
       FROM temperature_logs tl
-      JOIN temperature_zones tz ON tz.id = tl.zone_id
+      JOIN temperature_zones tz ON tz.id = tl.zone_id AND tz.restaurant_id = ?
       LEFT JOIN accounts a ON a.id = tl.recorded_by
-      WHERE tl.id = ?
-    `, [info.lastInsertRowid]);
+      WHERE tl.id = ? AND tl.restaurant_id = ?
+    `, [rid, info.lastInsertRowid, rid]);
     res.status(201).json(log);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -142,22 +147,23 @@ router.post('/temperatures', (req, res) => {
 });
 
 router.get('/temperatures/today', (req, res) => {
-  const zones = all('SELECT * FROM temperature_zones ORDER BY name');
+  const rid = req.user.restaurant_id;
+  const zones = all('SELECT * FROM temperature_zones WHERE restaurant_id = ? ORDER BY name', [rid]);
   const today = new Date().toISOString().slice(0, 10);
   const result = zones.map(zone => {
     const lastLog = get(`
       SELECT tl.*, a.name as recorded_by_name
       FROM temperature_logs tl
       LEFT JOIN accounts a ON a.id = tl.recorded_by
-      WHERE tl.zone_id = ? AND date(tl.recorded_at) = date(?)
+      WHERE tl.zone_id = ? AND tl.restaurant_id = ? AND date(tl.recorded_at) = date(?)
       ORDER BY tl.recorded_at DESC LIMIT 1
-    `, [zone.id, today]);
+    `, [zone.id, rid, today]);
 
     const allToday = all(`
       SELECT * FROM temperature_logs
-      WHERE zone_id = ? AND date(recorded_at) = date(?)
+      WHERE zone_id = ? AND restaurant_id = ? AND date(recorded_at) = date(?)
       ORDER BY recorded_at DESC
-    `, [zone.id, today]);
+    `, [zone.id, rid, today]);
 
     // Check if last recording is older than 4 hours
     let needsRecording = true;
@@ -179,16 +185,17 @@ router.get('/temperatures/today', (req, res) => {
 });
 
 router.get('/temperatures/alerts', (req, res) => {
+  const rid = req.user.restaurant_id;
   const alerts = all(`
     SELECT tl.*, tz.name as zone_name, tz.min_temp, tz.max_temp,
            a.name as recorded_by_name
     FROM temperature_logs tl
-    JOIN temperature_zones tz ON tz.id = tl.zone_id
+    JOIN temperature_zones tz ON tz.id = tl.zone_id AND tz.restaurant_id = ?
     LEFT JOIN accounts a ON a.id = tl.recorded_by
-    WHERE tl.is_alert = 1
+    WHERE tl.is_alert = 1 AND tl.restaurant_id = ?
     ORDER BY tl.recorded_at DESC
     LIMIT 50
-  `);
+  `, [rid, rid]);
   res.json(alerts);
 });
 
@@ -197,72 +204,78 @@ router.get('/temperatures/alerts', (req, res) => {
 // ═══════════════════════════════════════════
 
 router.get('/cleaning', (req, res) => {
-  const tasks = all('SELECT * FROM cleaning_tasks ORDER BY frequency, zone, name');
+  const rid = req.user.restaurant_id;
+  const tasks = all('SELECT * FROM cleaning_tasks WHERE restaurant_id = ? ORDER BY frequency, zone, name', [rid]);
   res.json(tasks);
 });
 
 router.post('/cleaning', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { name, zone, frequency, product, method, concentration, temps_contact, temperature_eau, rincage, epi } = req.body;
   if (!name || !zone) return res.status(400).json({ error: 'name et zone sont requis' });
   const info = run(
-    'INSERT INTO cleaning_tasks (name, zone, frequency, product, method, concentration, temps_contact, temperature_eau, rincage, epi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [name, zone, frequency || 'daily', product || null, method || null,
+    'INSERT INTO cleaning_tasks (restaurant_id, name, zone, frequency, product, method, concentration, temps_contact, temperature_eau, rincage, epi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [rid, name, zone, frequency || 'daily', product || null, method || null,
      concentration || null, temps_contact || null, temperature_eau || null, rincage || null, epi || null]
   );
-  res.status(201).json(get('SELECT * FROM cleaning_tasks WHERE id = ?', [info.lastInsertRowid]));
+  res.status(201).json(get('SELECT * FROM cleaning_tasks WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]));
 });
 
 router.put('/cleaning/:id', (req, res) => {
+  const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
-  const existing = get('SELECT * FROM cleaning_tasks WHERE id = ?', [id]);
+  const existing = get('SELECT * FROM cleaning_tasks WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (!existing) return res.status(404).json({ error: 'Tâche introuvable' });
   const { name, zone, frequency, product, method, concentration, temps_contact, temperature_eau, rincage, epi } = req.body;
   run(
-    'UPDATE cleaning_tasks SET name = ?, zone = ?, frequency = ?, product = ?, method = ?, concentration = ?, temps_contact = ?, temperature_eau = ?, rincage = ?, epi = ? WHERE id = ?',
+    'UPDATE cleaning_tasks SET name = ?, zone = ?, frequency = ?, product = ?, method = ?, concentration = ?, temps_contact = ?, temperature_eau = ?, rincage = ?, epi = ? WHERE id = ? AND restaurant_id = ?',
     [name || existing.name, zone || existing.zone, frequency || existing.frequency,
      product !== undefined ? product : existing.product, method !== undefined ? method : existing.method,
      concentration !== undefined ? concentration : existing.concentration,
      temps_contact !== undefined ? temps_contact : existing.temps_contact,
      temperature_eau !== undefined ? temperature_eau : existing.temperature_eau,
      rincage !== undefined ? rincage : existing.rincage,
-     epi !== undefined ? epi : existing.epi, id]
+     epi !== undefined ? epi : existing.epi, id, rid]
   );
-  res.json(get('SELECT * FROM cleaning_tasks WHERE id = ?', [id]));
+  res.json(get('SELECT * FROM cleaning_tasks WHERE id = ? AND restaurant_id = ?', [id, rid]));
 });
 
 router.delete('/cleaning/:id', (req, res) => {
+  const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
-  run('DELETE FROM cleaning_logs WHERE task_id = ?', [id]);
-  const info = run('DELETE FROM cleaning_tasks WHERE id = ?', [id]);
+  run('DELETE FROM cleaning_logs WHERE task_id = ? AND restaurant_id = ?', [id, rid]);
+  const info = run('DELETE FROM cleaning_tasks WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (info.changes === 0) return res.status(404).json({ error: 'Tâche introuvable' });
   res.json({ deleted: true });
 });
 
 router.post('/cleaning/:id/done', (req, res) => {
+  const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
-  const task = get('SELECT * FROM cleaning_tasks WHERE id = ?', [id]);
+  const task = get('SELECT * FROM cleaning_tasks WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (!task) return res.status(404).json({ error: 'Tâche introuvable' });
   const { completed_by, notes } = req.body;
   const info = run(
-    'INSERT INTO cleaning_logs (task_id, completed_by, notes) VALUES (?, ?, ?)',
-    [id, completed_by || null, notes || null]
+    'INSERT INTO cleaning_logs (restaurant_id, task_id, completed_by, notes) VALUES (?, ?, ?, ?)',
+    [rid, id, completed_by || null, notes || null]
   );
   const log = get(`
     SELECT cl.*, ct.name as task_name, a.name as completed_by_name
     FROM cleaning_logs cl
-    JOIN cleaning_tasks ct ON ct.id = cl.task_id
+    JOIN cleaning_tasks ct ON ct.id = cl.task_id AND ct.restaurant_id = ?
     LEFT JOIN accounts a ON a.id = cl.completed_by
-    WHERE cl.id = ?
-  `, [info.lastInsertRowid]);
+    WHERE cl.id = ? AND cl.restaurant_id = ?
+  `, [rid, info.lastInsertRowid, rid]);
   res.status(201).json(log);
 });
 
 router.get('/cleaning/today', (req, res) => {
+  const rid = req.user.restaurant_id;
   const today = new Date().toISOString().slice(0, 10);
   const dayOfWeek = new Date().getDay(); // 0=Sunday
   const dayOfMonth = new Date().getDate();
 
-  const tasks = all('SELECT * FROM cleaning_tasks ORDER BY zone, name');
+  const tasks = all('SELECT * FROM cleaning_tasks WHERE restaurant_id = ? ORDER BY zone, name', [rid]);
   const result = tasks.filter(task => {
     if (task.frequency === 'daily') return true;
     if (task.frequency === 'weekly') return dayOfWeek === 1; // Monday
@@ -273,9 +286,9 @@ router.get('/cleaning/today', (req, res) => {
       SELECT cl.*, a.name as completed_by_name
       FROM cleaning_logs cl
       LEFT JOIN accounts a ON a.id = cl.completed_by
-      WHERE cl.task_id = ? AND date(cl.completed_at) = date(?)
+      WHERE cl.task_id = ? AND cl.restaurant_id = ? AND date(cl.completed_at) = date(?)
       ORDER BY cl.completed_at DESC LIMIT 1
-    `, [task.id, today]);
+    `, [task.id, rid, today]);
     return {
       ...task,
       done_today: !!lastDone,
@@ -294,28 +307,29 @@ router.get('/cleaning/today', (req, res) => {
 // ═══════════════════════════════════════════
 
 router.get('/traceability', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { date, supplier } = req.query;
   let sql = `
     SELECT tl.*, a.name as received_by_name
     FROM traceability_logs tl
     LEFT JOIN accounts a ON a.id = tl.received_by
+    WHERE tl.restaurant_id = ?
   `;
-  const conditions = [];
-  const params = [];
-  if (date) { conditions.push("date(tl.received_at) = date(?)"); params.push(date); }
-  if (supplier) { conditions.push("tl.supplier LIKE ?"); params.push(`%${supplier}%`); }
-  if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
+  const params = [rid];
+  if (date) { sql += " AND date(tl.received_at) = date(?)"; params.push(date); }
+  if (supplier) { sql += " AND tl.supplier LIKE ?"; params.push(`%${supplier}%`); }
   sql += ' ORDER BY tl.received_at DESC';
   res.json(all(sql, params));
 });
 
 router.post('/traceability', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { product_name, supplier, batch_number, dlc, ddm, temperature_at_reception, quantity, unit, received_by, notes, etat_emballage, conformite_organoleptique, numero_bl } = req.body;
   if (!product_name) return res.status(400).json({ error: 'Le nom du produit est requis' });
   const info = run(
-    `INSERT INTO traceability_logs (product_name, supplier, batch_number, dlc, ddm, temperature_at_reception, quantity, unit, received_by, notes, etat_emballage, conformite_organoleptique, numero_bl)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [product_name, supplier || null, batch_number || null, dlc || null, ddm || null,
+    `INSERT INTO traceability_logs (restaurant_id, product_name, supplier, batch_number, dlc, ddm, temperature_at_reception, quantity, unit, received_by, notes, etat_emballage, conformite_organoleptique, numero_bl)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [rid, product_name, supplier || null, batch_number || null, dlc || null, ddm || null,
      temperature_at_reception ?? null, quantity ?? null, unit || 'kg', received_by || null, notes || null,
      etat_emballage || null, conformite_organoleptique || null, numero_bl || null]
   );
@@ -323,21 +337,22 @@ router.post('/traceability', (req, res) => {
     SELECT tl.*, a.name as received_by_name
     FROM traceability_logs tl
     LEFT JOIN accounts a ON a.id = tl.received_by
-    WHERE tl.id = ?
-  `, [info.lastInsertRowid]);
+    WHERE tl.id = ? AND tl.restaurant_id = ?
+  `, [info.lastInsertRowid, rid]);
   res.status(201).json(log);
 });
 
 router.get('/traceability/dlc-alerts', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const now = new Date();
     const in3days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const rows = db.prepare(`
       SELECT *, CAST((julianday(dlc) - julianday('now')) AS INTEGER) as days_until_dlc
       FROM traceability_logs
-      WHERE dlc IS NOT NULL AND dlc <= ?
+      WHERE dlc IS NOT NULL AND dlc <= ? AND restaurant_id = ?
       ORDER BY dlc ASC
-    `).all(in3days);
+    `).all(in3days, rid);
     const categorized = rows.map(r => ({
       ...r,
       alert_level: r.days_until_dlc < 0 ? 'expired' :
@@ -398,19 +413,19 @@ function checkPageBreak(doc, y, needed) {
 
 // Export temperatures PDF
 router.get('/export/temperatures', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { from, to } = req.query;
   let sql = `
     SELECT tl.*, tz.name as zone_name, tz.min_temp, tz.max_temp,
            a.name as recorded_by_name
     FROM temperature_logs tl
-    JOIN temperature_zones tz ON tz.id = tl.zone_id
+    JOIN temperature_zones tz ON tz.id = tl.zone_id AND tz.restaurant_id = ?
     LEFT JOIN accounts a ON a.id = tl.recorded_by
+    WHERE tl.restaurant_id = ?
   `;
-  const conditions = [];
-  const params = [];
-  if (from) { conditions.push("date(tl.recorded_at) >= date(?)"); params.push(from); }
-  if (to) { conditions.push("date(tl.recorded_at) <= date(?)"); params.push(to); }
-  if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
+  const params = [rid, rid];
+  if (from) { sql += " AND date(tl.recorded_at) >= date(?)"; params.push(from); }
+  if (to) { sql += " AND date(tl.recorded_at) <= date(?)"; params.push(to); }
   sql += ' ORDER BY tl.recorded_at DESC';
   const logs = all(sql, params);
 
@@ -480,20 +495,20 @@ router.get('/export/temperatures', (req, res) => {
 
 // Export cleaning PDF
 router.get('/export/cleaning', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { from, to } = req.query;
-  const tasks = all('SELECT * FROM cleaning_tasks ORDER BY frequency, zone, name');
+  const tasks = all('SELECT * FROM cleaning_tasks WHERE restaurant_id = ? ORDER BY frequency, zone, name', [rid]);
 
   let logSql = `
     SELECT cl.*, ct.name as task_name, ct.zone, ct.frequency, a.name as completed_by_name
     FROM cleaning_logs cl
-    JOIN cleaning_tasks ct ON ct.id = cl.task_id
+    JOIN cleaning_tasks ct ON ct.id = cl.task_id AND ct.restaurant_id = ?
     LEFT JOIN accounts a ON a.id = cl.completed_by
+    WHERE cl.restaurant_id = ?
   `;
-  const conditions = [];
-  const params = [];
-  if (from) { conditions.push("date(cl.completed_at) >= date(?)"); params.push(from); }
-  if (to) { conditions.push("date(cl.completed_at) <= date(?)"); params.push(to); }
-  if (conditions.length) logSql += ' WHERE ' + conditions.join(' AND ');
+  const params = [rid, rid];
+  if (from) { logSql += " AND date(cl.completed_at) >= date(?)"; params.push(from); }
+  if (to) { logSql += " AND date(cl.completed_at) <= date(?)"; params.push(to); }
   logSql += ' ORDER BY cl.completed_at DESC';
   const logs = all(logSql, params);
 
@@ -564,17 +579,17 @@ router.get('/export/cleaning', (req, res) => {
 
 // Export traceability PDF
 router.get('/export/traceability', (req, res) => {
+  const rid = req.user.restaurant_id;
   const { from, to } = req.query;
   let sql = `
     SELECT tl.*, a.name as received_by_name
     FROM traceability_logs tl
     LEFT JOIN accounts a ON a.id = tl.received_by
+    WHERE tl.restaurant_id = ?
   `;
-  const conditions = [];
-  const params = [];
-  if (from) { conditions.push("date(tl.received_at) >= date(?)"); params.push(from); }
-  if (to) { conditions.push("date(tl.received_at) <= date(?)"); params.push(to); }
-  if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
+  const params = [rid];
+  if (from) { sql += " AND date(tl.received_at) >= date(?)"; params.push(from); }
+  if (to) { sql += " AND date(tl.received_at) <= date(?)"; params.push(to); }
   sql += ' ORDER BY tl.received_at DESC';
   const logs = all(sql, params);
 
@@ -634,19 +649,24 @@ router.get('/export/traceability', (req, res) => {
 
 router.get('/cooling', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { from, to, limit = 50, offset = 0 } = req.query;
     let sql = `
       SELECT cl.*, a.name as recorded_by_name
       FROM cooling_logs cl
       LEFT JOIN accounts a ON cl.recorded_by = a.id
+      WHERE cl.restaurant_id = ?
     `;
-    const params = [];
-    const conditions = [];
-    if (from) { conditions.push("DATE(cl.start_time) >= DATE(?)"); params.push(from); }
-    if (to)   { conditions.push("DATE(cl.start_time) <= DATE(?)"); params.push(to); }
-    if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
+    const params = [rid];
+    if (from) { sql += " AND DATE(cl.start_time) >= DATE(?)"; params.push(from); }
+    if (to)   { sql += " AND DATE(cl.start_time) <= DATE(?)"; params.push(to); }
     sql += ' ORDER BY cl.start_time DESC';
-    const total = db.prepare(`SELECT COUNT(*) as c FROM cooling_logs cl ${conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''}`).get(...params).c;
+    // Build count query from same filter set
+    const countParams = [rid];
+    let countSql = `SELECT COUNT(*) as c FROM cooling_logs cl WHERE cl.restaurant_id = ?`;
+    if (from) { countSql += " AND DATE(cl.start_time) >= DATE(?)"; countParams.push(from); }
+    if (to)   { countSql += " AND DATE(cl.start_time) <= DATE(?)"; countParams.push(to); }
+    const total = db.prepare(countSql).get(...countParams).c;
     sql += ` LIMIT ? OFFSET ?`;
     params.push(Number(limit), Number(offset));
     const items = db.prepare(sql).all(...params);
@@ -658,6 +678,7 @@ router.get('/cooling', requireAuth, (req, res) => {
 
 router.post('/cooling', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { product_name, quantity, unit, start_time, temp_start, time_at_63c, time_at_10c, notes, recorded_by } = req.body;
     if (!product_name || !start_time || temp_start == null) {
       return res.status(400).json({ error: 'product_name, start_time et temp_start sont obligatoires' });
@@ -668,9 +689,9 @@ router.post('/cooling', requireAuth, (req, res) => {
       is_compliant = diffMs <= 2 * 60 * 60 * 1000 ? 1 : 0;
     }
     const result = db.prepare(`
-      INSERT INTO cooling_logs (product_name, quantity, unit, start_time, temp_start, time_at_63c, time_at_10c, is_compliant, notes, recorded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(product_name, quantity ?? null, unit ?? 'kg', start_time, temp_start, time_at_63c ?? null, time_at_10c ?? null, is_compliant, notes ?? null, recorded_by ?? null);
+      INSERT INTO cooling_logs (restaurant_id, product_name, quantity, unit, start_time, temp_start, time_at_63c, time_at_10c, is_compliant, notes, recorded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(rid, product_name, quantity ?? null, unit ?? 'kg', start_time, temp_start, time_at_63c ?? null, time_at_10c ?? null, is_compliant, notes ?? null, recorded_by ?? null);
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -679,6 +700,7 @@ router.post('/cooling', requireAuth, (req, res) => {
 
 router.put('/cooling/:id', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { time_at_63c, time_at_10c, notes } = req.body;
     let is_compliant = null;
     if (time_at_63c && time_at_10c) {
@@ -687,8 +709,8 @@ router.put('/cooling/:id', requireAuth, (req, res) => {
     }
     db.prepare(`
       UPDATE cooling_logs SET time_at_63c = ?, time_at_10c = ?, is_compliant = ?, notes = ?
-      WHERE id = ?
-    `).run(time_at_63c ?? null, time_at_10c ?? null, is_compliant, notes ?? null, req.params.id);
+      WHERE id = ? AND restaurant_id = ?
+    `).run(time_at_63c ?? null, time_at_10c ?? null, is_compliant, notes ?? null, req.params.id, rid);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -699,19 +721,23 @@ router.put('/cooling/:id', requireAuth, (req, res) => {
 
 router.get('/reheating', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { from, to, limit = 50, offset = 0 } = req.query;
     let sql = `
       SELECT rl.*, a.name as recorded_by_name
       FROM reheating_logs rl
       LEFT JOIN accounts a ON rl.recorded_by = a.id
+      WHERE rl.restaurant_id = ?
     `;
-    const params = [];
-    const conditions = [];
-    if (from) { conditions.push("DATE(rl.start_time) >= DATE(?)"); params.push(from); }
-    if (to)   { conditions.push("DATE(rl.start_time) <= DATE(?)"); params.push(to); }
-    if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
+    const params = [rid];
+    if (from) { sql += " AND DATE(rl.start_time) >= DATE(?)"; params.push(from); }
+    if (to)   { sql += " AND DATE(rl.start_time) <= DATE(?)"; params.push(to); }
     sql += ' ORDER BY rl.start_time DESC';
-    const total = db.prepare(`SELECT COUNT(*) as c FROM reheating_logs rl ${conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''}`).get(...params).c;
+    const countParams = [rid];
+    let countSql = `SELECT COUNT(*) as c FROM reheating_logs rl WHERE rl.restaurant_id = ?`;
+    if (from) { countSql += " AND DATE(rl.start_time) >= DATE(?)"; countParams.push(from); }
+    if (to)   { countSql += " AND DATE(rl.start_time) <= DATE(?)"; countParams.push(to); }
+    const total = db.prepare(countSql).get(...countParams).c;
     sql += ` LIMIT ? OFFSET ?`;
     params.push(Number(limit), Number(offset));
     const items = db.prepare(sql).all(...params);
@@ -723,6 +749,7 @@ router.get('/reheating', requireAuth, (req, res) => {
 
 router.post('/reheating', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { product_name, quantity, unit, start_time, temp_start, time_at_63c, notes, recorded_by } = req.body;
     if (!product_name || !start_time || temp_start == null) {
       return res.status(400).json({ error: 'product_name, start_time et temp_start sont obligatoires' });
@@ -733,9 +760,9 @@ router.post('/reheating', requireAuth, (req, res) => {
       is_compliant = diffMs <= 1 * 60 * 60 * 1000 ? 1 : 0;
     }
     const result = db.prepare(`
-      INSERT INTO reheating_logs (product_name, quantity, unit, start_time, temp_start, time_at_63c, is_compliant, notes, recorded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(product_name, quantity ?? null, unit ?? 'kg', start_time, temp_start, time_at_63c ?? null, is_compliant, notes ?? null, recorded_by ?? null);
+      INSERT INTO reheating_logs (restaurant_id, product_name, quantity, unit, start_time, temp_start, time_at_63c, is_compliant, notes, recorded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(rid, product_name, quantity ?? null, unit ?? 'kg', start_time, temp_start, time_at_63c ?? null, is_compliant, notes ?? null, recorded_by ?? null);
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -744,16 +771,17 @@ router.post('/reheating', requireAuth, (req, res) => {
 
 router.put('/reheating/:id', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { time_at_63c, notes } = req.body;
-    const existing = db.prepare('SELECT start_time FROM reheating_logs WHERE id = ?').get(req.params.id);
+    const existing = db.prepare('SELECT start_time FROM reheating_logs WHERE id = ? AND restaurant_id = ?').get(req.params.id, rid);
     if (!existing) return res.status(404).json({ error: 'Enregistrement non trouvé' });
     let is_compliant = null;
     if (time_at_63c) {
       const diffMs = new Date(time_at_63c) - new Date(existing.start_time);
       is_compliant = diffMs <= 1 * 60 * 60 * 1000 ? 1 : 0;
     }
-    db.prepare(`UPDATE reheating_logs SET time_at_63c = ?, is_compliant = ?, notes = ? WHERE id = ?`)
-      .run(time_at_63c ?? null, is_compliant, notes ?? null, req.params.id);
+    db.prepare(`UPDATE reheating_logs SET time_at_63c = ?, is_compliant = ?, notes = ? WHERE id = ? AND restaurant_id = ?`)
+      .run(time_at_63c ?? null, is_compliant, notes ?? null, req.params.id, rid);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -764,20 +792,21 @@ router.put('/reheating/:id', requireAuth, (req, res) => {
 
 router.get('/fryers', requireAuth, (req, res) => {
   try {
-    const fryers = db.prepare('SELECT * FROM fryers WHERE is_active = 1 ORDER BY name').all();
+    const rid = req.user.restaurant_id;
+    const fryers = db.prepare('SELECT * FROM fryers WHERE is_active = 1 AND restaurant_id = ? ORDER BY name').all(rid);
     const result = fryers.map(fryer => {
       const lastCheck = db.prepare(`
-        SELECT * FROM fryer_checks WHERE fryer_id = ? ORDER BY action_date DESC LIMIT 1
-      `).get(fryer.id);
+        SELECT * FROM fryer_checks WHERE fryer_id = ? AND restaurant_id = ? ORDER BY action_date DESC LIMIT 1
+      `).get(fryer.id, rid);
       const lastFilter = db.prepare(`
-        SELECT action_date FROM fryer_checks WHERE fryer_id = ? AND action_type = 'filtrage' ORDER BY action_date DESC LIMIT 1
-      `).get(fryer.id);
+        SELECT action_date FROM fryer_checks WHERE fryer_id = ? AND restaurant_id = ? AND action_type = 'filtrage' ORDER BY action_date DESC LIMIT 1
+      `).get(fryer.id, rid);
       const lastChange = db.prepare(`
-        SELECT action_date FROM fryer_checks WHERE fryer_id = ? AND action_type = 'changement' ORDER BY action_date DESC LIMIT 1
-      `).get(fryer.id);
+        SELECT action_date FROM fryer_checks WHERE fryer_id = ? AND restaurant_id = ? AND action_type = 'changement' ORDER BY action_date DESC LIMIT 1
+      `).get(fryer.id, rid);
       const serviceStart = db.prepare(`
-        SELECT action_date FROM fryer_checks WHERE fryer_id = ? AND action_type = 'mise_en_service' ORDER BY action_date DESC LIMIT 1
-      `).get(fryer.id);
+        SELECT action_date FROM fryer_checks WHERE fryer_id = ? AND restaurant_id = ? AND action_type = 'mise_en_service' ORDER BY action_date DESC LIMIT 1
+      `).get(fryer.id, rid);
       return { ...fryer, last_check: lastCheck, last_filter: lastFilter, last_change: lastChange, service_start: serviceStart };
     });
     res.json({ items: result, total: result.length });
@@ -788,9 +817,10 @@ router.get('/fryers', requireAuth, (req, res) => {
 
 router.post('/fryers', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: 'name est obligatoire' });
-    const result = db.prepare('INSERT INTO fryers (name) VALUES (?)').run(name);
+    const result = db.prepare('INSERT INTO fryers (restaurant_id, name) VALUES (?, ?)').run(rid, name);
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -799,14 +829,15 @@ router.post('/fryers', requireAuth, (req, res) => {
 
 router.get('/fryers/:id/checks', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const items = db.prepare(`
       SELECT fc.*, a.name as recorded_by_name
       FROM fryer_checks fc
       LEFT JOIN accounts a ON fc.recorded_by = a.id
-      WHERE fc.fryer_id = ?
+      WHERE fc.fryer_id = ? AND fc.restaurant_id = ?
       ORDER BY fc.action_date DESC
       LIMIT 100
-    `).all(req.params.id);
+    `).all(req.params.id, rid);
     res.json({ items, total: items.length });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -815,6 +846,7 @@ router.get('/fryers/:id/checks', requireAuth, (req, res) => {
 
 router.post('/fryers/:id/checks', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { action_type, action_date, polar_value, notes, recorded_by } = req.body;
     const VALID_TYPES = ['mise_en_service', 'controle_polaire', 'filtrage', 'changement'];
     if (!action_type || !VALID_TYPES.includes(action_type)) {
@@ -823,10 +855,13 @@ router.post('/fryers/:id/checks', requireAuth, (req, res) => {
     if (action_type === 'controle_polaire' && polar_value == null) {
       return res.status(400).json({ error: 'polar_value est obligatoire pour un contrôle polaire' });
     }
+    // Validate parent fryer belongs to caller tenant
+    const fryer = db.prepare('SELECT id FROM fryers WHERE id = ? AND restaurant_id = ?').get(req.params.id, rid);
+    if (!fryer) return res.status(404).json({ error: 'Friteuse non trouvée' });
     const result = db.prepare(`
-      INSERT INTO fryer_checks (fryer_id, action_type, action_date, polar_value, notes, recorded_by)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(req.params.id, action_type, action_date || new Date().toISOString(), polar_value ?? null, notes ?? null, recorded_by ?? null);
+      INSERT INTO fryer_checks (restaurant_id, fryer_id, action_type, action_date, polar_value, notes, recorded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(rid, req.params.id, action_type, action_date || new Date().toISOString(), polar_value ?? null, notes ?? null, recorded_by ?? null);
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -837,6 +872,7 @@ router.post('/fryers/:id/checks', requireAuth, (req, res) => {
 
 router.get('/non-conformities', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { status, limit = 50, offset = 0 } = req.query;
     let sql = `
       SELECT nc.*,
@@ -845,10 +881,14 @@ router.get('/non-conformities', requireAuth, (req, res) => {
       FROM non_conformities nc
       LEFT JOIN accounts a1 ON nc.detected_by = a1.id
       LEFT JOIN accounts a2 ON nc.resolved_by = a2.id
+      WHERE nc.restaurant_id = ?
     `;
-    const params = [];
-    if (status) { sql += ' WHERE nc.status = ?'; params.push(status); }
-    const total = db.prepare(`SELECT COUNT(*) as c FROM non_conformities nc ${status ? 'WHERE nc.status = ?' : ''}`).get(...(status ? [status] : [])).c;
+    const params = [rid];
+    if (status) { sql += ' AND nc.status = ?'; params.push(status); }
+    let countSql = `SELECT COUNT(*) as c FROM non_conformities nc WHERE nc.restaurant_id = ?`;
+    const countParams = [rid];
+    if (status) { countSql += ' AND nc.status = ?'; countParams.push(status); }
+    const total = db.prepare(countSql).get(...countParams).c;
     sql += ' ORDER BY nc.detected_at DESC LIMIT ? OFFSET ?';
     params.push(Number(limit), Number(offset));
     const items = db.prepare(sql).all(...params);
@@ -860,12 +900,13 @@ router.get('/non-conformities', requireAuth, (req, res) => {
 
 router.post('/non-conformities', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { title, description, category, severity, detected_by } = req.body;
     if (!title) return res.status(400).json({ error: 'title est obligatoire' });
     const result = db.prepare(`
-      INSERT INTO non_conformities (title, description, category, severity, detected_by)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(title, description ?? null, category ?? 'autre', severity ?? 'mineure', detected_by ?? null);
+      INSERT INTO non_conformities (restaurant_id, title, description, category, severity, detected_by)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(rid, title, description ?? null, category ?? 'autre', severity ?? 'mineure', detected_by ?? null);
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -874,20 +915,22 @@ router.post('/non-conformities', requireAuth, (req, res) => {
 
 router.put('/non-conformities/:id', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { corrective_action, status, resolved_by } = req.body;
-    const existing = db.prepare('SELECT * FROM non_conformities WHERE id = ?').get(req.params.id);
+    const existing = db.prepare('SELECT * FROM non_conformities WHERE id = ? AND restaurant_id = ?').get(req.params.id, rid);
     if (!existing) return res.status(404).json({ error: 'Non-conformité non trouvée' });
     const resolved_at = status === 'resolu' ? new Date().toISOString() : existing.resolved_at;
     db.prepare(`
       UPDATE non_conformities
       SET corrective_action = ?, status = ?, resolved_at = ?, resolved_by = ?
-      WHERE id = ?
+      WHERE id = ? AND restaurant_id = ?
     `).run(
       corrective_action ?? existing.corrective_action,
       status ?? existing.status,
       resolved_at,
       resolved_by ?? existing.resolved_by,
-      req.params.id
+      req.params.id,
+      rid
     );
     res.json({ ok: true });
   } catch (e) {
