@@ -53,7 +53,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.stripe.com https://generativelanguage.googleapis.com; frame-src https://js.stripe.com;");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.stripe.com https://generativelanguage.googleapis.com; frame-src https://js.stripe.com;");
   if (process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
@@ -179,6 +179,9 @@ if (!IS_TEST) {
   app.use('/api/stock', planGate('discovery'));
   app.use('/api/prices', planGate('discovery'));
   app.use('/api/variance', planGate('discovery'));
+  // Allergen declaration is a legal obligation under EU 1169/2011 (INCO) for
+  // every food business since 13/12/2014 — it cannot sit behind a paywall.
+  app.use('/api/allergens', planGate('discovery'));
 
   // essential — 29€/month
   app.use('/api/haccp', planGate('essential'));
@@ -186,7 +189,6 @@ if (!IS_TEST) {
   app.use('/api/orders', planGate('essential'));
   app.use('/api/deliveries', planGate('essential'));
   app.use('/api/purchase-orders', planGate('essential'));
-  app.use('/api/allergens', planGate('essential'));
   app.use('/api/qrcode', planGate('essential'));
   app.use('/api/menu', planGate('essential'));
   app.use('/api/alerts', planGate('essential'));

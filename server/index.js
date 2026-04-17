@@ -196,6 +196,9 @@ app.use('/api/recipes', planGate('discovery'));
 app.use('/api/stock', planGate('discovery'));
 app.use('/api/prices', planGate('discovery'));
 app.use('/api/variance', planGate('discovery'));
+// Allergen declaration is a legal obligation under EU 1169/2011 (INCO) for
+// every food business since 13/12/2014 — it cannot sit behind a paywall.
+app.use('/api/allergens', planGate('discovery'));
 
 // essential — 29€/month
 app.use('/api/haccp', planGate('essential'));
@@ -203,7 +206,6 @@ app.use('/api/suppliers', planGate('essential'));
 app.use('/api/orders', planGate('essential'));
 app.use('/api/deliveries', planGate('essential'));
 app.use('/api/purchase-orders', planGate('essential'));
-app.use('/api/allergens', planGate('essential'));
 app.use('/api/qrcode', planGate('essential'));
 app.use('/api/menu', planGate('essential'));
 app.use('/api/alerts', planGate('essential'));
