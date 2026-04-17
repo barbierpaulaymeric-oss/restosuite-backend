@@ -28,6 +28,18 @@ const upload = multer({
 // All AI routes require a valid JWT
 router.use(requireAuth);
 
+// ─── Action-level role restrictions (shared by /assistant filter and /execute-action gate) ───
+// gerant has full access; other roles are blocked from the listed action types.
+const ROLE_RESTRICTIONS = {
+  cuisinier: ['create_recipe', 'delete_recipe', 'add_supplier', 'modify_supplier_price'],
+  equipier: ['add_ingredient', 'modify_ingredient', 'create_recipe', 'delete_recipe', 'add_supplier', 'create_order', 'modify_supplier_price'],
+  salle: ['add_ingredient', 'modify_ingredient', 'create_recipe', 'delete_recipe', 'add_supplier', 'create_order', 'modify_supplier_price'],
+};
+
+function isActionAllowedForRole(type, role) {
+  return !ROLE_RESTRICTIONS[role]?.includes(type);
+}
+
 const VOICE_PARSE_SYSTEM = `Tu es un assistant culinaire professionnel spécialisé dans les fiches techniques de restaurant français.
 À partir d'une transcription vocale d'un chef, tu dois extraire une fiche technique structurée en JSON.
 
@@ -1077,6 +1089,12 @@ router.post('/execute-action', async (req, res) => {
     return res.status(400).json({ error: 'type et params requis' });
   }
 
+  // C-3 fix: role-gate before executing. Previously only the /assistant response
+  // was filtered; this endpoint bypassed role restrictions entirely.
+  if (!isActionAllowedForRole(type, user.role)) {
+    return res.status(403).json({ error: 'Action non autorisée pour ce rôle' });
+  }
+
   try {
     let result = null;
 
@@ -1245,18 +1263,8 @@ router.post('/execute-action', async (req, res) => {
 });
 
 function filterActionsByRole(actions, role) {
-  // Restrict certain actions based on role
-  const roleRestrictions = {
-    'cuisinier': ['create_recipe', 'delete_recipe', 'add_supplier', 'modify_supplier_price'],
-    'equipier': ['add_ingredient', 'modify_ingredient', 'create_recipe', 'delete_recipe', 'add_supplier', 'create_order', 'modify_supplier_price'],
-    'salle': ['add_ingredient', 'modify_ingredient', 'create_recipe', 'delete_recipe', 'add_supplier', 'create_order', 'modify_supplier_price'],
-  };
-
-  if (!roleRestrictions[role]) {
-    return actions; // gerant has full access
-  }
-
-  return actions.filter(action => !roleRestrictions[role].includes(action.type));
+  if (!ROLE_RESTRICTIONS[role]) return actions; // gerant has full access
+  return actions.filter(action => !ROLE_RESTRICTIONS[role].includes(action.type));
 }
 
 function buildPageContext(page, id) {

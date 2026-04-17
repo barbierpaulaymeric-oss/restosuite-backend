@@ -28,9 +28,9 @@ router.post('/score', requireAuth, (req, res) => {
     // Upsert: one score per day per restaurant
     run(
       `INSERT INTO health_score_history (restaurant_id, score, date)
-       VALUES (1, ?, date('now'))
+       VALUES (?, ?, date('now'))
        ON CONFLICT(restaurant_id, date) DO UPDATE SET score = excluded.score, recorded_at = datetime('now')`,
-      [s]
+      [req.user.restaurant_id, s]
     );
 
     res.json({ ok: true, score: s });
@@ -47,9 +47,9 @@ router.get('/history', requireAuth, (req, res) => {
 
     const history = all(
       `SELECT date, score FROM health_score_history
-       WHERE restaurant_id = 1 AND date >= ?
+       WHERE restaurant_id = ? AND date >= ?
        ORDER BY date ASC`,
-      [dateFrom]
+      [req.user.restaurant_id, dateFrom]
     );
 
     res.json({ days, history });

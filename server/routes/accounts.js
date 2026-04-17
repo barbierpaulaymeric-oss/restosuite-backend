@@ -304,33 +304,51 @@ router.delete('/:id', (req, res) => {
   res.json({ success: true });
 });
 
-// GET /api/accounts/:id/export — RGPD data export (requires auth)
+// GET /api/accounts/:id/export — RGPD data export (self or same-tenant gérant)
+// Phase 1 lockdown: bulk cross-tenant fields (recipes, ingredients, stock,
+// temperature_logs, cleaning_logs, traceability_logs, supplier_prices) are
+// temporarily removed because those tables currently lack restaurant_id and
+// returning them leaked the entire multi-tenant database. Phase 2 adds the
+// column and restores these fields with proper tenant filtering.
+// Ref: EVAL_SECURITE_EXPERT.md C-2, docs/plans/2026-04-17-multi-tenancy-isolation-design.md
 router.get('/:id/export', requireAuth, (req, res) => {
-  const { id } = req.params;
+  const targetId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(targetId)) {
+    return res.status(400).json({ error: 'id invalide' });
+  }
 
-  const account = get('SELECT id, name, role, created_at, last_login FROM accounts WHERE id = ?', [id]);
-  if (!account) {
+  const target = get(
+    'SELECT id, name, email, role, restaurant_id, created_at, last_login FROM accounts WHERE id = ?',
+    [targetId]
+  );
+  if (!target) {
     return res.status(404).json({ error: 'Compte introuvable' });
   }
 
-  const recipes = all('SELECT * FROM recipes');
-  const ingredients = all('SELECT * FROM ingredients');
-  const stock = all('SELECT * FROM stock');
-  const temperature_logs = all('SELECT * FROM temperature_logs');
-  const cleaning_logs = all('SELECT * FROM cleaning_logs');
-  const traceability_logs = all('SELECT * FROM traceability_logs');
-  const supplier_prices = all('SELECT * FROM supplier_prices');
+  const callerId = parseInt(req.user.id, 10);
+  const callerRole = req.user.role;
+  const callerRestaurantId = req.user.restaurant_id;
+
+  const isSelf = callerId === targetId;
+  const isSameTenantGerant =
+    callerRole === 'gerant' &&
+    callerRestaurantId != null &&
+    callerRestaurantId === target.restaurant_id;
+
+  if (!isSelf && !isSameTenantGerant) {
+    return res.status(403).json({ error: 'Accès refusé' });
+  }
+
+  const restaurant = target.restaurant_id
+    ? get('SELECT id, name, address, created_at FROM restaurants WHERE id = ?', [target.restaurant_id])
+    : null;
 
   const exportData = {
     exported_at: new Date().toISOString(),
-    account,
-    recipes,
-    ingredients,
-    stock,
-    temperature_logs,
-    cleaning_logs,
-    traceability_logs,
-    supplier_prices
+    account: target,
+    restaurant,
+    _notice:
+      'Phase 1 lockdown: recettes, ingrédients, stock et logs seront réintégrés avec filtrage par restaurant en Phase 2.',
   };
 
   const today = new Date().toISOString().slice(0, 10);

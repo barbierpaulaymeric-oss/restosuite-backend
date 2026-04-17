@@ -79,7 +79,7 @@ function requirePermission(perm) {
 // GET /api/public/keys — List API keys (internal)
 router.get('/keys', requireAuth, (req, res) => {
   try {
-    const keys = all('SELECT id, key_name, api_key, permissions, rate_limit, is_active, last_used, request_count, created_at FROM api_keys WHERE restaurant_id = 1');
+    const keys = all('SELECT id, key_name, api_key, permissions, rate_limit, is_active, last_used, request_count, created_at FROM api_keys WHERE restaurant_id = ?', [req.user.restaurant_id]);
     res.json(keys.map(k => ({ ...k, permissions: JSON.parse(k.permissions || '[]') })));
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -95,8 +95,8 @@ router.post('/keys', requireAuth, (req, res) => {
     const apiKey = 'rs_' + crypto.randomBytes(24).toString('hex');
     const perms = permissions || ['read'];
 
-    run(`INSERT INTO api_keys (restaurant_id, key_name, api_key, permissions) VALUES (1, ?, ?, ?)`,
-      [key_name, apiKey, JSON.stringify(perms)]
+    run(`INSERT INTO api_keys (restaurant_id, key_name, api_key, permissions) VALUES (?, ?, ?, ?)`,
+      [req.user.restaurant_id, key_name, apiKey, JSON.stringify(perms)]
     );
 
     res.json({ ok: true, api_key: apiKey, key_name, permissions: perms });

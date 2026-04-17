@@ -56,7 +56,10 @@ try {
 // GET /api/integrations — List all integrations
 router.get('/', (req, res) => {
   try {
-    const integrations = all(`SELECT id, provider, enabled, last_sync, sync_status, config, created_at FROM integrations WHERE restaurant_id = 1`);
+    const integrations = all(
+      `SELECT id, provider, enabled, last_sync, sync_status, config, created_at FROM integrations WHERE restaurant_id = ?`,
+      [req.user.restaurant_id]
+    );
 
     // Add default providers if not configured yet
     const providers = ['thefork', 'pos_caisse', 'comptabilite', 'deliveroo', 'ubereats'];
@@ -94,7 +97,8 @@ router.put('/:provider', (req, res) => {
     const { provider } = req.params;
     const { api_key, api_secret, webhook_url, config, enabled } = req.body;
 
-    const existing = get('SELECT id FROM integrations WHERE restaurant_id = 1 AND provider = ?', [provider]);
+    const rid = req.user.restaurant_id;
+    const existing = get('SELECT id FROM integrations WHERE restaurant_id = ? AND provider = ?', [rid, provider]);
 
     if (existing) {
       run(`UPDATE integrations SET
@@ -104,14 +108,14 @@ router.put('/:provider', (req, res) => {
         config = COALESCE(?, config),
         enabled = COALESCE(?, enabled),
         updated_at = datetime('now')
-        WHERE id = ?`,
-        [api_key, api_secret, webhook_url, config ? JSON.stringify(config) : null, enabled, existing.id]
+        WHERE id = ? AND restaurant_id = ?`,
+        [api_key, api_secret, webhook_url, config ? JSON.stringify(config) : null, enabled, existing.id, rid]
       );
       res.json({ ok: true, message: 'Intégration mise à jour' });
     } else {
       run(`INSERT INTO integrations (restaurant_id, provider, api_key, api_secret, webhook_url, config, enabled)
-        VALUES (1, ?, ?, ?, ?, ?, ?)`,
-        [provider, api_key || null, api_secret || null, webhook_url || null, JSON.stringify(config || {}), enabled ? 1 : 0]
+        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [rid, provider, api_key || null, api_secret || null, webhook_url || null, JSON.stringify(config || {}), enabled ? 1 : 0]
       );
       res.json({ ok: true, message: 'Intégration créée' });
     }
@@ -125,7 +129,7 @@ router.put('/:provider', (req, res) => {
 // To implement: replace the stub block below with an actual TheFork API call.
 router.post('/thefork/sync', async (req, res) => {
   try {
-    const integration = get('SELECT * FROM integrations WHERE provider = ? AND restaurant_id = 1', ['thefork']);
+    const integration = get('SELECT * FROM integrations WHERE provider = ? AND restaurant_id = ?', ['thefork', req.user.restaurant_id]);
 
     if (!integration || !integration.enabled) {
       return res.status(400).json({
@@ -162,9 +166,9 @@ router.post('/thefork/sync', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const reservations = all(`
       SELECT * FROM reservations
-      WHERE restaurant_id = 1 AND reservation_date >= ?
+      WHERE restaurant_id = ? AND reservation_date >= ?
       ORDER BY reservation_date, reservation_time
-    `, [today]);
+    `, [req.user.restaurant_id, today]);
 
     res.json({
       ok: true,
@@ -175,7 +179,7 @@ router.post('/thefork/sync', async (req, res) => {
       reservations
     });
   } catch (e) {
-    try { run(`UPDATE integrations SET sync_status = 'error', updated_at = datetime('now') WHERE provider = 'thefork' AND restaurant_id = 1`); } catch {}
+    try { run(`UPDATE integrations SET sync_status = 'error', updated_at = datetime('now') WHERE provider = 'thefork' AND restaurant_id = ?`, [req.user.restaurant_id]); } catch {}
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -185,7 +189,7 @@ router.post('/thefork/sync', async (req, res) => {
 // To implement: replace the stub block below with your POS provider's API call.
 router.post('/pos/sync', async (req, res) => {
   try {
-    const integration = get('SELECT * FROM integrations WHERE provider = ? AND restaurant_id = 1', ['pos_caisse']);
+    const integration = get('SELECT * FROM integrations WHERE provider = ? AND restaurant_id = ?', ['pos_caisse', req.user.restaurant_id]);
 
     if (!integration || !integration.enabled) {
       return res.status(400).json({
@@ -227,7 +231,7 @@ router.post('/pos/sync', async (req, res) => {
       synced_at: new Date().toISOString()
     });
   } catch (e) {
-    try { run(`UPDATE integrations SET sync_status = 'error', updated_at = datetime('now') WHERE provider = 'pos_caisse' AND restaurant_id = 1`); } catch {}
+    try { run(`UPDATE integrations SET sync_status = 'error', updated_at = datetime('now') WHERE provider = 'pos_caisse' AND restaurant_id = ?`, [req.user.restaurant_id]); } catch {}
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -238,8 +242,8 @@ router.post('/pos/sync', async (req, res) => {
 router.get('/reservations', (req, res) => {
   try {
     const { date, status } = req.query;
-    let sql = `SELECT r.*, t.table_number FROM reservations r LEFT JOIN tables t ON t.id = r.table_id WHERE r.restaurant_id = 1`;
-    const params = [];
+    let sql = `SELECT r.*, t.table_number FROM reservations r LEFT JOIN tables t ON t.id = r.table_id WHERE r.restaurant_id = ?`;
+    const params = [req.user.restaurant_id];
 
     if (date) {
       sql += ' AND r.reservation_date = ?';
@@ -267,8 +271,8 @@ router.post('/reservations', (req, res) => {
     }
 
     const result = run(`INSERT INTO reservations (restaurant_id, source, customer_name, customer_phone, customer_email, party_size, reservation_date, reservation_time, table_id, notes, special_requests)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [source || 'manual', customer_name, customer_phone || null, customer_email || null, party_size || 2, reservation_date, reservation_time, table_id || null, notes || null, special_requests || null]
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.restaurant_id, source || 'manual', customer_name, customer_phone || null, customer_email || null, party_size || 2, reservation_date, reservation_time, table_id || null, notes || null, special_requests || null]
     );
 
     res.json({ ok: true, id: result.lastInsertRowid });
@@ -289,8 +293,8 @@ router.put('/reservations/:id', (req, res) => {
       notes = COALESCE(?, notes),
       no_show = COALESCE(?, no_show),
       updated_at = datetime('now')
-      WHERE id = ?`,
-      [status, table_id, notes, no_show, id]
+      WHERE id = ? AND restaurant_id = ?`,
+      [status, table_id, notes, no_show, id, req.user.restaurant_id]
     );
 
     res.json({ ok: true });
@@ -302,7 +306,7 @@ router.put('/reservations/:id', (req, res) => {
 // DELETE /api/integrations/reservations/:id
 router.delete('/reservations/:id', (req, res) => {
   try {
-    run('DELETE FROM reservations WHERE id = ?', [Number(req.params.id)]);
+    run('DELETE FROM reservations WHERE id = ? AND restaurant_id = ?', [Number(req.params.id), req.user.restaurant_id]);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -315,20 +319,21 @@ router.get('/reservations/stats', (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const weekFromNow = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
 
-    const todayCount = get(`SELECT COUNT(*) as c FROM reservations WHERE reservation_date = ? AND status != 'cancelled'`, [today]).c;
-    const todayCovers = get(`SELECT COALESCE(SUM(party_size), 0) as c FROM reservations WHERE reservation_date = ? AND status != 'cancelled'`, [today]).c;
-    const weekCount = get(`SELECT COUNT(*) as c FROM reservations WHERE reservation_date BETWEEN ? AND ? AND status != 'cancelled'`, [today, weekFromNow]).c;
+    const rid = req.user.restaurant_id;
+    const todayCount = get(`SELECT COUNT(*) as c FROM reservations WHERE restaurant_id = ? AND reservation_date = ? AND status != 'cancelled'`, [rid, today]).c;
+    const todayCovers = get(`SELECT COALESCE(SUM(party_size), 0) as c FROM reservations WHERE restaurant_id = ? AND reservation_date = ? AND status != 'cancelled'`, [rid, today]).c;
+    const weekCount = get(`SELECT COUNT(*) as c FROM reservations WHERE restaurant_id = ? AND reservation_date BETWEEN ? AND ? AND status != 'cancelled'`, [rid, today, weekFromNow]).c;
     const noShowRate = (() => {
-      const total = get(`SELECT COUNT(*) as c FROM reservations WHERE reservation_date >= date('now', '-30 days')`).c;
-      const noShows = get(`SELECT COUNT(*) as c FROM reservations WHERE reservation_date >= date('now', '-30 days') AND no_show = 1`).c;
+      const total = get(`SELECT COUNT(*) as c FROM reservations WHERE restaurant_id = ? AND reservation_date >= date('now', '-30 days')`, [rid]).c;
+      const noShows = get(`SELECT COUNT(*) as c FROM reservations WHERE restaurant_id = ? AND reservation_date >= date('now', '-30 days') AND no_show = 1`, [rid]).c;
       return total > 0 ? Math.round((noShows / total) * 1000) / 10 : 0;
     })();
 
     const bySource = all(`
       SELECT source, COUNT(*) as count
-      FROM reservations WHERE reservation_date >= date('now', '-30 days')
+      FROM reservations WHERE restaurant_id = ? AND reservation_date >= date('now', '-30 days')
       GROUP BY source
-    `);
+    `, [rid]);
 
     res.json({ today_count: todayCount, today_covers: todayCovers, week_count: weekCount, no_show_rate_pct: noShowRate, by_source: bySource });
   } catch (e) {
