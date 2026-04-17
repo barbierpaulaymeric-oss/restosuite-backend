@@ -258,6 +258,7 @@ app.use('/api/allergen-plan', require('./routes/allergen-plan'));
 app.use('/api/water', require('./routes/water'));
 app.use('/api/pms-audit', require('./routes/pms-audit'));
 app.use('/api/pms', require('./routes/pms-export')); // pms-audit must appear first (prefix match)
+app.use('/api/sanitary/staff-health', require('./routes/staff-health'));
 app.use('/api/sanitary', require('./routes/sanitary-settings'));
 app.use('/api/tiac', require('./routes/tiac'));
 app.use('/api/fabrication-diagrams', require('./routes/fabrication-diagrams'));

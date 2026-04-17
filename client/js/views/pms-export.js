@@ -192,7 +192,28 @@ function renderPMSShell() {
   });
 
   document.getElementById('btn-pms-print').addEventListener('click', () => window.print());
-  document.getElementById('btn-pms-pdf').addEventListener('click', () => window.print());
+  document.getElementById('btn-pms-pdf').addEventListener('click', () => {
+    const token = localStorage.getItem('token');
+    const url = `/api/pms/export/pdf?period=${_pmsPeriod}`;
+    const a = document.createElement('a');
+    a.href = url;
+    // Pass auth token via fetch then blob-download since the endpoint requires auth
+    showToast('Génération du PDF en cours…', 'info');
+    fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then(r => {
+        if (!r.ok) throw new Error('Erreur serveur ' + r.status);
+        return r.blob();
+      })
+      .then(blob => {
+        const objUrl = URL.createObjectURL(blob);
+        a.href = objUrl;
+        a.download = `PMS-DDPP-${new Date().toISOString().slice(0, 10)}.pdf`;
+        a.click();
+        URL.revokeObjectURL(objUrl);
+        showToast('PDF téléchargé ✓', 'success');
+      })
+      .catch(err => showToast('Erreur PDF : ' + err.message, 'error'));
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
