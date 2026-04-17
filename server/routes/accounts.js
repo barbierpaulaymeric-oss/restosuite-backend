@@ -399,29 +399,38 @@ router.delete('/self', (req, res) => {
   const transaction = db.transaction(() => {
     const restaurantId = account.restaurant_id;
 
-    // Delete all accounts for this restaurant
-    if (restaurantId) {
-      run('DELETE FROM accounts WHERE restaurant_id = ?', [restaurantId]);
-      run('DELETE FROM restaurants WHERE id = ?', [restaurantId]);
+    // Without a restaurant_id we cannot scope the delete — only remove the orphan account.
+    if (!restaurantId) {
+      run('DELETE FROM accounts WHERE id = ? AND restaurant_id IS NULL', [account.id]);
+      return;
     }
 
-    // Delete the gérant account itself (if no restaurant_id was set)
-    run('DELETE FROM accounts WHERE id = ? AND restaurant_id IS NULL', [account.id]);
-
-    // Clean up all data tables (single-tenant: all data belongs to this restaurant)
-    const tables = [
-      'recipes', 'recipe_ingredients', 'ingredients', 'stock', 'stock_movements',
+    // Clean up tenant-scoped data tables. order_items / recipe_ingredients / delivery_note_items
+    // don't carry restaurant_id directly — delete via their parent row.
+    const tenantTables = [
+      'recipes', 'ingredients', 'stock', 'stock_movements',
       'suppliers', 'supplier_prices', 'supplier_accounts', 'supplier_catalog',
       'price_change_notifications', 'price_history',
       'temperature_logs', 'cleaning_logs', 'traceability_logs',
-      'tables_config', 'orders', 'order_items',
-      'purchase_orders', 'purchase_order_items',
-      'delivery_notes', 'delivery_note_items',
+      'orders', 'purchase_orders', 'delivery_notes',
       'referrals'
     ];
-    for (const table of tables) {
-      try { run(`DELETE FROM ${table}`); } catch (e) { /* table may not exist */ }
+
+    // Delete child rows first (they join through parents that carry restaurant_id)
+    try { run('DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)', [restaurantId]); } catch {}
+    try { run('DELETE FROM recipe_ingredients WHERE recipe_id IN (SELECT id FROM recipes WHERE restaurant_id = ?)', [restaurantId]); } catch {}
+    try { run('DELETE FROM purchase_order_items WHERE purchase_order_id IN (SELECT id FROM purchase_orders WHERE restaurant_id = ?)', [restaurantId]); } catch {}
+    try { run('DELETE FROM delivery_note_items WHERE delivery_note_id IN (SELECT id FROM delivery_notes WHERE restaurant_id = ?)', [restaurantId]); } catch {}
+    // tables_config stores per-restaurant table layout
+    try { run('DELETE FROM tables_config WHERE restaurant_id = ?', [restaurantId]); } catch {}
+
+    for (const table of tenantTables) {
+      try { run(`DELETE FROM ${table} WHERE restaurant_id = ?`, [restaurantId]); } catch (e) { /* table may not exist */ }
     }
+
+    // Finally, delete the accounts and restaurant row
+    run('DELETE FROM accounts WHERE restaurant_id = ?', [restaurantId]);
+    run('DELETE FROM restaurants WHERE id = ?', [restaurantId]);
   });
 
   try {

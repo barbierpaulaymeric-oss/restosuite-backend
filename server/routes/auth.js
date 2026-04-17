@@ -12,6 +12,36 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'restosuite-dev-secret-2026';
 const JWT_EXPIRY = '30d';
 
+// ─── JWT revocation (blacklist) ───
+// A token is identified by its `jti` claim (issued at registration / login) and stays
+// in the blacklist until its natural `exp`. Cleanup runs opportunistically on every
+// check (cheap index scan).
+try {
+  run(`CREATE TABLE IF NOT EXISTS jwt_blacklist (
+    jti TEXT PRIMARY KEY,
+    account_id INTEGER,
+    expires_at INTEGER NOT NULL,
+    revoked_at TEXT DEFAULT (datetime('now'))
+  )`);
+  run(`CREATE INDEX IF NOT EXISTS idx_jwt_blacklist_exp ON jwt_blacklist(expires_at)`);
+} catch {}
+
+function isTokenRevoked(jti) {
+  if (!jti) return false;
+  try {
+    const row = get('SELECT jti, expires_at FROM jwt_blacklist WHERE jti = ?', [jti]);
+    if (!row) return false;
+    // If the blacklisted entry has expired naturally, clean it up and allow.
+    if (row.expires_at && row.expires_at * 1000 < Date.now()) {
+      try { run('DELETE FROM jwt_blacklist WHERE jti = ?', [jti]); } catch {}
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // PIN brute-force protection
 const pinAttempts = new Map(); // restaurantId -> { count, lastAttempt }
 const PIN_MAX_ATTEMPTS = 5;
@@ -50,8 +80,10 @@ function recordPinAttempt(identifier, success) {
 }
 
 function generateToken(account) {
+  // Include a unique jti so individual tokens can be revoked without rotating JWT_SECRET.
+  const jti = crypto.randomBytes(16).toString('hex');
   return jwt.sign(
-    { id: account.id, email: account.email, role: account.role, restaurant_id: account.restaurant_id },
+    { id: account.id, email: account.email, role: account.role, restaurant_id: account.restaurant_id, jti },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRY }
   );
@@ -74,7 +106,11 @@ function requireAuth(req, res, next) {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    if (isTokenRevoked(decoded.jti)) {
+      return res.status(401).json({ error: 'Token révoqué' });
+    }
     req.user = decoded;
+    req.token = token;
     next();
   } catch (e) {
     return res.status(401).json({ error: 'Token invalide ou expiré' });
@@ -214,23 +250,33 @@ router.post('/login', (req, res) => {
 });
 
 // ─── POST /api/auth/pin-login ───
+// PIN lookup MUST be scoped by restaurant_id to prevent cross-tenant collisions:
+// without scoping, a PIN like 1234 set by tenant A would match tenant B's user
+// with the same PIN. Caller must supply restaurant_id (typically obtained via
+// /staff-login first).
 router.post('/pin-login', (req, res) => {
-  const { pin } = req.body;
+  const { pin, restaurant_id } = req.body;
 
   if (!pin || !/^\d{4}$/.test(pin)) {
     return res.status(400).json({ error: 'PIN à 4 chiffres requis' });
   }
+  if (!restaurant_id) {
+    return res.status(400).json({ error: 'restaurant_id requis (passez par /staff-login)' });
+  }
 
-  // Check for brute-force lockout — keyed per IP to prevent global DoS
-  const lockoutKey = `pin_login:${req.ip}`;
+  // Check for brute-force lockout — keyed per IP + restaurant to prevent global DoS
+  const lockoutKey = `pin_login:${req.ip}:${restaurant_id}`;
   const lockoutCheck = checkPinLockout(lockoutKey);
   if (lockoutCheck.locked) {
     const minutesRemaining = Math.ceil(lockoutCheck.remainingMs / 60000);
     return res.status(429).json({ error: `Trop de tentatives. Veuillez réessayer dans ${minutesRemaining} minutes.` });
   }
 
-  // Find account by trying to verify against all accounts with PINs
-  const accounts = all('SELECT * FROM accounts WHERE pin IS NOT NULL AND pin != ?', ['']);
+  // Scope PIN lookup to a single restaurant — prevents cross-tenant collisions.
+  const accounts = all(
+    'SELECT * FROM accounts WHERE pin IS NOT NULL AND pin != ? AND restaurant_id = ?',
+    ['', restaurant_id]
+  );
   let account = null;
   for (const acc of accounts) {
     if (verifyPin(pin, acc.pin)) {
@@ -427,6 +473,23 @@ router.put('/staff-password', requireAuth, (req, res) => {
   run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [hashedPassword, account.restaurant_id]);
 
   res.json({ success: true });
+});
+
+// ─── POST /api/auth/logout — Revoke the current token (JWT blacklist) ───
+router.post('/logout', requireAuth, (req, res) => {
+  try {
+    const { jti, exp } = req.user || {};
+    if (jti && exp) {
+      run(
+        'INSERT OR IGNORE INTO jwt_blacklist (jti, account_id, expires_at) VALUES (?, ?, ?)',
+        [jti, req.user.id, exp]
+      );
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Logout error:', e);
+    res.status(500).json({ error: 'Erreur lors de la déconnexion' });
+  }
 });
 
 module.exports = router;

@@ -810,7 +810,8 @@ router.get('/menu-suggestions', async (req, res) => {
   if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
 
   try {
-    // Get all recipes with cost data
+    const rid = req.user.restaurant_id;
+    // Get all recipes with cost data — scoped to this tenant
     const recipes = all(`
       SELECT r.id, r.name, r.category, r.selling_price, r.notes,
         COALESCE((
@@ -827,8 +828,8 @@ router.get('/menu-suggestions', async (req, res) => {
           FROM recipe_ingredients ri WHERE ri.recipe_id = r.id
         ), 0) as total_cost
       FROM recipes r
-      WHERE r.recipe_type = 'plat' OR r.recipe_type IS NULL
-    `);
+      WHERE (r.recipe_type = 'plat' OR r.recipe_type IS NULL) AND r.restaurant_id = ?
+    `, [rid]);
 
     const recipesData = recipes
       .filter(r => r.selling_price > 0)
@@ -842,13 +843,13 @@ router.get('/menu-suggestions', async (req, res) => {
         margin: Math.round((r.selling_price - r.total_cost) * 100) / 100
       }));
 
-    // Get ingredients in stock
+    // Get ingredients in stock — scoped to this tenant
     const stockIngredients = all(`
       SELECT i.name, s.quantity, s.unit
       FROM stock s JOIN ingredients i ON i.id = s.ingredient_id
-      WHERE s.quantity > 0
+      WHERE s.quantity > 0 AND s.restaurant_id = ?
       ORDER BY s.quantity DESC LIMIT 30
-    `);
+    `, [rid]);
 
     const prompt = `Voici les fiches techniques d'un restaurant avec leur food cost :
 ${JSON.stringify(recipesData, null, 2)}

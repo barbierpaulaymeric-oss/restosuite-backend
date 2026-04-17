@@ -122,16 +122,17 @@ router.delete('/keys/:id', requireAuth, (req, res) => {
 // GET /api/public/v1/menu — Public menu
 router.get('/v1/menu', apiKeyAuth, (req, res) => {
   try {
+    const rid = req.apiKey.restaurant_id;
     const recipes = all(`
       SELECT r.id, r.name, r.category, r.selling_price, r.description, r.recipe_type, r.photo_url,
         GROUP_CONCAT(DISTINCT CASE WHEN i.allergens IS NOT NULL AND i.allergens != '' THEN i.allergens END) as allergens
       FROM recipes r
       LEFT JOIN recipe_ingredients ri ON ri.recipe_id = r.id
       LEFT JOIN ingredients i ON i.id = ri.ingredient_id
-      WHERE r.selling_price > 0
+      WHERE r.selling_price > 0 AND r.restaurant_id = ?
       GROUP BY r.id
       ORDER BY r.category, r.name
-    `);
+    `, [rid]);
 
     const byCategory = {};
     for (const r of recipes) {
@@ -149,7 +150,7 @@ router.get('/v1/menu', apiKeyAuth, (req, res) => {
     }
 
     res.json({
-      restaurant: getRestaurantInfo(),
+      restaurant: getRestaurantInfo(rid),
       categories: Object.entries(byCategory).map(([name, items]) => ({ name, items })),
       total_items: recipes.length
     });
@@ -161,7 +162,8 @@ router.get('/v1/menu', apiKeyAuth, (req, res) => {
 // GET /api/public/v1/availability — Check recipe availability
 router.get('/v1/availability', apiKeyAuth, (req, res) => {
   try {
-    const recipes = all('SELECT id, name, selling_price FROM recipes WHERE selling_price > 0');
+    const rid = req.apiKey.restaurant_id;
+    const recipes = all('SELECT id, name, selling_price FROM recipes WHERE selling_price > 0 AND restaurant_id = ?', [rid]);
     const availability = [];
 
     for (const recipe of recipes) {
@@ -169,10 +171,10 @@ router.get('/v1/availability', apiKeyAuth, (req, res) => {
         SELECT ri.ingredient_id, ri.gross_quantity, ri.unit,
                s.quantity as stock_qty, i.name as ingredient_name
         FROM recipe_ingredients ri
-        LEFT JOIN stock s ON s.ingredient_id = ri.ingredient_id
+        LEFT JOIN stock s ON s.ingredient_id = ri.ingredient_id AND s.restaurant_id = ?
         LEFT JOIN ingredients i ON i.id = ri.ingredient_id
         WHERE ri.recipe_id = ? AND ri.sub_recipe_id IS NULL
-      `, [recipe.id]);
+      `, [rid, recipe.id]);
 
       let available = true;
       let maxPortions = Infinity;
@@ -209,20 +211,21 @@ router.get('/v1/availability', apiKeyAuth, (req, res) => {
 // POST /api/public/v1/orders — Create order from external source
 router.post('/v1/orders', apiKeyAuth, requirePermission('write'), (req, res) => {
   try {
+    const rid = req.apiKey.restaurant_id;
     const { table_number, items, source, customer_name, notes } = req.body;
     if (!items || !items.length) return res.status(400).json({ error: 'items required' });
 
-    // Calculate total
+    // Calculate total — scoped to this tenant's recipes only
     let totalCost = 0;
     for (const item of items) {
-      const recipe = get('SELECT selling_price FROM recipes WHERE id = ?', [item.recipe_id]);
+      const recipe = get('SELECT selling_price FROM recipes WHERE id = ? AND restaurant_id = ?', [item.recipe_id, rid]);
       if (!recipe) return res.status(400).json({ error: `Recipe ${item.recipe_id} not found` });
       totalCost += recipe.selling_price * (item.quantity || 1);
     }
 
     const result = run(`INSERT INTO orders (table_number, status, total_cost, restaurant_id, notes, created_at)
-      VALUES (?, 'reçu', ?, 1, ?, datetime('now'))`,
-      [table_number || 0, totalCost, notes ? `[${source || 'api'}] ${notes}` : `[${source || 'api'}]`]
+      VALUES (?, 'reçu', ?, ?, ?, datetime('now'))`,
+      [table_number || 0, totalCost, rid, notes ? `[${source || 'api'}] ${notes}` : `[${source || 'api'}]`]
     );
 
     const orderId = Number(result.lastInsertRowid);
@@ -242,7 +245,8 @@ router.post('/v1/orders', apiKeyAuth, requirePermission('write'), (req, res) => 
 // GET /api/public/v1/orders/:id — Get order status
 router.get('/v1/orders/:id', apiKeyAuth, (req, res) => {
   try {
-    const order = get('SELECT * FROM orders WHERE id = ?', [Number(req.params.id)]);
+    const rid = req.apiKey.restaurant_id;
+    const order = get('SELECT * FROM orders WHERE id = ? AND restaurant_id = ?', [Number(req.params.id), rid]);
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
     const items = all(`
@@ -261,6 +265,7 @@ router.get('/v1/orders/:id', apiKeyAuth, (req, res) => {
 // GET /api/public/v1/stock — Current stock levels
 router.get('/v1/stock', apiKeyAuth, (req, res) => {
   try {
+    const rid = req.apiKey.restaurant_id;
     const stock = all(`
       SELECT s.ingredient_id, i.name, s.quantity, s.unit, s.min_quantity,
         CASE
@@ -270,8 +275,9 @@ router.get('/v1/stock', apiKeyAuth, (req, res) => {
         END as status
       FROM stock s
       JOIN ingredients i ON i.id = s.ingredient_id
+      WHERE s.restaurant_id = ?
       ORDER BY i.name
-    `);
+    `, [rid]);
     res.json({ stock, timestamp: new Date().toISOString() });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -281,11 +287,12 @@ router.get('/v1/stock', apiKeyAuth, (req, res) => {
 // GET /api/public/v1/stats — Basic stats
 router.get('/v1/stats', apiKeyAuth, (req, res) => {
   try {
+    const rid = req.apiKey.restaurant_id;
     const today = new Date().toISOString().split('T')[0];
-    const todayOrders = get("SELECT COUNT(*) as c, COALESCE(SUM(total_cost),0) as rev FROM orders WHERE date(created_at) = ? AND status != 'annulé'", [today]);
-    const totalRecipes = get('SELECT COUNT(*) as c FROM recipes').c;
-    const totalIngredients = get('SELECT COUNT(*) as c FROM ingredients').c;
-    const lowStock = get('SELECT COUNT(*) as c FROM stock WHERE quantity <= min_quantity AND min_quantity > 0').c;
+    const todayOrders = get("SELECT COUNT(*) as c, COALESCE(SUM(total_cost),0) as rev FROM orders WHERE date(created_at) = ? AND status != 'annulé' AND restaurant_id = ?", [today, rid]);
+    const totalRecipes = get('SELECT COUNT(*) as c FROM recipes WHERE restaurant_id = ?', [rid]).c;
+    const totalIngredients = get('SELECT COUNT(*) as c FROM ingredients WHERE restaurant_id = ?', [rid]).c;
+    const lowStock = get('SELECT COUNT(*) as c FROM stock WHERE quantity <= min_quantity AND min_quantity > 0 AND restaurant_id = ?', [rid]).c;
 
     res.json({
       today: { orders: todayOrders.c, revenue: todayOrders.rev },
@@ -298,9 +305,9 @@ router.get('/v1/stats', apiKeyAuth, (req, res) => {
   }
 });
 
-function getRestaurantInfo() {
+function getRestaurantInfo(restaurantId = 1) {
   try {
-    const r = get('SELECT name, type, address, city, postal_code, phone FROM restaurants WHERE id = 1');
+    const r = get('SELECT name, type, address, city, postal_code, phone FROM restaurants WHERE id = ?', [restaurantId]);
     return r || { name: 'Mon Restaurant' };
   } catch {
     return { name: 'Mon Restaurant' };
