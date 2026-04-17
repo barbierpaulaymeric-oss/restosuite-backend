@@ -12,7 +12,18 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemi
 // ─── Multer config for invoice uploads ───
 const uploadDir = '/tmp/restosuite-uploads';
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-const upload = multer({ dest: uploadDir, limits: { fileSize: 10 * 1024 * 1024 } });
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+const upload = multer({
+  dest: uploadDir,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Type de fichier non autorisé. Formats acceptés : JPEG, PNG, WebP, GIF, PDF.'));
+    }
+  }
+});
 
 // All AI routes require a valid JWT
 router.use(requireAuth);
