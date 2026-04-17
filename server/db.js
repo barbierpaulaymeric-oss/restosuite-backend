@@ -216,6 +216,7 @@ db.exec(`
     email TEXT,
     pin TEXT NOT NULL,
     access_token TEXT,
+    token_expires_at DATETIME,
     last_login DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
@@ -1796,6 +1797,17 @@ try {
   console.log('✅ Migration: staff_health_records table ready');
 } catch (e) {
   if (!e.message.includes('already exists')) console.error('Migration staff_health_records error:', e.message);
+}
+
+// ─── Migration: supplier_accounts.token_expires_at ───
+try {
+  const saColNames = all("PRAGMA table_info(supplier_accounts)").map(c => c.name);
+  if (!saColNames.includes('token_expires_at')) {
+    db.exec("ALTER TABLE supplier_accounts ADD COLUMN token_expires_at DATETIME");
+    console.log('✅ Migration: added token_expires_at to supplier_accounts');
+  }
+} catch (e) {
+  console.error('Migration supplier_accounts.token_expires_at error:', e.message);
 }
 
 module.exports = { db, all, get, run };

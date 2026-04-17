@@ -29,58 +29,7 @@
     </div>
     <div style="color:#8899aa; font-size:13px; margin-top:12px;" id="loading-text">Chargement...</div>
   </div>
-  <script>
-  (function() {
-    var screen = document.getElementById('loading-screen');
-    var bar = document.getElementById('loading-bar');
-    var text = document.getElementById('loading-text');
-    var messages = ['Chargement...', 'Préparation de votre espace...', 'Connexion au serveur...', 'Presque prêt...'];
-    var progress = 0, msgIndex = 0, shown = false;
-
-    // Only show loading screen if server takes > 2s to respond
-    var showTimer = setTimeout(function() {
-      screen.style.display = 'flex';
-      shown = true;
-    }, 2000);
-
-    var interval = setInterval(function() {
-      progress = Math.min(progress + Math.random() * 15, 90);
-      bar.style.width = progress + '%';
-      if (progress > 25 * (msgIndex + 1) && msgIndex < messages.length - 1) {
-        msgIndex++;
-        text.textContent = messages[msgIndex];
-      }
-    }, 800);
-
-    function hideScreen() {
-      clearTimeout(showTimer);
-      clearInterval(interval);
-      if (shown) {
-        bar.style.width = '100%';
-        text.textContent = 'C\'est parti !';
-        setTimeout(function() {
-          screen.style.opacity = '0';
-          screen.style.transition = 'opacity 0.3s';
-          setTimeout(function() { screen.remove(); }, 300);
-        }, 400);
-      } else {
-        screen.remove();
-      }
-    }
-
-    function checkServer() {
-      fetch('/api/health')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.status === 'ok') { hideScreen(); }
-          else { setTimeout(checkServer, 2000); }
-        })
-        .catch(function() { setTimeout(checkServer, 2000); });
-    }
-
-    setTimeout(checkServer, 1000);
-  })();
-  </script>
+  <script src="js/app-init.js"></script>
 
   <!-- Navigation — Bottom bar mobile, top bar desktop -->
   <nav class="nav-bottom" id="nav">
@@ -136,16 +85,5 @@
   <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
 
   <script src="js/app.bundle.js"></script>
-  <script>
-    // Initialize Lucide icons after DOM load
-    document.addEventListener('DOMContentLoaded', () => {
-      if (window.lucide) lucide.createIcons();
-    });
-  </script>
-  <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  }
-  </script>
 </body>
 </html>

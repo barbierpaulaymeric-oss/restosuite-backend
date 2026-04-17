@@ -91,7 +91,7 @@ router.get('/customers', (req, res) => {
     const customers = all(sql, params);
     res.json(customers.map(c => ({ ...c, tags: JSON.parse(c.tags || '[]') })));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -113,7 +113,7 @@ router.get('/customers/:id', (req, res) => {
       reservations
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -136,7 +136,7 @@ router.post('/customers', validate(customerValidation), (req, res) => {
 
     res.json({ ok: true, id: Number(result.lastInsertRowid) });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -162,7 +162,7 @@ router.put('/customers/:id', (req, res) => {
 
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -202,7 +202,7 @@ router.post('/customers/:id/visit', (req, res) => {
 
     res.json({ ok: true, points_earned: pointsEarned });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -214,7 +214,7 @@ router.get('/rewards', (req, res) => {
     const rewards = all('SELECT * FROM loyalty_rewards WHERE restaurant_id = 1 ORDER BY points_required');
     res.json(rewards);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -231,7 +231,7 @@ router.post('/rewards', (req, res) => {
 
     res.json({ ok: true, id: Number(result.lastInsertRowid) });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -264,7 +264,7 @@ router.post('/customers/:id/redeem/:rewardId', (req, res) => {
 
     res.json({ ok: true, message: `Récompense "${reward.name}" utilisée` });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -299,7 +299,7 @@ router.get('/stats', (req, res) => {
       top_spenders: topSpenders
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 

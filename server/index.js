@@ -54,7 +54,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.stripe.com https://generativelanguage.googleapis.com; frame-src https://js.stripe.com;");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.stripe.com https://generativelanguage.googleapis.com; frame-src https://js.stripe.com;");
   if (process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
@@ -89,6 +89,25 @@ app.use('/api/accounts/login', authLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/pin-login', authLimiter);
+
+// Staff auth — 4-digit PINs are brute-forceable, keep limit tight
+const staffAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Trop de tentatives, réessayez dans 15 minutes' },
+});
+app.use('/api/auth/staff-login', staffAuthLimiter);
+app.use('/api/auth/staff-pin', staffAuthLimiter);
+
+// Supplier portal auth — same tight limit as main auth
+const supplierAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Trop de tentatives, réessayez dans 15 minutes' },
+});
+app.use('/api/supplier-portal/company-login', supplierAuthLimiter);
+app.use('/api/supplier-portal/member-pin', supplierAuthLimiter);
+app.use('/api/supplier-portal/quick-login', supplierAuthLimiter);
 
 // ─── DB Backup ───
 backupDatabase(); // on startup

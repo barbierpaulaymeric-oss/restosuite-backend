@@ -606,7 +606,7 @@ router.get('/:id/allergens', requireAuth, (req, res) => {
       allergen_count: allergens.length
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 

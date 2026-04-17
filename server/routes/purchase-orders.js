@@ -36,7 +36,7 @@ router.get('/', (req, res) => {
 
     res.json(enriched);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -84,7 +84,7 @@ router.get('/suggest', (req, res) => {
 
     res.json(Object.values(bySupplier));
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -192,7 +192,7 @@ router.get('/analytics', (req, res) => {
       price_changes: priceChanges
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -215,7 +215,7 @@ router.get('/:id', (req, res) => {
 
     res.json({ ...po, items });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -290,7 +290,7 @@ router.post('/', (req, res) => {
 
     res.status(201).json({ ...po, items: poItems });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -366,7 +366,7 @@ router.put('/:id', (req, res) => {
     const updatedItems = all(`SELECT poi.*, i.name as ingredient_name FROM purchase_order_items poi LEFT JOIN ingredients i ON i.id = poi.ingredient_id WHERE poi.purchase_order_id = ?`, [id]);
     res.json({ ...updated, items: updatedItems });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -432,7 +432,7 @@ router.post('/:id/receive', (req, res) => {
     const updatedItems = all(`SELECT poi.*, i.name as ingredient_name FROM purchase_order_items poi LEFT JOIN ingredients i ON i.id = poi.ingredient_id WHERE poi.purchase_order_id = ?`, [id]);
     res.json({ ...updated, items: updatedItems, stock_updated: true });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -450,7 +450,7 @@ router.delete('/:id', (req, res) => {
     run('DELETE FROM purchase_orders WHERE id = ?', [id]);
     res.json({ deleted: true });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -509,7 +509,7 @@ router.post('/:id/clone', (req, res) => {
 
     res.status(201).json({ ...newPo, items: newItems });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur', details: e.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

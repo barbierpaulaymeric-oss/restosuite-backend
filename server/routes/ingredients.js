@@ -151,7 +151,7 @@ router.put('/:id/allergens', requireAuth, (req, res) => {
     run('UPDATE ingredients SET allergens = ? WHERE id = ?', [allergenText, id]);
     res.json({ ingredient_id: id, allergens: allergenText, allergen_codes });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 

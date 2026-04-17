@@ -276,7 +276,7 @@ router.post('/:id/send', (req, res) => {
       stock_deducted: true
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 

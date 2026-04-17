@@ -228,7 +228,7 @@ router.get('/summary', (req, res) => {
       health: lossRatio < 3 ? 'good' : lossRatio < 6 ? 'warning' : 'critical'
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -294,7 +294,7 @@ router.get('/top-losses', (req, res) => {
       }))
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -342,7 +342,7 @@ router.get('/trends', (req, res) => {
 
     res.json({ period_days: days, trends });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 

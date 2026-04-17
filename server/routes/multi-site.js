@@ -29,7 +29,7 @@ router.get('/', (req, res) => {
     `);
     res.json(sites);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -54,7 +54,7 @@ router.get('/:id', (req, res) => {
 
     res.json({ ...site, tables, staff });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -71,7 +71,7 @@ router.post('/', (req, res) => {
 
     res.json({ ok: true, id: Number(result.lastInsertRowid) });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -99,7 +99,7 @@ router.put('/:id', (req, res) => {
 
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -129,7 +129,7 @@ router.delete('/:id', (req, res) => {
     run('DELETE FROM restaurants WHERE id = ?', [id]);
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -172,7 +172,7 @@ router.get('/compare/all', (req, res) => {
 
     res.json({ period_days: days, sites: comparison });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 

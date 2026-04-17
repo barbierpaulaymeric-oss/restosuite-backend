@@ -82,7 +82,7 @@ router.get('/keys', requireAuth, (req, res) => {
     const keys = all('SELECT id, key_name, api_key, permissions, rate_limit, is_active, last_used, request_count, created_at FROM api_keys WHERE restaurant_id = 1');
     res.json(keys.map(k => ({ ...k, permissions: JSON.parse(k.permissions || '[]') })));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -101,17 +101,17 @@ router.post('/keys', requireAuth, (req, res) => {
 
     res.json({ ok: true, api_key: apiKey, key_name, permissions: perms });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
 // DELETE /api/public/keys/:id
 router.delete('/keys/:id', requireAuth, (req, res) => {
   try {
-    run('DELETE FROM api_keys WHERE id = ?', [Number(req.params.id)]);
+    run('DELETE FROM api_keys WHERE id = ? AND restaurant_id = ?', [Number(req.params.id), req.user.restaurant_id]);
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur lors de la suppression' });
   }
 });
 
@@ -154,7 +154,7 @@ router.get('/v1/menu', apiKeyAuth, (req, res) => {
       total_items: recipes.length
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -202,7 +202,7 @@ router.get('/v1/availability', apiKeyAuth, (req, res) => {
 
     res.json({ availability, timestamp: new Date().toISOString() });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -235,7 +235,7 @@ router.post('/v1/orders', apiKeyAuth, requirePermission('write'), (req, res) => 
 
     res.json({ ok: true, order_id: orderId, total: totalCost });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -254,7 +254,7 @@ router.get('/v1/orders/:id', apiKeyAuth, (req, res) => {
 
     res.json({ ...order, items });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -274,7 +274,7 @@ router.get('/v1/stock', apiKeyAuth, (req, res) => {
     `);
     res.json({ stock, timestamp: new Date().toISOString() });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
@@ -294,7 +294,7 @@ router.get('/v1/stats', apiKeyAuth, (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
