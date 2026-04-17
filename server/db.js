@@ -1810,4 +1810,59 @@ try {
   console.error('Migration supplier_accounts.token_expires_at error:', e.message);
 }
 
+// ─── Phase 2 multi-tenancy: restaurant_id on every tenant-scoped table ───
+try {
+  const PHASE2_TABLES = [
+    'ingredients','recipes','recipe_ingredients','recipe_steps',
+    'stock','stock_movements','suppliers','supplier_prices','supplier_accounts',
+    'supplier_catalog','ingredient_supplier_prefs','price_history','price_change_notifications',
+    'temperature_zones','temperature_logs','cleaning_tasks','cleaning_logs',
+    'cooling_logs','reheating_logs','fryers','fryer_checks','non_conformities',
+    'haccp_hazard_analysis','haccp_ccp','haccp_decision_tree_results',
+    'traceability_logs','downstream_traceability','recall_procedures','training_records',
+    'pest_control','equipment_maintenance','waste_management',
+    'corrective_actions_templates','corrective_actions_log',
+    'allergen_management_plan','water_management','pms_audits',
+    'tiac_procedures','fabrication_diagrams',
+    'order_items','purchase_orders','purchase_order_items',
+    'delivery_notes','delivery_note_items','loyalty_transactions',
+    'prediction_accuracy','referrals'
+  ];
+  for (const t of PHASE2_TABLES) {
+    const tableExists = db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?"
+    ).get(t);
+    if (!tableExists) continue;
+    const cols = db.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name);
+    if (!cols.includes('restaurant_id')) {
+      db.exec(`ALTER TABLE ${t} ADD COLUMN restaurant_id INTEGER DEFAULT 1`);
+      db.exec(`UPDATE ${t} SET restaurant_id = 1 WHERE restaurant_id IS NULL`);
+    }
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_${t}_restaurant_id ON ${t}(restaurant_id)`);
+  }
+  console.log('✅ Migration: Phase 2 restaurant_id backfill complete');
+} catch (e) {
+  console.warn('⚠️ Phase 2 migration error:', e.message);
+}
+
+// ─── audit_log (append-only, immutable by convention) ───
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER NOT NULL,
+    account_id INTEGER,
+    table_name TEXT NOT NULL,
+    record_id INTEGER,
+    action TEXT NOT NULL CHECK(action IN ('create','update','delete')),
+    old_values TEXT,
+    new_values TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_log_restaurant ON audit_log(restaurant_id, created_at DESC)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_log_table_record ON audit_log(table_name, record_id)`);
+  console.log('✅ Migration: audit_log table ready');
+} catch (e) {
+  console.warn('⚠️ audit_log migration error:', e.message);
+}
+
 module.exports = { db, all, get, run };

@@ -39,6 +39,7 @@ try {
 try {
   run(`CREATE TABLE IF NOT EXISTS loyalty_transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER DEFAULT 1,
     customer_id INTEGER NOT NULL REFERENCES customers(id),
     points INTEGER NOT NULL,
     type TEXT NOT NULL,
@@ -46,6 +47,12 @@ try {
     order_id INTEGER,
     created_at TEXT DEFAULT (datetime('now'))
   )`);
+  // Idempotent backfill for DBs pre-dating Phase 2
+  try {
+    const cols2 = require('../db').db.prepare('PRAGMA table_info(loyalty_transactions)').all().map(c => c.name);
+    if (!cols2.includes('restaurant_id')) run('ALTER TABLE loyalty_transactions ADD COLUMN restaurant_id INTEGER DEFAULT 1');
+  } catch {}
+  run(`CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_restaurant_id ON loyalty_transactions(restaurant_id)`);
 } catch {}
 
 try {

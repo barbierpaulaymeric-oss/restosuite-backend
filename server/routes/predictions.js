@@ -7,13 +7,19 @@ const router = Router();
 try {
   run(`CREATE TABLE IF NOT EXISTS prediction_accuracy (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER DEFAULT 1,
     date TEXT NOT NULL,
     predicted_orders INTEGER,
     actual_orders INTEGER,
     accuracy_pct REAL,
     recorded_at TEXT DEFAULT (datetime('now'))
   )`);
-  run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_prediction_accuracy_date ON prediction_accuracy (date)`);
+  try {
+    const cols = require('../db').db.prepare('PRAGMA table_info(prediction_accuracy)').all().map(c => c.name);
+    if (!cols.includes('restaurant_id')) run('ALTER TABLE prediction_accuracy ADD COLUMN restaurant_id INTEGER DEFAULT 1');
+  } catch {}
+  run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_prediction_accuracy_date ON prediction_accuracy (restaurant_id, date)`);
+  run(`CREATE INDEX IF NOT EXISTS idx_prediction_accuracy_restaurant_id ON prediction_accuracy(restaurant_id)`);
 } catch {}
 
 router.use(requireAuth);
