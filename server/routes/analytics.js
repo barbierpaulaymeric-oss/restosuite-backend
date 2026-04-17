@@ -8,9 +8,8 @@ router.use(requireAuth);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-// ─── AI Insights Cache (1h) ───
-let _insightsCache = null;
-let _insightsCacheTime = 0;
+// ─── AI Insights Cache (1h) — per-tenant to prevent cross-tenant leak ───
+const _insightsCache = new Map(); // rid -> { insights, time }
 const INSIGHTS_TTL = 60 * 60 * 1000; // 1 hour
 
 // ═══════════════════════════════════════════
@@ -18,8 +17,9 @@ const INSIGHTS_TTL = 60 * 60 * 1000; // 1 hour
 // ═══════════════════════════════════════════
 router.get('/kpis', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     // Total recipes
-    const totalRecipes = get('SELECT COUNT(*) as c FROM recipes').c;
+    const totalRecipes = get('SELECT COUNT(*) as c FROM recipes WHERE restaurant_id = ?', [rid]).c;
 
     // Average food cost % across recipes with selling_price > 0
     const recipes = all(`
@@ -31,14 +31,14 @@ router.get('/kpis', (req, res) => {
                 WHEN sp.unit = 'kg' THEN 1000
                 WHEN sp.unit = 'L' THEN 1000
                 ELSE 1
-              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1),
+              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
               0
             )
           )
-          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id
+          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?
         ), 0) as cost
-      FROM recipes r WHERE r.selling_price > 0
-    `);
+      FROM recipes r WHERE r.selling_price > 0 AND r.restaurant_id = ?
+    `, [rid, rid, rid]);
 
     let totalFoodCostPct = 0;
     let countWithPrice = 0;
@@ -57,34 +57,36 @@ router.get('/kpis', (req, res) => {
           WHEN sp.unit = 'kg' THEN 1000
           WHEN sp.unit = 'L' THEN 1000
           ELSE 1
-        END FROM supplier_prices sp WHERE sp.ingredient_id = s.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1),
+        END FROM supplier_prices sp WHERE sp.ingredient_id = s.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
         0
       )), 0) as total
       FROM stock s
-    `);
+      WHERE s.restaurant_id = ?
+    `, [rid, rid]);
     const totalStockValue = Math.round(stockVal.total * 100) / 100;
 
     // HACCP compliance today
     const today = new Date().toISOString().split('T')[0];
 
-    const tempZones = get('SELECT COUNT(*) as c FROM temperature_zones').c;
-    const tempDone = get(`SELECT COUNT(DISTINCT zone_id) as c FROM temperature_logs WHERE date(recorded_at) = ?`, [today]).c;
+    const tempZones = get('SELECT COUNT(*) as c FROM temperature_zones WHERE restaurant_id = ?', [rid]).c;
+    const tempDone = get(`SELECT COUNT(DISTINCT zone_id) as c FROM temperature_logs WHERE date(recorded_at) = ? AND restaurant_id = ?`, [today, rid]).c;
 
     // Cleaning: daily tasks expected today
     const dayOfWeek = new Date().getDay(); // 0=Sun
-    const cleaningTotal = get(`SELECT COUNT(*) as c FROM cleaning_tasks WHERE frequency = 'daily'`).c;
+    const cleaningTotal = get(`SELECT COUNT(*) as c FROM cleaning_tasks WHERE frequency = 'daily' AND restaurant_id = ?`, [rid]).c;
     const cleaningDone = get(`
       SELECT COUNT(DISTINCT task_id) as c FROM cleaning_logs cl
       JOIN cleaning_tasks ct ON ct.id = cl.task_id
       WHERE date(cl.completed_at) = ? AND ct.frequency = 'daily'
-    `, [today]).c;
+        AND cl.restaurant_id = ? AND ct.restaurant_id = ?
+    `, [today, rid, rid]).c;
 
     // Low stock count
-    const lowStock = get(`SELECT COUNT(*) as c FROM stock WHERE quantity <= min_quantity AND min_quantity > 0`).c;
+    const lowStock = get(`SELECT COUNT(*) as c FROM stock WHERE quantity <= min_quantity AND min_quantity > 0 AND restaurant_id = ?`, [rid]).c;
 
     // Price changes last 30 days
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
-    const priceChanges = get(`SELECT COUNT(*) as c FROM price_change_notifications WHERE created_at >= ?`, [thirtyDaysAgo]).c;
+    const priceChanges = get(`SELECT COUNT(*) as c FROM price_change_notifications WHERE created_at >= ? AND restaurant_id = ?`, [thirtyDaysAgo, rid]).c;
 
     res.json({
       total_recipes: totalRecipes,
@@ -108,6 +110,7 @@ router.get('/kpis', (req, res) => {
 // ═══════════════════════════════════════════
 router.get('/food-cost', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const recipes = all(`
       SELECT r.id, r.name, r.selling_price, r.portions,
         COALESCE((
@@ -117,15 +120,16 @@ router.get('/food-cost', (req, res) => {
                 WHEN sp.unit = 'kg' THEN 1000
                 WHEN sp.unit = 'L' THEN 1000
                 ELSE 1
-              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1),
+              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
               0
             )
           )
-          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id
+          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?
         ), 0) as cost
       FROM recipes r
+      WHERE r.restaurant_id = ?
       ORDER BY r.name
-    `);
+    `, [rid, rid, rid]);
 
     const result = [];
     let totalPct = 0;
@@ -186,6 +190,7 @@ router.get('/food-cost', (req, res) => {
 // ═══════════════════════════════════════════
 router.get('/stock', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     // Total value
     const stockItems = all(`
       SELECT s.*, i.name, i.category,
@@ -194,12 +199,13 @@ router.get('/stock', (req, res) => {
             WHEN sp.unit = 'kg' THEN 1000
             WHEN sp.unit = 'L' THEN 1000
             ELSE 1
-          END FROM supplier_prices sp WHERE sp.ingredient_id = s.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1),
+          END FROM supplier_prices sp WHERE sp.ingredient_id = s.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
           0
         ) as unit_price
       FROM stock s
       JOIN ingredients i ON i.id = s.ingredient_id
-    `);
+      WHERE s.restaurant_id = ? AND i.restaurant_id = ?
+    `, [rid, rid, rid]);
 
     let totalValue = 0;
     const catMap = {};
@@ -228,10 +234,11 @@ router.get('/stock', (req, res) => {
       JOIN ingredients i ON i.id = sm.ingredient_id
       WHERE sm.movement_type IN ('loss', 'consumption', 'adjustment')
         AND sm.recorded_at >= ?
+        AND sm.restaurant_id = ? AND i.restaurant_id = ?
       GROUP BY sm.ingredient_id
       ORDER BY quantity DESC
       LIMIT 5
-    `, [thirtyDaysAgo]);
+    `, [thirtyDaysAgo, rid, rid]);
 
     // Alerts
     const alerts = all(`
@@ -244,13 +251,14 @@ router.get('/stock', (req, res) => {
       FROM stock s
       JOIN ingredients i ON i.id = s.ingredient_id
       WHERE s.quantity <= s.min_quantity AND s.min_quantity > 0
+        AND s.restaurant_id = ? AND i.restaurant_id = ?
       ORDER BY s.quantity / NULLIF(s.min_quantity, 0) ASC
-    `);
+    `, [rid, rid]);
 
     // Movements summary (30 days)
-    const receptions = get(`SELECT COUNT(*) as c FROM stock_movements WHERE movement_type = 'reception' AND recorded_at >= ?`, [thirtyDaysAgo]).c;
-    const losses = get(`SELECT COUNT(*) as c FROM stock_movements WHERE movement_type = 'loss' AND recorded_at >= ?`, [thirtyDaysAgo]).c;
-    const adjustments = get(`SELECT COUNT(*) as c FROM stock_movements WHERE movement_type = 'adjustment' AND recorded_at >= ?`, [thirtyDaysAgo]).c;
+    const receptions = get(`SELECT COUNT(*) as c FROM stock_movements WHERE movement_type = 'reception' AND recorded_at >= ? AND restaurant_id = ?`, [thirtyDaysAgo, rid]).c;
+    const losses = get(`SELECT COUNT(*) as c FROM stock_movements WHERE movement_type = 'loss' AND recorded_at >= ? AND restaurant_id = ?`, [thirtyDaysAgo, rid]).c;
+    const adjustments = get(`SELECT COUNT(*) as c FROM stock_movements WHERE movement_type = 'adjustment' AND recorded_at >= ? AND restaurant_id = ?`, [thirtyDaysAgo, rid]).c;
 
     res.json({
       total_value: Math.round(totalValue * 100) / 100,
@@ -270,12 +278,13 @@ router.get('/stock', (req, res) => {
 // ═══════════════════════════════════════════
 router.get('/prices', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
 
     // Recent price changes from notifications
     const recentChanges = all(`
       SELECT pcn.product_name as product,
-        (SELECT s.name FROM suppliers s WHERE s.id = pcn.supplier_id) as supplier,
+        (SELECT s.name FROM suppliers s WHERE s.id = pcn.supplier_id AND s.restaurant_id = ?) as supplier,
         pcn.old_price, pcn.new_price,
         CASE WHEN pcn.old_price > 0
           THEN ROUND(((pcn.new_price - pcn.old_price) / pcn.old_price) * 100, 1)
@@ -283,10 +292,10 @@ router.get('/prices', (req, res) => {
         END as change_pct,
         pcn.created_at as date
       FROM price_change_notifications pcn
-      WHERE pcn.created_at >= ?
+      WHERE pcn.created_at >= ? AND pcn.restaurant_id = ?
       ORDER BY pcn.created_at DESC
       LIMIT 20
-    `, [thirtyDaysAgo]);
+    `, [rid, thirtyDaysAgo, rid]);
 
     // Average inflation
     let totalChangePct = 0;
@@ -312,11 +321,13 @@ router.get('/prices', (req, res) => {
       JOIN suppliers s2 ON s2.id = sp2.supplier_id
       WHERE sp2.price < sp1.price
         AND sp1.supplier_id = COALESCE(i.preferred_supplier_id, sp1.supplier_id)
+        AND sp1.restaurant_id = ? AND sp2.restaurant_id = ?
+        AND i.restaurant_id = ? AND s1.restaurant_id = ? AND s2.restaurant_id = ?
       GROUP BY sp1.ingredient_id
       HAVING sp2.price = MIN(sp2.price)
       ORDER BY savings_pct DESC
       LIMIT 10
-    `);
+    `, [rid, rid, rid, rid, rid]);
 
     res.json({
       recent_changes: recentChanges,
@@ -334,19 +345,21 @@ router.get('/prices', (req, res) => {
 // ═══════════════════════════════════════════
 router.get('/haccp', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
 
     // Temperature compliance 7d: % of readings within zone min/max
     const tempTotal7d = get(`
-      SELECT COUNT(*) as c FROM temperature_logs WHERE date(recorded_at) >= ?
-    `, [sevenDaysAgo]).c;
+      SELECT COUNT(*) as c FROM temperature_logs WHERE date(recorded_at) >= ? AND restaurant_id = ?
+    `, [sevenDaysAgo, rid]).c;
     const tempOk7d = get(`
       SELECT COUNT(*) as c FROM temperature_logs tl
       JOIN temperature_zones tz ON tz.id = tl.zone_id
       WHERE date(tl.recorded_at) >= ?
         AND tl.temperature >= tz.min_temp AND tl.temperature <= tz.max_temp
-    `, [sevenDaysAgo]).c;
+        AND tl.restaurant_id = ? AND tz.restaurant_id = ?
+    `, [sevenDaysAgo, rid, rid]).c;
     const temperatureCompliance7d = tempTotal7d > 0 ? Math.round((tempOk7d / tempTotal7d) * 1000) / 10 : 100;
 
     // Cleaning compliance 7d: % of daily tasks completed each day
@@ -355,9 +368,10 @@ router.get('/haccp', (req, res) => {
       FROM cleaning_logs cl
       JOIN cleaning_tasks ct ON ct.id = cl.task_id
       WHERE date(cl.completed_at) >= ? AND ct.frequency = 'daily'
+        AND cl.restaurant_id = ? AND ct.restaurant_id = ?
       GROUP BY date(cl.completed_at)
-    `, [sevenDaysAgo]);
-    const dailyTaskCount = get(`SELECT COUNT(*) as c FROM cleaning_tasks WHERE frequency = 'daily'`).c;
+    `, [sevenDaysAgo, rid, rid]);
+    const dailyTaskCount = get(`SELECT COUNT(*) as c FROM cleaning_tasks WHERE frequency = 'daily' AND restaurant_id = ?`, [rid]).c;
     let cleaningTotal = 0;
     let cleaningDoneTotal = 0;
     for (const d of cleaningDays) {
@@ -376,26 +390,29 @@ router.get('/haccp', (req, res) => {
       JOIN temperature_zones tz ON tz.id = tl.zone_id
       WHERE date(tl.recorded_at) >= ?
         AND (tl.temperature < tz.min_temp OR tl.temperature > tz.max_temp)
-    `, [sevenDaysAgo]).c;
+        AND tl.restaurant_id = ? AND tz.restaurant_id = ?
+    `, [sevenDaysAgo, rid, rid]).c;
 
     // Daily scores (30 days)
     const dailyScores = [];
     for (let i = 29; i >= 0; i--) {
       const d = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
 
-      const dayTempTotal = get(`SELECT COUNT(*) as c FROM temperature_logs WHERE date(recorded_at) = ?`, [d]).c;
+      const dayTempTotal = get(`SELECT COUNT(*) as c FROM temperature_logs WHERE date(recorded_at) = ? AND restaurant_id = ?`, [d, rid]).c;
       const dayTempOk = get(`
         SELECT COUNT(*) as c FROM temperature_logs tl
         JOIN temperature_zones tz ON tz.id = tl.zone_id
         WHERE date(tl.recorded_at) = ?
           AND tl.temperature >= tz.min_temp AND tl.temperature <= tz.max_temp
-      `, [d]).c;
+          AND tl.restaurant_id = ? AND tz.restaurant_id = ?
+      `, [d, rid, rid]).c;
 
       const dayCleanDone = get(`
         SELECT COUNT(DISTINCT cl.task_id) as c FROM cleaning_logs cl
         JOIN cleaning_tasks ct ON ct.id = cl.task_id
         WHERE date(cl.completed_at) = ? AND ct.frequency = 'daily'
-      `, [d]).c;
+          AND cl.restaurant_id = ? AND ct.restaurant_id = ?
+      `, [d, rid, rid]).c;
 
       dailyScores.push({
         date: d,
@@ -421,14 +438,16 @@ router.get('/haccp', (req, res) => {
 // ═══════════════════════════════════════════
 router.get('/ai-insights', async (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const forceRefresh = req.query.refresh === 'true';
 
-    // Return cache if still valid
-    if (!forceRefresh && _insightsCache && (Date.now() - _insightsCacheTime) < INSIGHTS_TTL) {
+    // Return cache if still valid (per-tenant)
+    const cached = _insightsCache.get(rid);
+    if (!forceRefresh && cached && (Date.now() - cached.time) < INSIGHTS_TTL) {
       return res.json({
-        insights: _insightsCache,
+        insights: cached.insights,
         cached: true,
-        cached_at: new Date(_insightsCacheTime).toISOString()
+        cached_at: new Date(cached.time).toISOString()
       });
     }
 
@@ -438,26 +457,27 @@ router.get('/ai-insights', async (req, res) => {
         COALESCE((
           SELECT SUM(ri.gross_quantity * COALESCE(
             (SELECT sp.price / CASE WHEN sp.unit = 'kg' THEN 1000 WHEN sp.unit = 'L' THEN 1000 ELSE 1 END
-             FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1), 0))
-          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id
+             FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1), 0))
+          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?
         ), 0) as cost
-      FROM recipes r WHERE r.selling_price > 0
-    `);
+      FROM recipes r WHERE r.selling_price > 0 AND r.restaurant_id = ?
+    `, [rid, rid, rid]);
 
     const stockAlerts = all(`
       SELECT i.name, s.quantity, s.min_quantity, s.unit
       FROM stock s JOIN ingredients i ON i.id = s.ingredient_id
       WHERE s.quantity <= s.min_quantity AND s.min_quantity > 0
-    `);
+        AND s.restaurant_id = ? AND i.restaurant_id = ?
+    `, [rid, rid]);
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
     const priceChanges = all(`
       SELECT product_name, old_price, new_price,
         ROUND(((new_price - old_price) / NULLIF(old_price, 0)) * 100, 1) as change_pct
       FROM price_change_notifications
-      WHERE created_at >= ? AND old_price > 0
+      WHERE created_at >= ? AND old_price > 0 AND restaurant_id = ?
       ORDER BY ABS(new_price - old_price) DESC LIMIT 10
-    `, [thirtyDaysAgo]);
+    `, [thirtyDaysAgo, rid]);
 
     const topCostRecipes = recipesData
       .filter(r => r.selling_price > 0 && r.cost > 0)
@@ -526,14 +546,14 @@ Règles :
       insights = generateFallbackInsights(topCostRecipes, stockAlerts, priceChanges);
     }
 
-    // Cache result
-    _insightsCache = insights;
-    _insightsCacheTime = Date.now();
+    // Cache result (per-tenant)
+    const now = Date.now();
+    _insightsCache.set(rid, { insights, time: now });
 
     res.json({
       insights,
       cached: false,
-      cached_at: new Date(_insightsCacheTime).toISOString()
+      cached_at: new Date(now).toISOString()
     });
   } catch (e) {
     console.error('Analytics AI insights error:', e);
@@ -599,6 +619,7 @@ function generateFallbackInsights(topCostRecipes, stockAlerts, priceChanges) {
 // ═══════════════════════════════════════════
 router.get('/price-trends', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { ingredient_id, period } = req.query;
     if (!ingredient_id) return res.status(400).json({ error: 'ingredient_id requis' });
 
@@ -612,10 +633,10 @@ router.get('/price-trends', (req, res) => {
       SELECT ph.price, ph.recorded_at as date,
              COALESCE(s.name, 'Inconnu') as supplier_name
       FROM price_history ph
-      LEFT JOIN suppliers s ON s.id = ph.supplier_id
-      WHERE ph.ingredient_id = ? AND ph.recorded_at >= ?
+      LEFT JOIN suppliers s ON s.id = ph.supplier_id AND s.restaurant_id = ?
+      WHERE ph.ingredient_id = ? AND ph.recorded_at >= ? AND ph.restaurant_id = ?
       ORDER BY ph.recorded_at ASC
-    `, [Number(ingredient_id), since]);
+    `, [rid, Number(ingredient_id), since, rid]);
 
     res.json(trends);
   } catch (e) {
@@ -629,6 +650,7 @@ router.get('/price-trends', (req, res) => {
 // ═══════════════════════════════════════════
 router.get('/price-alerts', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
 
     // Get latest price per ingredient from supplier_prices
@@ -641,10 +663,11 @@ router.get('/price-alerts', (req, res) => {
       JOIN suppliers s ON s.id = sp.supplier_id
       WHERE sp.id IN (
         SELECT id FROM supplier_prices sp2
-        WHERE sp2.ingredient_id = sp.ingredient_id
+        WHERE sp2.ingredient_id = sp.ingredient_id AND sp2.restaurant_id = ?
         ORDER BY sp2.last_updated DESC LIMIT 1
       )
-    `);
+        AND sp.restaurant_id = ? AND i.restaurant_id = ? AND s.restaurant_id = ?
+    `, [rid, rid, rid, rid]);
 
     const alerts = [];
     for (const ing of ingredients) {
@@ -652,8 +675,8 @@ router.get('/price-alerts', (req, res) => {
       const avg = get(`
         SELECT AVG(price) as avg_price
         FROM price_history
-        WHERE ingredient_id = ? AND recorded_at >= ? AND price > 0
-      `, [ing.id, thirtyDaysAgo]);
+        WHERE ingredient_id = ? AND recorded_at >= ? AND price > 0 AND restaurant_id = ?
+      `, [ing.id, thirtyDaysAgo, rid]);
 
       if (avg && avg.avg_price && avg.avg_price > 0) {
         const variation = ((ing.current_price - avg.avg_price) / avg.avg_price) * 100;
@@ -687,6 +710,7 @@ router.get('/price-alerts', (req, res) => {
 // ═══════════════════════════════════════════
 router.get('/menu-engineering', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const days = Number(req.query.days) || 30;
     const dateFrom = new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
 
@@ -700,15 +724,15 @@ router.get('/menu-engineering', (req, res) => {
                 WHEN sp.unit = 'kg' THEN 1000
                 WHEN sp.unit = 'L' THEN 1000
                 ELSE 1
-              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1),
+              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
               0
             )
           )
-          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id
+          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?
         ), 0) as cost
       FROM recipes r
-      WHERE r.selling_price > 0
-    `);
+      WHERE r.selling_price > 0 AND r.restaurant_id = ?
+    `, [rid, rid, rid]);
 
     // 2. Get sales data per recipe
     let salesData = {};
@@ -719,8 +743,9 @@ router.get('/menu-engineering', (req, res) => {
         JOIN orders o ON o.id = oi.order_id
         WHERE o.status NOT IN ('annulé', 'cancelled')
           AND date(o.created_at) >= ?
+          AND o.restaurant_id = ? AND oi.restaurant_id = ?
         GROUP BY oi.recipe_id
-      `, [dateFrom]);
+      `, [dateFrom, rid, rid]);
       for (const s of sales) {
         salesData[s.recipe_id] = { qty_sold: s.qty_sold, order_count: s.order_count };
       }

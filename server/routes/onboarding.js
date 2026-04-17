@@ -34,9 +34,13 @@ router.get('/status', (req, res) => {
     ? all('SELECT id, name, role, first_name, last_name FROM accounts WHERE restaurant_id = ? AND id != ? ORDER BY created_at', [account.restaurant_id, account.id])
     : [];
 
-  const zones = all('SELECT * FROM temperature_zones ORDER BY id');
+  const zones = account.restaurant_id
+    ? all('SELECT * FROM temperature_zones WHERE restaurant_id = ? ORDER BY id', [account.restaurant_id])
+    : [];
 
-  const suppliers = all('SELECT * FROM suppliers ORDER BY name');
+  const suppliers = account.restaurant_id
+    ? all('SELECT * FROM suppliers WHERE restaurant_id = ? ORDER BY name', [account.restaurant_id])
+    : [];
 
   res.json({
     current_step: account.onboarding_step,
@@ -55,10 +59,11 @@ router.get('/status', (req, res) => {
 
 // ─── GET /api/onboarding/checklist — post-wizard activation checklist ───
 router.get('/checklist', (req, res) => {
-  const recipeRow   = get('SELECT COUNT(*) as c FROM recipes');
-  const supplierRow = get('SELECT COUNT(*) as c FROM suppliers');
-  const zoneRow     = get('SELECT COUNT(*) as c FROM temperature_zones');
-  const logRow      = get('SELECT COUNT(*) as c FROM temperature_logs');
+  const rid = req.user.restaurant_id;
+  const recipeRow   = get('SELECT COUNT(*) as c FROM recipes WHERE restaurant_id = ?', [rid]);
+  const supplierRow = get('SELECT COUNT(*) as c FROM suppliers WHERE restaurant_id = ?', [rid]);
+  const zoneRow     = get('SELECT COUNT(*) as c FROM temperature_zones WHERE restaurant_id = ?', [rid]);
+  const logRow      = get('SELECT COUNT(*) as c FROM temperature_logs WHERE restaurant_id = ?', [rid]);
 
   const steps = [
     { id: 'recipe',      label: 'Créez votre première fiche technique vocale', link: '#/new',                done: recipeRow.c > 0 },
@@ -180,14 +185,15 @@ router.put('/step/4', (req, res) => {
 // ─── PUT /api/onboarding/step/5 — Zones froides ───
 router.put('/step/5', (req, res) => {
   const { zones } = req.body;
+  const rid = req.user.restaurant_id;
 
   if (Array.isArray(zones)) {
-    // Clear and re-create temperature zones
-    run('DELETE FROM temperature_zones');
+    // Clear and re-create temperature zones (scoped to caller tenant)
+    run('DELETE FROM temperature_zones WHERE restaurant_id = ?', [rid]);
     for (const z of zones) {
       run(
-        'INSERT INTO temperature_zones (name, type, min_temp, max_temp) VALUES (?, ?, ?, ?)',
-        [z.name || 'Zone', z.type || 'fridge', z.min_temp ?? 0, z.max_temp ?? 4]
+        'INSERT INTO temperature_zones (restaurant_id, name, type, min_temp, max_temp) VALUES (?, ?, ?, ?, ?)',
+        [rid, z.name || 'Zone', z.type || 'fridge', z.min_temp ?? 0, z.max_temp ?? 4]
       );
     }
   }
@@ -200,16 +206,17 @@ router.put('/step/5', (req, res) => {
 // ─── PUT /api/onboarding/step/6 — Fournisseurs ───
 router.put('/step/6', (req, res) => {
   const { suppliers } = req.body;
+  const rid = req.user.restaurant_id;
 
   if (Array.isArray(suppliers)) {
     for (const s of suppliers) {
       if (!s.name) continue;
-      // Check if supplier already exists
-      const existing = get('SELECT id FROM suppliers WHERE name = ? COLLATE NOCASE', [s.name.trim()]);
+      // Check if supplier already exists (scoped to caller tenant)
+      const existing = get('SELECT id FROM suppliers WHERE name = ? COLLATE NOCASE AND restaurant_id = ?', [s.name.trim(), rid]);
       if (!existing) {
         run(
-          'INSERT INTO suppliers (name, contact, phone, email) VALUES (?, ?, ?, ?)',
-          [s.name.trim(), (s.contact || '').trim(), (s.phone || '').trim(), (s.email || '').trim()]
+          'INSERT INTO suppliers (restaurant_id, name, contact, phone, email) VALUES (?, ?, ?, ?, ?)',
+          [rid, s.name.trim(), (s.contact || '').trim(), (s.phone || '').trim(), (s.email || '').trim()]
         );
       }
     }

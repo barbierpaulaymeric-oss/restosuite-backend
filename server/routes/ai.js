@@ -277,18 +277,19 @@ Retourne un JSON avec cette structure :
 
 router.post('/modify-voice', async (req, res) => {
   const { text, recipe_id } = req.body;
+  const rid = req.user.restaurant_id;
   if (!text) return res.status(400).json({ error: 'text is required' });
   if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
 
   // Get current recipe context for the AI
   let recipeContext = '';
   if (recipe_id) {
-    const recipe = get('SELECT * FROM recipes WHERE id = ?', [recipe_id]);
+    const recipe = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [recipe_id, rid]);
     if (recipe) {
       const ingredients = all(`
-        SELECT ri.*, i.name as ingredient_name 
-        FROM recipe_ingredients ri JOIN ingredients i ON i.id = ri.ingredient_id 
-        WHERE ri.recipe_id = ?`, [recipe_id]);
+        SELECT ri.*, i.name as ingredient_name
+        FROM recipe_ingredients ri JOIN ingredients i ON i.id = ri.ingredient_id
+        WHERE ri.recipe_id = ? AND ri.restaurant_id = ? AND i.restaurant_id = ?`, [recipe_id, rid, rid]);
       recipeContext = `\n\nRecette actuelle: "${recipe.name}" (${recipe.portions} portions)\nIngrédients: ${ingredients.map(i => `${i.ingredient_name} ${i.gross_quantity}${i.unit}`).join(', ')}`;
     }
   }
@@ -321,32 +322,32 @@ router.post('/modify-voice', async (req, res) => {
       const { run: dbRun } = require('../db');
       for (const action of actions.actions) {
         if (action.type === 'supplier_preference') {
-          // Find or create supplier
-          let supplier = get('SELECT * FROM suppliers WHERE LOWER(name) = LOWER(?)', [action.supplier_name]);
+          // Find or create supplier (scoped to caller tenant)
+          let supplier = get('SELECT * FROM suppliers WHERE LOWER(name) = LOWER(?) AND restaurant_id = ?', [action.supplier_name, rid]);
           if (!supplier) {
             const info = dbRun(
-              'INSERT INTO suppliers (name, quality_rating, quality_notes) VALUES (?, ?, ?)',
-              [action.supplier_name, action.quality_rating || 3, action.reason || null]
+              'INSERT INTO suppliers (restaurant_id, name, quality_rating, quality_notes) VALUES (?, ?, ?, ?)',
+              [rid, action.supplier_name, action.quality_rating || 3, action.reason || null]
             );
-            supplier = get('SELECT * FROM suppliers WHERE id = ?', [info.lastInsertRowid]);
+            supplier = get('SELECT * FROM suppliers WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
           }
-          
-          // Find ingredient
-          const ingredient = get('SELECT * FROM ingredients WHERE LOWER(name) LIKE ?', 
-            [`%${action.ingredient_name.toLowerCase()}%`]);
-          
+
+          // Find ingredient (scoped to caller tenant)
+          const ingredient = get('SELECT * FROM ingredients WHERE LOWER(name) LIKE ? AND restaurant_id = ?',
+            [`%${action.ingredient_name.toLowerCase()}%`, rid]);
+
           if (supplier && ingredient) {
             // Save preference
             try {
               dbRun(
-                `INSERT OR REPLACE INTO ingredient_supplier_prefs (ingredient_id, recipe_id, supplier_id, reason)
-                 VALUES (?, ?, ?, ?)`,
-                [ingredient.id, action.scope === 'recipe' ? recipe_id : null, supplier.id, action.reason || null]
+                `INSERT OR REPLACE INTO ingredient_supplier_prefs (restaurant_id, ingredient_id, recipe_id, supplier_id, reason)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [rid, ingredient.id, action.scope === 'recipe' ? recipe_id : null, supplier.id, action.reason || null]
               );
-              
+
               // Also update ingredient's preferred supplier if global
               if (action.scope === 'global') {
-                dbRun('UPDATE ingredients SET preferred_supplier_id = ? WHERE id = ?', [supplier.id, ingredient.id]);
+                dbRun('UPDATE ingredients SET preferred_supplier_id = ? WHERE id = ? AND restaurant_id = ?', [supplier.id, ingredient.id, rid]);
               }
               
               action.applied = true;
@@ -662,13 +663,14 @@ Si un champ n'est pas visible, mets null. Extrais TOUS les produits listés, mê
 // ═══════════════════════════════════════════
 router.post('/import-mercuriale', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { supplier_id, items } = req.body;
     if (!supplier_id) return res.status(400).json({ error: 'supplier_id requis' });
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Au moins un article à importer' });
     }
 
-    const supplier = get('SELECT id, name FROM suppliers WHERE id = ?', [Number(supplier_id)]);
+    const supplier = get('SELECT id, name FROM suppliers WHERE id = ? AND restaurant_id = ?', [Number(supplier_id), rid]);
     if (!supplier) return res.status(404).json({ error: 'Fournisseur introuvable' });
 
     let updated = 0;
@@ -681,30 +683,34 @@ router.post('/import-mercuriale', (req, res) => {
         continue;
       }
 
+      // Verify ingredient belongs to caller tenant before any write
+      const ingOk = get('SELECT id FROM ingredients WHERE id = ? AND restaurant_id = ?', [item.ingredient_id, rid]);
+      if (!ingOk) { skipped++; continue; }
+
       const unit = item.unit || 'kg';
 
       // Upsert supplier_prices
-      const existing = get('SELECT id, price FROM supplier_prices WHERE ingredient_id = ? AND supplier_id = ?',
-        [item.ingredient_id, supplier_id]);
+      const existing = get('SELECT id, price FROM supplier_prices WHERE ingredient_id = ? AND supplier_id = ? AND restaurant_id = ?',
+        [item.ingredient_id, supplier_id, rid]);
 
       if (existing) {
         if (existing.price !== item.price) {
-          run('UPDATE supplier_prices SET price = ?, unit = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
-            [item.price, unit, existing.id]);
+          run('UPDATE supplier_prices SET price = ?, unit = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?',
+            [item.price, unit, existing.id, rid]);
           updated++;
         } else {
           skipped++; // Same price, no update needed
           continue;
         }
       } else {
-        run('INSERT INTO supplier_prices (ingredient_id, supplier_id, price, unit) VALUES (?, ?, ?, ?)',
-          [item.ingredient_id, supplier_id, item.price, unit]);
+        run('INSERT INTO supplier_prices (restaurant_id, ingredient_id, supplier_id, price, unit) VALUES (?, ?, ?, ?, ?)',
+          [rid, item.ingredient_id, supplier_id, item.price, unit]);
         created++;
       }
 
       // Record in price_history
-      run('INSERT INTO price_history (ingredient_id, supplier_id, price, recorded_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
-        [item.ingredient_id, supplier_id, item.price]);
+      run('INSERT INTO price_history (restaurant_id, ingredient_id, supplier_id, price, recorded_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
+        [rid, item.ingredient_id, supplier_id, item.price]);
     }
 
     res.json({
@@ -1084,6 +1090,7 @@ DOMAINES D'EXPERTISE :
 router.post('/execute-action', async (req, res) => {
   const { type, params } = req.body;
   const user = req.user;
+  const rid = req.user.restaurant_id;
 
   if (!type || !params) {
     return res.status(400).json({ error: 'type et params requis' });
@@ -1105,9 +1112,13 @@ router.post('/execute-action', async (req, res) => {
         if (!recipe_id || !ingredient_id) {
           return res.status(400).json({ error: 'recipe_id et ingredient_id requis' });
         }
+        // Verify recipe & ingredient belong to caller tenant
+        const recipeOk = get('SELECT id FROM recipes WHERE id = ? AND restaurant_id = ?', [recipe_id, rid]);
+        const ingOk = get('SELECT id FROM ingredients WHERE id = ? AND restaurant_id = ?', [ingredient_id, rid]);
+        if (!recipeOk || !ingOk) return res.status(404).json({ error: 'recipe ou ingredient introuvable' });
         run(
-          'INSERT INTO recipe_ingredients (recipe_id, ingredient_id, gross_quantity, unit, notes) VALUES (?, ?, ?, ?, ?)',
-          [recipe_id, ingredient_id, gross_quantity || 0, unit || 'g', notes || '']
+          'INSERT INTO recipe_ingredients (restaurant_id, recipe_id, ingredient_id, gross_quantity, unit, notes) VALUES (?, ?, ?, ?, ?, ?)',
+          [rid, recipe_id, ingredient_id, gross_quantity || 0, unit || 'g', notes || '']
         );
         result = { success: true, message: 'Ingrédient ajouté' };
         break;
@@ -1128,9 +1139,9 @@ router.post('/execute-action', async (req, res) => {
           }
         }
         if (setClauses.length > 0) {
-          values.push(recipe_id, ingredient_id);
+          values.push(recipe_id, ingredient_id, rid);
           run(
-            `UPDATE recipe_ingredients SET ${setClauses.join(', ')} WHERE recipe_id = ? AND ingredient_id = ?`,
+            `UPDATE recipe_ingredients SET ${setClauses.join(', ')} WHERE recipe_id = ? AND ingredient_id = ? AND restaurant_id = ?`,
             values
           );
         }
@@ -1143,7 +1154,7 @@ router.post('/execute-action', async (req, res) => {
         if (!recipe_id || !ingredient_id) {
           return res.status(400).json({ error: 'recipe_id et ingredient_id requis' });
         }
-        run('DELETE FROM recipe_ingredients WHERE recipe_id = ? AND ingredient_id = ?', [recipe_id, ingredient_id]);
+        run('DELETE FROM recipe_ingredients WHERE recipe_id = ? AND ingredient_id = ? AND restaurant_id = ?', [recipe_id, ingredient_id, rid]);
         result = { success: true, message: 'Ingrédient supprimé' };
         break;
       }
@@ -1152,8 +1163,8 @@ router.post('/execute-action', async (req, res) => {
         const { name, category, portions, selling_price, recipe_type } = params;
         if (!name) return res.status(400).json({ error: 'name requis' });
         const info = run(
-          'INSERT INTO recipes (name, category, portions, selling_price, recipe_type) VALUES (?, ?, ?, ?, ?)',
-          [name, category || 'plat', portions || 1, selling_price || 0, recipe_type || 'plat']
+          'INSERT INTO recipes (restaurant_id, name, category, portions, selling_price, recipe_type) VALUES (?, ?, ?, ?, ?, ?)',
+          [rid, name, category || 'plat', portions || 1, selling_price || 0, recipe_type || 'plat']
         );
         result = { success: true, message: 'Fiche créée', recipe_id: info.lastInsertRowid };
         break;
@@ -1171,8 +1182,8 @@ router.post('/execute-action', async (req, res) => {
           }
         }
         if (setClauses.length > 0) {
-          values.push(recipe_id);
-          run(`UPDATE recipes SET ${setClauses.join(', ')} WHERE id = ?`, values);
+          values.push(recipe_id, rid);
+          run(`UPDATE recipes SET ${setClauses.join(', ')} WHERE id = ? AND restaurant_id = ?`, values);
         }
         result = { success: true, message: 'Fiche modifiée' };
         break;
@@ -1182,8 +1193,8 @@ router.post('/execute-action', async (req, res) => {
         const { recipe_id } = params;
         if (!recipe_id) return res.status(400).json({ error: 'recipe_id requis' });
         // Delete recipe_ingredients first (FK constraint)
-        run('DELETE FROM recipe_ingredients WHERE recipe_id = ?', [recipe_id]);
-        run('DELETE FROM recipes WHERE id = ?', [recipe_id]);
+        run('DELETE FROM recipe_ingredients WHERE recipe_id = ? AND restaurant_id = ?', [recipe_id, rid]);
+        run('DELETE FROM recipes WHERE id = ? AND restaurant_id = ?', [recipe_id, rid]);
         result = { success: true, message: 'Fiche supprimée' };
         break;
       }
@@ -1192,8 +1203,8 @@ router.post('/execute-action', async (req, res) => {
         const { name, email, phone } = params;
         if (!name) return res.status(400).json({ error: 'name requis' });
         const info = run(
-          'INSERT INTO suppliers (name, email, phone) VALUES (?, ?, ?)',
-          [name, email || null, phone || null]
+          'INSERT INTO suppliers (restaurant_id, name, email, phone) VALUES (?, ?, ?, ?)',
+          [rid, name, email || null, phone || null]
         );
         result = { success: true, message: 'Fournisseur créé', supplier_id: info.lastInsertRowid };
         break;
@@ -1204,9 +1215,13 @@ router.post('/execute-action', async (req, res) => {
         if (!supplier_id || !ingredient_id) {
           return res.status(400).json({ error: 'supplier_id et ingredient_id requis' });
         }
+        // Verify supplier & ingredient belong to caller tenant
+        const supOk = get('SELECT id FROM suppliers WHERE id = ? AND restaurant_id = ?', [supplier_id, rid]);
+        const ingOk = get('SELECT id FROM ingredients WHERE id = ? AND restaurant_id = ?', [ingredient_id, rid]);
+        if (!supOk || !ingOk) return res.status(404).json({ error: 'supplier ou ingredient introuvable' });
         const info = run(
-          'INSERT INTO orders (supplier_id, ingredient_id, quantity, unit, status, notes) VALUES (?, ?, ?, ?, ?, ?)',
-          [supplier_id, ingredient_id, quantity || 0, unit || 'kg', 'pending', notes || '']
+          'INSERT INTO orders (restaurant_id, supplier_id, ingredient_id, quantity, unit, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [rid, supplier_id, ingredient_id, quantity || 0, unit || 'kg', 'pending', notes || '']
         );
         result = { success: true, message: 'Commande créée', order_id: info.lastInsertRowid };
         break;
@@ -1217,9 +1232,11 @@ router.post('/execute-action', async (req, res) => {
         if (!location || temperature === undefined) {
           return res.status(400).json({ error: 'location et temperature requis' });
         }
+        // Note: haccp_temperatures table is not defined in schema (pre-existing bug).
+        // Include restaurant_id defensively in case table is added later.
         const info = run(
-          'INSERT INTO haccp_temperatures (location, temperature, recorded_at) VALUES (?, ?, ?)',
-          [location, temperature, timestamp || new Date().toISOString()]
+          'INSERT INTO haccp_temperatures (restaurant_id, location, temperature, recorded_at) VALUES (?, ?, ?, ?)',
+          [rid, location, temperature, timestamp || new Date().toISOString()]
         );
         result = { success: true, message: 'Température enregistrée', record_id: info.lastInsertRowid };
         break;
@@ -1230,9 +1247,11 @@ router.post('/execute-action', async (req, res) => {
         if (!ingredient_id || !quantity) {
           return res.status(400).json({ error: 'ingredient_id et quantity requis' });
         }
+        const ingOk = get('SELECT id, default_unit FROM ingredients WHERE id = ? AND restaurant_id = ?', [ingredient_id, rid]);
+        if (!ingOk) return res.status(404).json({ error: 'ingredient introuvable' });
         run(
-          'INSERT INTO stock_movements (ingredient_id, quantity, movement_type, reason, notes, recorded_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [ingredient_id, -Math.abs(quantity), 'perte', reason || '', notes || '', new Date().toISOString()]
+          'INSERT INTO stock_movements (restaurant_id, ingredient_id, quantity, unit, movement_type, reason, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [rid, ingredient_id, -Math.abs(quantity), ingOk.default_unit || 'g', 'perte', reason || notes || '', new Date().toISOString()]
         );
         result = { success: true, message: 'Perte enregistrée' };
         break;
@@ -1243,9 +1262,12 @@ router.post('/execute-action', async (req, res) => {
         if (!supplier_id || !ingredient_id || price === undefined) {
           return res.status(400).json({ error: 'supplier_id, ingredient_id et price requis' });
         }
+        const supOk = get('SELECT id FROM suppliers WHERE id = ? AND restaurant_id = ?', [supplier_id, rid]);
+        const ingOk = get('SELECT id FROM ingredients WHERE id = ? AND restaurant_id = ?', [ingredient_id, rid]);
+        if (!supOk || !ingOk) return res.status(404).json({ error: 'supplier ou ingredient introuvable' });
         run(
-          'INSERT OR REPLACE INTO supplier_prices (supplier_id, ingredient_id, price, unit, last_updated) VALUES (?, ?, ?, ?, ?)',
-          [supplier_id, ingredient_id, price, unit || 'kg', new Date().toISOString()]
+          'INSERT OR REPLACE INTO supplier_prices (restaurant_id, supplier_id, ingredient_id, price, unit, last_updated) VALUES (?, ?, ?, ?, ?, ?)',
+          [rid, supplier_id, ingredient_id, price, unit || 'kg', new Date().toISOString()]
         );
         result = { success: true, message: 'Prix mis à jour' };
         break;
