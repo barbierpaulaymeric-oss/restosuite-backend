@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { all, get, run } = require('../db');
 const { getAccountStatusById } = require('../middleware/trial');
-const { requireAuth } = require('./auth');
+const { requireAuth, JWT_SECRET } = require('./auth');
 const router = express.Router();
 
 function hashPin(pin) {
@@ -388,7 +388,7 @@ router.delete('/self', (req, res) => {
 
   let account = null;
   try {
-    const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET || 'development');
+    const decoded = require('jsonwebtoken').verify(token, JWT_SECRET);
     account = get('SELECT * FROM accounts WHERE id = ?', [decoded.id]);
   } catch (e) {
     return res.status(401).json({ error: 'Token invalide' });

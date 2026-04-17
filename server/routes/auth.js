@@ -494,3 +494,4 @@ router.post('/logout', requireAuth, (req, res) => {
 
 module.exports = router;
 module.exports.requireAuth = requireAuth;
+module.exports.JWT_SECRET = JWT_SECRET;
