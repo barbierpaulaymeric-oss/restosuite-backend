@@ -264,6 +264,27 @@ const API = {
   updateReheatingLog(id, data) {
     return this.request(`/haccp/reheating/${id}`, { method: "PUT", body: data });
   },
+  // Cooking Records (CCP2)
+  getCookingRecords(params) {
+    const qs = params ? new URLSearchParams(params).toString() : "";
+    return this.request(`/haccp/cooking${qs ? "?" + qs : ""}`);
+  },
+  getCookingStats(params) {
+    const qs = params ? new URLSearchParams(params).toString() : "";
+    return this.request(`/haccp/cooking/stats${qs ? "?" + qs : ""}`);
+  },
+  getCookingNonCompliant() {
+    return this.request("/haccp/cooking/non-compliant");
+  },
+  createCookingRecord(data) {
+    return this.request("/haccp/cooking", { method: "POST", body: data });
+  },
+  updateCookingRecord(id, data) {
+    return this.request(`/haccp/cooking/${id}`, { method: "PUT", body: data });
+  },
+  deleteCookingRecord(id) {
+    return this.request(`/haccp/cooking/${id}`, { method: "DELETE" });
+  },
   // Fryers
   getFryers() {
     return this.request("/haccp/fryers");
@@ -1967,7 +1988,7 @@ function renderIngredientLines() {
         <span class="ing-qty">${ing.gross_quantity}${ing.unit}</span>
         <span class="ing-qty text-muted">\u2192 ${net}${ing.unit}</span>
         <span class="text-muted" style="font-size:var(--text-sm);font-family:var(--font-mono)">${ing.waste_percent}%</span>
-        <span class="ing-remove" role="button" aria-label="Retirer l'ingr\xE9dient" onclick="removeIngredient(${i})"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+        <span class="ing-remove" role="button" tabindex="0" aria-label="Retirer l'ingr\xE9dient" onclick="removeIngredient(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeIngredient(${i})}"><i data-lucide="x" style="width:16px;height:16px"></i></span>
       </div>
     `;
   }).join("");
@@ -1986,7 +2007,7 @@ function renderSubRecipeLines() {
       <span class="ing-name">\u{1F4CB} ${escapeHtml(sr.name)}</span>
       <span class="ing-qty">${sr.quantity} portion${sr.quantity !== 1 ? "s" : ""}</span>
       <span class="ing-qty text-muted">${sr.cost > 0 ? formatCurrency(sr.cost) : ""}</span>
-      <span class="ing-remove" role="button" aria-label="Retirer la sous-recette" onclick="removeSubRecipe(${i})"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+      <span class="ing-remove" role="button" tabindex="0" aria-label="Retirer la sous-recette" onclick="removeSubRecipe(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeSubRecipe(${i})}"><i data-lucide="x" style="width:16px;height:16px"></i></span>
     </div>
   `).join("");
   lucide.createIcons();
@@ -2027,7 +2048,7 @@ function renderStepLines() {
     return;
   }
   el.innerHTML = `<ol class="steps-list">${formSteps.map(
-    (s, i) => `<li><span style="flex:1">${escapeHtml(s)}</span><span class="ing-remove" role="button" aria-label="Retirer l'\xE9tape" onclick="removeStep(${i})"><i data-lucide="x" style="width:14px;height:14px"></i></span></li>`
+    (s, i) => `<li><span style="flex:1">${escapeHtml(s)}</span><span class="ing-remove" role="button" tabindex="0" aria-label="Retirer l'\xE9tape" onclick="removeStep(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeStep(${i})}"><i data-lucide="x" style="width:14px;height:14px"></i></span></li>`
   ).join("")}</ol>`;
   lucide.createIcons();
 }
@@ -3600,6 +3621,7 @@ const HACCP_SUBNAV_ITEMS = [
   { href: "#/haccp/temperatures", label: "Temp\xE9ratures" },
   { href: "#/haccp/cleaning", label: "Nettoyage" },
   { href: "#/haccp/traceability", label: "Tra\xE7abilit\xE9" },
+  { href: "#/haccp/cooking", label: "Cuisson (CCP2)" },
   { href: "#/haccp/cooling", label: "Refroidissement" },
   { href: "#/haccp/reheating", label: "Remise en T\xB0" },
   { href: "#/haccp/fryers", label: "Friteuses" },
@@ -4853,6 +4875,361 @@ function showCoolingUpdateModal(id, productName) {
         showToast(mins <= 120 ? `\u2705 Conforme \u2014 ${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}` : `\u26A0\uFE0F Non conforme \u2014 ${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")} > 2h`, mins <= 120 ? "success" : "error");
       }
       renderHACCPCooling();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+const COOKING_PRODUCT_PRESETS = [
+  { label: "Viande rouge / poisson", target: 63 },
+  { label: "Porc / agneau", target: 65 },
+  { label: "Volaille", target: 70 },
+  { label: "Viande hach\xE9e", target: 70 },
+  { label: "Produit remis en T\xB0 / plat t\xE9moin r\xE9chauff\xE9", target: 75 },
+  { label: "\u0152ufs / plats \xE0 base d'\u0153uf", target: 65 }
+];
+async function renderHACCPCooking() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const [recordsRes, stats] = await Promise.all([
+      API.getCookingRecords({ limit: 100 }),
+      API.getCookingStats()
+    ]);
+    const items = recordsRes.items || [];
+    const complianceRateText = stats.compliance_rate == null ? "\u2014" : `${stats.compliance_rate}%`;
+    const complianceColor = stats.compliance_rate == null ? "#666" : stats.compliance_rate >= 98 ? "#2D8B55" : stats.compliance_rate >= 90 ? "#E8722A" : "#D93025";
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Registre de cuisson (CCP2)</h1>
+          <button class="btn btn-primary btn-large" id="btn-new-cooking">
+            <i data-lucide="plus" style="width:20px;height:20px"></i> Nouvelle cuisson
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+
+        <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+          <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
+          <span class="text-sm">
+            CCP2 \u2014 Cuisson : mesure \xE0 c\u0153ur avec sonde \xE9talonn\xE9e. Seuils :
+            <strong>63\xB0C</strong> (viande rouge/poisson),
+            <strong>70\xB0C</strong> (volailles, hach\xE9),
+            <strong>75\xB0C</strong> (remise en temp\xE9rature).
+            En cas de non-conformit\xE9, prolonger la cuisson ou jeter, et renseigner l'action corrective.
+          </span>
+        </div>
+
+        <div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px">
+          <div class="card" style="padding:14px;text-align:center">
+            <div class="text-secondary text-sm">Total cuissons</div>
+            <div style="font-size:28px;font-weight:600;margin-top:4px">${stats.total}</div>
+          </div>
+          <div class="card" style="padding:14px;text-align:center">
+            <div class="text-secondary text-sm">Taux de conformit\xE9</div>
+            <div style="font-size:28px;font-weight:600;color:${complianceColor};margin-top:4px">${complianceRateText}</div>
+          </div>
+          <div class="card" style="padding:14px;text-align:center">
+            <div class="text-secondary text-sm">Conformes</div>
+            <div style="font-size:28px;font-weight:600;color:#2D8B55;margin-top:4px">${stats.compliant}</div>
+          </div>
+          <div class="card" style="padding:14px;text-align:center">
+            <div class="text-secondary text-sm">Non conformes</div>
+            <div style="font-size:28px;font-weight:600;color:${stats.non_compliant > 0 ? "#D93025" : "#666"};margin-top:4px">${stats.non_compliant}</div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Produit</th>
+                <th>Lot</th>
+                <th>T\xB0 cible</th>
+                <th>T\xB0 mesur\xE9e</th>
+                <th>Conformit\xE9</th>
+                <th>Op\xE9rateur</th>
+                <th>Action corrective</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>${renderCookingRows(items)}</tbody>
+          </table>
+        </div>
+        ${items.length === 0 ? '<div class="empty-state"><p>Aucun enregistrement de cuisson</p></div>' : ""}
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupCookingEvents();
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function renderCookingRows(items) {
+  return items.map((item) => {
+    const date = new Date(item.cooking_date).toLocaleDateString("fr-FR");
+    const isCompliant = item.is_compliant === 1;
+    const complianceHtml = isCompliant ? '<span class="badge badge--success">\u2713 Conforme</span>' : '<span class="badge badge--danger">\u2717 Non conforme</span>';
+    const rowStyle = isCompliant ? "" : "background:#FFF0F0";
+    return `
+      <tr style="${rowStyle}">
+        <td class="mono text-sm">${date}</td>
+        <td style="font-weight:500">${escapeHtml(item.product_name)}</td>
+        <td class="mono text-sm">${escapeHtml(item.batch_number || "\u2014")}</td>
+        <td class="mono">${item.target_temperature.toFixed(1)}\xB0C</td>
+        <td class="mono" style="font-weight:600;color:${isCompliant ? "#2D8B55" : "#D93025"}">${item.measured_temperature.toFixed(1)}\xB0C</td>
+        <td>${complianceHtml}</td>
+        <td>${escapeHtml(item.operator || "\u2014")}</td>
+        <td class="text-sm">${escapeHtml(item.corrective_action || (isCompliant ? "\u2014" : "\u26A0 \xE0 renseigner"))}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" data-id="${item.id}" data-action="edit-cooking" title="Modifier">
+            <i data-lucide="pencil" style="width:14px;height:14px"></i>
+          </button>
+          <button class="btn btn-ghost btn-sm" data-id="${item.id}" data-action="delete-cooking" title="Supprimer">
+            <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+function setupCookingEvents() {
+  var _a;
+  (_a = document.getElementById("btn-new-cooking")) == null ? void 0 : _a.addEventListener("click", () => showCookingModal());
+  document.querySelectorAll('[data-action="edit-cooking"]').forEach((btn) => {
+    btn.addEventListener("click", () => showCookingModal(Number(btn.dataset.id)));
+  });
+  document.querySelectorAll('[data-action="delete-cooking"]').forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Supprimer cet enregistrement de cuisson ?")) return;
+      try {
+        await API.deleteCookingRecord(Number(btn.dataset.id));
+        showToast("Enregistrement supprim\xE9 \u2713", "success");
+        renderHACCPCooking();
+      } catch (err) {
+        showToast("Erreur : " + err.message, "error");
+      }
+    });
+  });
+}
+async function showCookingModal(editId = null) {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  let existingRecord = null;
+  if (editId) {
+    try {
+      const { items } = await API.getCookingRecords({ limit: 500 });
+      existingRecord = items.find((r) => r.id === editId) || null;
+    } catch (e) {
+    }
+  }
+  const account = getAccount();
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const nowTime = (/* @__PURE__ */ new Date()).toTimeString().slice(0, 5);
+  const presetOptions = COOKING_PRODUCT_PRESETS.map(
+    (p, i) => `<option value="${p.target}">${p.label} (\u2265${p.target}\xB0C)</option>`
+  ).join("");
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:580px">
+      <h2>
+        <i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>
+        ${editId ? "Modifier cuisson" : "Nouvelle cuisson"}
+      </h2>
+      <p class="text-secondary text-sm" style="margin-bottom:16px">
+        Mesurer la temp\xE9rature \xE0 c\u0153ur du produit. CCP2 \u2014 preuve de cuisson ma\xEEtris\xE9e.
+      </p>
+
+      <div class="form-group">
+        <label>Type de produit (pr\xE9r\xE9glage T\xB0 cible)</label>
+        <select class="form-control" id="cook-preset">
+          <option value="">\u2014 Choisir un pr\xE9r\xE9glage \u2014</option>
+          ${presetOptions}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Nom du produit *</label>
+        <input type="text" class="form-control" id="cook-product"
+               placeholder="ex: Poulet r\xF4ti" autofocus
+               value="${existingRecord ? escapeHtml(existingRecord.product_name) : ""}">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date de cuisson *</label>
+          <input type="date" class="form-control" id="cook-date"
+                 value="${existingRecord ? existingRecord.cooking_date : today}">
+        </div>
+        <div class="form-group">
+          <label>N\xB0 de lot</label>
+          <input type="text" class="form-control" id="cook-batch"
+                 placeholder="optionnel"
+                 value="${existingRecord && existingRecord.batch_number ? escapeHtml(existingRecord.batch_number) : ""}">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>D\xE9but cuisson</label>
+          <input type="time" class="form-control" id="cook-start"
+                 value="${existingRecord && existingRecord.cooking_time_start ? existingRecord.cooking_time_start : ""}">
+        </div>
+        <div class="form-group">
+          <label>Fin cuisson</label>
+          <input type="time" class="form-control" id="cook-end"
+                 value="${existingRecord && existingRecord.cooking_time_end ? existingRecord.cooking_time_end : nowTime}">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>T\xB0 cible (\xB0C) *</label>
+          <input type="number" step="0.1" class="form-control" id="cook-target"
+                 inputmode="decimal"
+                 value="${existingRecord ? existingRecord.target_temperature : "63"}">
+        </div>
+        <div class="form-group">
+          <label>T\xB0 mesur\xE9e \xE0 c\u0153ur (\xB0C) *</label>
+          <input type="number" step="0.1" class="form-control" id="cook-measured"
+                 inputmode="decimal" placeholder="ex: 72.5"
+                 value="${existingRecord ? existingRecord.measured_temperature : ""}">
+        </div>
+      </div>
+
+      <div id="cook-compliance-indicator" style="padding:10px 14px;border-radius:8px;margin-bottom:12px;display:none;font-weight:600"></div>
+
+      <div class="form-group" id="cook-corrective-group" style="display:none">
+        <label>Action corrective *</label>
+        <select class="form-control" id="cook-corrective-select">
+          <option value="">\u2014 Choisir \u2014</option>
+          <option value="Prolongation de la cuisson jusqu'\xE0 atteinte de la T\xB0 cible">Prolongation de la cuisson</option>
+          <option value="Produit jet\xE9 (non-conformit\xE9 critique)">Produit jet\xE9</option>
+          <option value="Remise en cuisson imm\xE9diate">Remise en cuisson imm\xE9diate</option>
+          <option value="Autre">Autre (pr\xE9ciser dans les notes)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Op\xE9rateur</label>
+        <input type="text" class="form-control" id="cook-operator"
+               placeholder="Qui a effectu\xE9 la cuisson"
+               value="${existingRecord && existingRecord.operator ? escapeHtml(existingRecord.operator) : ""}">
+      </div>
+
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" class="form-control" id="cook-notes"
+               value="${existingRecord && existingRecord.notes ? escapeHtml(existingRecord.notes) : ""}">
+      </div>
+
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="cook-cancel">Annuler</button>
+        <button class="btn btn-primary" id="cook-save">
+          <i data-lucide="check" style="width:18px;height:18px"></i> Enregistrer
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("cook-cancel").addEventListener("click", () => overlay.remove());
+  const targetInput = document.getElementById("cook-target");
+  const measuredInput = document.getElementById("cook-measured");
+  const indicator = document.getElementById("cook-compliance-indicator");
+  const correctiveGroup = document.getElementById("cook-corrective-group");
+  function updateComplianceIndicator() {
+    const target = parseFloat(targetInput.value);
+    const measured = parseFloat(measuredInput.value);
+    if (isNaN(target) || isNaN(measured)) {
+      indicator.style.display = "none";
+      correctiveGroup.style.display = "none";
+      return;
+    }
+    indicator.style.display = "block";
+    if (measured >= target) {
+      indicator.textContent = `\u2713 Conforme \u2014 ${measured.toFixed(1)}\xB0C \u2265 ${target.toFixed(1)}\xB0C`;
+      indicator.style.background = "#E6F4EA";
+      indicator.style.color = "#2D8B55";
+      indicator.style.border = "1px solid #7EC394";
+      correctiveGroup.style.display = "none";
+    } else {
+      const delta = (target - measured).toFixed(1);
+      indicator.textContent = `\u2717 Non conforme \u2014 ${measured.toFixed(1)}\xB0C < ${target.toFixed(1)}\xB0C (\u2212${delta}\xB0C)`;
+      indicator.style.background = "#FDEAEA";
+      indicator.style.color = "#D93025";
+      indicator.style.border = "1px solid #F2A8A8";
+      correctiveGroup.style.display = "block";
+    }
+  }
+  targetInput.addEventListener("input", updateComplianceIndicator);
+  measuredInput.addEventListener("input", updateComplianceIndicator);
+  document.getElementById("cook-preset").addEventListener("change", (e) => {
+    if (e.target.value) {
+      targetInput.value = e.target.value;
+      updateComplianceIndicator();
+    }
+  });
+  if (existingRecord && existingRecord.is_compliant === 0 && existingRecord.corrective_action) {
+    updateComplianceIndicator();
+    const sel = document.getElementById("cook-corrective-select");
+    const matching = Array.from(sel.options).find((o) => o.value === existingRecord.corrective_action);
+    if (matching) sel.value = existingRecord.corrective_action;
+  }
+  if (existingRecord) updateComplianceIndicator();
+  document.getElementById("cook-save").addEventListener("click", async () => {
+    const product_name = document.getElementById("cook-product").value.trim();
+    const cooking_date = document.getElementById("cook-date").value;
+    const target_temperature = parseFloat(targetInput.value);
+    const measured_temperature = parseFloat(measuredInput.value);
+    if (!product_name) {
+      document.getElementById("cook-product").classList.add("form-control--error");
+      return showToast("Nom du produit requis", "error");
+    }
+    if (!cooking_date) {
+      document.getElementById("cook-date").classList.add("form-control--error");
+      return showToast("Date de cuisson requise", "error");
+    }
+    if (isNaN(target_temperature)) {
+      targetInput.classList.add("form-control--error");
+      return showToast("T\xB0 cible requise", "error");
+    }
+    if (isNaN(measured_temperature)) {
+      measuredInput.classList.add("form-control--error");
+      return showToast("T\xB0 mesur\xE9e requise", "error");
+    }
+    const isCompliant = measured_temperature >= target_temperature;
+    const corrective_action = document.getElementById("cook-corrective-select").value || null;
+    if (!isCompliant && !corrective_action) {
+      return showToast("Action corrective obligatoire pour non-conformit\xE9", "error");
+    }
+    const payload = {
+      product_name,
+      cooking_date,
+      batch_number: document.getElementById("cook-batch").value.trim() || null,
+      cooking_time_start: document.getElementById("cook-start").value || null,
+      cooking_time_end: document.getElementById("cook-end").value || null,
+      target_temperature,
+      measured_temperature,
+      corrective_action: isCompliant ? null : corrective_action,
+      operator: document.getElementById("cook-operator").value.trim() || (account ? account.name : null),
+      notes: document.getElementById("cook-notes").value.trim() || null
+    };
+    try {
+      if (editId) {
+        await API.updateCookingRecord(editId, payload);
+        showToast("Enregistrement modifi\xE9 \u2713", "success");
+      } else {
+        await API.createCookingRecord(payload);
+        showToast(isCompliant ? "Cuisson conforme enregistr\xE9e \u2713" : "Cuisson non conforme enregistr\xE9e \u2014 action corrective requise", isCompliant ? "success" : "warning");
+      }
+      overlay.remove();
+      renderHACCPCooking();
     } catch (err) {
       showToast("Erreur : " + err.message, "error");
     }
@@ -15319,6 +15696,21 @@ class LoginView {
       document.getElementById("pin-error").textContent = "";
       document.getElementById("pin-dots").classList.remove("shake");
     });
+    this._pinKeydownHandler = (e) => {
+      if (!document.getElementById("pin-pad")) return;
+      if (e.key >= "0" && e.key <= "9") {
+        if (this.pinDigits.length >= 4) return;
+        this.pinDigits.push(e.key);
+        this.updatePinDots();
+        if (this.pinDigits.length === 4) this.handleStaffPinLogin();
+      } else if (e.key === "Backspace") {
+        this.pinDigits.pop();
+        this.updatePinDots();
+        document.getElementById("pin-error").textContent = "";
+        document.getElementById("pin-dots").classList.remove("shake");
+      }
+    };
+    document.addEventListener("keydown", this._pinKeydownHandler);
   }
   // ─── Create PIN (first-time) ───
   renderCreatePin(app) {
@@ -21668,11 +22060,25 @@ const ROUTE_ROLES = {
   "/more": ["gerant", "cuisinier", "equipier"],
   "/subscribe": ["gerant"],
   "/supplier-portal": ["gerant"],
-  "/scan-invoice": ["gerant"],
+  "/scan-invoice": ["gerant", "cuisinier"],
   "/mercuriale": ["gerant"],
   "/qrcodes": ["gerant"],
   "/errors-log": ["gerant"],
-  "/fabrication-diagrams": ["gerant"]
+  "/fabrication-diagrams": ["gerant"],
+  "/crm": ["gerant"],
+  "/carbon": ["gerant"],
+  "/multi-site": ["gerant"],
+  "/api-keys": ["gerant"],
+  "/integrations": ["gerant"],
+  "/predictions": ["gerant"],
+  "/menu-engineering": ["gerant"],
+  "/traceability/downstream": ["gerant", "cuisinier"],
+  "/pms/export": ["gerant"],
+  "/settings/plans": ["gerant"],
+  "/settings/sanitary-approval": ["gerant"],
+  "/import-mercuriale": ["gerant"],
+  "/admin": ["admin"],
+  "/chef": ["gerant"]
 };
 function isRouteAllowed(path, role) {
   if (ROUTE_ROLES[path]) {
@@ -21683,7 +22089,7 @@ function isRouteAllowed(path, role) {
       return allowedRoles.includes(role);
     }
   }
-  return false;
+  return true;
 }
 const Router = {
   routes: [],
@@ -21696,6 +22102,9 @@ const Router = {
     if (role && !isRouteAllowed(path, role)) {
       console.warn(`Access denied to ${path} for role ${role}`);
       location.hash = "#/";
+      if (typeof showToast === "function") {
+        showToast("Acc\xE8s non autoris\xE9", "error");
+      }
       return;
     }
     if (typeof _svcCleanup === "function" && !path.startsWith("/service")) {
@@ -22015,6 +22424,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/cleaning$/, renderHACCPCleaning);
   Router.add(/^\/haccp\/traceability$/, renderHACCPTraceability);
   Router.add(/^\/haccp\/cooling$/, renderHACCPCooling);
+  Router.add(/^\/haccp\/cooking$/, renderHACCPCooking);
   Router.add(/^\/haccp\/reheating$/, renderHACCPReheating);
   Router.add(/^\/haccp\/fryers$/, renderHACCPFryers);
   Router.add(/^\/haccp\/non-conformities$/, renderHACCPNonConformities);
@@ -22044,7 +22454,9 @@ function registerRoutes() {
   Router.add(/^\/scan-invoice$/, renderScanInvoice);
   Router.add(/^\/mercuriale$/, renderMercuriale);
   Router.add(/^\/import-mercuriale$/, renderImportMercuriale);
-  Router.add(/^\/chef$/, renderAIChef);
+  Router.add(/^\/chef$/, () => {
+    location.hash = "#/ia";
+  });
   Router.add(/^\/menu-engineering$/, renderMenuEngineering);
   Router.add(/^\/carbon$/, renderCarbon);
   Router.add(/^\/integrations$/, renderIntegrations);
