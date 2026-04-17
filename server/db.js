@@ -7,7 +7,7 @@ const dataDir = process.env.NODE_ENV === 'production' && fs.existsSync('/data')
   : path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-const dbPath = path.join(dataDir, 'restosuite.db');
+const dbPath = process.env.DB_PATH || path.join(dataDir, 'restosuite.db');
 const db = new Database(dbPath);
 
 db.pragma('journal_mode = WAL');
@@ -317,6 +317,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_temperature_logs_zone_id ON temperature_logs(zone_id);
   CREATE INDEX IF NOT EXISTS idx_temperature_logs_recorded_at ON temperature_logs(recorded_at);
   CREATE INDEX IF NOT EXISTS idx_cleaning_logs_task_id ON cleaning_logs(task_id);
+  CREATE INDEX IF NOT EXISTS idx_subscriptions_account_id ON subscriptions(account_id);
+  CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
 `);
 
 // ─── HACCP: Seed default zones & cleaning tasks ───

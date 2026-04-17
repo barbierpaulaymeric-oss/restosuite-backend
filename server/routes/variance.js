@@ -113,6 +113,18 @@ router.get('/analysis', (req, res) => {
       ...Object.keys(actualConsumption).map(Number)
     ]);
 
+    // Batch-fetch all ingredient data in one query (avoids N+1)
+    const ingredientIdList = [...allIngredientIds];
+    const ingredientMap = {};
+    if (ingredientIdList.length > 0) {
+      const placeholders = ingredientIdList.map(() => '?').join(',');
+      const ingredientRows = all(
+        `SELECT id, name, default_unit, price_per_unit, price_unit FROM ingredients WHERE id IN (${placeholders})`,
+        ingredientIdList
+      );
+      for (const row of ingredientRows) ingredientMap[row.id] = row;
+    }
+
     const report = [];
     let totalVarianceValue = 0;
 
@@ -121,7 +133,7 @@ router.get('/analysis', (req, res) => {
       const actual = actualConsumption[id];
       const stock = currentStock[id];
       const entry = entries[id];
-      const ingredient = get('SELECT name, default_unit, price_per_unit, price_unit FROM ingredients WHERE id = ?', [id]);
+      const ingredient = ingredientMap[id] || null;
 
       const theoreticalQty = theoretical ? Math.round(theoretical.theoretical_qty * 1000) / 1000 : 0;
       const actualQty = actual ? Math.round(actual.actual_qty * 1000) / 1000 : 0;

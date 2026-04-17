@@ -9,6 +9,21 @@ const router = Router();
 
 router.use(requireAuth);
 
+// GET /api/haccp-plan — Overview: count of hazards, CCPs, and completion status
+router.get('/', (req, res) => {
+  try {
+    const hazardCount = get('SELECT COUNT(*) as c FROM haccp_hazard_analysis') || { c: 0 };
+    const ccpCount = get('SELECT COUNT(*) as c FROM haccp_ccp') || { c: 0 };
+    res.json({
+      hazard_count: hazardCount.c,
+      ccp_count: ccpCount.c,
+      status: hazardCount.c > 0 ? 'in_progress' : 'empty'
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // ═══════════════════════════════════════════
 // ANALYSE DES DANGERS
 // ═══════════════════════════════════════════

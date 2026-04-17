@@ -118,6 +118,7 @@ router.post('/parse-voice', async (req, res) => {
 
   try {
     const response = await fetch(GEMINI_URL, {
+      signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -271,6 +272,7 @@ router.post('/modify-voice', async (req, res) => {
 
   try {
     const response = await fetch(GEMINI_URL, {
+      signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -412,6 +414,7 @@ router.post('/scan-invoice', upload.single('invoice'), async (req, res) => {
 
   try {
     const response = await fetch(GEMINI_URL, {
+      signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -525,6 +528,7 @@ Si un champ n'est pas visible, mets null. Extrais TOUS les produits listés, mê
 
   try {
     const response = await fetch(GEMINI_URL, {
+      signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -759,6 +763,7 @@ Réponds en JSON avec cette structure :
 }`;
 
     const geminiRes = await fetch(GEMINI_URL, {
+      signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -859,6 +864,7 @@ DOMAINES D'EXPERTISE :
     });
 
     const response = await fetch(GEMINI_URL, {
+      signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -977,6 +983,7 @@ DOMAINES D'EXPERTISE :
 
     // First call: get text response and action detection
     const response = await fetch(GEMINI_URL, {
+      signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

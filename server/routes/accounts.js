@@ -49,6 +49,14 @@ const SALLE_PERMISSIONS = {
   export_pdf: false
 };
 
+const FOURNISSEUR_PERMISSIONS = {
+  view_recipes: false,
+  view_costs: false,
+  edit_recipes: false,
+  view_suppliers: true,
+  export_pdf: false
+};
+
 const VALID_ROLES = ['gerant', 'cuisinier', 'equipier', 'salle', 'fournisseur'];
 
 function getPermissionsForRole(role) {
@@ -56,6 +64,7 @@ function getPermissionsForRole(role) {
     case 'gerant': return GERANT_PERMISSIONS;
     case 'cuisinier': return CUISINIER_PERMISSIONS;
     case 'salle': return SALLE_PERMISSIONS;
+    case 'fournisseur': return FOURNISSEUR_PERMISSIONS;
     default: return EQUIPIER_DEFAULT_PERMISSIONS;
   }
 }
