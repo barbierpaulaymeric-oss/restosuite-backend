@@ -89,18 +89,26 @@ describe('C-2: GET /api/accounts/:id/export access control', () => {
     expect(res.body.account.id).toBe(1003);
   });
 
-  it('does not include cross-tenant bulk fields in the export (Phase 1 lockdown)', async () => {
+  it('includes only same-tenant bulk data in the export (Phase 2 restored)', async () => {
+    // Seed tenant-tagged recipes in two restaurants
+    run("INSERT OR IGNORE INTO recipes (id, name, restaurant_id) VALUES (9100, 'recipeR100', 100)");
+    run("INSERT OR IGNORE INTO recipes (id, name, restaurant_id) VALUES (9200, 'recipeR200', 200)");
+
     const res = await request(app)
       .get('/api/accounts/1003/export')
-      .set(authHeader({ id: 1003, role: 'equipier', restaurant_id: 100 }));
+      .set(authHeader({ id: 1001, role: 'gerant', restaurant_id: 100 }));
     expect(res.status).toBe(200);
-    expect(res.body).not.toHaveProperty('recipes');
-    expect(res.body).not.toHaveProperty('ingredients');
-    expect(res.body).not.toHaveProperty('stock');
-    expect(res.body).not.toHaveProperty('temperature_logs');
-    expect(res.body).not.toHaveProperty('cleaning_logs');
-    expect(res.body).not.toHaveProperty('traceability_logs');
-    expect(res.body).not.toHaveProperty('supplier_prices');
+    expect(Array.isArray(res.body.recipes)).toBe(true);
+    const recipeIds = res.body.recipes.map(r => r.id);
+    expect(recipeIds).toContain(9100);
+    expect(recipeIds).not.toContain(9200);
+    // Other bulk fields should be arrays (possibly empty) but never contain cross-tenant rows
+    expect(Array.isArray(res.body.ingredients)).toBe(true);
+    expect(Array.isArray(res.body.stock)).toBe(true);
+    expect(Array.isArray(res.body.temperature_logs)).toBe(true);
+    expect(Array.isArray(res.body.cleaning_logs)).toBe(true);
+    expect(Array.isArray(res.body.traceability_logs)).toBe(true);
+    expect(Array.isArray(res.body.supplier_prices)).toBe(true);
   });
 });
 

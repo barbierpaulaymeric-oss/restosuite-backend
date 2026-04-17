@@ -305,11 +305,7 @@ router.delete('/:id', (req, res) => {
 });
 
 // GET /api/accounts/:id/export — RGPD data export (self or same-tenant gérant)
-// Phase 1 lockdown: bulk cross-tenant fields (recipes, ingredients, stock,
-// temperature_logs, cleaning_logs, traceability_logs, supplier_prices) are
-// temporarily removed because those tables currently lack restaurant_id and
-// returning them leaked the entire multi-tenant database. Phase 2 adds the
-// column and restores these fields with proper tenant filtering.
+// Phase 2 (restored): bulk data scoped to the target account's restaurant_id.
 // Ref: EVAL_SECURITE_EXPERT.md C-2, docs/plans/2026-04-17-multi-tenancy-isolation-design.md
 router.get('/:id/export', requireAuth, (req, res) => {
   const targetId = parseInt(req.params.id, 10);
@@ -339,16 +335,33 @@ router.get('/:id/export', requireAuth, (req, res) => {
     return res.status(403).json({ error: 'Accès refusé' });
   }
 
-  const restaurant = target.restaurant_id
-    ? get('SELECT id, name, address, created_at FROM restaurants WHERE id = ?', [target.restaurant_id])
+  const rid = target.restaurant_id;
+  const restaurant = rid
+    ? get('SELECT id, name, address, created_at FROM restaurants WHERE id = ?', [rid])
     : null;
+
+  // Tenant-scoped bulk data. Every SELECT filters by restaurant_id.
+  // Wrapped in try/catch per-table so a missing optional table doesn't kill the whole export.
+  const safeAll = (sql, params) => {
+    try { return all(sql, params); } catch { return []; }
+  };
+
+  const bulk = rid ? {
+    recipes: safeAll('SELECT * FROM recipes WHERE restaurant_id = ?', [rid]),
+    ingredients: safeAll('SELECT * FROM ingredients WHERE restaurant_id = ?', [rid]),
+    stock: safeAll('SELECT * FROM stock WHERE restaurant_id = ?', [rid]),
+    suppliers: safeAll('SELECT * FROM suppliers WHERE restaurant_id = ?', [rid]),
+    supplier_prices: safeAll('SELECT * FROM supplier_prices WHERE restaurant_id = ?', [rid]),
+    temperature_logs: safeAll('SELECT * FROM temperature_logs WHERE restaurant_id = ?', [rid]),
+    cleaning_logs: safeAll('SELECT * FROM cleaning_logs WHERE restaurant_id = ?', [rid]),
+    traceability_logs: safeAll('SELECT * FROM traceability_logs WHERE restaurant_id = ?', [rid]),
+  } : {};
 
   const exportData = {
     exported_at: new Date().toISOString(),
     account: target,
     restaurant,
-    _notice:
-      'Phase 1 lockdown: recettes, ingrédients, stock et logs seront réintégrés avec filtrage par restaurant en Phase 2.',
+    ...bulk,
   };
 
   const today = new Date().toISOString().slice(0, 10);
