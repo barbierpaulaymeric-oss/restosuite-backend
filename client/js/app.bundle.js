@@ -277,6 +277,41 @@ const API = {
   createFryerCheck(fryerId, data) {
     return this.request(`/haccp/fryers/${fryerId}/checks`, { method: "POST", body: data });
   },
+  // Thermometers & Calibrations (DDPP — étalonnage)
+  getThermometers() {
+    return this.request("/haccp/thermometers");
+  },
+  getThermometer(id) {
+    return this.request(`/haccp/thermometers/${id}`);
+  },
+  createThermometer(data) {
+    return this.request("/haccp/thermometers", { method: "POST", body: data });
+  },
+  updateThermometer(id, data) {
+    return this.request(`/haccp/thermometers/${id}`, { method: "PUT", body: data });
+  },
+  deleteThermometer(id) {
+    return this.request(`/haccp/thermometers/${id}`, { method: "DELETE" });
+  },
+  getThermometerAlerts() {
+    return this.request("/haccp/thermometers/alerts");
+  },
+  getCalibrations(params) {
+    const qs = params ? new URLSearchParams(params).toString() : "";
+    return this.request(`/haccp/calibrations${qs ? "?" + qs : ""}`);
+  },
+  getCalibration(id) {
+    return this.request(`/haccp/calibrations/${id}`);
+  },
+  createCalibration(data) {
+    return this.request("/haccp/calibrations", { method: "POST", body: data });
+  },
+  updateCalibration(id, data) {
+    return this.request(`/haccp/calibrations/${id}`, { method: "PUT", body: data });
+  },
+  deleteCalibration(id) {
+    return this.request(`/haccp/calibrations/${id}`, { method: "DELETE" });
+  },
   // Non-conformités
   getNonConformities(status) {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
@@ -1967,7 +2002,7 @@ function renderIngredientLines() {
         <span class="ing-qty">${ing.gross_quantity}${ing.unit}</span>
         <span class="ing-qty text-muted">\u2192 ${net}${ing.unit}</span>
         <span class="text-muted" style="font-size:var(--text-sm);font-family:var(--font-mono)">${ing.waste_percent}%</span>
-        <span class="ing-remove" role="button" aria-label="Retirer l'ingr\xE9dient" onclick="removeIngredient(${i})"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+        <span class="ing-remove" role="button" tabindex="0" aria-label="Retirer l'ingr\xE9dient" onclick="removeIngredient(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeIngredient(${i})}"><i data-lucide="x" style="width:16px;height:16px"></i></span>
       </div>
     `;
   }).join("");
@@ -1986,7 +2021,7 @@ function renderSubRecipeLines() {
       <span class="ing-name">\u{1F4CB} ${escapeHtml(sr.name)}</span>
       <span class="ing-qty">${sr.quantity} portion${sr.quantity !== 1 ? "s" : ""}</span>
       <span class="ing-qty text-muted">${sr.cost > 0 ? formatCurrency(sr.cost) : ""}</span>
-      <span class="ing-remove" role="button" aria-label="Retirer la sous-recette" onclick="removeSubRecipe(${i})"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+      <span class="ing-remove" role="button" tabindex="0" aria-label="Retirer la sous-recette" onclick="removeSubRecipe(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeSubRecipe(${i})}"><i data-lucide="x" style="width:16px;height:16px"></i></span>
     </div>
   `).join("");
   lucide.createIcons();
@@ -2027,7 +2062,7 @@ function renderStepLines() {
     return;
   }
   el.innerHTML = `<ol class="steps-list">${formSteps.map(
-    (s, i) => `<li><span style="flex:1">${escapeHtml(s)}</span><span class="ing-remove" role="button" aria-label="Retirer l'\xE9tape" onclick="removeStep(${i})"><i data-lucide="x" style="width:14px;height:14px"></i></span></li>`
+    (s, i) => `<li><span style="flex:1">${escapeHtml(s)}</span><span class="ing-remove" role="button" tabindex="0" aria-label="Retirer l'\xE9tape" onclick="removeStep(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeStep(${i})}"><i data-lucide="x" style="width:14px;height:14px"></i></span></li>`
   ).join("")}</ol>`;
   lucide.createIcons();
 }
@@ -3598,6 +3633,7 @@ async function showSupplierDetail(id) {
 const HACCP_SUBNAV_ITEMS = [
   { href: "#/haccp", label: "Dashboard" },
   { href: "#/haccp/temperatures", label: "Temp\xE9ratures" },
+  { href: "#/haccp/calibrations", label: "\xC9talonnage" },
   { href: "#/haccp/cleaning", label: "Nettoyage" },
   { href: "#/haccp/traceability", label: "Tra\xE7abilit\xE9" },
   { href: "#/haccp/cooling", label: "Refroidissement" },
@@ -4130,6 +4166,412 @@ function showZoneModal(data) {
       overlay.remove();
       showToast(isEdit ? "Zone modifi\xE9e \u2713" : "Zone cr\xE9\xE9e \u2713", "success");
       renderHACCPTemperatures();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+function calibrationStatus(thermo) {
+  if (!thermo.next_calibration_date) return { level: "red", label: "Jamais \xE9talonn\xE9" };
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const next = thermo.next_calibration_date.slice(0, 10);
+  if (next <= today) return { level: "red", label: "En retard" };
+  const diffDays = Math.ceil((new Date(next) - new Date(today)) / (24 * 60 * 60 * 1e3));
+  if (diffDays <= 30) return { level: "orange", label: `\xC0 pr\xE9voir (${diffDays}j)` };
+  return { level: "green", label: "OK" };
+}
+async function renderHACCPCalibrations() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const [thermosResp, alertsResp, calibrationsResp] = await Promise.all([
+      API.getThermometers(),
+      API.getThermometerAlerts(),
+      API.getCalibrations({ limit: 50 })
+    ]);
+    const thermometers = thermosResp.items || [];
+    const alerts = alertsResp || { overdue: [], due_soon: [] };
+    const calibrations = calibrationsResp.items || [];
+    const alertBanner = alerts.overdue.length > 0 || alerts.due_soon.length > 0 ? `
+      <div style="background:rgba(217,48,37,0.12);border:1px solid rgba(217,48,37,0.45);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;color:var(--text-primary)">
+        <i data-lucide="alert-triangle" style="width:18px;height:18px;color:var(--color-danger);flex-shrink:0;margin-top:1px"></i>
+        <div>
+          <strong>\xC9talonnage requis</strong>
+          ${alerts.overdue.length > 0 ? `<div class="text-sm">\u26A0\uFE0F ${alerts.overdue.length} thermom\xE8tre(s) en retard d'\xE9talonnage</div>` : ""}
+          ${alerts.due_soon.length > 0 ? `<div class="text-sm">\u{1F552} ${alerts.due_soon.length} thermom\xE8tre(s) \xE0 \xE9talonner dans les 30 jours</div>` : ""}
+          <div class="text-sm text-secondary" style="margin-top:4px">Sans certificat d'\xE9talonnage r\xE9cent, les relev\xE9s de temp\xE9rature perdent leur valeur probante lors d'un contr\xF4le DDPP.</div>
+        </div>
+      </div>
+    ` : "";
+    app.innerHTML = `
+      <div class="haccp-page">
+        <nav aria-label="Breadcrumb" class="breadcrumb">
+          <a href="#/haccp">HACCP</a>
+          <span class="breadcrumb-sep">\u203A</span>
+          <span class="breadcrumb-current">\xC9talonnage</span>
+        </nav>
+        <div class="page-header">
+          <h1><i data-lucide="ruler" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>\xC9talonnage des thermom\xE8tres</h1>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary" id="btn-new-thermometer">
+              <i data-lucide="plus" style="width:18px;height:18px"></i> Thermom\xE8tre
+            </button>
+            <button class="btn btn-primary" id="btn-new-calibration" ${thermometers.filter((t) => t.is_active).length === 0 ? "disabled" : ""}>
+              <i data-lucide="check-circle" style="width:18px;height:18px"></i> Nouvel \xE9talonnage
+            </button>
+          </div>
+        </div>
+
+        ${HACCP_SUBNAV_FULL}
+
+        ${alertBanner}
+
+        <div style="background:rgba(59,158,222,0.12);border:1px solid rgba(59,158,222,0.45);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;color:var(--text-primary)">
+          <i data-lucide="info" style="width:18px;height:18px;color:var(--color-info);flex-shrink:0;margin-top:1px"></i>
+          <span class="text-sm">
+            Exigence DDPP : chaque thermom\xE8tre doit \xEAtre \xE9talonn\xE9 <strong>au moins une fois par an</strong>
+            contre un thermom\xE8tre de r\xE9f\xE9rence. Tol\xE9rance typique :
+            <strong>\xB10,5\xB0C pour le froid</strong>, <strong>\xB11\xB0C pour le chaud</strong>.
+          </span>
+        </div>
+
+        <div class="section-title">Thermom\xE8tres (${thermometers.length})</div>
+        ${thermometers.length === 0 ? `
+          <div class="empty-state">
+            <p>Aucun thermom\xE8tre enregistr\xE9.</p>
+            <button class="btn btn-primary" id="btn-new-thermometer-empty">Ajouter un thermom\xE8tre</button>
+          </div>
+        ` : `
+          <div class="table-container" style="margin-bottom:24px">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>N\xB0 s\xE9rie</th>
+                  <th>Emplacement</th>
+                  <th>Type</th>
+                  <th>Dernier \xE9talonnage</th>
+                  <th>Prochain \xE9talonnage</th>
+                  <th>Statut</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${thermometers.map((t) => {
+      const st = calibrationStatus(t);
+      const dot = st.level === "red" ? "\u{1F534}" : st.level === "orange" ? "\u{1F7E0}" : "\u{1F7E2}";
+      const last = t.last_calibration_date ? new Date(t.last_calibration_date).toLocaleDateString("fr-FR") : "\u2014";
+      const next = t.next_calibration_date ? new Date(t.next_calibration_date).toLocaleDateString("fr-FR") : "\u2014";
+      return `
+                    <tr style="${t.is_active ? "" : "opacity:0.4"}">
+                      <td style="font-weight:500">${escapeHtml(t.name)}</td>
+                      <td class="mono text-sm">${escapeHtml(t.serial_number || "\u2014")}</td>
+                      <td>${escapeHtml(t.location || "\u2014")}</td>
+                      <td>${escapeHtml(t.type || "\u2014")}</td>
+                      <td class="mono text-sm">${last}</td>
+                      <td class="mono text-sm">${next}</td>
+                      <td>${dot} ${st.label}</td>
+                      <td>
+                        <button class="btn btn-secondary btn-sm" data-action="calibrate" data-id="${t.id}" data-name="${escapeHtml(t.name)}" data-location="${escapeHtml(t.location || "")}" ${t.is_active ? "" : "disabled"}>\xC9talonner</button>
+                      </td>
+                    </tr>
+                  `;
+    }).join("")}
+              </tbody>
+            </table>
+          </div>
+        `}
+
+        <div class="section-title">Historique des \xE9talonnages (${calibrations.length})</div>
+        ${calibrations.length === 0 ? `
+          <div class="empty-state"><p>Aucun \xE9talonnage enregistr\xE9.</p></div>
+        ` : `
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Thermom\xE8tre</th>
+                  <th>T\xB0 r\xE9f.</th>
+                  <th>T\xB0 mesur\xE9e</th>
+                  <th>\xC9cart</th>
+                  <th>Tol\xE9rance</th>
+                  <th>Conformit\xE9</th>
+                  <th>Par</th>
+                  <th>Certificat</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${calibrations.map((c) => {
+      var _a;
+      const date = c.calibration_date ? new Date(c.calibration_date).toLocaleDateString("fr-FR") : "\u2014";
+      const compliance = c.is_compliant ? '<span class="badge badge--success">\u2713 Conforme</span>' : '<span class="badge badge--danger">\u2717 Non conforme</span>';
+      return `
+                    <tr>
+                      <td class="mono text-sm">${date}</td>
+                      <td>${escapeHtml(c.thermometer_name || c.thermometer_id)}</td>
+                      <td class="mono">${c.reference_temperature}\xB0C</td>
+                      <td class="mono">${c.measured_temperature}\xB0C</td>
+                      <td class="mono" style="font-weight:500">${c.deviation != null ? (c.deviation > 0 ? "+" : "") + c.deviation.toFixed(2) + "\xB0C" : "\u2014"}</td>
+                      <td class="mono text-sm">\xB1${(_a = c.tolerance) != null ? _a : 0.5}\xB0C</td>
+                      <td>${compliance}</td>
+                      <td>${escapeHtml(c.calibrated_by || "\u2014")}</td>
+                      <td class="mono text-sm">${escapeHtml(c.certificate_reference || "\u2014")}</td>
+                    </tr>
+                  `;
+    }).join("")}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupCalibrationEvents(thermometers);
+  } catch (err) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function setupCalibrationEvents(thermometers) {
+  var _a, _b, _c;
+  (_a = document.getElementById("btn-new-thermometer")) == null ? void 0 : _a.addEventListener("click", showThermometerModal);
+  (_b = document.getElementById("btn-new-thermometer-empty")) == null ? void 0 : _b.addEventListener("click", showThermometerModal);
+  (_c = document.getElementById("btn-new-calibration")) == null ? void 0 : _c.addEventListener("click", () => showCalibrationModal(thermometers));
+  document.querySelectorAll('[data-action="calibrate"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      showCalibrationModal(thermometers, {
+        id: Number(btn.dataset.id),
+        name: btn.dataset.name,
+        location: btn.dataset.location
+      });
+    });
+  });
+}
+function showThermometerModal() {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:540px">
+      <h2><i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouveau thermom\xE8tre</h2>
+      <div class="form-group">
+        <label>Nom *</label>
+        <input type="text" class="form-control" id="th-name" placeholder="ex: Sonde chambre froide A" autofocus>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>N\xB0 de s\xE9rie</label>
+          <input type="text" class="form-control" id="th-serial" placeholder="SN-xxxx">
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select class="form-control" id="th-type">
+            <option value="digital">Digital</option>
+            <option value="analogique">Analogique</option>
+            <option value="infrarouge">Infrarouge</option>
+            <option value="sonde">Sonde</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Emplacement</label>
+        <input type="text" class="form-control" id="th-location" placeholder="ex: Chambre froide positive">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Dernier \xE9talonnage</label>
+          <input type="date" class="form-control" id="th-last" lang="fr">
+        </div>
+        <div class="form-group">
+          <label>Prochain \xE9talonnage</label>
+          <input type="date" class="form-control" id="th-next" lang="fr">
+        </div>
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="th-cancel">Annuler</button>
+        <button class="btn btn-primary" id="th-save">Enregistrer</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("th-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("th-save").addEventListener("click", async () => {
+    const name = document.getElementById("th-name").value.trim();
+    if (!name) {
+      document.getElementById("th-name").classList.add("form-control--error");
+      return;
+    }
+    try {
+      await API.createThermometer({
+        name,
+        serial_number: document.getElementById("th-serial").value.trim() || null,
+        location: document.getElementById("th-location").value.trim() || null,
+        type: document.getElementById("th-type").value,
+        last_calibration_date: document.getElementById("th-last").value || null,
+        next_calibration_date: document.getElementById("th-next").value || null
+      });
+      overlay.remove();
+      showToast("Thermom\xE8tre ajout\xE9 \u2713", "success");
+      renderHACCPCalibrations();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+function showCalibrationModal(thermometers, preselected) {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const account = typeof getAccount === "function" ? getAccount() : null;
+  const activeThermos = thermometers.filter((t) => t.is_active);
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const nextYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+  const selectedId = preselected ? preselected.id : activeThermos[0] && activeThermos[0].id;
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:560px">
+      <h2><i data-lucide="check-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouvel \xE9talonnage</h2>
+      <p class="text-secondary text-sm" style="margin-bottom:16px">
+        Mesurez la temp\xE9rature d'un bain de glace fondante (0\xB0C r\xE9f\xE9rence) ou d'eau bouillante (100\xB0C r\xE9f\xE9rence),
+        puis notez ce que votre thermom\xE8tre affiche.
+      </p>
+      <div class="form-group">
+        <label>Thermom\xE8tre *</label>
+        <select class="form-control" id="cal-thermo">
+          ${activeThermos.map((t) => `
+            <option value="${t.id}" ${t.id === selectedId ? "selected" : ""}>
+              ${escapeHtml(t.name)}${t.location ? " \u2014 " + escapeHtml(t.location) : ""}
+            </option>
+          `).join("")}
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date d'\xE9talonnage *</label>
+          <input type="date" class="form-control" id="cal-date" value="${today}" lang="fr">
+        </div>
+        <div class="form-group">
+          <label>Prochain \xE9talonnage</label>
+          <input type="date" class="form-control" id="cal-next" value="${nextYear}" lang="fr">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>T\xB0 r\xE9f\xE9rence (\xB0C) *</label>
+          <input type="number" step="0.1" class="form-control" id="cal-ref" value="0" inputmode="decimal">
+        </div>
+        <div class="form-group">
+          <label>T\xB0 mesur\xE9e (\xB0C) *</label>
+          <input type="number" step="0.1" class="form-control" id="cal-meas" placeholder="ex: 0.3" inputmode="decimal">
+        </div>
+        <div class="form-group">
+          <label>Tol\xE9rance (\xB1\xB0C)</label>
+          <input type="number" step="0.1" min="0" class="form-control" id="cal-tol" value="0.5" inputmode="decimal">
+        </div>
+      </div>
+      <div id="cal-preview" class="text-sm" style="padding:8px 12px;background:var(--surface-alt,#f5f5f5);border-radius:6px;margin-bottom:12px">
+        \xC9cart : <strong id="cal-dev">\u2014</strong> \u2014 <span id="cal-compliance">\u2014</span>
+      </div>
+      <div class="form-group" id="cal-correction-wrap" style="display:none">
+        <label>Action corrective *</label>
+        <textarea class="form-control" id="cal-correction" rows="2" placeholder="ex: Sonde retir\xE9e, envoy\xE9e en r\xE9paration"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>\xC9talonn\xE9 par</label>
+          <input type="text" class="form-control" id="cal-by" value="${account ? escapeHtml(account.name || "") : ""}">
+        </div>
+        <div class="form-group">
+          <label>R\xE9f. certificat</label>
+          <input type="text" class="form-control" id="cal-cert" placeholder="ex: COFRAC-2026-001">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" class="form-control" id="cal-notes">
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="cal-cancel">Annuler</button>
+        <button class="btn btn-primary" id="cal-save">Enregistrer</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  function refreshPreview() {
+    const ref = parseFloat(document.getElementById("cal-ref").value);
+    const meas = parseFloat(document.getElementById("cal-meas").value);
+    const tol = parseFloat(document.getElementById("cal-tol").value);
+    if (Number.isNaN(ref) || Number.isNaN(meas)) {
+      document.getElementById("cal-dev").textContent = "\u2014";
+      document.getElementById("cal-compliance").textContent = "\u2014";
+      document.getElementById("cal-correction-wrap").style.display = "none";
+      return;
+    }
+    const dev = Math.round((meas - ref) * 100) / 100;
+    const devStr = (dev > 0 ? "+" : "") + dev.toFixed(2) + "\xB0C";
+    document.getElementById("cal-dev").textContent = devStr;
+    const compliant = !Number.isNaN(tol) && Math.abs(dev) <= tol;
+    document.getElementById("cal-compliance").innerHTML = compliant ? '<span style="color:var(--color-success)">\u2713 Conforme</span>' : '<span style="color:var(--color-danger)">\u2717 Non conforme \u2014 action corrective requise</span>';
+    document.getElementById("cal-correction-wrap").style.display = compliant ? "none" : "block";
+  }
+  ["cal-ref", "cal-meas", "cal-tol"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", refreshPreview);
+  });
+  refreshPreview();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("cal-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("cal-save").addEventListener("click", async () => {
+    const thermometer_id = document.getElementById("cal-thermo").value;
+    const calibration_date = document.getElementById("cal-date").value;
+    const reference_temperature = parseFloat(document.getElementById("cal-ref").value);
+    const measured_temperature = parseFloat(document.getElementById("cal-meas").value);
+    const tolerance = parseFloat(document.getElementById("cal-tol").value);
+    if (!thermometer_id) {
+      showToast("S\xE9lectionnez un thermom\xE8tre", "error");
+      return;
+    }
+    if (!calibration_date) {
+      showToast("Date d'\xE9talonnage requise", "error");
+      return;
+    }
+    if (Number.isNaN(reference_temperature) || Number.isNaN(measured_temperature)) {
+      showToast("Temp\xE9ratures invalides", "error");
+      return;
+    }
+    const dev = measured_temperature - reference_temperature;
+    const compliant = !Number.isNaN(tolerance) && Math.abs(dev) <= tolerance;
+    let corrective_action = null;
+    if (!compliant) {
+      corrective_action = document.getElementById("cal-correction").value.trim();
+      if (!corrective_action) {
+        showToast("Action corrective requise (non conforme)", "error");
+        return;
+      }
+    }
+    try {
+      await API.createCalibration({
+        thermometer_id,
+        calibration_date,
+        next_calibration_date: document.getElementById("cal-next").value || null,
+        reference_temperature,
+        measured_temperature,
+        tolerance: Number.isNaN(tolerance) ? 0.5 : tolerance,
+        corrective_action,
+        calibrated_by: document.getElementById("cal-by").value.trim() || null,
+        certificate_reference: document.getElementById("cal-cert").value.trim() || null,
+        notes: document.getElementById("cal-notes").value.trim() || null
+      });
+      overlay.remove();
+      showToast(compliant ? "\xC9talonnage enregistr\xE9 \u2713 Conforme" : "\xC9talonnage enregistr\xE9 \u2014 non conforme", compliant ? "success" : "error");
+      renderHACCPCalibrations();
     } catch (err) {
       showToast("Erreur : " + err.message, "error");
     }
@@ -15319,6 +15761,21 @@ class LoginView {
       document.getElementById("pin-error").textContent = "";
       document.getElementById("pin-dots").classList.remove("shake");
     });
+    this._pinKeydownHandler = (e) => {
+      if (!document.getElementById("pin-pad")) return;
+      if (e.key >= "0" && e.key <= "9") {
+        if (this.pinDigits.length >= 4) return;
+        this.pinDigits.push(e.key);
+        this.updatePinDots();
+        if (this.pinDigits.length === 4) this.handleStaffPinLogin();
+      } else if (e.key === "Backspace") {
+        this.pinDigits.pop();
+        this.updatePinDots();
+        document.getElementById("pin-error").textContent = "";
+        document.getElementById("pin-dots").classList.remove("shake");
+      }
+    };
+    document.addEventListener("keydown", this._pinKeydownHandler);
   }
   // ─── Create PIN (first-time) ───
   renderCreatePin(app) {
@@ -21659,6 +22116,7 @@ const ROUTE_ROLES = {
   "/orders/": ["gerant"],
   "/haccp": ["gerant", "cuisinier"],
   "/haccp/": ["gerant", "cuisinier"],
+  "/haccp/calibrations": ["gerant", "cuisinier"],
   "/suppliers": ["gerant"],
   "/ia": ["gerant", "cuisinier", "equipier"],
   "/analytics": ["gerant"],
@@ -21668,11 +22126,25 @@ const ROUTE_ROLES = {
   "/more": ["gerant", "cuisinier", "equipier"],
   "/subscribe": ["gerant"],
   "/supplier-portal": ["gerant"],
-  "/scan-invoice": ["gerant"],
+  "/scan-invoice": ["gerant", "cuisinier"],
   "/mercuriale": ["gerant"],
   "/qrcodes": ["gerant"],
   "/errors-log": ["gerant"],
-  "/fabrication-diagrams": ["gerant"]
+  "/fabrication-diagrams": ["gerant"],
+  "/crm": ["gerant"],
+  "/carbon": ["gerant"],
+  "/multi-site": ["gerant"],
+  "/api-keys": ["gerant"],
+  "/integrations": ["gerant"],
+  "/predictions": ["gerant"],
+  "/menu-engineering": ["gerant"],
+  "/traceability/downstream": ["gerant", "cuisinier"],
+  "/pms/export": ["gerant"],
+  "/settings/plans": ["gerant"],
+  "/settings/sanitary-approval": ["gerant"],
+  "/import-mercuriale": ["gerant"],
+  "/admin": ["admin"],
+  "/chef": ["gerant"]
 };
 function isRouteAllowed(path, role) {
   if (ROUTE_ROLES[path]) {
@@ -21683,7 +22155,7 @@ function isRouteAllowed(path, role) {
       return allowedRoles.includes(role);
     }
   }
-  return false;
+  return true;
 }
 const Router = {
   routes: [],
@@ -21696,6 +22168,9 @@ const Router = {
     if (role && !isRouteAllowed(path, role)) {
       console.warn(`Access denied to ${path} for role ${role}`);
       location.hash = "#/";
+      if (typeof showToast === "function") {
+        showToast("Acc\xE8s non autoris\xE9", "error");
+      }
       return;
     }
     if (typeof _svcCleanup === "function" && !path.startsWith("/service")) {
@@ -22012,6 +22487,7 @@ function registerRoutes() {
   Router.add(/^\/ia$/, renderAIAssistant);
   Router.add(/^\/haccp$/, renderHACCPDashboard);
   Router.add(/^\/haccp\/temperatures$/, renderHACCPTemperatures);
+  Router.add(/^\/haccp\/calibrations$/, renderHACCPCalibrations);
   Router.add(/^\/haccp\/cleaning$/, renderHACCPCleaning);
   Router.add(/^\/haccp\/traceability$/, renderHACCPTraceability);
   Router.add(/^\/haccp\/cooling$/, renderHACCPCooling);
@@ -22044,7 +22520,9 @@ function registerRoutes() {
   Router.add(/^\/scan-invoice$/, renderScanInvoice);
   Router.add(/^\/mercuriale$/, renderMercuriale);
   Router.add(/^\/import-mercuriale$/, renderImportMercuriale);
-  Router.add(/^\/chef$/, renderAIChef);
+  Router.add(/^\/chef$/, () => {
+    location.hash = "#/ia";
+  });
   Router.add(/^\/menu-engineering$/, renderMenuEngineering);
   Router.add(/^\/carbon$/, renderCarbon);
   Router.add(/^\/integrations$/, renderIntegrations);
