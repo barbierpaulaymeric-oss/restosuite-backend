@@ -306,6 +306,82 @@ describe('HACCP — Fryers (/fryers)', () => {
   });
 });
 
+describe('HACCP — Fryer polar compounds enforcement (Arrêté 21/12/2009 Art 6)', () => {
+  async function makeFryer() {
+    const res = await request(app)
+      .post('/api/haccp/fryers')
+      .set(AUTH)
+      .send({ name: `Friteuse ${Date.now()}` });
+    return res.body.id;
+  }
+
+  it('accepts controle_polaire with value ≤ 20% as compliant (no warning)', async () => {
+    const fryerId = await makeFryer();
+    const res = await request(app)
+      .post(`/api/haccp/fryers/${fryerId}/checks`)
+      .set(AUTH)
+      .send({ action_type: 'controle_polaire', polar_value: 15 });
+    expect(res.status).toBe(201);
+    expect(res.body.is_compliant).toBe(1);
+    expect(res.body.warning).toBeUndefined();
+  });
+
+  it('accepts value in warning zone [20, 25] with a warning message', async () => {
+    const fryerId = await makeFryer();
+    const res = await request(app)
+      .post(`/api/haccp/fryers/${fryerId}/checks`)
+      .set(AUTH)
+      .send({ action_type: 'controle_polaire', polar_value: 22 });
+    expect(res.status).toBe(201);
+    expect(res.body.is_compliant).toBe(1);
+    expect(res.body.warning).toMatch(/seuil d'alerte/);
+  });
+
+  it('accepts value = 25 exactly (legal limit inclusive)', async () => {
+    const fryerId = await makeFryer();
+    const res = await request(app)
+      .post(`/api/haccp/fryers/${fryerId}/checks`)
+      .set(AUTH)
+      .send({ action_type: 'controle_polaire', polar_value: 25 });
+    expect(res.status).toBe(201);
+    expect(res.body.is_compliant).toBe(1);
+  });
+
+  it('rejects value > 25 without corrective_action (400)', async () => {
+    const fryerId = await makeFryer();
+    const res = await request(app)
+      .post(`/api/haccp/fryers/${fryerId}/checks`)
+      .set(AUTH)
+      .send({ action_type: 'controle_polaire', polar_value: 28 });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Art 6/);
+    expect(res.body.is_compliant).toBe(0);
+  });
+
+  it('accepts value > 25 with corrective_action, marked non-compliant', async () => {
+    const fryerId = await makeFryer();
+    const res = await request(app)
+      .post(`/api/haccp/fryers/${fryerId}/checks`)
+      .set(AUTH)
+      .send({
+        action_type: 'controle_polaire',
+        polar_value: 30,
+        corrective_action: 'Vidange complète, retrait du bain et changement d\'huile',
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.is_compliant).toBe(0);
+  });
+
+  it('POST /checks without polar_value still requires it for controle_polaire', async () => {
+    const fryerId = await makeFryer();
+    const res = await request(app)
+      .post(`/api/haccp/fryers/${fryerId}/checks`)
+      .set(AUTH)
+      .send({ action_type: 'controle_polaire' });
+    expect(res.status).toBe(400);
+  });
+});
+
 // ─── Non-Conformities ───────────────────────────────────────
 
 describe('HACCP — Non-Conformities (/non-conformities)', () => {

@@ -903,10 +903,15 @@ router.get('/fryers/:id/checks', requireAuth, (req, res) => {
   }
 });
 
+// Arrêté du 21/12/2009 Art 6 — legal threshold for frying oil polar compounds.
+// Above 25% the oil MUST be discarded; between 20 and 25% is an early-warning zone.
+const POLAR_LIMIT_PCT = 25;
+const POLAR_WARNING_PCT = 20;
+
 router.post('/fryers/:id/checks', requireAuth, (req, res) => {
   try {
     const rid = req.user.restaurant_id;
-    const { action_type, action_date, polar_value, notes, recorded_by } = req.body;
+    const { action_type, action_date, polar_value, notes, recorded_by, corrective_action } = req.body;
     const VALID_TYPES = ['mise_en_service', 'controle_polaire', 'filtrage', 'changement'];
     if (!action_type || !VALID_TYPES.includes(action_type)) {
       return res.status(400).json({ error: `action_type doit être l'un de: ${VALID_TYPES.join(', ')}` });
@@ -914,19 +919,50 @@ router.post('/fryers/:id/checks', requireAuth, (req, res) => {
     if (action_type === 'controle_polaire' && polar_value == null) {
       return res.status(400).json({ error: 'polar_value est obligatoire pour un contrôle polaire' });
     }
+    // Arrêté 21/12/2009 Art 6: polar compounds > 25 % → oil is legally unfit.
+    // Reject the entry unless a corrective_action is supplied (oil change, batch tag, …).
+    const polar = polar_value == null ? null : Number(polar_value);
+    let is_compliant = 1;
+    let warning = null;
+    if (polar != null && !Number.isNaN(polar)) {
+      if (polar > POLAR_LIMIT_PCT) {
+        is_compliant = 0;
+        if (!corrective_action || String(corrective_action).trim() === '') {
+          return res.status(400).json({
+            error: `Composés polaires ${polar}% > ${POLAR_LIMIT_PCT}% (Arrêté 21/12/2009 Art 6). Une corrective_action est obligatoire (changement d'huile, retrait du bain, …).`,
+            polar_value: polar,
+            legal_limit: POLAR_LIMIT_PCT,
+            is_compliant: 0,
+          });
+        }
+      } else if (polar >= POLAR_WARNING_PCT) {
+        warning = `Composés polaires ${polar}% — seuil d'alerte ${POLAR_WARNING_PCT}% atteint, limite légale ${POLAR_LIMIT_PCT}%. Surveillance accrue recommandée.`;
+      }
+    }
     // Validate parent fryer belongs to caller tenant
     const fryer = db.prepare('SELECT id FROM fryers WHERE id = ? AND restaurant_id = ?').get(req.params.id, rid);
     if (!fryer) return res.status(404).json({ error: 'Friteuse non trouvée' });
     const result = db.prepare(`
-      INSERT INTO fryer_checks (restaurant_id, fryer_id, action_type, action_date, polar_value, notes, recorded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(rid, req.params.id, action_type, action_date || new Date().toISOString(), polar_value ?? null, notes ?? null, recorded_by ?? null);
+      INSERT INTO fryer_checks (restaurant_id, fryer_id, action_type, action_date, polar_value, notes, recorded_by, is_compliant, corrective_action)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      rid, req.params.id, action_type,
+      action_date || new Date().toISOString(),
+      polar ?? null,
+      notes ?? null,
+      recorded_by ?? null,
+      is_compliant,
+      corrective_action ?? null
+    );
     const created = db.prepare('SELECT * FROM fryer_checks WHERE id = ? AND restaurant_id = ?').get(result.lastInsertRowid, rid);
     try {
       writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'fryer_checks', record_id: result.lastInsertRowid, action: 'create', old_values: null, new_values: created });
     } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
-    res.status(201).json({ id: result.lastInsertRowid });
+    const payload = { id: result.lastInsertRowid, is_compliant };
+    if (warning) payload.warning = warning;
+    res.status(201).json(payload);
   } catch (e) {
+    console.error('POST fryer_checks error:', e);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });

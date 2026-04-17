@@ -838,6 +838,23 @@ try {
   if (!e.message.includes('already exists')) console.error('Migration fryers error:', e.message);
 }
 
+// ─── Migration: Add is_compliant + corrective_action to fryer_checks ───
+// Arrêté 21/12/2009 Art 6 — polar compounds must be ≤ 25%. Track compliance flag
+// server-side so non-compliant records can't silently pass.
+try {
+  const cols = all("PRAGMA table_info(fryer_checks)");
+  if (!cols.some(c => c.name === 'is_compliant')) {
+    db.exec("ALTER TABLE fryer_checks ADD COLUMN is_compliant INTEGER DEFAULT 1");
+    console.log('✅ Migration: added is_compliant to fryer_checks');
+  }
+  if (!cols.some(c => c.name === 'corrective_action')) {
+    db.exec("ALTER TABLE fryer_checks ADD COLUMN corrective_action TEXT");
+    console.log('✅ Migration: added corrective_action to fryer_checks');
+  }
+} catch (e) {
+  console.error('Migration fryer_checks compliance error:', e.message);
+}
+
 // ─── Migration: HACCP Non-conformités ───
 try {
   db.exec(`

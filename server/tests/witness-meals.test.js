@@ -192,3 +192,57 @@ describe('TIAC integration — witness-meals-check', () => {
     expect(check.body.has_coverage).toBe(false);
   });
 });
+
+describe('Witness meals — storage temp validation (Arrêté 21/12/2009 Art 32)', () => {
+  it('POST / with storage_temperature in [0, 3] accepts as compliant', async () => {
+    const res = await createSample({ storage_temperature: 2, is_complete: 1 });
+    expect(res.status).toBe(201);
+    expect(res.body.is_complete).toBe(1);
+    expect(res.body.warning).toBeUndefined();
+  });
+
+  it('POST / with storage_temperature = 0 accepts (lower bound)', async () => {
+    const res = await createSample({ storage_temperature: 0, is_complete: 1 });
+    expect(res.status).toBe(201);
+    expect(res.body.is_complete).toBe(1);
+  });
+
+  it('POST / with storage_temperature = 3 accepts (upper bound)', async () => {
+    const res = await createSample({ storage_temperature: 3, is_complete: 1 });
+    expect(res.status).toBe(201);
+    expect(res.body.is_complete).toBe(1);
+  });
+
+  it('POST / with storage_temperature > 3 forces is_complete=0 and returns warning', async () => {
+    const res = await createSample({ storage_temperature: 8, is_complete: 1 });
+    expect(res.status).toBe(201);
+    expect(res.body.is_complete).toBe(0);
+    expect(res.body.warning).toMatch(/Art 32/);
+    expect(res.body.notes).toMatch(/NON-CONFORME Art 32/);
+  });
+
+  it('POST / with storage_temperature < 0 forces is_complete=0', async () => {
+    const res = await createSample({ storage_temperature: -5, is_complete: 1 });
+    expect(res.status).toBe(201);
+    expect(res.body.is_complete).toBe(0);
+    expect(res.body.warning).toMatch(/Art 32/);
+  });
+
+  it('POST / with non-numeric storage_temperature returns 400', async () => {
+    const res = await createSample({ storage_temperature: 'cold' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/nombre/);
+  });
+
+  it('PUT / updating storage_temperature out of range forces is_complete=0', async () => {
+    const created = await createSample({ storage_temperature: 2, is_complete: 1 });
+    const id = created.body.id;
+    const res = await request(app)
+      .put(`/api/haccp/witness-meals/${id}`)
+      .set(AUTH)
+      .send({ storage_temperature: 10 });
+    expect(res.status).toBe(200);
+    expect(res.body.is_complete).toBe(0);
+    expect(res.body.warning).toMatch(/Art 32/);
+  });
+});

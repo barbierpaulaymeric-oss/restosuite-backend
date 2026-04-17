@@ -15,6 +15,26 @@ router.use(requireAuth);
 const VALID_MEAL_TYPES = ['petit_dejeuner', 'dejeuner', 'diner', 'gouter', 'collation'];
 const VALID_SERVICE_TYPES = ['sur_place', 'livraison', 'emporter', 'traiteur'];
 
+// Arrêté du 21/12/2009 Art 32 — plats témoins conservés à 0-3 °C pendant 5 jours
+const STORAGE_TEMP_MIN = 0;
+const STORAGE_TEMP_MAX = 3;
+
+// Returns { value, outOfRange, warning } or null if input is null/undefined.
+// Invalid number returns { value: null, parseError: true }.
+function normalizeStorageTemp(raw) {
+  if (raw == null || raw === '') return null;
+  const num = Number(raw);
+  if (Number.isNaN(num)) return { value: null, parseError: true };
+  const outOfRange = num < STORAGE_TEMP_MIN || num > STORAGE_TEMP_MAX;
+  return {
+    value: num,
+    outOfRange,
+    warning: outOfRange
+      ? `Température ${num}°C hors plage légale [${STORAGE_TEMP_MIN}, ${STORAGE_TEMP_MAX}]°C (Arrêté 21/12/2009 Art 32). Conservation non conforme — is_complete forcé à 0.`
+      : null,
+  };
+}
+
 // Compute ISO datetime = meal_date + 5 days 23:59 (covers full 5th day)
 function computeKeptUntil(mealDate) {
   const d = new Date(mealDate + 'T00:00:00Z');
@@ -150,6 +170,19 @@ router.post('/', (req, res) => {
       return res.status(400).json({ error: `service_type invalide. Valeurs : ${VALID_SERVICE_TYPES.join(', ')}` });
     }
 
+    const temp = normalizeStorageTemp(storage_temperature);
+    if (temp && temp.parseError) {
+      return res.status(400).json({ error: 'storage_temperature doit être un nombre' });
+    }
+    // Out-of-range → force is_complete=0 and append compliance note
+    let effectiveIsComplete = is_complete ? 1 : 0;
+    let effectiveNotes = notes || null;
+    if (temp && temp.outOfRange) {
+      effectiveIsComplete = 0;
+      const prefix = '[NON-CONFORME Art 32] Conservation hors 0-3°C. ';
+      effectiveNotes = effectiveNotes ? `${prefix}${effectiveNotes}` : prefix.trim();
+    }
+
     const kept_until = computeKeptUntil(meal_date);
 
     const info = run(
@@ -164,12 +197,12 @@ router.post('/', (req, res) => {
         meal_type,
         service_type || null,
         serializeSamples(samples),
-        storage_temperature != null ? Number(storage_temperature) : null,
+        temp ? temp.value : null,
         storage_location || null,
         kept_until,
         quantity_per_sample || '100g minimum',
-        is_complete ? 1 : 0,
-        notes || null,
+        effectiveIsComplete,
+        effectiveNotes,
         operator || null,
       ]
     );
@@ -177,7 +210,9 @@ router.post('/', (req, res) => {
     try {
       writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'witness_meals', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: created });
     } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
-    res.status(201).json(created);
+    const response = { ...created };
+    if (temp && temp.warning) response.warning = temp.warning;
+    res.status(201).json(response);
   } catch (e) {
     console.error('POST witness-meals error:', e);
     res.status(500).json({ error: 'Erreur serveur' });
@@ -208,6 +243,26 @@ router.put('/:id', (req, res) => {
     const nextMealDate = meal_date || existing.meal_date;
     const kept_until = meal_date ? computeKeptUntil(meal_date) : existing.kept_until;
 
+    // Re-validate temp on update only when caller provided a new value
+    let nextTemp = existing.storage_temperature;
+    let tempResult = null;
+    if (storage_temperature !== undefined) {
+      tempResult = normalizeStorageTemp(storage_temperature);
+      if (tempResult && tempResult.parseError) {
+        return res.status(400).json({ error: 'storage_temperature doit être un nombre' });
+      }
+      nextTemp = tempResult ? tempResult.value : null;
+    }
+    let nextIsComplete = is_complete !== undefined ? (is_complete ? 1 : 0) : existing.is_complete;
+    let nextNotes = notes !== undefined ? (notes || null) : existing.notes;
+    if (tempResult && tempResult.outOfRange) {
+      nextIsComplete = 0;
+      const prefix = '[NON-CONFORME Art 32] Conservation hors 0-3°C. ';
+      if (!nextNotes || !nextNotes.includes('[NON-CONFORME Art 32]')) {
+        nextNotes = nextNotes ? `${prefix}${nextNotes}` : prefix.trim();
+      }
+    }
+
     run(
       `UPDATE witness_meals SET
          meal_date = ?, meal_type = ?, service_type = ?, samples = ?,
@@ -220,14 +275,14 @@ router.put('/:id', (req, res) => {
         meal_type || existing.meal_type,
         service_type !== undefined ? (service_type || null) : existing.service_type,
         samples !== undefined ? serializeSamples(samples) : existing.samples,
-        storage_temperature !== undefined ? (storage_temperature != null ? Number(storage_temperature) : null) : existing.storage_temperature,
+        nextTemp,
         storage_location !== undefined ? (storage_location || null) : existing.storage_location,
         kept_until,
         disposed_date !== undefined ? (disposed_date || null) : existing.disposed_date,
         disposed_by !== undefined ? (disposed_by || null) : existing.disposed_by,
         quantity_per_sample || existing.quantity_per_sample,
-        is_complete !== undefined ? (is_complete ? 1 : 0) : existing.is_complete,
-        notes !== undefined ? (notes || null) : existing.notes,
+        nextIsComplete,
+        nextNotes,
         operator !== undefined ? (operator || null) : existing.operator,
         id,
         rid,
@@ -237,7 +292,9 @@ router.put('/:id', (req, res) => {
     try {
       writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'witness_meals', record_id: id, action: 'update', old_values: existing, new_values: updated });
     } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
-    res.json(updated);
+    const response = { ...updated };
+    if (tempResult && tempResult.warning) response.warning = tempResult.warning;
+    res.json(response);
   } catch (e) {
     console.error('PUT witness-meals error:', e);
     res.status(500).json({ error: 'Erreur serveur' });
