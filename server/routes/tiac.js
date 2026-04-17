@@ -26,6 +26,38 @@ router.get('/:id', (req, res) => {
   res.json(procedure);
 });
 
+// GET /api/tiac/:id/witness-meals-check — cross-check plats témoins for the incident window
+// Arrêté 21/12/2009 art. 32 — samples must cover the meal(s) suspected of causing the TIAC.
+router.get('/:id/witness-meals-check', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const procedure = get('SELECT * FROM tiac_procedures WHERE id = ? AND restaurant_id = ?', [Number(req.params.id), rid]);
+    if (!procedure) return res.status(404).json({ error: 'Procédure introuvable' });
+    const tableExists = get(`SELECT name FROM sqlite_master WHERE type='table' AND name='witness_meals'`);
+    if (!tableExists) return res.json({ has_coverage: false, samples: [], window_start: null, window_end: procedure.date_incident });
+    const end = procedure.date_incident;
+    const startD = new Date(end + 'T00:00:00Z');
+    startD.setUTCDate(startD.getUTCDate() - 3);
+    const start = startD.toISOString().slice(0, 10);
+    const samples = all(
+      `SELECT * FROM witness_meals
+       WHERE restaurant_id = ?
+         AND meal_date >= ? AND meal_date <= ?
+       ORDER BY meal_date DESC`,
+      [rid, start, end]
+    );
+    res.json({
+      has_coverage: samples.length > 0,
+      samples,
+      window_start: start,
+      window_end: end,
+    });
+  } catch (e) {
+    console.error('GET tiac/:id/witness-meals-check error:', e);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // POST /api/tiac
 router.post('/', (req, res) => {
   const rid = req.user.restaurant_id;

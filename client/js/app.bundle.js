@@ -3674,6 +3674,7 @@ const HACCP_SUBNAV_ITEMS = [
   { href: "#/haccp/water", label: "Eau" },
   { href: "#/haccp/pms-audit", label: "Audits PMS" },
   { href: "#/haccp/tiac", label: "TIAC" },
+  { href: "#/haccp/witness-meals", label: "Plats t\xE9moins" },
   { href: "#/haccp/staff-health", label: "Sant\xE9 personnel" },
   { href: "#/pms/export", label: "Export PMS", extra: " haccp-subnav__link--export" }
 ];
@@ -7372,6 +7373,415 @@ function showTIACModal(procedure) {
       overlay.remove();
       showToast(isEdit ? "Proc\xE9dure modifi\xE9e \u2713" : "Proc\xE9dure cr\xE9\xE9e \u2713", "success");
       renderHACCPTIAC();
+    } catch (err) {
+      showToast("Erreur : " + err.message, "error");
+    }
+  });
+}
+const MEAL_TYPE_LABELS = {
+  petit_dejeuner: "Petit-d\xE9jeuner",
+  dejeuner: "D\xE9jeuner",
+  diner: "D\xEEner",
+  gouter: "Go\xFBter",
+  collation: "Collation"
+};
+const SERVICE_TYPE_LABELS = {
+  sur_place: "Sur place",
+  livraison: "Livraison",
+  emporter: "\xC0 emporter",
+  traiteur: "Traiteur"
+};
+function fmtCountdown(keptUntil) {
+  if (!keptUntil) return "\u2014";
+  const end = /* @__PURE__ */ new Date(keptUntil.replace(" ", "T") + "Z");
+  const now = /* @__PURE__ */ new Date();
+  const ms = end - now;
+  if (ms <= 0) return "Expir\xE9";
+  const h = Math.floor(ms / 36e5);
+  if (h < 24) return `${h} h restantes`;
+  const d = Math.floor(h / 24);
+  return `${d} j ${h % 24} h`;
+}
+function parseSamples(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v : [];
+  } catch (e) {
+    return [];
+  }
+}
+async function renderHACCPWitnessMeals() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const [{ items }, active, overdue, alerts] = await Promise.all([
+      API.request("/haccp/witness-meals"),
+      API.request("/haccp/witness-meals/active"),
+      API.request("/haccp/witness-meals/overdue"),
+      API.request("/haccp/witness-meals/alerts")
+    ]);
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="package-2" style="width:22px;height:22px;vertical-align:middle;margin-right:8px"></i>Plats t\xE9moins</h1>
+          <button class="btn btn-primary" id="btn-new-wm">
+            <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau pr\xE9l\xE8vement
+          </button>
+        </div>
+        ${HACCP_SUBNAV_FULL}
+
+        ${overdue.total > 0 ? `
+        <div style="background:#fff0f0;border:1px solid #ef4444;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center">
+          <i data-lucide="alert-triangle" style="width:18px;height:18px;color:#ef4444;flex-shrink:0"></i>
+          <span class="text-sm"><strong>${overdue.total} pr\xE9l\xE8vement(s)</strong> au-del\xE0 de la p\xE9riode de conservation \u2014 \xE0 \xE9liminer et tracer</span>
+        </div>
+        ` : ""}
+
+        ${alerts.total > 0 ? `
+        <div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center">
+          <i data-lucide="clock" style="width:18px;height:18px;color:#f59e0b;flex-shrink:0"></i>
+          <span class="text-sm"><strong>${alerts.total} jour(s)</strong> sur les 7 derniers sans aucun plat t\xE9moin enregistr\xE9 \u2014 v\xE9rifier si service concern\xE9</span>
+        </div>
+        ` : ""}
+
+        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+          <div class="kpi-card">
+            <div class="kpi-card__label">Total enregistrements</div>
+            <div class="kpi-card__value">${items.length}</div>
+          </div>
+          <div class="kpi-card ${active.total > 0 ? "kpi-card--success" : ""}">
+            <div class="kpi-card__label">Actifs (en conservation)</div>
+            <div class="kpi-card__value">${active.total}</div>
+          </div>
+          <div class="kpi-card ${overdue.total > 0 ? "kpi-card--danger" : ""}">
+            <div class="kpi-card__label">\xC0 \xE9liminer</div>
+            <div class="kpi-card__value">${overdue.total}</div>
+          </div>
+          <div class="kpi-card ${alerts.total > 0 ? "kpi-card--warning" : ""}">
+            <div class="kpi-card__label">Jours sans pr\xE9l\xE8vement (7j)</div>
+            <div class="kpi-card__value">${alerts.total}</div>
+          </div>
+        </div>
+
+        <div style="background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:0.85rem;color:#3730a3">
+          <strong>Rappel r\xE9glementaire</strong> \u2014 Arr\xEAt\xE9 du 21/12/2009 (art. 32) : 100 g minimum par plat servi, conservation 0\u20133 \xB0C pendant 5 jours minimum \xE0 compter de la derni\xE8re pr\xE9sentation au consommateur. Obligatoire pour collectivit\xE9s (&gt;150 repas/jour), livraison et traiteur.
+        </div>
+
+        ${active.total > 0 ? `
+        <h2 class="section-title" style="margin-top:0">Actuellement en conservation</h2>
+        <div class="table-container" style="margin-bottom:24px">
+          <table>
+            <thead>
+              <tr>
+                <th>Date repas</th>
+                <th>Service</th>
+                <th>Plats</th>
+                <th>T\xB0 stockage</th>
+                <th>Emplacement</th>
+                <th>\xC9ch\xE9ance</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${active.items.map((item) => {
+      const samples = parseSamples(item.samples);
+      const nb = samples.length;
+      const temp = item.storage_temperature != null ? `${item.storage_temperature} \xB0C` : "\u2014";
+      const tempBad = item.storage_temperature != null && (item.storage_temperature < 0 || item.storage_temperature > 3);
+      return `
+                  <tr>
+                    <td class="mono text-sm">${new Date(item.meal_date).toLocaleDateString("fr-FR")}</td>
+                    <td><span class="badge">${MEAL_TYPE_LABELS[item.meal_type] || item.meal_type}</span>${item.service_type ? ` <span class="text-secondary text-xs">${SERVICE_TYPE_LABELS[item.service_type] || item.service_type}</span>` : ""}</td>
+                    <td>${nb} plat${nb > 1 ? "s" : ""}</td>
+                    <td class="mono text-sm${tempBad ? " text-danger" : ""}">${temp}</td>
+                    <td class="text-sm">${escapeHtml(item.storage_location || "\u2014")}</td>
+                    <td class="mono text-sm">${fmtCountdown(item.kept_until)}</td>
+                    <td style="white-space:nowrap">
+                      <button class="btn btn-secondary btn-sm" data-action="edit-wm" data-id="${item.id}">
+                        <i data-lucide="pencil" style="width:14px;height:14px"></i>
+                      </button>
+                      <button class="btn btn-ghost btn-sm" data-action="dispose-wm" data-id="${item.id}" title="Marquer comme \xE9limin\xE9">
+                        <i data-lucide="trash" style="width:14px;height:14px"></i>
+                      </button>
+                    </td>
+                  </tr>
+                `;
+    }).join("")}
+            </tbody>
+          </table>
+        </div>
+        ` : ""}
+
+        <h2 class="section-title">Historique complet</h2>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Service</th>
+                <th>Plats</th>
+                <th>T\xB0</th>
+                <th>Statut</th>
+                <th>Op\xE9rateur</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.length === 0 ? '<tr><td colspan="7" class="text-secondary text-center" style="padding:24px">Aucun plat t\xE9moin enregistr\xE9</td></tr>' : items.map((item) => {
+      const samples = parseSamples(item.samples);
+      const disposed = !!item.disposed_date;
+      const overdueRow = !disposed && /* @__PURE__ */ new Date(item.kept_until.replace(" ", "T") + "Z") < /* @__PURE__ */ new Date();
+      const statusBadge2 = disposed ? '<span class="badge badge--success">\xC9limin\xE9</span>' : overdueRow ? '<span class="badge badge--danger">\xC0 \xE9liminer</span>' : '<span class="badge badge--info">En conservation</span>';
+      return `
+                    <tr${overdueRow ? ' style="background:#fff5f5"' : ""}>
+                      <td class="mono text-sm">${new Date(item.meal_date).toLocaleDateString("fr-FR")}</td>
+                      <td><span class="badge">${MEAL_TYPE_LABELS[item.meal_type] || item.meal_type}</span></td>
+                      <td>${samples.length} plat${samples.length > 1 ? "s" : ""}</td>
+                      <td class="mono text-sm">${item.storage_temperature != null ? item.storage_temperature + " \xB0C" : "\u2014"}</td>
+                      <td>${statusBadge2}</td>
+                      <td class="text-sm">${escapeHtml(item.operator || "\u2014")}</td>
+                      <td style="white-space:nowrap">
+                        <button class="btn btn-secondary btn-sm" data-action="edit-wm" data-id="${item.id}" style="margin-right:4px">
+                          <i data-lucide="pencil" style="width:14px;height:14px"></i>
+                        </button>
+                        <button class="btn btn-ghost btn-sm" data-action="delete-wm" data-id="${item.id}" style="color:var(--color-danger)">
+                          <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  `;
+    }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    setupWitnessMealsEvents(items, active.items);
+  } catch (err) {
+    document.getElementById("app").innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+function setupWitnessMealsEvents(items, activeItems) {
+  var _a;
+  const all = [...items];
+  (_a = document.getElementById("btn-new-wm")) == null ? void 0 : _a.addEventListener("click", () => showWitnessMealModal());
+  document.querySelectorAll('[data-action="edit-wm"]').forEach((btn) => {
+    const id = Number(btn.dataset.id);
+    const record = all.find((i) => i.id === id) || activeItems.find((i) => i.id === id);
+    btn.addEventListener("click", () => showWitnessMealModal(record));
+  });
+  document.querySelectorAll('[data-action="dispose-wm"]').forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const operator = prompt("Qui effectue l'\xE9limination ?") || "";
+      if (!operator.trim()) return;
+      try {
+        await API.request("/haccp/witness-meals/" + btn.dataset.id, {
+          method: "PUT",
+          body: {
+            disposed_date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 19).replace("T", " "),
+            disposed_by: operator.trim()
+          }
+        });
+        showToast("\xC9limination trac\xE9e \u2713", "success");
+        renderHACCPWitnessMeals();
+      } catch (err) {
+        showToast("Erreur : " + err.message, "error");
+      }
+    });
+  });
+  document.querySelectorAll('[data-action="delete-wm"]').forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Supprimer cet enregistrement ?")) return;
+      try {
+        await API.request("/haccp/witness-meals/" + btn.dataset.id, { method: "DELETE" });
+        showToast("Enregistrement supprim\xE9", "success");
+        renderHACCPWitnessMeals();
+      } catch (err) {
+        showToast("Erreur : " + err.message, "error");
+      }
+    });
+  });
+}
+function showWitnessMealModal(record = null) {
+  var _a;
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const isEdit = !!record;
+  const samples = record ? typeof record.samples === "string" ? (() => {
+    try {
+      return JSON.parse(record.samples) || [];
+    } catch (e) {
+      return [];
+    }
+  })() : record.samples || [] : [];
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:720px">
+      <h2>
+        <i data-lucide="package-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>
+        ${isEdit ? "Modifier le pr\xE9l\xE8vement" : "Nouveau plat t\xE9moin"}
+      </h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date du repas *</label>
+          <input type="date" class="form-control" id="wm-date" value="${(record == null ? void 0 : record.meal_date) || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}">
+        </div>
+        <div class="form-group">
+          <label>Type de repas *</label>
+          <select class="form-control" id="wm-type">
+            <option value="petit_dejeuner" ${(record == null ? void 0 : record.meal_type) === "petit_dejeuner" ? "selected" : ""}>Petit-d\xE9jeuner</option>
+            <option value="dejeuner"       ${!record || record.meal_type === "dejeuner" ? "selected" : ""}>D\xE9jeuner</option>
+            <option value="diner"          ${(record == null ? void 0 : record.meal_type) === "diner" ? "selected" : ""}>D\xEEner</option>
+            <option value="gouter"         ${(record == null ? void 0 : record.meal_type) === "gouter" ? "selected" : ""}>Go\xFBter</option>
+            <option value="collation"      ${(record == null ? void 0 : record.meal_type) === "collation" ? "selected" : ""}>Collation</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Mode de service</label>
+          <select class="form-control" id="wm-service">
+            <option value="" ${!(record == null ? void 0 : record.service_type) ? "selected" : ""}>\u2014</option>
+            <option value="sur_place" ${(record == null ? void 0 : record.service_type) === "sur_place" ? "selected" : ""}>Sur place</option>
+            <option value="livraison" ${(record == null ? void 0 : record.service_type) === "livraison" ? "selected" : ""}>Livraison</option>
+            <option value="emporter"  ${(record == null ? void 0 : record.service_type) === "emporter" ? "selected" : ""}>\xC0 emporter</option>
+            <option value="traiteur"  ${(record == null ? void 0 : record.service_type) === "traiteur" ? "selected" : ""}>Traiteur</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>T\xB0 stockage (\xB0C) *</label>
+          <input type="number" step="0.1" min="-2" max="10" class="form-control" id="wm-temp" value="${(_a = record == null ? void 0 : record.storage_temperature) != null ? _a : "2"}" placeholder="0 \xE0 3 \xB0C">
+        </div>
+        <div class="form-group">
+          <label>Emplacement frigo</label>
+          <input type="text" class="form-control" id="wm-loc" value="${escapeHtml((record == null ? void 0 : record.storage_location) || "")}" placeholder="ex: Chambre froide plats t\xE9moins">
+        </div>
+        <div class="form-group">
+          <label>Op\xE9rateur</label>
+          <input type="text" class="form-control" id="wm-op" value="${escapeHtml((record == null ? void 0 : record.operator) || "")}" placeholder="Pr\xE9nom NOM">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Plats pr\xE9lev\xE9s (\u2265 100 g chacun)</label>
+        <div id="wm-samples-list"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="wm-add-sample">
+          <i data-lucide="plus" style="width:14px;height:14px"></i> Ajouter un plat
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea class="form-control" id="wm-notes" rows="2" placeholder="ex: Buffet de midi, 180 couverts">${escapeHtml((record == null ? void 0 : record.notes) || "")}</textarea>
+      </div>
+
+      ${isEdit ? `
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date d'\xE9limination</label>
+          <input type="datetime-local" class="form-control" id="wm-disposed-date" value="${(record == null ? void 0 : record.disposed_date) ? record.disposed_date.replace(" ", "T").slice(0, 16) : ""}">
+        </div>
+        <div class="form-group">
+          <label>\xC9limin\xE9 par</label>
+          <input type="text" class="form-control" id="wm-disposed-by" value="${escapeHtml((record == null ? void 0 : record.disposed_by) || "")}" placeholder="Pr\xE9nom NOM">
+        </div>
+      </div>
+      ` : ""}
+
+      <div style="background:#f0f4ff;border-radius:6px;padding:10px 14px;font-size:0.82rem;color:#3730a3;margin-bottom:16px">
+        <strong>Rappel :</strong> 100 g minimum par plat, conservation 0\u20133 \xB0C, 5 jours minimum. L'\xE9ch\xE9ance est calcul\xE9e automatiquement \xE0 partir de la date du repas.
+      </div>
+      <div class="actions-row" style="justify-content:flex-end">
+        <button class="btn btn-secondary" id="wm-cancel">Annuler</button>
+        <button class="btn btn-primary" id="wm-save">
+          <i data-lucide="check" style="width:18px;height:18px"></i> ${isEdit ? "Enregistrer" : "Cr\xE9er"}
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.getElementById("wm-cancel").addEventListener("click", () => overlay.remove());
+  const samplesList = document.getElementById("wm-samples-list");
+  const sampleState = samples.length ? samples.slice() : [{ name: "", quantity: "100g", location: "" }];
+  function renderSamples() {
+    samplesList.innerHTML = sampleState.map((s, i) => `
+      <div class="form-row" style="margin-bottom:6px">
+        <input type="text" class="form-control" data-i="${i}" data-k="name"     placeholder="Nom du plat"   value="${escapeHtml(s.name || "")}" style="flex:2">
+        <input type="text" class="form-control" data-i="${i}" data-k="quantity" placeholder="Quantit\xE9 (\u2265100g)" value="${escapeHtml(s.quantity || "")}" style="flex:1">
+        <input type="text" class="form-control" data-i="${i}" data-k="location" placeholder="Emplacement"    value="${escapeHtml(s.location || "")}" style="flex:1">
+        <button type="button" class="btn btn-ghost btn-sm" data-rm="${i}" style="color:var(--color-danger)"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+      </div>
+    `).join("");
+    if (window.lucide) lucide.createIcons();
+    samplesList.querySelectorAll("input").forEach((inp) => {
+      inp.addEventListener("input", () => {
+        const i = Number(inp.dataset.i);
+        sampleState[i][inp.dataset.k] = inp.value;
+      });
+    });
+    samplesList.querySelectorAll("[data-rm]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        sampleState.splice(Number(btn.dataset.rm), 1);
+        if (sampleState.length === 0) sampleState.push({ name: "", quantity: "100g", location: "" });
+        renderSamples();
+      });
+    });
+  }
+  renderSamples();
+  document.getElementById("wm-add-sample").addEventListener("click", () => {
+    sampleState.push({ name: "", quantity: "100g", location: "" });
+    renderSamples();
+  });
+  document.getElementById("wm-save").addEventListener("click", async () => {
+    var _a2, _b;
+    const meal_date = document.getElementById("wm-date").value;
+    const meal_type = document.getElementById("wm-type").value;
+    const service_type = document.getElementById("wm-service").value || null;
+    const storage_temperature = document.getElementById("wm-temp").value;
+    const storage_location = document.getElementById("wm-loc").value.trim();
+    const operator = document.getElementById("wm-op").value.trim();
+    const notes = document.getElementById("wm-notes").value.trim();
+    if (!meal_date) {
+      document.getElementById("wm-date").classList.add("form-control--error");
+      return;
+    }
+    const cleanSamples = sampleState.filter((s) => (s.name || "").trim());
+    const payload = {
+      meal_date,
+      meal_type,
+      service_type,
+      storage_temperature: storage_temperature !== "" ? Number(storage_temperature) : null,
+      storage_location: storage_location || null,
+      operator: operator || null,
+      notes: notes || null,
+      samples: cleanSamples,
+      is_complete: cleanSamples.length > 0 ? 1 : 0
+    };
+    if (isEdit) {
+      const dd = (_a2 = document.getElementById("wm-disposed-date")) == null ? void 0 : _a2.value;
+      const db = (_b = document.getElementById("wm-disposed-by")) == null ? void 0 : _b.value.trim();
+      if (dd) payload.disposed_date = dd.replace("T", " ");
+      if (db !== void 0) payload.disposed_by = db || null;
+    }
+    try {
+      if (isEdit) {
+        await API.request("/haccp/witness-meals/" + record.id, { method: "PUT", body: payload });
+        showToast("Plat t\xE9moin mis \xE0 jour \u2713", "success");
+      } else {
+        await API.request("/haccp/witness-meals", { method: "POST", body: payload });
+        showToast("Plat t\xE9moin enregistr\xE9 \u2713", "success");
+      }
+      overlay.remove();
+      renderHACCPWitnessMeals();
     } catch (err) {
       showToast("Erreur : " + err.message, "error");
     }
@@ -22884,6 +23294,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/water$/, renderHACCPWater);
   Router.add(/^\/haccp\/pms-audit$/, renderHACCPPmsAudit);
   Router.add(/^\/haccp\/tiac$/, renderHACCPTIAC);
+  Router.add(/^\/haccp\/witness-meals$/, renderHACCPWitnessMeals);
   Router.add(/^\/haccp\/staff-health$/, renderHACCPStaffHealth);
   Router.add(/^\/settings\/sanitary-approval$/, renderSanitaryApproval);
   Router.add(/^\/analytics$/, renderAnalytics);
