@@ -33,6 +33,12 @@ function formatQuantity(qty, unit) {
 function showConfirmModal(title, message, onConfirm, options = {}) {
   const confirmText = options.confirmText || 'Confirmer';
   const confirmClass = options.confirmClass || 'btn btn-danger';
+  // Escape title/message to prevent XSS (callers pass user data like product names)
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const safeTitle = esc(title);
+  const safeMessage = esc(message).replace(/\n/g, '<br>');
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay confirm-modal-overlay';
   overlay.setAttribute('role', 'dialog');
@@ -43,10 +49,10 @@ function showConfirmModal(title, message, onConfirm, options = {}) {
       <div style="font-size:2rem;margin-bottom:12px">
         <i data-lucide="alert-triangle" style="width:40px;height:40px;color:var(--color-danger)"></i>
       </div>
-      <h3 id="confirm-modal-title" style="margin-bottom:8px">${title}</h3>
-      <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:20px">${message}</p>
+      <h3 id="confirm-modal-title" style="margin-bottom:8px">${safeTitle}</h3>
+      <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:20px">${safeMessage}</p>
       <div class="actions-row" style="justify-content:center">
-        <button class="${confirmClass}" id="confirm-yes">${confirmText}</button>
+        <button class="${confirmClass}" id="confirm-yes">${esc(confirmText)}</button>
         <button class="btn btn-secondary" id="confirm-no">Annuler</button>
       </div>
     </div>

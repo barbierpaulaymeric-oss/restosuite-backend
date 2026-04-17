@@ -187,7 +187,7 @@ async function renderTraceabilityDownstream() {
     allItems = await loadItems();
     filteredItems = allItems;
   } catch (e) {
-    app.innerHTML = `<div class="error-state"><p>Erreur lors du chargement : ${e.message}</p></div>`;
+    app.innerHTML = `<div class="error-state"><p>Erreur lors du chargement : ${escapeHtml(e.message)}</p></div>`;
     return;
   }
 
