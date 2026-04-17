@@ -88,36 +88,36 @@
       <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 28px; width: auto;">
     </div>
     <div class="nav-links">
-      <button class="nav-link" data-group="cuisine" data-roles="gerant,cuisinier,equipier">
-        <span class="nav-icon"><i data-lucide="utensils"></i></span>
+      <button class="nav-link" data-group="cuisine" data-roles="gerant,cuisinier,equipier" aria-expanded="false">
+        <span class="nav-icon"><i data-lucide="utensils" aria-hidden="true"></i></span>
         <span class="nav-label">Cuisine</span>
       </button>
-      <button class="nav-link" data-group="operations" data-roles="gerant,cuisinier,salle">
-        <span class="nav-icon"><i data-lucide="clipboard-pen"></i></span>
+      <button class="nav-link" data-group="operations" data-roles="gerant,cuisinier,salle" aria-expanded="false">
+        <span class="nav-icon"><i data-lucide="clipboard-pen" aria-hidden="true"></i></span>
         <span class="nav-label">Opérations</span>
       </button>
       <a href="#/haccp" class="nav-link" data-route="/haccp" data-roles="gerant,cuisinier">
-        <span class="nav-icon"><i data-lucide="shield-check"></i></span>
+        <span class="nav-icon"><i data-lucide="shield-check" aria-hidden="true"></i></span>
         <span class="nav-label">HACCP</span>
       </a>
-      <button class="nav-link" data-group="pilotage" data-roles="gerant">
-        <span class="nav-icon"><i data-lucide="bar-chart-3"></i></span>
+      <button class="nav-link" data-group="pilotage" data-roles="gerant" aria-expanded="false">
+        <span class="nav-icon"><i data-lucide="bar-chart-3" aria-hidden="true"></i></span>
         <span class="nav-label">Pilotage</span>
       </button>
       <a href="#/ia" class="nav-link" data-route="/ia" data-roles="gerant,cuisinier,equipier">
-        <span class="nav-icon"><i data-lucide="brain"></i></span>
+        <span class="nav-icon"><i data-lucide="brain" aria-hidden="true"></i></span>
         <span class="nav-label">IA</span>
       </a>
-      <button class="nav-link" data-group="documents" data-roles="gerant">
-        <span class="nav-icon"><i data-lucide="file-text"></i></span>
+      <button class="nav-link" data-group="documents" data-roles="gerant" aria-expanded="false">
+        <span class="nav-icon"><i data-lucide="file-text" aria-hidden="true"></i></span>
         <span class="nav-label">Docs</span>
       </button>
-      <button class="nav-link" data-group="config" data-roles="gerant,cuisinier,equipier">
-        <span class="nav-icon"><i data-lucide="settings"></i></span>
+      <button class="nav-link" data-group="config" data-roles="gerant,cuisinier,equipier" aria-expanded="false">
+        <span class="nav-icon"><i data-lucide="settings" aria-hidden="true"></i></span>
         <span class="nav-label">Config</span>
       </button>
       <a href="#/admin" class="nav-link" id="nav-admin-link" style="display:none">
-        <span class="nav-icon"><i data-lucide="shield"></i></span>
+        <span class="nav-icon"><i data-lucide="shield" aria-hidden="true"></i></span>
         <span class="nav-label">Admin</span>
       </a>
     </div>
@@ -133,7 +133,7 @@
   <main id="app"></main>
 
   <!-- Toast notifications -->
-  <div id="toast-container"></div>
+  <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
 
   <script src="js/app.bundle.js"></script>
   <script>

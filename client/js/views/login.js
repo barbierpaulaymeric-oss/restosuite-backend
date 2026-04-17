@@ -479,6 +479,22 @@ class LoginView {
       document.getElementById('pin-error').textContent = '';
       document.getElementById('pin-dots').classList.remove('shake');
     });
+
+    this._pinKeydownHandler = (e) => {
+      if (!document.getElementById('pin-pad')) return;
+      if (e.key >= '0' && e.key <= '9') {
+        if (this.pinDigits.length >= 4) return;
+        this.pinDigits.push(e.key);
+        this.updatePinDots();
+        if (this.pinDigits.length === 4) this.handleStaffPinLogin();
+      } else if (e.key === 'Backspace') {
+        this.pinDigits.pop();
+        this.updatePinDots();
+        document.getElementById('pin-error').textContent = '';
+        document.getElementById('pin-dots').classList.remove('shake');
+      }
+    };
+    document.addEventListener('keydown', this._pinKeydownHandler);
   }
 
   // ─── Create PIN (first-time) ───
