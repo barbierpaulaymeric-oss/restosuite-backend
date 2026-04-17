@@ -913,8 +913,8 @@ router.post('/chef', async (req, res) => {
   if (!message) return res.status(400).json({ error: 'Message requis' });
 
   try {
-    // Build restaurant context from real data
-    const context = buildRestaurantContext();
+    // Build restaurant context from real data (tenant-scoped)
+    const context = buildRestaurantContext(req.user?.restaurant_id);
 
     // Load personalization context (preferences, recent learning, shortcuts)
     const perso = loadPersonalizationContext(req.user?.restaurant_id, req.user?.id);
@@ -1051,13 +1051,13 @@ router.post('/assistant', async (req, res) => {
       });
     }
 
-    // Build restaurant context from real data
-    const context = buildRestaurantContext();
+    // Build restaurant context from real data (tenant-scoped)
+    const context = buildRestaurantContext(user.restaurant_id);
 
-    // Fetch page-specific context if provided
+    // Fetch page-specific context if provided (tenant-scoped)
     let pageContext = '';
     if (context_page && context_id) {
-      pageContext = buildPageContext(context_page, context_id);
+      pageContext = buildPageContext(context_page, context_id, user.restaurant_id);
     }
 
     // Load personalization + onboarding state
@@ -1936,15 +1936,16 @@ function filterActionsByRole(actions, role) {
   return actions.filter(action => !ROLE_RESTRICTIONS[role].includes(action.type));
 }
 
-function buildPageContext(page, id) {
+function buildPageContext(page, id, rid) {
   try {
+    if (!rid) return '';
     if (page === 'recipe' && id) {
-      const recipe = get('SELECT * FROM recipes WHERE id = ?', [id]);
+      const recipe = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [id, rid]);
       if (!recipe) return '';
 
       const ingredients = all(
-        'SELECT ri.*, i.name, i.price_per_unit FROM recipe_ingredients ri JOIN ingredients i ON i.id = ri.ingredient_id WHERE ri.recipe_id = ?',
-        [id]
+        'SELECT ri.*, i.name, i.price_per_unit FROM recipe_ingredients ri JOIN ingredients i ON i.id = ri.ingredient_id WHERE ri.recipe_id = ? AND ri.restaurant_id = ?',
+        [id, rid]
       );
 
       let totalCost = 0;
@@ -1962,7 +1963,7 @@ Ingrédients: ${ingList}
 Coût estimé: ${totalCost.toFixed(2)}€
 Food cost: ${recipe.selling_price > 0 ? (totalCost / recipe.selling_price * 100).toFixed(1) : 0}%`;
     } else if (page === 'stock' && id) {
-      const stock = get('SELECT s.*, i.name FROM stock s JOIN ingredients i ON i.id = s.ingredient_id WHERE s.id = ?', [id]);
+      const stock = get('SELECT s.*, i.name FROM stock s JOIN ingredients i ON i.id = s.ingredient_id WHERE s.id = ? AND s.restaurant_id = ?', [id, rid]);
       if (!stock) return '';
       return `\n\nCONTEXTE STOCK :
 Ingrédient: "${stock.name}"
@@ -1975,8 +1976,11 @@ Minimum: ${stock.min_quantity}${stock.unit}`;
   }
 }
 
-function buildRestaurantContext() {
+function buildRestaurantContext(rid) {
   try {
+    // Tenant is required — refuse to build context without one rather than leak
+    // platform-wide stats into the LLM prompt.
+    if (!rid) return '';
     const parts = [];
 
     // Recipe stats
@@ -1987,10 +1991,11 @@ function buildRestaurantContext() {
              AVG(CASE WHEN selling_price > 0 THEN
                (SELECT SUM(ri.gross_quantity * COALESCE(
                  (SELECT sp.price / CASE WHEN sp.unit = 'kg' THEN 1000 WHEN sp.unit = 'L' THEN 1000 ELSE 1 END
-                  FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1), 0))
-               FROM recipe_ingredients ri WHERE ri.recipe_id = r.id) / selling_price * 100 END) as avg_food_cost
+                  FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1), 0))
+               FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?) / selling_price * 100 END) as avg_food_cost
       FROM recipes r
-    `);
+      WHERE r.restaurant_id = ?
+    `, [rid, rid, rid]);
     parts.push(`FICHES : ${recipeStats.total} fiches techniques (${recipeStats.plats} plats, ${recipeStats.sous_recettes} sous-recettes). Food cost moyen : ${recipeStats.avg_food_cost ? recipeStats.avg_food_cost.toFixed(1) + '%' : 'non calculé'}.`);
 
     // Top 5 recipes by food cost
@@ -1998,11 +2003,11 @@ function buildRestaurantContext() {
       SELECT r.name, r.selling_price, r.category,
         COALESCE((SELECT SUM(ri.gross_quantity * COALESCE(
           (SELECT sp.price / CASE WHEN sp.unit = 'kg' THEN 1000 WHEN sp.unit = 'L' THEN 1000 ELSE 1 END
-           FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1), 0))
-        FROM recipe_ingredients ri WHERE ri.recipe_id = r.id), 0) as cost
-      FROM recipes r WHERE r.selling_price > 0 AND (r.recipe_type = 'plat' OR r.recipe_type IS NULL)
+           FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1), 0))
+        FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?), 0) as cost
+      FROM recipes r WHERE r.selling_price > 0 AND (r.recipe_type = 'plat' OR r.recipe_type IS NULL) AND r.restaurant_id = ?
       ORDER BY (cost / r.selling_price) DESC LIMIT 5
-    `);
+    `, [rid, rid, rid]);
     if (topRecipes.length > 0) {
       parts.push('TOP 5 FOOD COST (les plus chers) : ' + topRecipes.map(r =>
         `${r.name} (coût: ${r.cost.toFixed(2)}€, vente: ${r.selling_price}€, FC: ${r.selling_price > 0 ? (r.cost / r.selling_price * 100).toFixed(1) : 0}%)`
@@ -2015,11 +2020,12 @@ function buildRestaurantContext() {
              COALESCE(SUM(s.quantity * COALESCE(i.price_per_unit, 0)), 0) as total_value,
              COUNT(CASE WHEN s.quantity <= s.min_quantity AND s.min_quantity > 0 THEN 1 END) as low_stock
       FROM stock s JOIN ingredients i ON i.id = s.ingredient_id
-    `);
+      WHERE s.restaurant_id = ?
+    `, [rid]);
     parts.push(`STOCK : ${stockSummary.total_items} ingrédients en stock, valeur totale ${stockSummary.total_value.toFixed(2)}€, ${stockSummary.low_stock} en stock bas.`);
 
     // Suppliers
-    const supplierCount = get('SELECT COUNT(*) as c FROM suppliers').c;
+    const supplierCount = get('SELECT COUNT(*) as c FROM suppliers WHERE restaurant_id = ?', [rid]).c;
     parts.push(`FOURNISSEURS : ${supplierCount} fournisseurs référencés.`);
 
     // Recent losses
@@ -2027,13 +2033,14 @@ function buildRestaurantContext() {
       SELECT COALESCE(SUM(ABS(sm.quantity) * COALESCE(i.price_per_unit, 0)), 0) as loss_value
       FROM stock_movements sm LEFT JOIN ingredients i ON i.id = sm.ingredient_id
       WHERE sm.movement_type = 'perte' AND date(sm.recorded_at) >= date('now', '-30 days')
-    `);
+        AND sm.restaurant_id = ?
+    `, [rid]);
     parts.push(`PERTES (30j) : ${losses.loss_value.toFixed(2)}€ de pertes déclarées.`);
 
     // Ingredients list (categories)
     const categories = all(`
-      SELECT category, COUNT(*) as c FROM ingredients WHERE category IS NOT NULL GROUP BY category ORDER BY c DESC LIMIT 8
-    `);
+      SELECT category, COUNT(*) as c FROM ingredients WHERE category IS NOT NULL AND restaurant_id = ? GROUP BY category ORDER BY c DESC LIMIT 8
+    `, [rid]);
     if (categories.length > 0) {
       parts.push('CATÉGORIES INGRÉDIENTS : ' + categories.map(c => `${c.category} (${c.c})`).join(', '));
     }

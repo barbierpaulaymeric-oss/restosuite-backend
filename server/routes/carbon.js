@@ -113,10 +113,14 @@ function toKg(quantity, unit) {
 // GET /api/carbon/recipes — Bilan carbone par recette
 router.get('/recipes', (req, res) => {
   try {
+    const rid = req.user && req.user.restaurant_id;
+    if (!rid) return res.status(400).json({ error: 'restaurant_id manquant dans le contexte' });
     const recipes = all(`
       SELECT r.id, r.name, r.category, r.portions, r.selling_price
-      FROM recipes r ORDER BY r.name
-    `);
+      FROM recipes r
+      WHERE r.restaurant_id = ?
+      ORDER BY r.name
+    `, [rid]);
 
     const results = [];
 

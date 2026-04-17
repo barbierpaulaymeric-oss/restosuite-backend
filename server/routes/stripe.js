@@ -175,8 +175,30 @@ router.post('/create-checkout', async (req, res) => {
 // Check subscription status for an account
 // ─────────────────────────────────────────────
 router.get('/status/:accountId', (req, res) => {
-  const { accountId } = req.params;
-  const sub = get('SELECT * FROM subscriptions WHERE account_id = ?', [accountId]);
+  const targetId = parseInt(req.params.accountId, 10);
+  if (!Number.isInteger(targetId)) {
+    return res.status(400).json({ error: 'accountId invalide' });
+  }
+
+  // Authorize: caller must be the target account, or a gérant of the same tenant.
+  const callerId = parseInt(req.user.id, 10);
+  const callerRole = req.user.role;
+  const callerRestaurantId = req.user.restaurant_id;
+
+  const target = get('SELECT id, restaurant_id FROM accounts WHERE id = ?', [targetId]);
+  if (!target) return res.status(404).json({ error: 'Compte introuvable' });
+
+  const isSelf = callerId === targetId;
+  const isSameTenantGerant =
+    callerRole === 'gerant' &&
+    callerRestaurantId != null &&
+    callerRestaurantId === target.restaurant_id;
+
+  if (!isSelf && !isSameTenantGerant) {
+    return res.status(403).json({ error: 'Accès refusé' });
+  }
+
+  const sub = get('SELECT * FROM subscriptions WHERE account_id = ?', [targetId]);
 
   if (!sub) {
     return res.json({
@@ -187,8 +209,11 @@ router.get('/status/:accountId', (req, res) => {
     });
   }
 
-  // Count recipes for this account (all recipes for now — later filter by account)
-  const recipeCount = get('SELECT COUNT(*) as count FROM recipes')?.count || 0;
+  // Recipe count scoped to target's tenant (prevents cross-tenant leakage via count).
+  const rid = target.restaurant_id;
+  const recipeCount = rid
+    ? (get('SELECT COUNT(*) as count FROM recipes WHERE restaurant_id = ?', [rid])?.count || 0)
+    : 0;
   const isFree = sub.plan === 'free' || sub.status !== 'active';
   const limit = isFree ? 5 : Infinity;
   const canCreate = recipeCount < limit;
