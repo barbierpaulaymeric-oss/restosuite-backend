@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════
-// Floating AI Bubble — Voice + Chat
+// Alto — Floating assistant bubble (voice + chat)
 // Persistent across page navigation
 // ═══════════════════════════════════════════
 
@@ -255,17 +255,17 @@ function initFloatingAIBubble() {
       }
     </style>
 
-    <button class="bubble-fab" id="bubble-fab" title="Assistant IA">🎤</button>
+    <button class="bubble-fab" id="bubble-fab" title="Alto — assistant culinaire">🎤</button>
     <div class="bubble-panel" id="bubble-panel" style="display:none">
       <div class="bubble-header">
-        <h3>Assistant IA</h3>
+        <h3>Alto</h3>
         <button class="bubble-close" id="bubble-close">✕</button>
       </div>
       <div class="bubble-messages" id="bubble-messages"></div>
       <div id="bubble-transcript" class="bubble-transcript" style="display:none"></div>
       <div class="bubble-input-area">
         <button class="bubble-voice-btn" id="bubble-voice-btn" title="Enregistrer au micro">🎤</button>
-        <input type="text" class="bubble-text-input" id="bubble-text-input" placeholder="Votre question…" autocomplete="off">
+        <input type="text" class="bubble-text-input" id="bubble-text-input" placeholder="Parlez à Alto…" autocomplete="off">
         <button class="bubble-send-btn" id="bubble-send-btn" title="Envoyer">⬆</button>
       </div>
     </div>
