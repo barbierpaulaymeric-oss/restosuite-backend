@@ -780,6 +780,37 @@ try {
   if (!e.message.includes('already exists')) console.error('Migration reheating_logs error:', e.message);
 }
 
+// ─── Migration: HACCP Registre de cuisson (CCP2) ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cooking_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL DEFAULT 1,
+      recipe_id INTEGER,
+      product_name TEXT NOT NULL,
+      batch_number TEXT,
+      cooking_date TEXT NOT NULL,
+      cooking_time_start TEXT,
+      cooking_time_end TEXT,
+      target_temperature REAL NOT NULL,
+      measured_temperature REAL NOT NULL,
+      is_compliant INTEGER,
+      thermometer_id INTEGER,
+      corrective_action TEXT,
+      operator TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_cooking_records_restaurant_id ON cooking_records(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_cooking_records_cooking_date ON cooking_records(cooking_date);
+    CREATE INDEX IF NOT EXISTS idx_cooking_records_is_compliant ON cooking_records(is_compliant);
+  `);
+  console.log('✅ Migration: cooking_records table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration cooking_records error:', e.message);
+}
+
 // ─── Migration: HACCP Gestion huiles de friture ───
 try {
   db.exec(`
@@ -1817,7 +1848,7 @@ try {
     'stock','stock_movements','suppliers','supplier_prices','supplier_accounts',
     'supplier_catalog','ingredient_supplier_prefs','price_history','price_change_notifications',
     'temperature_zones','temperature_logs','cleaning_tasks','cleaning_logs',
-    'cooling_logs','reheating_logs','fryers','fryer_checks','non_conformities',
+    'cooling_logs','reheating_logs','cooking_records','fryers','fryer_checks','non_conformities',
     'haccp_hazard_analysis','haccp_ccp','haccp_decision_tree_results',
     'traceability_logs','downstream_traceability','recall_procedures','training_records',
     'pest_control','equipment_maintenance','waste_management',

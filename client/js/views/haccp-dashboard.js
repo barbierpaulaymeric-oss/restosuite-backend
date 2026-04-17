@@ -8,6 +8,7 @@ const HACCP_SUBNAV_ITEMS = [
   { href: '#/haccp/temperatures',          label: 'Températures' },
   { href: '#/haccp/cleaning',              label: 'Nettoyage' },
   { href: '#/haccp/traceability',          label: 'Traçabilité' },
+  { href: '#/haccp/cooking',               label: 'Cuisson (CCP2)' },
   { href: '#/haccp/cooling',               label: 'Refroidissement' },
   { href: '#/haccp/reheating',             label: 'Remise en T°' },
   { href: '#/haccp/fryers',                label: 'Friteuses' },

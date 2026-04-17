@@ -170,6 +170,133 @@ describe('HACCP — Reheating Logs (/reheating)', () => {
   });
 });
 
+// ─── Cooking Records (CCP2) ─────────────────────────────────
+
+describe('HACCP — Cooking Records (/cooking)', () => {
+  it('GET /api/haccp/cooking → 200 with items array', async () => {
+    const res = await request(app).get('/api/haccp/cooking').set(AUTH);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.items)).toBe(true);
+    expect(typeof res.body.total).toBe('number');
+  });
+
+  it('POST /api/haccp/cooking → 201 conforme when measured ≥ target', async () => {
+    const res = await request(app)
+      .post('/api/haccp/cooking')
+      .set(AUTH)
+      .send({
+        product_name: 'Poulet rôti',
+        cooking_date: '2026-04-17',
+        target_temperature: 70,
+        measured_temperature: 72.5,
+        operator: 'Chef Test',
+      });
+    expect(res.status).toBe(201);
+    expect(res.body).toHaveProperty('id');
+    expect(res.body.is_compliant).toBe(1);
+  });
+
+  it('POST /api/haccp/cooking → 201 non-conforme when measured < target', async () => {
+    const res = await request(app)
+      .post('/api/haccp/cooking')
+      .set(AUTH)
+      .send({
+        product_name: 'Bœuf',
+        cooking_date: '2026-04-17',
+        target_temperature: 63,
+        measured_temperature: 58,
+        corrective_action: 'Prolongation de la cuisson',
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.is_compliant).toBe(0);
+  });
+
+  it('POST /api/haccp/cooking → 400 without required fields', async () => {
+    const res = await request(app)
+      .post('/api/haccp/cooking')
+      .set(AUTH)
+      .send({ product_name: 'Test' }); // missing date + temps
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /api/haccp/cooking → 400 for target_temperature out of range', async () => {
+    const res = await request(app)
+      .post('/api/haccp/cooking')
+      .set(AUTH)
+      .send({
+        product_name: 'Test',
+        cooking_date: '2026-04-17',
+        target_temperature: 500,
+        measured_temperature: 60,
+      });
+    expect(res.status).toBe(400);
+  });
+
+  it('PUT /api/haccp/cooking/:id → 200 and recomputes is_compliant', async () => {
+    const createRes = await request(app)
+      .post('/api/haccp/cooking')
+      .set(AUTH)
+      .send({
+        product_name: 'Saumon',
+        cooking_date: '2026-04-17',
+        target_temperature: 63,
+        measured_temperature: 55,
+      });
+    const id = createRes.body.id;
+
+    const res = await request(app)
+      .put(`/api/haccp/cooking/${id}`)
+      .set(AUTH)
+      .send({ measured_temperature: 65 });
+    expect(res.status).toBe(200);
+    expect(res.body.is_compliant).toBe(1);
+  });
+
+  it('PUT /api/haccp/cooking/999999 → 404', async () => {
+    const res = await request(app)
+      .put('/api/haccp/cooking/999999')
+      .set(AUTH)
+      .send({ measured_temperature: 70 });
+    expect(res.status).toBe(404);
+  });
+
+  it('DELETE /api/haccp/cooking/:id → 200', async () => {
+    const createRes = await request(app)
+      .post('/api/haccp/cooking')
+      .set(AUTH)
+      .send({
+        product_name: 'À supprimer',
+        cooking_date: '2026-04-17',
+        target_temperature: 63,
+        measured_temperature: 65,
+      });
+    const id = createRes.body.id;
+
+    const res = await request(app)
+      .delete(`/api/haccp/cooking/${id}`)
+      .set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body.deleted).toBe(true);
+  });
+
+  it('GET /api/haccp/cooking/stats → 200 with compliance metrics', async () => {
+    const res = await request(app).get('/api/haccp/cooking/stats').set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('total');
+    expect(res.body).toHaveProperty('compliant');
+    expect(res.body).toHaveProperty('non_compliant');
+    expect(res.body).toHaveProperty('compliance_rate');
+    expect(Array.isArray(res.body.by_product)).toBe(true);
+  });
+
+  it('GET /api/haccp/cooking/non-compliant → 200 with items', async () => {
+    const res = await request(app).get('/api/haccp/cooking/non-compliant').set(AUTH);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.items)).toBe(true);
+    res.body.items.forEach(item => expect(item.is_compliant).toBe(0));
+  });
+});
+
 // ─── Fryers ─────────────────────────────────────────────────
 
 describe('HACCP — Fryers (/fryers)', () => {
@@ -219,6 +346,7 @@ describe('HACCP — all subroutes require auth', () => {
     '/api/haccp/cleaning',
     '/api/haccp/traceability',
     '/api/haccp/cooling',
+    '/api/haccp/cooking',
     '/api/haccp/reheating',
     '/api/haccp/fryers',
     '/api/haccp/non-conformities',

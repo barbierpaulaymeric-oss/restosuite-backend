@@ -236,6 +236,20 @@ const API = {
   createReheatingLog(data) { return this.request('/haccp/reheating', { method: 'POST', body: data }); },
   updateReheatingLog(id, data) { return this.request(`/haccp/reheating/${id}`, { method: 'PUT', body: data }); },
 
+  // Cooking Records (CCP2)
+  getCookingRecords(params) {
+    const qs = params ? new URLSearchParams(params).toString() : '';
+    return this.request(`/haccp/cooking${qs ? '?' + qs : ''}`);
+  },
+  getCookingStats(params) {
+    const qs = params ? new URLSearchParams(params).toString() : '';
+    return this.request(`/haccp/cooking/stats${qs ? '?' + qs : ''}`);
+  },
+  getCookingNonCompliant() { return this.request('/haccp/cooking/non-compliant'); },
+  createCookingRecord(data) { return this.request('/haccp/cooking', { method: 'POST', body: data }); },
+  updateCookingRecord(id, data) { return this.request(`/haccp/cooking/${id}`, { method: 'PUT', body: data }); },
+  deleteCookingRecord(id) { return this.request(`/haccp/cooking/${id}`, { method: 'DELETE' }); },
+
   // Fryers
   getFryers() { return this.request('/haccp/fryers'); },
   createFryer(data) { return this.request('/haccp/fryers', { method: 'POST', body: data }); },

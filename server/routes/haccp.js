@@ -1009,4 +1009,209 @@ router.put('/non-conformities/:id', requireAuth, (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// COOKING RECORDS — CCP2 Cuisson (Registre de cuisson)
+// Réglementation : CE 852/2004 — preuve de maîtrise de la cuisson (CCP2)
+// ═══════════════════════════════════════════
+
+router.get('/cooking', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const { from, to, limit = 100, offset = 0 } = req.query;
+    let sql = 'SELECT * FROM cooking_records WHERE restaurant_id = ?';
+    const params = [rid];
+    if (from) { sql += ' AND cooking_date >= ?'; params.push(from); }
+    if (to)   { sql += ' AND cooking_date <= ?'; params.push(to); }
+    let countSql = 'SELECT COUNT(*) as c FROM cooking_records WHERE restaurant_id = ?';
+    const countParams = [rid];
+    if (from) { countSql += ' AND cooking_date >= ?'; countParams.push(from); }
+    if (to)   { countSql += ' AND cooking_date <= ?'; countParams.push(to); }
+    const total = db.prepare(countSql).get(...countParams).c;
+    sql += ' ORDER BY cooking_date DESC, id DESC LIMIT ? OFFSET ?';
+    params.push(Number(limit), Number(offset));
+    const items = db.prepare(sql).all(...params);
+    res.json({ items, total, limit: Number(limit), offset: Number(offset) });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+router.get('/cooking/stats', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const { from, to } = req.query;
+    let where = 'WHERE restaurant_id = ?';
+    const params = [rid];
+    if (from) { where += ' AND cooking_date >= ?'; params.push(from); }
+    if (to)   { where += ' AND cooking_date <= ?'; params.push(to); }
+
+    const totals = db.prepare(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN is_compliant = 1 THEN 1 ELSE 0 END) as compliant,
+        SUM(CASE WHEN is_compliant = 0 THEN 1 ELSE 0 END) as non_compliant
+      FROM cooking_records ${where}
+    `).get(...params);
+
+    const byProduct = db.prepare(`
+      SELECT
+        product_name,
+        COUNT(*) as count,
+        AVG(measured_temperature) as avg_measured_temp,
+        AVG(target_temperature) as avg_target_temp,
+        SUM(CASE WHEN is_compliant = 1 THEN 1 ELSE 0 END) as compliant_count
+      FROM cooking_records ${where}
+      GROUP BY product_name
+      ORDER BY count DESC
+      LIMIT 50
+    `).all(...params);
+
+    const total = totals.total || 0;
+    const compliant = totals.compliant || 0;
+    const compliance_rate = total > 0 ? Math.round((compliant / total) * 1000) / 10 : null;
+
+    res.json({
+      total,
+      compliant,
+      non_compliant: totals.non_compliant || 0,
+      compliance_rate,
+      by_product: byProduct,
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+router.get('/cooking/non-compliant', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const items = db.prepare(`
+      SELECT * FROM cooking_records
+      WHERE restaurant_id = ? AND is_compliant = 0
+      ORDER BY cooking_date DESC, id DESC
+      LIMIT 200
+    `).all(rid);
+    res.json({ items, total: items.length });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+router.post('/cooking', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const {
+      recipe_id, product_name, batch_number, cooking_date,
+      cooking_time_start, cooking_time_end, target_temperature,
+      measured_temperature, thermometer_id, corrective_action,
+      operator, notes,
+    } = req.body;
+
+    if (!product_name || cooking_date == null || target_temperature == null || measured_temperature == null) {
+      return res.status(400).json({ error: 'product_name, cooking_date, target_temperature et measured_temperature sont requis' });
+    }
+    if (typeof target_temperature !== 'number' || target_temperature < 0 || target_temperature > 300) {
+      return res.status(400).json({ error: 'target_temperature doit être un nombre entre 0 et 300°C' });
+    }
+    if (typeof measured_temperature !== 'number' || measured_temperature < -50 || measured_temperature > 300) {
+      return res.status(400).json({ error: 'measured_temperature doit être un nombre entre -50 et 300°C' });
+    }
+
+    const is_compliant = measured_temperature >= target_temperature ? 1 : 0;
+
+    const info = run(
+      `INSERT INTO cooking_records (
+        restaurant_id, recipe_id, product_name, batch_number, cooking_date,
+        cooking_time_start, cooking_time_end, target_temperature, measured_temperature,
+        is_compliant, thermometer_id, corrective_action, operator, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        rid, recipe_id ?? null, product_name, batch_number ?? null, cooking_date,
+        cooking_time_start ?? null, cooking_time_end ?? null,
+        target_temperature, measured_temperature,
+        is_compliant, thermometer_id ?? null, corrective_action ?? null,
+        operator ?? null, notes ?? null,
+      ]
+    );
+    const created = get('SELECT * FROM cooking_records WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'cooking_records', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: created });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+    res.status(201).json(created);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+router.put('/cooking/:id', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const id = Number(req.params.id);
+    const existing = get('SELECT * FROM cooking_records WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    if (!existing) return res.status(404).json({ error: 'Enregistrement non trouvé' });
+
+    const allowed = [
+      'recipe_id', 'product_name', 'batch_number', 'cooking_date',
+      'cooking_time_start', 'cooking_time_end', 'target_temperature',
+      'measured_temperature', 'thermometer_id', 'corrective_action',
+      'operator', 'notes',
+    ];
+    const merged = { ...existing };
+    for (const key of allowed) {
+      if (key in req.body) merged[key] = req.body[key];
+    }
+
+    if (typeof merged.target_temperature !== 'number' || merged.target_temperature < 0 || merged.target_temperature > 300) {
+      return res.status(400).json({ error: 'target_temperature doit être un nombre entre 0 et 300°C' });
+    }
+    if (typeof merged.measured_temperature !== 'number' || merged.measured_temperature < -50 || merged.measured_temperature > 300) {
+      return res.status(400).json({ error: 'measured_temperature doit être un nombre entre -50 et 300°C' });
+    }
+
+    const is_compliant = merged.measured_temperature >= merged.target_temperature ? 1 : 0;
+
+    run(
+      `UPDATE cooking_records SET
+        recipe_id = ?, product_name = ?, batch_number = ?, cooking_date = ?,
+        cooking_time_start = ?, cooking_time_end = ?, target_temperature = ?,
+        measured_temperature = ?, is_compliant = ?, thermometer_id = ?,
+        corrective_action = ?, operator = ?, notes = ?,
+        updated_at = datetime('now')
+       WHERE id = ? AND restaurant_id = ?`,
+      [
+        merged.recipe_id ?? null, merged.product_name, merged.batch_number ?? null, merged.cooking_date,
+        merged.cooking_time_start ?? null, merged.cooking_time_end ?? null,
+        merged.target_temperature, merged.measured_temperature, is_compliant,
+        merged.thermometer_id ?? null, merged.corrective_action ?? null,
+        merged.operator ?? null, merged.notes ?? null,
+        id, rid,
+      ]
+    );
+    const updated = get('SELECT * FROM cooking_records WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'cooking_records', record_id: id, action: 'update', old_values: existing, new_values: updated });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+    res.json(updated);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+router.delete('/cooking/:id', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const id = Number(req.params.id);
+    const existing = get('SELECT * FROM cooking_records WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    if (!existing) return res.status(404).json({ error: 'Enregistrement non trouvé' });
+    const info = run('DELETE FROM cooking_records WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    if (info.changes === 0) return res.status(404).json({ error: 'Enregistrement non trouvé' });
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'cooking_records', record_id: id, action: 'delete', old_values: existing, new_values: null });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+    res.json({ deleted: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
 module.exports = router;

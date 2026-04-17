@@ -305,6 +305,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/cleaning$/, renderHACCPCleaning);
   Router.add(/^\/haccp\/traceability$/, renderHACCPTraceability);
   Router.add(/^\/haccp\/cooling$/, renderHACCPCooling);
+  Router.add(/^\/haccp\/cooking$/, renderHACCPCooking);
   Router.add(/^\/haccp\/reheating$/, renderHACCPReheating);
   Router.add(/^\/haccp\/fryers$/, renderHACCPFryers);
   Router.add(/^\/haccp\/non-conformities$/, renderHACCPNonConformities);
