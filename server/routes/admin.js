@@ -11,8 +11,18 @@ const { requireAuth } = require('./auth');
 
 const router = express.Router();
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'barbierpaulaymeric@gmail.com')
-  .split(',').map(e => e.trim().toLowerCase());
+if (!process.env.ADMIN_EMAILS) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ FATAL: ADMIN_EMAILS env var not set. Refusing to start without admin access config.');
+    process.exit(1);
+  } else {
+    console.warn('⚠️  WARNING: ADMIN_EMAILS not set. No one will have admin access.');
+  }
+}
+
+const ADMIN_EMAILS = process.env.ADMIN_EMAILS
+  ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase())
+  : [];
 
 function requireAdmin(req, res, next) {
   const email = (req.user.email || '').toLowerCase();
