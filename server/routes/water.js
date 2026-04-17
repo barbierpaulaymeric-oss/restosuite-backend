@@ -12,7 +12,8 @@ router.use(requireAuth);
 // GET /api/water — liste toutes les analyses
 router.get('/', (req, res) => {
   try {
-    const items = all('SELECT * FROM water_management ORDER BY analysis_date DESC');
+    const rid = req.user.restaurant_id;
+    const items = all('SELECT * FROM water_management WHERE restaurant_id = ? ORDER BY analysis_date DESC', [rid]);
     res.json({ items, total: items.length });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -22,7 +23,8 @@ router.get('/', (req, res) => {
 // GET /api/water/latest — dernière analyse
 router.get('/latest', (req, res) => {
   try {
-    const item = get('SELECT * FROM water_management ORDER BY analysis_date DESC LIMIT 1');
+    const rid = req.user.restaurant_id;
+    const item = get('SELECT * FROM water_management WHERE restaurant_id = ? ORDER BY analysis_date DESC LIMIT 1', [rid]);
     res.json({ item: item || null });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -32,7 +34,8 @@ router.get('/latest', (req, res) => {
 // GET /api/water/:id — détail
 router.get('/:id', (req, res) => {
   try {
-    const item = get('SELECT * FROM water_management WHERE id = ?', [Number(req.params.id)]);
+    const rid = req.user.restaurant_id;
+    const item = get('SELECT * FROM water_management WHERE id = ? AND restaurant_id = ?', [Number(req.params.id), rid]);
     if (!item) return res.status(404).json({ error: 'Analyse introuvable' });
     res.json(item);
   } catch (e) {
@@ -43,6 +46,7 @@ router.get('/:id', (req, res) => {
 // POST /api/water — créer une analyse
 router.post('/', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const {
       analysis_date, analysis_type, provider, results, conformity,
       next_analysis_date, report_ref, water_source, treatment, notes,
@@ -60,9 +64,10 @@ router.post('/', (req, res) => {
 
     const info = run(
       `INSERT INTO water_management
-        (analysis_date, analysis_type, provider, results, conformity, next_analysis_date, report_ref, water_source, treatment, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (restaurant_id, analysis_date, analysis_type, provider, results, conformity, next_analysis_date, report_ref, water_source, treatment, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        rid,
         analysis_date,
         analysis_type || 'complète',
         provider || null,
@@ -75,7 +80,7 @@ router.post('/', (req, res) => {
         notes || null,
       ]
     );
-    res.status(201).json(get('SELECT * FROM water_management WHERE id = ?', [info.lastInsertRowid]));
+    res.status(201).json(get('SELECT * FROM water_management WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]));
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -84,8 +89,9 @@ router.post('/', (req, res) => {
 // PUT /api/water/:id — mettre à jour
 router.put('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const existing = get('SELECT * FROM water_management WHERE id = ?', [id]);
+    const existing = get('SELECT * FROM water_management WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Analyse introuvable' });
 
     const {
@@ -97,7 +103,7 @@ router.put('/:id', (req, res) => {
       `UPDATE water_management SET
         analysis_date=?, analysis_type=?, provider=?, results=?, conformity=?,
         next_analysis_date=?, report_ref=?, water_source=?, treatment=?, notes=?
-       WHERE id=?`,
+       WHERE id=? AND restaurant_id=?`,
       [
         analysis_date || existing.analysis_date,
         analysis_type || existing.analysis_type,
@@ -110,9 +116,10 @@ router.put('/:id', (req, res) => {
         treatment !== undefined ? treatment : existing.treatment,
         notes !== undefined ? notes : existing.notes,
         id,
+        rid,
       ]
     );
-    res.json(get('SELECT * FROM water_management WHERE id = ?', [id]));
+    res.json(get('SELECT * FROM water_management WHERE id = ? AND restaurant_id = ?', [id, rid]));
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -121,10 +128,11 @@ router.put('/:id', (req, res) => {
 // DELETE /api/water/:id — supprimer
 router.delete('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const existing = get('SELECT * FROM water_management WHERE id = ?', [id]);
+    const existing = get('SELECT * FROM water_management WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Analyse introuvable' });
-    run('DELETE FROM water_management WHERE id = ?', [id]);
+    run('DELETE FROM water_management WHERE id = ? AND restaurant_id = ?', [id, rid]);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });

@@ -16,7 +16,8 @@ const VALID_TYPES = ['aptitude', 'visite_medicale', 'maladie', 'blessure', 'form
 // GET /api/sanitary/staff-health — list all records
 router.get('/', (req, res) => {
   try {
-    const items = all('SELECT * FROM staff_health_records ORDER BY date_record DESC, created_at DESC');
+    const rid = req.user.restaurant_id;
+    const items = all('SELECT * FROM staff_health_records WHERE restaurant_id = ? ORDER BY date_record DESC, created_at DESC', [rid]);
     res.json({ items, total: items.length });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -26,12 +27,14 @@ router.get('/', (req, res) => {
 // GET /api/sanitary/staff-health/unfit — currently unfit staff (maladie/blessure without expiry or expiry in future)
 router.get('/unfit', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const items = all(`
       SELECT * FROM staff_health_records
-      WHERE record_type IN ('maladie', 'blessure')
+      WHERE restaurant_id = ?
+        AND record_type IN ('maladie', 'blessure')
         AND (date_expiry IS NULL OR date_expiry >= DATE('now'))
       ORDER BY date_record DESC
-    `);
+    `, [rid]);
     res.json({ items, total: items.length });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -41,14 +44,16 @@ router.get('/unfit', (req, res) => {
 // GET /api/sanitary/staff-health/expiring — aptitudes/visites expiring within 90 days
 router.get('/expiring', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const items = all(`
       SELECT * FROM staff_health_records
-      WHERE record_type IN ('aptitude', 'visite_medicale')
+      WHERE restaurant_id = ?
+        AND record_type IN ('aptitude', 'visite_medicale')
         AND date_expiry IS NOT NULL
         AND date_expiry <= DATE('now', '+90 days')
         AND date_expiry >= DATE('now')
       ORDER BY date_expiry ASC
-    `);
+    `, [rid]);
     res.json({ items, total: items.length });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -58,7 +63,8 @@ router.get('/expiring', (req, res) => {
 // POST /api/sanitary/staff-health — create
 router.post('/', (req, res) => {
   try {
-    const { account_id, restaurant_id, staff_name, record_type, date_record, date_expiry, notes, document_path } = req.body;
+    const rid = req.user.restaurant_id;
+    const { account_id, staff_name, record_type, date_record, date_expiry, notes, document_path } = req.body;
     if (!staff_name) return res.status(400).json({ error: 'staff_name est requis' });
     if (!record_type) return res.status(400).json({ error: 'record_type est requis' });
     if (!VALID_TYPES.includes(record_type)) return res.status(400).json({ error: `record_type invalide. Valeurs : ${VALID_TYPES.join(', ')}` });
@@ -69,7 +75,7 @@ router.post('/', (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         account_id || null,
-        restaurant_id || null,
+        rid,
         staff_name,
         record_type,
         date_record,
@@ -78,7 +84,7 @@ router.post('/', (req, res) => {
         document_path || null,
       ]
     );
-    res.status(201).json(get('SELECT * FROM staff_health_records WHERE id = ?', [info.lastInsertRowid]));
+    res.status(201).json(get('SELECT * FROM staff_health_records WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]));
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -87,22 +93,22 @@ router.post('/', (req, res) => {
 // PUT /api/sanitary/staff-health/:id — update
 router.put('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const existing = get('SELECT * FROM staff_health_records WHERE id = ?', [id]);
+    const existing = get('SELECT * FROM staff_health_records WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Enregistrement introuvable' });
-    const { account_id, restaurant_id, staff_name, record_type, date_record, date_expiry, notes, document_path } = req.body;
+    const { account_id, staff_name, record_type, date_record, date_expiry, notes, document_path } = req.body;
     if (record_type && !VALID_TYPES.includes(record_type)) {
       return res.status(400).json({ error: `record_type invalide. Valeurs : ${VALID_TYPES.join(', ')}` });
     }
     run(
       `UPDATE staff_health_records SET
-        account_id=?, restaurant_id=?, staff_name=?, record_type=?,
+        account_id=?, staff_name=?, record_type=?,
         date_record=?, date_expiry=?, notes=?, document_path=?,
         updated_at=CURRENT_TIMESTAMP
-       WHERE id=?`,
+       WHERE id=? AND restaurant_id=?`,
       [
         account_id !== undefined ? account_id : existing.account_id,
-        restaurant_id !== undefined ? restaurant_id : existing.restaurant_id,
         staff_name || existing.staff_name,
         record_type || existing.record_type,
         date_record || existing.date_record,
@@ -110,9 +116,10 @@ router.put('/:id', (req, res) => {
         notes !== undefined ? (notes || null) : existing.notes,
         document_path !== undefined ? (document_path || null) : existing.document_path,
         id,
+        rid,
       ]
     );
-    res.json(get('SELECT * FROM staff_health_records WHERE id = ?', [id]));
+    res.json(get('SELECT * FROM staff_health_records WHERE id = ? AND restaurant_id = ?', [id, rid]));
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -121,10 +128,11 @@ router.put('/:id', (req, res) => {
 // DELETE /api/sanitary/staff-health/:id — delete
 router.delete('/:id', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
-    const existing = get('SELECT * FROM staff_health_records WHERE id = ?', [id]);
+    const existing = get('SELECT * FROM staff_health_records WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Enregistrement introuvable' });
-    run('DELETE FROM staff_health_records WHERE id = ?', [id]);
+    run('DELETE FROM staff_health_records WHERE id = ? AND restaurant_id = ?', [id, rid]);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
