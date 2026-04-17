@@ -6,6 +6,7 @@
 const HACCP_SUBNAV_ITEMS = [
   { href: '#/haccp',                       label: 'Dashboard' },
   { href: '#/haccp/temperatures',          label: 'Températures' },
+  { href: '#/haccp/calibrations',          label: 'Étalonnage' },
   { href: '#/haccp/cleaning',              label: 'Nettoyage' },
   { href: '#/haccp/traceability',          label: 'Traçabilité' },
   { href: '#/haccp/cooking',               label: 'Cuisson (CCP2)' },

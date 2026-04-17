@@ -1841,6 +1841,64 @@ try {
   console.error('Migration supplier_accounts.token_expires_at error:', e.message);
 }
 
+// ─── Migration: HACCP Étalonnage des thermomètres (DDPP requirement) ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS thermometers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL DEFAULT 1,
+      name TEXT NOT NULL,
+      serial_number TEXT,
+      location TEXT,
+      type TEXT DEFAULT 'digital',
+      last_calibration_date TEXT,
+      next_calibration_date TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_thermometers_restaurant_id ON thermometers(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_thermometers_next_calibration ON thermometers(next_calibration_date);
+
+    CREATE TABLE IF NOT EXISTS thermometer_calibrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL DEFAULT 1,
+      thermometer_id TEXT NOT NULL,
+      thermometer_name TEXT,
+      thermometer_location TEXT,
+      calibration_date TEXT NOT NULL,
+      next_calibration_date TEXT,
+      reference_temperature REAL NOT NULL,
+      measured_temperature REAL NOT NULL,
+      deviation REAL,
+      is_compliant INTEGER DEFAULT 1,
+      tolerance REAL DEFAULT 0.5,
+      corrective_action TEXT,
+      calibrated_by TEXT,
+      certificate_reference TEXT,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_calibrations_restaurant_id ON thermometer_calibrations(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_calibrations_thermometer_id ON thermometer_calibrations(thermometer_id);
+    CREATE INDEX IF NOT EXISTS idx_calibrations_calibration_date ON thermometer_calibrations(calibration_date);
+  `);
+  console.log('✅ Migration: thermometers + thermometer_calibrations tables ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration thermometers error:', e.message);
+}
+
+// ─── Migration: link temperature_logs to thermometers (probative value) ───
+try {
+  const tlCols = db.prepare("PRAGMA table_info(temperature_logs)").all().map(c => c.name);
+  if (!tlCols.includes('thermometer_id')) {
+    db.exec('ALTER TABLE temperature_logs ADD COLUMN thermometer_id INTEGER REFERENCES thermometers(id)');
+    console.log('✅ Migration: added thermometer_id to temperature_logs');
+  }
+} catch (e) {
+  console.error('Migration temperature_logs.thermometer_id error:', e.message);
+}
+
 // ─── Phase 2 multi-tenancy: restaurant_id on every tenant-scoped table ───
 try {
   const PHASE2_TABLES = [
@@ -1857,7 +1915,8 @@ try {
     'tiac_procedures','fabrication_diagrams',
     'order_items','purchase_orders','purchase_order_items',
     'delivery_notes','delivery_note_items','loyalty_transactions',
-    'prediction_accuracy','referrals'
+    'prediction_accuracy','referrals',
+    'thermometers','thermometer_calibrations'
   ];
   for (const t of PHASE2_TABLES) {
     const tableExists = db.prepare(

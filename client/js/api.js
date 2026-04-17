@@ -256,6 +256,22 @@ const API = {
   getFryerChecks(fryerId) { return this.request(`/haccp/fryers/${fryerId}/checks`); },
   createFryerCheck(fryerId, data) { return this.request(`/haccp/fryers/${fryerId}/checks`, { method: 'POST', body: data }); },
 
+  // Thermometers & Calibrations (DDPP — étalonnage)
+  getThermometers() { return this.request('/haccp/thermometers'); },
+  getThermometer(id) { return this.request(`/haccp/thermometers/${id}`); },
+  createThermometer(data) { return this.request('/haccp/thermometers', { method: 'POST', body: data }); },
+  updateThermometer(id, data) { return this.request(`/haccp/thermometers/${id}`, { method: 'PUT', body: data }); },
+  deleteThermometer(id) { return this.request(`/haccp/thermometers/${id}`, { method: 'DELETE' }); },
+  getThermometerAlerts() { return this.request('/haccp/thermometers/alerts'); },
+  getCalibrations(params) {
+    const qs = params ? new URLSearchParams(params).toString() : '';
+    return this.request(`/haccp/calibrations${qs ? '?' + qs : ''}`);
+  },
+  getCalibration(id) { return this.request(`/haccp/calibrations/${id}`); },
+  createCalibration(data) { return this.request('/haccp/calibrations', { method: 'POST', body: data }); },
+  updateCalibration(id, data) { return this.request(`/haccp/calibrations/${id}`, { method: 'PUT', body: data }); },
+  deleteCalibration(id) { return this.request(`/haccp/calibrations/${id}`, { method: 'DELETE' }); },
+
   // Non-conformités
   getNonConformities(status) {
     const qs = status ? `?status=${encodeURIComponent(status)}` : '';
