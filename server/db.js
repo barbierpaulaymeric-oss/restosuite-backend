@@ -1830,6 +1830,36 @@ try {
   if (!e.message.includes('already exists')) console.error('Migration staff_health_records error:', e.message);
 }
 
+// ─── Plats témoins (witness meals) — Arrêté 21/12/2009 art. 32 ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS witness_meals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      meal_date TEXT NOT NULL,
+      meal_type TEXT NOT NULL CHECK(meal_type IN ('petit_dejeuner','dejeuner','diner','gouter','collation')),
+      service_type TEXT CHECK(service_type IN ('sur_place','livraison','emporter','traiteur')),
+      samples TEXT,
+      storage_temperature REAL,
+      storage_location TEXT,
+      kept_until TEXT NOT NULL,
+      disposed_date TEXT,
+      disposed_by TEXT,
+      quantity_per_sample TEXT DEFAULT '100g minimum',
+      is_complete INTEGER DEFAULT 0,
+      notes TEXT,
+      operator TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_witness_meals_restaurant_date ON witness_meals(restaurant_id, meal_date DESC)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_witness_meals_kept_until ON witness_meals(restaurant_id, kept_until)`);
+  console.log('✅ Migration: witness_meals table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration witness_meals error:', e.message);
+}
+
 // ─── Migration: supplier_accounts.token_expires_at ───
 try {
   const saColNames = all("PRAGMA table_info(supplier_accounts)").map(c => c.name);
@@ -1912,7 +1942,7 @@ try {
     'pest_control','equipment_maintenance','waste_management',
     'corrective_actions_templates','corrective_actions_log',
     'allergen_management_plan','water_management','pms_audits',
-    'tiac_procedures','fabrication_diagrams',
+    'tiac_procedures','fabrication_diagrams','witness_meals',
     'order_items','purchase_orders','purchase_order_items',
     'delivery_notes','delivery_note_items','loyalty_transactions',
     'prediction_accuracy','referrals',

@@ -26,6 +26,7 @@ const HACCP_SUBNAV_ITEMS = [
   { href: '#/haccp/water',                 label: 'Eau' },
   { href: '#/haccp/pms-audit',             label: 'Audits PMS' },
   { href: '#/haccp/tiac',                  label: 'TIAC' },
+  { href: '#/haccp/witness-meals',         label: 'Plats témoins' },
   { href: '#/haccp/staff-health',           label: 'Santé personnel' },
   { href: '#/pms/export',                  label: 'Export PMS', extra: ' haccp-subnav__link--export' },
 ];
