@@ -16,9 +16,9 @@
   --color-secondary: #F7F5F2;
 
   /* Accent */
-  --color-accent: #E8722A;
-  --color-accent-hover: #D4611F;
-  --color-accent-light: rgba(232, 114, 42, 0.12);
+  --color-accent: #C45A18;
+  --color-accent-hover: #A84C12;
+  --color-accent-light: rgba(196, 90, 24, 0.12);
 
   /* Fonctionnelles */
   --color-success: #2D8B55;
@@ -32,6 +32,9 @@
   /* Surfaces — Dark mode default */
   --bg-base: #0F1723;
   --bg-elevated: #1B2A4A;
+  --bg-secondary: #1A2840;
+  --bg-tertiary: #253655;
+  --bg-card: #1B2A4A;
   --bg-sunken: #0A1019;
   --text-primary: #F7F5F2;
   --text-secondary: #9CA3AF;
@@ -85,7 +88,7 @@
   --shadow-sm: 0 1px 2px rgba(15, 23, 35, 0.2);
   --shadow-md: 0 4px 12px rgba(15, 23, 35, 0.25);
   --shadow-lg: 0 8px 24px rgba(15, 23, 35, 0.35);
-  --shadow-accent: 0 4px 16px rgba(232, 114, 42, 0.3);
+  --shadow-accent: 0 4px 16px rgba(196, 90, 24, 0.3);
 
   /* Transitions */
   --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
@@ -111,6 +114,9 @@
   --bg-sunken: #F0F0F0;
   --bg-base: #FFFFFF;
   --bg-elevated: #F7F7F7;
+  --bg-secondary: #F7F7F7;
+  --bg-tertiary: #EBEBEB;
+  --bg-card: #FFFFFF;
   --text-primary: #1B2A4A;
   --text-secondary: #4A5568;
   --text-tertiary: #718096;
@@ -118,8 +124,8 @@
   --border-light: #EDF2F7;
   --color-primary: #1B2A4A;
   --color-primary-light: #2A3F6B;
-  --color-accent: #E8722A;
-  --color-accent-hover: #D4611F;
+  --color-accent: #C45A18;
+  --color-accent-hover: #A84C12;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
