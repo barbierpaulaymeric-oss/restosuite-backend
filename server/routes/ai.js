@@ -799,6 +799,7 @@ router.post('/import-mercuriale', (req, res) => {
       total: items.length
     });
   } catch (e) {
+    console.error('Supplier import error:', e);
     res.status(500).json({ error: 'Erreur import' });
   }
 });
@@ -1026,7 +1027,10 @@ router.post('/assistant', async (req, res) => {
             WHERE id = ? AND restaurant_id = ?`,
           [shortcutHit.id, user.restaurant_id]
         );
-      } catch (_) {}
+      } catch (usageErr) {
+        // Usage-counter bump must never block the response; log at warn level.
+        console.warn('shortcut usage counter bump failed:', usageErr.message);
+      }
 
       let templateObj = null;
       if (shortcutHit.action_template) {

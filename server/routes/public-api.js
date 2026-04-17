@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { all, get, run } = require('../db');
 const crypto = require('crypto');
 const { requireAuth } = require('./auth');
+const { apiError } = require('../lib/error-handler');
 const router = Router();
 
 // ═══════════════════════════════════════════
@@ -22,7 +23,12 @@ try {
     request_count INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
   )`);
-} catch {}
+} catch (e) {
+  // Table may already exist on subsequent boots — only log real errors.
+  if (!/already exists/i.test(e && e.message || '')) {
+    console.error('api_keys table init failed:', e);
+  }
+}
 
 // In-memory rate limit windows: api_key -> { count, resetAt }
 const rateLimitWindows = new Map();
@@ -58,7 +64,9 @@ function apiKeyAuth(req, res, next) {
   }
 
   // Update usage
-  run('UPDATE api_keys SET last_used = datetime("now"), request_count = request_count + 1 WHERE id = ?', [record.id]);
+  // NB: SQLite treats "now" with double quotes as an identifier (column reference)
+  // and raises "no such column: now". Use single quotes for string literals.
+  run("UPDATE api_keys SET last_used = datetime('now'), request_count = request_count + 1 WHERE id = ?", [record.id]);
 
   req.apiKey = record;
   req.apiPermissions = JSON.parse(record.permissions || '["read"]');
@@ -82,7 +90,7 @@ router.get('/keys', requireAuth, (req, res) => {
     const keys = all('SELECT id, key_name, api_key, permissions, rate_limit, is_active, last_used, request_count, created_at FROM api_keys WHERE restaurant_id = ?', [req.user.restaurant_id]);
     res.json(keys.map(k => ({ ...k, permissions: JSON.parse(k.permissions || '[]') })));
   } catch (e) {
-    res.status(500).json({ error: 'Erreur interne du serveur' });
+    return apiError(res, e, { route: 'GET /api/public/keys' });
   }
 });
 
@@ -101,7 +109,7 @@ router.post('/keys', requireAuth, (req, res) => {
 
     res.json({ ok: true, api_key: apiKey, key_name, permissions: perms });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur interne du serveur' });
+    return apiError(res, e, { route: 'POST /api/public/keys' });
   }
 });
 
@@ -111,7 +119,7 @@ router.delete('/keys/:id', requireAuth, (req, res) => {
     run('DELETE FROM api_keys WHERE id = ? AND restaurant_id = ?', [Number(req.params.id), req.user.restaurant_id]);
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur lors de la suppression' });
+    return apiError(res, e, { route: 'DELETE /api/public/keys/:id', message: 'Erreur lors de la suppression' });
   }
 });
 
@@ -155,7 +163,7 @@ router.get('/v1/menu', apiKeyAuth, (req, res) => {
       total_items: recipes.length
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur interne du serveur' });
+    return apiError(res, e, { route: 'GET /api/public/v1/menu' });
   }
 });
 
@@ -204,7 +212,7 @@ router.get('/v1/availability', apiKeyAuth, (req, res) => {
 
     res.json({ availability, timestamp: new Date().toISOString() });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur interne du serveur' });
+    return apiError(res, e, { route: 'GET /api/public/v1/availability' });
   }
 });
 
@@ -238,7 +246,7 @@ router.post('/v1/orders', apiKeyAuth, requirePermission('write'), (req, res) => 
 
     res.json({ ok: true, order_id: orderId, total: totalCost });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur interne du serveur' });
+    return apiError(res, e, { route: 'POST /api/public/v1/orders' });
   }
 });
 
@@ -258,7 +266,7 @@ router.get('/v1/orders/:id', apiKeyAuth, (req, res) => {
 
     res.json({ ...order, items });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur interne du serveur' });
+    return apiError(res, e, { route: 'GET /api/public/v1/orders/:id' });
   }
 });
 
@@ -280,7 +288,7 @@ router.get('/v1/stock', apiKeyAuth, (req, res) => {
     `, [rid]);
     res.json({ stock, timestamp: new Date().toISOString() });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur interne du serveur' });
+    return apiError(res, e, { route: 'GET /api/public/v1/stock' });
   }
 });
 
@@ -301,7 +309,7 @@ router.get('/v1/stats', apiKeyAuth, (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur interne du serveur' });
+    return apiError(res, e, { route: 'GET /api/public/v1/stats' });
   }
 });
 
@@ -309,7 +317,8 @@ function getRestaurantInfo(restaurantId = 1) {
   try {
     const r = get('SELECT name, type, address, city, postal_code, phone FROM restaurants WHERE id = ?', [restaurantId]);
     return r || { name: 'Mon Restaurant' };
-  } catch {
+  } catch (e) {
+    console.error('getRestaurantInfo failed:', e);
     return { name: 'Mon Restaurant' };
   }
 }
