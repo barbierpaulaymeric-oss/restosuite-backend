@@ -1929,6 +1929,52 @@ try {
   console.error('Migration temperature_logs.thermometer_id error:', e.message);
 }
 
+// ─── DDPP probative-value migrations: cooking core measurement point + temperature operator ───
+try {
+  // cooking_records: add core_temp_point ("point de piqûre") — DDPP requires
+  // recording WHERE the probe was inserted (cœur du produit / centre géométrique).
+  const ccCols = db.prepare("PRAGMA table_info(cooking_records)").all().map(c => c.name);
+  if (!ccCols.includes('core_temp_point')) {
+    db.exec("ALTER TABLE cooking_records ADD COLUMN core_temp_point TEXT");
+    console.log("✅ Migration: added cooking_records.core_temp_point (point de piqûre)");
+  }
+  // temperature_logs: add operator_name — staff using a tablet may not be a logged-in account.
+  const tlCols = db.prepare("PRAGMA table_info(temperature_logs)").all().map(c => c.name);
+  if (!tlCols.includes('operator_name')) {
+    db.exec("ALTER TABLE temperature_logs ADD COLUMN operator_name TEXT");
+    console.log("✅ Migration: added temperature_logs.operator_name (responsable du relevé)");
+  }
+} catch (e) {
+  console.warn('⚠️ DDPP fields migration error:', e.message);
+}
+
+// ─── JWT revocation blacklist (referenced by routes/auth.js) ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS jwt_blacklist (
+      jti TEXT PRIMARY KEY,
+      account_id INTEGER,
+      expires_at INTEGER NOT NULL,
+      revoked_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_jwt_blacklist_exp ON jwt_blacklist(expires_at);
+  `);
+} catch (e) {
+  console.warn('⚠️ jwt_blacklist migration error:', e.message);
+}
+
+// ─── Non-conformity ↔ corrective-action FK link ───
+try {
+  const ncCols = db.prepare("PRAGMA table_info(non_conformities)").all().map(c => c.name);
+  if (ncCols.length && !ncCols.includes('corrective_action_id')) {
+    db.exec("ALTER TABLE non_conformities ADD COLUMN corrective_action_id INTEGER");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_nc_corrective_action ON non_conformities(corrective_action_id)");
+    console.log("✅ Migration: added non_conformities.corrective_action_id");
+  }
+} catch (e) {
+  console.warn('⚠️ NC ↔ CA link migration error:', e.message);
+}
+
 // ─── Phase 2 multi-tenancy: restaurant_id on every tenant-scoped table ───
 try {
   const PHASE2_TABLES = [

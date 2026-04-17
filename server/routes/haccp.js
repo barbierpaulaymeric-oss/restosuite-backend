@@ -126,7 +126,7 @@ router.get('/temperatures', (req, res) => {
 router.post('/temperatures', (req, res) => {
   try {
     const rid = req.user.restaurant_id;
-    const { zone_id, temperature, notes, recorded_by } = req.body;
+    const { zone_id, temperature, notes, recorded_by, operator_name } = req.body;
 
     if (!zone_id || temperature == null) {
       return res.status(400).json({ error: 'zone_id et temperature sont requis' });
@@ -142,8 +142,8 @@ router.post('/temperatures', (req, res) => {
 
     const isAlert = (temperature < zone.min_temp || temperature > zone.max_temp) ? 1 : 0;
     const info = run(
-      'INSERT INTO temperature_logs (restaurant_id, zone_id, temperature, recorded_by, notes, is_alert) VALUES (?, ?, ?, ?, ?, ?)',
-      [rid, zone_id, temperature, recorded_by || null, notes || null, isAlert]
+      'INSERT INTO temperature_logs (restaurant_id, zone_id, temperature, recorded_by, operator_name, notes, is_alert) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [rid, zone_id, temperature, recorded_by || null, (operator_name || '').toString().trim() || null, notes || null, isAlert]
     );
     const log = get(`
       SELECT tl.*, tz.name as zone_name, tz.min_temp, tz.max_temp,
@@ -940,10 +940,14 @@ router.get('/non-conformities', requireAuth, (req, res) => {
     let sql = `
       SELECT nc.*,
         a1.name as detected_by_name,
-        a2.name as resolved_by_name
+        a2.name as resolved_by_name,
+        ca.action_taken as linked_action_taken,
+        ca.status as linked_action_status,
+        ca.responsible_person as linked_action_responsible
       FROM non_conformities nc
       LEFT JOIN accounts a1 ON nc.detected_by = a1.id
       LEFT JOIN accounts a2 ON nc.resolved_by = a2.id
+      LEFT JOIN corrective_actions_log ca ON ca.id = nc.corrective_action_id AND ca.restaurant_id = nc.restaurant_id
       WHERE nc.restaurant_id = ?
     `;
     const params = [rid];
@@ -983,19 +987,29 @@ router.post('/non-conformities', requireAuth, (req, res) => {
 router.put('/non-conformities/:id', requireAuth, (req, res) => {
   try {
     const rid = req.user.restaurant_id;
-    const { corrective_action, status, resolved_by } = req.body;
+    const { corrective_action, status, resolved_by, corrective_action_id } = req.body;
     const existing = db.prepare('SELECT * FROM non_conformities WHERE id = ? AND restaurant_id = ?').get(req.params.id, rid);
     if (!existing) return res.status(404).json({ error: 'Non-conformité non trouvée' });
+
+    // If a corrective_action_id is supplied, validate it belongs to this tenant.
+    let linkedActionId = corrective_action_id !== undefined ? corrective_action_id : existing.corrective_action_id;
+    if (corrective_action_id) {
+      const linked = db.prepare('SELECT id FROM corrective_actions_log WHERE id = ? AND restaurant_id = ?').get(corrective_action_id, rid);
+      if (!linked) return res.status(400).json({ error: 'corrective_action_id invalide pour ce restaurant' });
+      linkedActionId = linked.id;
+    }
+
     const resolved_at = status === 'resolu' ? new Date().toISOString() : existing.resolved_at;
     db.prepare(`
       UPDATE non_conformities
-      SET corrective_action = ?, status = ?, resolved_at = ?, resolved_by = ?
+      SET corrective_action = ?, status = ?, resolved_at = ?, resolved_by = ?, corrective_action_id = ?
       WHERE id = ? AND restaurant_id = ?
     `).run(
       corrective_action ?? existing.corrective_action,
       status ?? existing.status,
       resolved_at,
       resolved_by ?? existing.resolved_by,
+      linkedActionId ?? null,
       req.params.id,
       rid
     );
@@ -1104,7 +1118,7 @@ router.post('/cooking', (req, res) => {
       recipe_id, product_name, batch_number, cooking_date,
       cooking_time_start, cooking_time_end, target_temperature,
       measured_temperature, thermometer_id, corrective_action,
-      operator, notes,
+      operator, notes, core_temp_point,
     } = req.body;
 
     if (!product_name || cooking_date == null || target_temperature == null || measured_temperature == null) {
@@ -1123,14 +1137,14 @@ router.post('/cooking', (req, res) => {
       `INSERT INTO cooking_records (
         restaurant_id, recipe_id, product_name, batch_number, cooking_date,
         cooking_time_start, cooking_time_end, target_temperature, measured_temperature,
-        is_compliant, thermometer_id, corrective_action, operator, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        is_compliant, thermometer_id, corrective_action, operator, notes, core_temp_point
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         rid, recipe_id ?? null, product_name, batch_number ?? null, cooking_date,
         cooking_time_start ?? null, cooking_time_end ?? null,
         target_temperature, measured_temperature,
         is_compliant, thermometer_id ?? null, corrective_action ?? null,
-        operator ?? null, notes ?? null,
+        operator ?? null, notes ?? null, core_temp_point ?? null,
       ]
     );
     const created = get('SELECT * FROM cooking_records WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
@@ -1154,7 +1168,7 @@ router.put('/cooking/:id', (req, res) => {
       'recipe_id', 'product_name', 'batch_number', 'cooking_date',
       'cooking_time_start', 'cooking_time_end', 'target_temperature',
       'measured_temperature', 'thermometer_id', 'corrective_action',
-      'operator', 'notes',
+      'operator', 'notes', 'core_temp_point',
     ];
     const merged = { ...existing };
     for (const key of allowed) {
@@ -1175,7 +1189,7 @@ router.put('/cooking/:id', (req, res) => {
         recipe_id = ?, product_name = ?, batch_number = ?, cooking_date = ?,
         cooking_time_start = ?, cooking_time_end = ?, target_temperature = ?,
         measured_temperature = ?, is_compliant = ?, thermometer_id = ?,
-        corrective_action = ?, operator = ?, notes = ?,
+        corrective_action = ?, operator = ?, notes = ?, core_temp_point = ?,
         updated_at = datetime('now')
        WHERE id = ? AND restaurant_id = ?`,
       [
@@ -1183,7 +1197,7 @@ router.put('/cooking/:id', (req, res) => {
         merged.cooking_time_start ?? null, merged.cooking_time_end ?? null,
         merged.target_temperature, merged.measured_temperature, is_compliant,
         merged.thermometer_id ?? null, merged.corrective_action ?? null,
-        merged.operator ?? null, merged.notes ?? null,
+        merged.operator ?? null, merged.notes ?? null, merged.core_temp_point ?? null,
         id, rid,
       ]
     );

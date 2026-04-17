@@ -31,7 +31,7 @@ router.get('/', (req, res) => {
 // GET /api/allergens/ingredients/:id — Allergènes d'un ingrédient (parsed from text field)
 router.get('/ingredients/:id', requireAuth, (req, res) => {
   try {
-    const ingredient = get('SELECT allergens FROM ingredients WHERE id = ?', [Number(req.params.id)]);
+    const ingredient = get('SELECT allergens FROM ingredients WHERE id = ? AND restaurant_id = ?', [Number(req.params.id), req.user.restaurant_id]);
     if (!ingredient) return res.status(404).json({ error: 'Ingrédient non trouvé' });
 
     const parsed = parseAllergenText(ingredient.allergens);
@@ -45,7 +45,7 @@ router.get('/ingredients/:id', requireAuth, (req, res) => {
 router.put('/ingredients/:id', requireAuth, (req, res) => {
   try {
     const id = Number(req.params.id);
-    const ingredient = get('SELECT * FROM ingredients WHERE id = ?', [id]);
+    const ingredient = get('SELECT * FROM ingredients WHERE id = ? AND restaurant_id = ?', [id, req.user.restaurant_id]);
     if (!ingredient) return res.status(404).json({ error: 'Ingrédient non trouvé' });
 
     const { allergen_codes } = req.body; // Array of codes like ['gluten', 'lait', 'oeufs']
@@ -67,7 +67,20 @@ router.put('/ingredients/:id', requireAuth, (req, res) => {
     });
     const allergenText = allergenNames.length > 0 ? allergenNames.join(', ') : null;
 
-    run('UPDATE ingredients SET allergens = ? WHERE id = ?', [allergenText, id]);
+    run('UPDATE ingredients SET allergens = ? WHERE id = ? AND restaurant_id = ?', [allergenText, id, req.user.restaurant_id]);
+
+    // Audit trail (allergen declaration is regulatory under INCO)
+    try {
+      const { writeAudit } = require('../audit-log');
+      writeAudit({
+        restaurant_id: req.user.restaurant_id,
+        account_id: req.user.id,
+        table_name: 'ingredients',
+        record_id: id,
+        action: 'update',
+        new_values: { allergens: allergenText, codes: allergen_codes }
+      });
+    } catch {}
 
     res.json({
       ingredient_id: id,
@@ -83,7 +96,7 @@ router.put('/ingredients/:id', requireAuth, (req, res) => {
 router.get('/recipes/:id', requireAuth, (req, res) => {
   try {
     const recipeId = Number(req.params.id);
-    const recipe = get('SELECT * FROM recipes WHERE id = ?', [recipeId]);
+    const recipe = get('SELECT * FROM recipes WHERE id = ? AND restaurant_id = ?', [recipeId, req.user.restaurant_id]);
     if (!recipe) return res.status(404).json({ error: 'Recette non trouvée' });
 
     const allergens = getRecipeAllergens(recipeId);
@@ -100,9 +113,9 @@ router.get('/recipes/:id', requireAuth, (req, res) => {
 });
 
 // GET /api/allergens/menu — Allergènes de toutes les recettes (pour affichage carte)
-router.get('/menu', (req, res) => {
+router.get('/menu', requireAuth, (req, res) => {
   try {
-    const recipes = all('SELECT id, name, selling_price FROM recipes ORDER BY name');
+    const recipes = all('SELECT id, name, selling_price FROM recipes WHERE restaurant_id = ? ORDER BY name', [req.user.restaurant_id]);
     const result = recipes.map(r => ({
       recipe_id: r.id,
       recipe_name: r.name,
@@ -182,31 +195,21 @@ function getRecipeAllergens(recipeId, visited = new Set()) {
 // ─── INCO: Affichage allergènes menu complet ───
 router.get('/menu-display', requireAuth, (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const recipes = db.prepare(`
       SELECT r.id, r.name, r.category
       FROM recipes r
+      WHERE r.restaurant_id = ?
       ORDER BY r.category, r.name
-    `).all();
+    `).all(rid);
 
     const result = recipes.map(recipe => {
-      const allergenRows = db.prepare(`
-        SELECT DISTINCT i.allergens
-        FROM recipe_ingredients ri
-        JOIN ingredients i ON ri.ingredient_id = i.id
-        WHERE ri.recipe_id = ? AND i.allergens IS NOT NULL AND i.allergens != ''
-      `).all(recipe.id);
-
-      const allergenSet = new Set();
-      allergenRows.forEach(row => {
-        try {
-          const codes = JSON.parse(row.allergens);
-          if (Array.isArray(codes)) codes.forEach(c => allergenSet.add(c));
-        } catch {}
-      });
-
+      // Use the recipe-allergens helper so we honour both the comma-separated
+      // legacy format AND sub-recipe inheritance (matches /api/allergens/recipes/:id).
+      const allergens = getRecipeAllergens(recipe.id);
       return {
         ...recipe,
-        allergen_codes: [...allergenSet].sort()
+        allergen_codes: allergens.map(a => a.code).sort()
       };
     });
 

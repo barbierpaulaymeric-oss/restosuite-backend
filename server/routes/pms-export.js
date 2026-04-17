@@ -298,6 +298,15 @@ router.get('/export/pdf', (req, res) => {
     const sanitary = get('SELECT * FROM sanitary_settings WHERE restaurant_id = ? ORDER BY id ASC LIMIT 1', [rid]) || {};
     const hazards = all('SELECT * FROM haccp_hazard_analysis WHERE restaurant_id = ? ORDER BY step_name ASC', [rid]);
     const ccps = all('SELECT c.*, h.step_name FROM haccp_ccp c JOIN haccp_hazard_analysis h ON h.id = c.hazard_analysis_id WHERE c.restaurant_id = ? AND h.restaurant_id = ? ORDER BY c.ccp_number ASC', [rid, rid]);
+    // Codex Alimentarius decision tree results (Q1-Q4) per hazard — required by DDPP
+    const decisionTree = all(`
+      SELECT d.hazard_analysis_id, d.q1_answer, d.q2_answer, d.q3_answer, d.q4_answer,
+             d.result, h.step_name, h.hazard_type, h.hazard_description
+      FROM haccp_decision_tree_results d
+      JOIN haccp_hazard_analysis h ON h.id = d.hazard_analysis_id AND h.restaurant_id = ?
+      WHERE d.restaurant_id = ?
+      ORDER BY h.step_name ASC, d.hazard_analysis_id ASC
+    `, [rid, rid]);
     const cleaningTasks = all('SELECT * FROM cleaning_tasks WHERE restaurant_id = ? ORDER BY zone ASC, name ASC', [rid]);
     const cleaningLogs = all(`SELECT l.*, t.name as task_name FROM cleaning_logs l JOIN cleaning_tasks t ON t.id = l.task_id WHERE l.completed_at >= ? AND l.restaurant_id = ? AND t.restaurant_id = ? ORDER BY l.completed_at DESC LIMIT 200`, [periodSince, rid, rid]);
     const tempLogs = all(`SELECT tl.*, tz.name as zone_name FROM temperature_logs tl JOIN temperature_zones tz ON tz.id = tl.zone_id WHERE tl.recorded_at >= ? AND tl.restaurant_id = ? AND tz.restaurant_id = ? ORDER BY tl.recorded_at DESC LIMIT 300`, [periodSince, rid, rid]);
@@ -365,6 +374,30 @@ router.get('/export/pdf', (req, res) => {
       y += 10;
     }
     y += 4;
+
+    // ── Arbre de décision Codex Alimentarius (Q1-Q4) ──
+    if (decisionTree.length > 0) {
+      if (y + 30 > 800) { doc.addPage(); y = PDF_MARGIN; }
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#1B2A4A');
+      doc.text('Arbre de décision Codex Alimentarius (Q1 → Q4)', PDF_MARGIN + 2, y, { width: CONTENT_W - 4 });
+      y += 13;
+      doc.font('Helvetica-Oblique').fontSize(6.5).fillColor('#666');
+      doc.text('Q1 : Mesure préventive ? — Q2 : Élimine/réduit le danger ? — Q3 : Contamination possible ? — Q4 : Étape ultérieure éliminera ?', PDF_MARGIN + 4, y, { width: CONTENT_W - 8 });
+      y += 12;
+      const yn = (v) => v === 1 || v === '1' || v === true || v === 'oui' ? 'Oui' : (v === 0 || v === '0' || v === false || v === 'non' ? 'Non' : '—');
+      for (const dt of decisionTree) {
+        if (y + 22 > 800) { doc.addPage(); y = PDF_MARGIN; }
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#1B2A4A');
+        const head = `${dt.step_name || '—'} (${dt.hazard_type || '?'}) — ${dt.result === 'CCP' ? '✓ CCP' : (dt.result || '—')}`;
+        doc.text(head, PDF_MARGIN + 4, y, { width: CONTENT_W - 8 });
+        y += 10;
+        doc.font('Helvetica').fontSize(6.8).fillColor('#333');
+        doc.text(`Q1=${yn(dt.q1_answer)}   Q2=${yn(dt.q2_answer)}   Q3=${yn(dt.q3_answer)}   Q4=${yn(dt.q4_answer)}`, PDF_MARGIN + 12, y, { width: CONTENT_W - 24 });
+        y += 11;
+      }
+      y += 4;
+      doc.fillColor('#000');
+    }
 
     // ── Températures ──
     if (y + 40 > 800) { doc.addPage(); y = PDF_MARGIN; }

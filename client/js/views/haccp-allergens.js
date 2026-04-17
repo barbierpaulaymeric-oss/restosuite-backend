@@ -3,21 +3,24 @@
 // Règlement (UE) n°1169/2011 — 14 allergènes majeurs
 // ═══════════════════════════════════════════
 
+// Codes MUST match the server's INCO_ALLERGENS in server/routes/allergens.js
+// (French codes: gluten, crustaces, oeufs, poissons, arachides, soja, lait,
+// fruits_coque, celeri, moutarde, sesame, sulfites, lupin, mollusques).
 const ALLERGEN_LABELS = {
-  gluten: { label: 'Gluten', icon: '🌾' },
-  crustaceans: { label: 'Crustacés', icon: '🦀' },
-  eggs: { label: 'Œufs', icon: '🥚' },
-  fish: { label: 'Poissons', icon: '🐟' },
-  peanuts: { label: 'Arachides', icon: '🥜' },
-  soybeans: { label: 'Soja', icon: '🫘' },
-  milk: { label: 'Lait', icon: '🥛' },
-  nuts: { label: 'Fruits à coque', icon: '🌰' },
-  celery: { label: 'Céleri', icon: '🌿' },
-  mustard: { label: 'Moutarde', icon: '🟡' },
-  sesame: { label: 'Sésame', icon: '⚪' },
-  sulphites: { label: 'Sulfites', icon: '🍷' },
-  lupin: { label: 'Lupin', icon: '🌸' },
-  molluscs: { label: 'Mollusques', icon: '🐚' },
+  gluten:       { label: 'Gluten',         icon: '🌾' },
+  crustaces:    { label: 'Crustacés',      icon: '🦀' },
+  oeufs:        { label: 'Œufs',           icon: '🥚' },
+  poissons:     { label: 'Poissons',       icon: '🐟' },
+  arachides:    { label: 'Arachides',      icon: '🥜' },
+  soja:         { label: 'Soja',           icon: '🫘' },
+  lait:         { label: 'Lait',           icon: '🥛' },
+  fruits_coque: { label: 'Fruits à coque', icon: '🌰' },
+  celeri:       { label: 'Céleri',         icon: '🌿' },
+  moutarde:     { label: 'Moutarde',       icon: '🟡' },
+  sesame:       { label: 'Sésame',         icon: '⚪' },
+  sulfites:     { label: 'Sulfites',       icon: '🍷' },
+  lupin:        { label: 'Lupin',          icon: '🌸' },
+  mollusques:   { label: 'Mollusques',     icon: '🐚' },
 };
 
 async function renderHACCPAllergens() {
