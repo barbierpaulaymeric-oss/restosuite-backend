@@ -13,7 +13,19 @@ router.use(requireAuth);
 const VALID_REASONS    = ['sanitaire', 'qualite', 'etiquetage', 'autre'];
 const VALID_SOURCES    = ['DGAL', 'fournisseur', 'interne', 'client'];
 const VALID_SEVERITIES = ['critique', 'majeur', 'mineur'];
-const VALID_STATUSES   = ['alerte', 'en_cours', 'cloture'];
+// Workflow: alerte → investigation → decision → execution → cloture
+// Legacy 'en_cours' kept as an alias for back-compat with existing rows.
+const VALID_STATUSES   = ['alerte', 'investigation', 'decision', 'execution', 'en_cours', 'cloture'];
+
+// Workflow: which transitions are allowed from a given status.
+const WORKFLOW = {
+  alerte:        ['investigation', 'cloture'],
+  investigation: ['decision', 'cloture'],
+  decision:      ['execution', 'cloture'],
+  execution:     ['cloture'],
+  en_cours:      ['investigation', 'decision', 'execution', 'cloture'], // legacy
+  cloture:       [], // terminal
+};
 
 // GET /api/recall — all procedures (newest first)
 router.get('/', (req, res) => {
@@ -118,6 +130,15 @@ router.put('/:id', (req, res) => {
       return res.status(400).json({ error: 'status invalide' });
 
     const newStatus = status !== undefined ? status : existing.status;
+    // Enforce workflow transitions when status changes.
+    if (status !== undefined && status !== existing.status) {
+      const allowed = WORKFLOW[existing.status] || [];
+      if (!allowed.includes(status)) {
+        return res.status(400).json({
+          error: `Transition interdite : ${existing.status} → ${status}. Étapes possibles : ${allowed.join(', ') || 'aucune (état terminal)'}`
+        });
+      }
+    }
     const isClosed  = newStatus === 'cloture';
 
     run(
@@ -161,6 +182,68 @@ router.put('/:id', (req, res) => {
     } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.json(updated);
   } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/recall/:id/batch-trace — find every place a recalled batch was used.
+// Returns deliveries + recipes + downstream traceability rows that mention this lot.
+// Tenant-scoped: never crosses to another restaurant.
+router.get('/:id/batch-trace', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const id = Number(req.params.id);
+    const recall = get('SELECT * FROM recall_procedures WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    if (!recall) return res.status(404).json({ error: 'Procédure introuvable' });
+
+    const lot = recall.lot_number || '';
+    const productNeedle = `%${(recall.product_name || '').toLowerCase()}%`;
+
+    // 1. Inbound deliveries that mention this lot
+    let deliveries = [];
+    try {
+      deliveries = all(
+        `SELECT id, supplier_id, delivery_date, lot_number, product_label
+         FROM delivery_note_items
+         WHERE restaurant_id = ? AND (lot_number = ? OR LOWER(product_label) LIKE ?)
+         ORDER BY delivery_date DESC LIMIT 100`,
+        [rid, lot, productNeedle]
+      );
+    } catch {}
+
+    // 2. Traceability log rows for this lot
+    let traceability = [];
+    try {
+      traceability = all(
+        `SELECT id, product_name, lot_number, supplier, received_at, dlc, quantity, unit
+         FROM traceability_logs
+         WHERE restaurant_id = ? AND (lot_number = ? OR LOWER(product_name) LIKE ?)
+         ORDER BY received_at DESC LIMIT 100`,
+        [rid, lot, productNeedle]
+      );
+    } catch {}
+
+    // 3. Downstream traceability — to whom was the affected batch served / sold
+    let downstream = [];
+    try {
+      downstream = all(
+        `SELECT id, product_name, lot_number, served_at, customer_reference, quantity, notes
+         FROM downstream_traceability
+         WHERE restaurant_id = ? AND (lot_number = ? OR LOWER(product_name) LIKE ?)
+         ORDER BY served_at DESC LIMIT 100`,
+        [rid, lot, productNeedle]
+      );
+    } catch {}
+
+    res.json({
+      recall: { id: recall.id, product_name: recall.product_name, lot_number: recall.lot_number, status: recall.status },
+      deliveries,
+      traceability,
+      downstream,
+      counts: { deliveries: deliveries.length, traceability: traceability.length, downstream: downstream.length }
+    });
+  } catch (e) {
+    console.error('batch-trace error:', e);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
