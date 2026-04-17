@@ -26,11 +26,25 @@ const ROUTE_ROLES = {
   '/more': ['gerant', 'cuisinier', 'equipier'],
   '/subscribe': ['gerant'],
   '/supplier-portal': ['gerant'],
-  '/scan-invoice': ['gerant'],
+  '/scan-invoice': ['gerant', 'cuisinier'],
   '/mercuriale': ['gerant'],
   '/qrcodes': ['gerant'],
   '/errors-log': ['gerant'],
   '/fabrication-diagrams': ['gerant'],
+  '/crm': ['gerant'],
+  '/carbon': ['gerant'],
+  '/multi-site': ['gerant'],
+  '/api-keys': ['gerant'],
+  '/integrations': ['gerant'],
+  '/predictions': ['gerant'],
+  '/menu-engineering': ['gerant'],
+  '/traceability/downstream': ['gerant', 'cuisinier'],
+  '/pms/export': ['gerant'],
+  '/settings/plans': ['gerant'],
+  '/settings/sanitary-approval': ['gerant'],
+  '/import-mercuriale': ['gerant'],
+  '/admin': ['admin'],
+  '/chef': ['gerant'],
 };
 
 function isRouteAllowed(path, role) {
@@ -46,8 +60,8 @@ function isRouteAllowed(path, role) {
     }
   }
 
-  // Default: deny access
-  return false;
+  // Default: allow access for unmapped routes
+  return true;
 }
 
 const Router = {
@@ -65,6 +79,9 @@ const Router = {
     if (role && !isRouteAllowed(path, role)) {
       console.warn(`Access denied to ${path} for role ${role}`);
       location.hash = '#/';
+      if (typeof showToast === 'function') {
+        showToast('Accès non autorisé', 'error');
+      }
       return;
     }
 

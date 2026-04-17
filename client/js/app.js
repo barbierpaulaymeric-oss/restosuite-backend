@@ -331,7 +331,7 @@ function registerRoutes() {
   Router.add(/^\/scan-invoice$/, renderScanInvoice);
   Router.add(/^\/mercuriale$/, renderMercuriale);
   Router.add(/^\/import-mercuriale$/, renderImportMercuriale);
-  Router.add(/^\/chef$/, renderAIChef);
+  Router.add(/^\/chef$/, () => { location.hash = '#/ia'; });
   Router.add(/^\/menu-engineering$/, renderMenuEngineering);
   Router.add(/^\/carbon$/, renderCarbon);
   Router.add(/^\/integrations$/, renderIntegrations);
