@@ -4,6 +4,7 @@
 
 const express = require('express');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const { all, get, run } = require('../db');
 const { getAccountStatusById } = require('../middleware/trial');
 const { requireAuth } = require('./auth');
@@ -111,9 +112,16 @@ router.post('/login', (req, res) => {
 // ─── Auth middleware — all routes below require authentication ───
 router.use(requireAuth);
 
-// GET /api/accounts — list all accounts (no PIN)
+// GET /api/accounts — list accounts for the caller's tenant only (no PIN)
 router.get('/', (req, res) => {
-  const accounts = all('SELECT id, name, role, permissions, created_at, last_login, zones, skills, hire_date, training_notes, CASE WHEN pin IS NOT NULL AND pin != \'\' THEN 1 ELSE 0 END as has_pin FROM accounts ORDER BY created_at ASC');
+  const rid = req.user && req.user.restaurant_id;
+  if (!rid) {
+    return res.status(400).json({ error: 'restaurant_id manquant dans le contexte' });
+  }
+  const accounts = all(
+    'SELECT id, name, role, permissions, created_at, last_login, zones, skills, hire_date, training_notes, CASE WHEN pin IS NOT NULL AND pin != \'\' THEN 1 ELSE 0 END as has_pin FROM accounts WHERE restaurant_id = ? ORDER BY created_at ASC',
+    [rid]
+  );
   res.json(accounts.map(a => ({
     ...a,
     permissions: JSON.parse(a.permissions)
