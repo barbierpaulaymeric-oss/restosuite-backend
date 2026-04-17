@@ -237,6 +237,7 @@ app.use('/api/sites', require('./routes/multi-site'));
 app.use('/api/predictions', require('./routes/predictions'));
 app.use('/api/health', require('./routes/health'));
 app.use('/api/public', require('./routes/public-api'));
+app.use('/api/audit-log', require('./routes/audit'));
 app.use('/api/crm', require('./routes/crm'));
 app.use('/api/training', require('./routes/training'));
 app.use('/api/pest-control', require('./routes/pest-control'));
