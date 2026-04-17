@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const compression = require('compression');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
@@ -25,6 +26,8 @@ if (process.env.NODE_ENV === 'production') {
 } else if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   console.warn('⚠️  WARNING: JWT_SECRET not set or too short. Using default (NOT SAFE FOR PRODUCTION).');
 }
+
+app.use(compression());
 
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
@@ -347,7 +350,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🍽️  RestoSuite running on http://0.0.0.0:${PORT}`);
   console.log(`   Landing page: http://localhost:${PORT}/`);
   console.log(`   App:          http://localhost:${PORT}/app`);
@@ -364,3 +367,15 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('🏓 Keep-alive enabled (14min interval)');
   }
 });
+
+function gracefulShutdown(signal) {
+  console.log(`Received ${signal}, shutting down gracefully...`);
+  server.close(() => {
+    console.log('HTTP server closed.');
+    process.exit(0);
+  });
+  // Force exit after 10s if pending requests don't finish
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
