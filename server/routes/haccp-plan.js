@@ -5,6 +5,7 @@
 const { Router } = require('express');
 const { db, all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
+const { writeAudit } = require('../lib/audit-log');
 const router = Router();
 
 router.use(requireAuth);
@@ -62,7 +63,11 @@ router.post('/hazards', (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [rid, step_name, hazard_type || 'B', hazard_description, sev, prob, is_ccp ? 1 : 0, preventive_measures || '']
     );
-    res.status(201).json(get('SELECT * FROM haccp_hazard_analysis WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]));
+    const created = get('SELECT * FROM haccp_hazard_analysis WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'haccp_hazard_analysis', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: created });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+    res.status(201).json(created);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -94,7 +99,11 @@ router.put('/hazards/:id', (req, res) => {
         rid,
       ]
     );
-    res.json(get('SELECT * FROM haccp_hazard_analysis WHERE id = ? AND restaurant_id = ?', [id, rid]));
+    const updated = get('SELECT * FROM haccp_hazard_analysis WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'haccp_hazard_analysis', record_id: id, action: 'update', old_values: existing, new_values: updated });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+    res.json(updated);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -107,6 +116,9 @@ router.delete('/hazards/:id', (req, res) => {
     const existing = get('SELECT * FROM haccp_hazard_analysis WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Danger introuvable' });
     run('DELETE FROM haccp_hazard_analysis WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'haccp_hazard_analysis', record_id: id, action: 'delete', old_values: existing, new_values: null });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -151,7 +163,11 @@ router.post('/ccps', (req, res) => {
     const existing = get('SELECT id FROM haccp_ccp WHERE hazard_analysis_id = ? AND restaurant_id = ?', [hazard_analysis_id, rid]);
     let recordId;
 
+    let ccpOldRow = null;
+    let ccpAction = 'create';
     if (existing) {
+      ccpOldRow = get('SELECT * FROM haccp_ccp WHERE id = ? AND restaurant_id = ?', [existing.id, rid]);
+      ccpAction = 'update';
       run(
         `UPDATE haccp_ccp
          SET ccp_number=?, critical_limits=?, monitoring_procedure=?, monitoring_frequency=?,
@@ -184,7 +200,11 @@ router.post('/ccps', (req, res) => {
     // Ensure hazard is marked CCP
     run('UPDATE haccp_hazard_analysis SET is_ccp=1, updated_at=CURRENT_TIMESTAMP WHERE id=? AND restaurant_id=?', [hazard_analysis_id, rid]);
 
-    res.status(201).json(get('SELECT * FROM haccp_ccp WHERE id = ? AND restaurant_id = ?', [recordId, rid]));
+    const ccpRow = get('SELECT * FROM haccp_ccp WHERE id = ? AND restaurant_id = ?', [recordId, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'haccp_ccp', record_id: recordId, action: ccpAction, old_values: ccpOldRow, new_values: ccpRow });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+    res.status(201).json(ccpRow);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -197,6 +217,9 @@ router.delete('/ccps/:id', (req, res) => {
     const ccp = get('SELECT * FROM haccp_ccp WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!ccp) return res.status(404).json({ error: 'CCP introuvable' });
     run('DELETE FROM haccp_ccp WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'haccp_ccp', record_id: id, action: 'delete', old_values: ccp, new_values: null });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -258,7 +281,11 @@ router.post('/decision-tree/:hazardId', (req, res) => {
       [result === 'CCP' ? 1 : 0, hazardId, rid]
     );
 
-    res.json(get('SELECT * FROM haccp_decision_tree_results WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]));
+    const dtResult = get('SELECT * FROM haccp_decision_tree_results WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'haccp_decision_tree_results', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: dtResult });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+    res.json(dtResult);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }

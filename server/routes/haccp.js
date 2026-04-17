@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { db, all, get, run } = require('../db');
 const PDFDocument = require('pdfkit');
 const { requireAuth } = require('./auth');
+const { writeAudit } = require('../lib/audit-log');
 const router = Router();
 
 router.use(requireAuth);
@@ -41,6 +42,9 @@ router.post('/zones', (req, res) => {
       [rid, name, type || 'fridge', min_temp ?? 0, max_temp ?? 4]
     );
     const zone = get('SELECT * FROM temperature_zones WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'temperature_zones', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: zone });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.status(201).json(zone);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -73,7 +77,11 @@ router.put('/zones/:id', (req, res) => {
       'UPDATE temperature_zones SET name = ?, type = ?, min_temp = ?, max_temp = ? WHERE id = ? AND restaurant_id = ?',
       [name || existing.name, type || existing.type, min_temp ?? existing.min_temp, max_temp ?? existing.max_temp, id, rid]
     );
-    res.json(get('SELECT * FROM temperature_zones WHERE id = ? AND restaurant_id = ?', [id, rid]));
+    const updated = get('SELECT * FROM temperature_zones WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'temperature_zones', record_id: id, action: 'update', old_values: existing, new_values: updated });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+    res.json(updated);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -82,9 +90,14 @@ router.put('/zones/:id', (req, res) => {
 router.delete('/zones/:id', (req, res) => {
   const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
+  const existing = get('SELECT * FROM temperature_zones WHERE id = ? AND restaurant_id = ?', [id, rid]);
+  if (!existing) return res.status(404).json({ error: 'Zone introuvable' });
   run('DELETE FROM temperature_logs WHERE zone_id = ? AND restaurant_id = ?', [id, rid]);
   const info = run('DELETE FROM temperature_zones WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (info.changes === 0) return res.status(404).json({ error: 'Zone introuvable' });
+  try {
+    writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'temperature_zones', record_id: id, action: 'delete', old_values: existing, new_values: null });
+  } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
   res.json({ deleted: true });
 });
 
@@ -140,6 +153,9 @@ router.post('/temperatures', (req, res) => {
       LEFT JOIN accounts a ON a.id = tl.recorded_by
       WHERE tl.id = ? AND tl.restaurant_id = ?
     `, [rid, info.lastInsertRowid, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'temperature_logs', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: log });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.status(201).json(log);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -218,7 +234,11 @@ router.post('/cleaning', (req, res) => {
     [rid, name, zone, frequency || 'daily', product || null, method || null,
      concentration || null, temps_contact || null, temperature_eau || null, rincage || null, epi || null]
   );
-  res.status(201).json(get('SELECT * FROM cleaning_tasks WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]));
+  const created = get('SELECT * FROM cleaning_tasks WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
+  try {
+    writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'cleaning_tasks', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: created });
+  } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+  res.status(201).json(created);
 });
 
 router.put('/cleaning/:id', (req, res) => {
@@ -237,15 +257,24 @@ router.put('/cleaning/:id', (req, res) => {
      rincage !== undefined ? rincage : existing.rincage,
      epi !== undefined ? epi : existing.epi, id, rid]
   );
-  res.json(get('SELECT * FROM cleaning_tasks WHERE id = ? AND restaurant_id = ?', [id, rid]));
+  const updated = get('SELECT * FROM cleaning_tasks WHERE id = ? AND restaurant_id = ?', [id, rid]);
+  try {
+    writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'cleaning_tasks', record_id: id, action: 'update', old_values: existing, new_values: updated });
+  } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+  res.json(updated);
 });
 
 router.delete('/cleaning/:id', (req, res) => {
   const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
+  const existing = get('SELECT * FROM cleaning_tasks WHERE id = ? AND restaurant_id = ?', [id, rid]);
+  if (!existing) return res.status(404).json({ error: 'Tâche introuvable' });
   run('DELETE FROM cleaning_logs WHERE task_id = ? AND restaurant_id = ?', [id, rid]);
   const info = run('DELETE FROM cleaning_tasks WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (info.changes === 0) return res.status(404).json({ error: 'Tâche introuvable' });
+  try {
+    writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'cleaning_tasks', record_id: id, action: 'delete', old_values: existing, new_values: null });
+  } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
   res.json({ deleted: true });
 });
 
@@ -266,6 +295,9 @@ router.post('/cleaning/:id/done', (req, res) => {
     LEFT JOIN accounts a ON a.id = cl.completed_by
     WHERE cl.id = ? AND cl.restaurant_id = ?
   `, [rid, info.lastInsertRowid, rid]);
+  try {
+    writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'cleaning_logs', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: log });
+  } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
   res.status(201).json(log);
 });
 
@@ -339,6 +371,9 @@ router.post('/traceability', (req, res) => {
     LEFT JOIN accounts a ON a.id = tl.received_by
     WHERE tl.id = ? AND tl.restaurant_id = ?
   `, [info.lastInsertRowid, rid]);
+  try {
+    writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'traceability_logs', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: log });
+  } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
   res.status(201).json(log);
 });
 
@@ -692,6 +727,10 @@ router.post('/cooling', requireAuth, (req, res) => {
       INSERT INTO cooling_logs (restaurant_id, product_name, quantity, unit, start_time, temp_start, time_at_63c, time_at_10c, is_compliant, notes, recorded_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(rid, product_name, quantity ?? null, unit ?? 'kg', start_time, temp_start, time_at_63c ?? null, time_at_10c ?? null, is_compliant, notes ?? null, recorded_by ?? null);
+    const created = db.prepare('SELECT * FROM cooling_logs WHERE id = ? AND restaurant_id = ?').get(result.lastInsertRowid, rid);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'cooling_logs', record_id: result.lastInsertRowid, action: 'create', old_values: null, new_values: created });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -701,6 +740,9 @@ router.post('/cooling', requireAuth, (req, res) => {
 router.put('/cooling/:id', requireAuth, (req, res) => {
   try {
     const rid = req.user.restaurant_id;
+    const id = Number(req.params.id);
+    const existing = db.prepare('SELECT * FROM cooling_logs WHERE id = ? AND restaurant_id = ?').get(id, rid);
+    if (!existing) return res.status(404).json({ error: 'Enregistrement non trouvé' });
     const { time_at_63c, time_at_10c, notes } = req.body;
     let is_compliant = null;
     if (time_at_63c && time_at_10c) {
@@ -710,7 +752,11 @@ router.put('/cooling/:id', requireAuth, (req, res) => {
     db.prepare(`
       UPDATE cooling_logs SET time_at_63c = ?, time_at_10c = ?, is_compliant = ?, notes = ?
       WHERE id = ? AND restaurant_id = ?
-    `).run(time_at_63c ?? null, time_at_10c ?? null, is_compliant, notes ?? null, req.params.id, rid);
+    `).run(time_at_63c ?? null, time_at_10c ?? null, is_compliant, notes ?? null, id, rid);
+    const updated = db.prepare('SELECT * FROM cooling_logs WHERE id = ? AND restaurant_id = ?').get(id, rid);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'cooling_logs', record_id: id, action: 'update', old_values: existing, new_values: updated });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -763,6 +809,10 @@ router.post('/reheating', requireAuth, (req, res) => {
       INSERT INTO reheating_logs (restaurant_id, product_name, quantity, unit, start_time, temp_start, time_at_63c, is_compliant, notes, recorded_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(rid, product_name, quantity ?? null, unit ?? 'kg', start_time, temp_start, time_at_63c ?? null, is_compliant, notes ?? null, recorded_by ?? null);
+    const created = db.prepare('SELECT * FROM reheating_logs WHERE id = ? AND restaurant_id = ?').get(result.lastInsertRowid, rid);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'reheating_logs', record_id: result.lastInsertRowid, action: 'create', old_values: null, new_values: created });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -772,8 +822,9 @@ router.post('/reheating', requireAuth, (req, res) => {
 router.put('/reheating/:id', requireAuth, (req, res) => {
   try {
     const rid = req.user.restaurant_id;
+    const id = Number(req.params.id);
     const { time_at_63c, notes } = req.body;
-    const existing = db.prepare('SELECT start_time FROM reheating_logs WHERE id = ? AND restaurant_id = ?').get(req.params.id, rid);
+    const existing = db.prepare('SELECT * FROM reheating_logs WHERE id = ? AND restaurant_id = ?').get(id, rid);
     if (!existing) return res.status(404).json({ error: 'Enregistrement non trouvé' });
     let is_compliant = null;
     if (time_at_63c) {
@@ -781,7 +832,11 @@ router.put('/reheating/:id', requireAuth, (req, res) => {
       is_compliant = diffMs <= 1 * 60 * 60 * 1000 ? 1 : 0;
     }
     db.prepare(`UPDATE reheating_logs SET time_at_63c = ?, is_compliant = ?, notes = ? WHERE id = ? AND restaurant_id = ?`)
-      .run(time_at_63c ?? null, is_compliant, notes ?? null, req.params.id, rid);
+      .run(time_at_63c ?? null, is_compliant, notes ?? null, id, rid);
+    const updated = db.prepare('SELECT * FROM reheating_logs WHERE id = ? AND restaurant_id = ?').get(id, rid);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'reheating_logs', record_id: id, action: 'update', old_values: existing, new_values: updated });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -821,6 +876,10 @@ router.post('/fryers', requireAuth, (req, res) => {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: 'name est obligatoire' });
     const result = db.prepare('INSERT INTO fryers (restaurant_id, name) VALUES (?, ?)').run(rid, name);
+    const created = db.prepare('SELECT * FROM fryers WHERE id = ? AND restaurant_id = ?').get(result.lastInsertRowid, rid);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'fryers', record_id: result.lastInsertRowid, action: 'create', old_values: null, new_values: created });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -862,6 +921,10 @@ router.post('/fryers/:id/checks', requireAuth, (req, res) => {
       INSERT INTO fryer_checks (restaurant_id, fryer_id, action_type, action_date, polar_value, notes, recorded_by)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(rid, req.params.id, action_type, action_date || new Date().toISOString(), polar_value ?? null, notes ?? null, recorded_by ?? null);
+    const created = db.prepare('SELECT * FROM fryer_checks WHERE id = ? AND restaurant_id = ?').get(result.lastInsertRowid, rid);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'fryer_checks', record_id: result.lastInsertRowid, action: 'create', old_values: null, new_values: created });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -907,6 +970,10 @@ router.post('/non-conformities', requireAuth, (req, res) => {
       INSERT INTO non_conformities (restaurant_id, title, description, category, severity, detected_by)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(rid, title, description ?? null, category ?? 'autre', severity ?? 'mineure', detected_by ?? null);
+    const created = db.prepare('SELECT * FROM non_conformities WHERE id = ? AND restaurant_id = ?').get(result.lastInsertRowid, rid);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'non_conformities', record_id: result.lastInsertRowid, action: 'create', old_values: null, new_values: created });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -932,6 +999,10 @@ router.put('/non-conformities/:id', requireAuth, (req, res) => {
       req.params.id,
       rid
     );
+    const updated = db.prepare('SELECT * FROM non_conformities WHERE id = ? AND restaurant_id = ?').get(req.params.id, rid);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'non_conformities', record_id: Number(req.params.id), action: 'update', old_values: existing, new_values: updated });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });

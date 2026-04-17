@@ -5,6 +5,7 @@
 const { Router } = require('express');
 const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
+const { writeAudit } = require('../lib/audit-log');
 const router = Router();
 
 router.use(requireAuth);
@@ -44,6 +45,9 @@ router.post('/templates', (req, res) => {
        escalation_procedure || null, documentation_required || null]
     );
     const item = get('SELECT * FROM corrective_actions_templates WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'corrective_actions_templates', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: item });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.status(201).json(item);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -86,6 +90,9 @@ router.put('/templates/:id', (req, res) => {
        id, rid]
     );
     const item = get('SELECT * FROM corrective_actions_templates WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'corrective_actions_templates', record_id: Number(id), action: 'update', old_values: existing, new_values: item });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.json(item);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -132,6 +139,9 @@ router.post('/log', (req, res) => {
        notes || null, related_record_id || null, related_record_type || null]
     );
     const item = get('SELECT * FROM corrective_actions_log WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'corrective_actions_log', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: item });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.status(201).json(item);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -167,6 +177,9 @@ router.put('/log/:id', (req, res) => {
        id, rid]
     );
     const item = get('SELECT * FROM corrective_actions_log WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'corrective_actions_log', record_id: Number(id), action: 'update', old_values: existing, new_values: item });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.json(item);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });

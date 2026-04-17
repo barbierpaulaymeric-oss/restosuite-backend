@@ -5,6 +5,7 @@
 const { Router } = require('express');
 const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
+const { writeAudit } = require('../lib/audit-log');
 const router = Router();
 
 router.use(requireAuth);
@@ -35,7 +36,11 @@ router.post('/', (req, res) => {
        findings || null, actions_taken || null, bait_stations_count ? Number(bait_stations_count) : 0,
        status || 'conforme', report_ref || null]
     );
-    res.status(201).json(get('SELECT * FROM pest_control WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]));
+    const created = get('SELECT * FROM pest_control WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'pest_control', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: created });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+    res.status(201).json(created);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -68,7 +73,11 @@ router.put('/:id', (req, res) => {
         rid,
       ]
     );
-    res.json(get('SELECT * FROM pest_control WHERE id = ? AND restaurant_id = ?', [id, rid]));
+    const updated = get('SELECT * FROM pest_control WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'pest_control', record_id: id, action: 'update', old_values: existing, new_values: updated });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+    res.json(updated);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -82,6 +91,9 @@ router.delete('/:id', (req, res) => {
     const existing = get('SELECT * FROM pest_control WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Visite introuvable' });
     run('DELETE FROM pest_control WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    try {
+      writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'pest_control', record_id: id, action: 'delete', old_values: existing, new_values: null });
+    } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
