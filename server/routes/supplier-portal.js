@@ -54,12 +54,13 @@ function requireSupplierAuth(req, res, next) {
 
 // POST /invite — Create supplier portal access
 router.post('/invite', requireAuth, (req, res) => {
+  const rid = req.user.restaurant_id;
   const { supplier_id, pin, name, email, password } = req.body;
   if (!supplier_id) {
     return res.status(400).json({ error: 'supplier_id requis' });
   }
 
-  const supplier = get('SELECT * FROM suppliers WHERE id = ?', [supplier_id]);
+  const supplier = get('SELECT * FROM suppliers WHERE id = ? AND restaurant_id = ?', [supplier_id, rid]);
   if (!supplier) {
     return res.status(404).json({ error: 'Fournisseur introuvable' });
   }
@@ -70,13 +71,13 @@ router.post('/invite', requireAuth, (req, res) => {
       return res.status(400).json({ error: 'Le mot de passe doit faire au moins 6 caractères' });
     }
     const emailLower = email.trim().toLowerCase();
-    const existingEmail = get('SELECT id FROM suppliers WHERE email = ? AND id != ?', [emailLower, supplier_id]);
+    const existingEmail = get('SELECT id FROM suppliers WHERE email = ? AND id != ? AND restaurant_id = ?', [emailLower, supplier_id, rid]);
     if (existingEmail) {
       return res.status(409).json({ error: 'Cet email est déjà utilisé par un autre fournisseur' });
     }
     const passwordHash = bcrypt.hashSync(password, 10);
-    run('UPDATE suppliers SET email = ?, password_hash = ?, contact_name = ? WHERE id = ?',
-      [emailLower, passwordHash, name || supplier.name, supplier_id]);
+    run('UPDATE suppliers SET email = ?, password_hash = ?, contact_name = ? WHERE id = ? AND restaurant_id = ?',
+      [emailLower, passwordHash, name || supplier.name, supplier_id, rid]);
   }
 
   // If PIN provided, create a member account within this supplier
@@ -84,15 +85,15 @@ router.post('/invite', requireAuth, (req, res) => {
     if (!/^\d{4,6}$/.test(pin)) {
       return res.status(400).json({ error: 'Le PIN doit être entre 4 et 6 chiffres' });
     }
-    const existing = get('SELECT id FROM supplier_accounts WHERE supplier_id = ?', [supplier_id]);
+    const existing = get('SELECT id FROM supplier_accounts WHERE supplier_id = ? AND restaurant_id = ?', [supplier_id, rid]);
     if (existing) {
       return res.status(409).json({ error: 'Ce fournisseur a déjà un compte membre portail' });
     }
     const hashedPin = hashPin(pin);
     const accountName = name || supplier.name;
     run(
-      'INSERT INTO supplier_accounts (supplier_id, name, email, pin) VALUES (?, ?, ?, ?)',
-      [supplier_id, accountName, email || null, hashedPin]
+      'INSERT INTO supplier_accounts (restaurant_id, supplier_id, name, email, pin) VALUES (?, ?, ?, ?, ?)',
+      [rid, supplier_id, accountName, email || null, hashedPin]
     );
   }
 
@@ -101,29 +102,33 @@ router.post('/invite', requireAuth, (req, res) => {
 
 // GET /accounts — List supplier accounts
 router.get('/accounts', requireAuth, (req, res) => {
+  const rid = req.user.restaurant_id;
   const accounts = all(`
     SELECT sa.id, sa.supplier_id, sa.name, sa.email, sa.last_login, sa.created_at,
            s.name as supplier_name
     FROM supplier_accounts sa
-    JOIN suppliers s ON s.id = sa.supplier_id
+    JOIN suppliers s ON s.id = sa.supplier_id AND s.restaurant_id = ?
+    WHERE sa.restaurant_id = ?
     ORDER BY sa.created_at DESC
-  `);
+  `, [rid, rid]);
   res.json(accounts);
 });
 
 // DELETE /accounts/:id — Revoke supplier access
 router.delete('/accounts/:id', requireAuth, (req, res) => {
+  const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
-  const account = get('SELECT * FROM supplier_accounts WHERE id = ?', [id]);
+  const account = get('SELECT * FROM supplier_accounts WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (!account) {
     return res.status(404).json({ error: 'Compte fournisseur introuvable' });
   }
-  run('DELETE FROM supplier_accounts WHERE id = ?', [id]);
+  run('DELETE FROM supplier_accounts WHERE id = ? AND restaurant_id = ?', [id, rid]);
   res.json({ success: true });
 });
 
 // POST /accounts/add-member — Add a member to a supplier company
 router.post('/accounts/add-member', requireAuth, (req, res) => {
+  const rid = req.user.restaurant_id;
   const { supplier_id, name, pin, email } = req.body;
   if (!supplier_id || !name || !pin) {
     return res.status(400).json({ error: 'supplier_id, name et pin requis' });
@@ -132,21 +137,21 @@ router.post('/accounts/add-member', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Le PIN doit être entre 4 et 6 chiffres' });
   }
 
-  const supplier = get('SELECT * FROM suppliers WHERE id = ?', [supplier_id]);
+  const supplier = get('SELECT * FROM suppliers WHERE id = ? AND restaurant_id = ?', [supplier_id, rid]);
   if (!supplier) {
     return res.status(404).json({ error: 'Fournisseur introuvable' });
   }
 
   // Check PIN uniqueness WITHIN this supplier only
   const hashedPin = hashPin(pin);
-  const existingPin = get('SELECT id FROM supplier_accounts WHERE supplier_id = ? AND pin = ?', [supplier_id, hashedPin]);
+  const existingPin = get('SELECT id FROM supplier_accounts WHERE supplier_id = ? AND pin = ? AND restaurant_id = ?', [supplier_id, hashedPin, rid]);
   if (existingPin) {
     return res.status(409).json({ error: 'Ce PIN est déjà utilisé par un autre membre de votre entreprise' });
   }
 
   const result = run(
-    'INSERT INTO supplier_accounts (supplier_id, name, email, pin) VALUES (?, ?, ?, ?)',
-    [supplier_id, name, email || null, hashedPin]
+    'INSERT INTO supplier_accounts (restaurant_id, supplier_id, name, email, pin) VALUES (?, ?, ?, ?, ?)',
+    [rid, supplier_id, name, email || null, hashedPin]
   );
 
   res.status(201).json({
@@ -159,32 +164,37 @@ router.post('/accounts/add-member', requireAuth, (req, res) => {
 
 // GET /notifications — Price change notifications
 router.get('/notifications', requireAuth, (req, res) => {
+  const rid = req.user.restaurant_id;
   const notifications = all(`
     SELECT pcn.*, s.name as supplier_name
     FROM price_change_notifications pcn
-    JOIN suppliers s ON s.id = pcn.supplier_id
+    JOIN suppliers s ON s.id = pcn.supplier_id AND s.restaurant_id = ?
+    WHERE pcn.restaurant_id = ?
     ORDER BY pcn.created_at DESC
     LIMIT 100
-  `);
+  `, [rid, rid]);
   res.json(notifications);
 });
 
 // GET /notifications/unread-count — Badge count
 router.get('/notifications/unread-count', requireAuth, (req, res) => {
-  const result = get('SELECT COUNT(*) as count FROM price_change_notifications WHERE read = 0');
+  const rid = req.user.restaurant_id;
+  const result = get('SELECT COUNT(*) as count FROM price_change_notifications WHERE read = 0 AND restaurant_id = ?', [rid]);
   res.json({ count: result.count });
 });
 
 // PUT /notifications/:id/read — Mark as read
 router.put('/notifications/:id/read', requireAuth, (req, res) => {
+  const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
-  run('UPDATE price_change_notifications SET read = 1 WHERE id = ?', [id]);
+  run('UPDATE price_change_notifications SET read = 1 WHERE id = ? AND restaurant_id = ?', [id, rid]);
   res.json({ success: true });
 });
 
 // PUT /notifications/read-all — Mark all as read
 router.put('/notifications/read-all', requireAuth, (req, res) => {
-  run('UPDATE price_change_notifications SET read = 1 WHERE read = 0');
+  const rid = req.user.restaurant_id;
+  run('UPDATE price_change_notifications SET read = 1 WHERE read = 0 AND restaurant_id = ?', [rid]);
   res.json({ success: true });
 });
 
@@ -301,39 +311,42 @@ router.post('/quick-login', (req, res) => {
 
 // GET /catalog — Get my catalog (authenticated supplier)
 router.get('/catalog', requireSupplierAuth, (req, res) => {
+  const rid = req.supplierAccount.restaurant_id;
   const catalog = all(
-    'SELECT * FROM supplier_catalog WHERE supplier_id = ? ORDER BY category, product_name',
-    [req.supplierAccount.supplier_id]
+    'SELECT * FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? ORDER BY category, product_name',
+    [req.supplierAccount.supplier_id, rid]
   );
   res.json(catalog);
 });
 
 // POST /catalog — Add product to catalog
 router.post('/catalog', requireSupplierAuth, (req, res) => {
+  const rid = req.supplierAccount.restaurant_id;
   const { product_name, category, unit, price, min_order } = req.body;
   if (!product_name || !unit || price == null) {
     return res.status(400).json({ error: 'product_name, unit et price requis' });
   }
 
   const result = run(
-    'INSERT INTO supplier_catalog (supplier_id, product_name, category, unit, price, min_order) VALUES (?, ?, ?, ?, ?, ?)',
-    [req.supplierAccount.supplier_id, product_name, category || null, unit, price, min_order || 0]
+    'INSERT INTO supplier_catalog (restaurant_id, supplier_id, product_name, category, unit, price, min_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [rid, req.supplierAccount.supplier_id, product_name, category || null, unit, price, min_order || 0]
   );
 
   // Create notification for new product
   run(
-    'INSERT INTO price_change_notifications (supplier_id, product_name, old_price, new_price, change_type) VALUES (?, ?, NULL, ?, ?)',
-    [req.supplierAccount.supplier_id, product_name, price, 'new']
+    'INSERT INTO price_change_notifications (restaurant_id, supplier_id, product_name, old_price, new_price, change_type) VALUES (?, ?, ?, NULL, ?, ?)',
+    [rid, req.supplierAccount.supplier_id, product_name, price, 'new']
   );
 
-  const item = get('SELECT * FROM supplier_catalog WHERE id = ?', [result.lastInsertRowid]);
+  const item = get('SELECT * FROM supplier_catalog WHERE id = ? AND restaurant_id = ?', [result.lastInsertRowid, rid]);
   res.status(201).json(item);
 });
 
 // PUT /catalog/:id — Update product
 router.put('/catalog/:id', requireSupplierAuth, (req, res) => {
+  const rid = req.supplierAccount.restaurant_id;
   const id = Number(req.params.id);
-  const item = get('SELECT * FROM supplier_catalog WHERE id = ? AND supplier_id = ?', [id, req.supplierAccount.supplier_id]);
+  const item = get('SELECT * FROM supplier_catalog WHERE id = ? AND supplier_id = ? AND restaurant_id = ?', [id, req.supplierAccount.supplier_id, rid]);
   if (!item) {
     return res.status(404).json({ error: 'Produit introuvable' });
   }
@@ -343,68 +356,71 @@ router.put('/catalog/:id', requireSupplierAuth, (req, res) => {
   const oldPrice = item.price;
 
   run(
-    'UPDATE supplier_catalog SET product_name = ?, category = ?, unit = ?, price = ?, min_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    'UPDATE supplier_catalog SET product_name = ?, category = ?, unit = ?, price = ?, min_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?',
     [
       product_name || item.product_name,
       category !== undefined ? category : item.category,
       unit || item.unit,
       newPrice,
       min_order != null ? min_order : item.min_order,
-      id
+      id,
+      rid
     ]
   );
 
   // If price changed, create notification and update supplier_prices
   if (price != null && price !== oldPrice) {
     run(
-      'INSERT INTO price_change_notifications (supplier_id, product_name, old_price, new_price, change_type) VALUES (?, ?, ?, ?, ?)',
-      [req.supplierAccount.supplier_id, product_name || item.product_name, oldPrice, newPrice, 'update']
+      'INSERT INTO price_change_notifications (restaurant_id, supplier_id, product_name, old_price, new_price, change_type) VALUES (?, ?, ?, ?, ?, ?)',
+      [rid, req.supplierAccount.supplier_id, product_name || item.product_name, oldPrice, newPrice, 'update']
     );
 
     // Try to update linked supplier_prices (match by product name → ingredient name)
     const linkedIngredient = get(
-      'SELECT i.id FROM ingredients i JOIN supplier_prices sp ON sp.ingredient_id = i.id WHERE sp.supplier_id = ? AND LOWER(i.name) = LOWER(?)',
-      [req.supplierAccount.supplier_id, product_name || item.product_name]
+      'SELECT i.id FROM ingredients i JOIN supplier_prices sp ON sp.ingredient_id = i.id AND sp.restaurant_id = ? WHERE sp.supplier_id = ? AND i.restaurant_id = ? AND LOWER(i.name) = LOWER(?)',
+      [rid, req.supplierAccount.supplier_id, rid, product_name || item.product_name]
     );
     if (linkedIngredient) {
       run(
-        'UPDATE supplier_prices SET price = ?, last_updated = CURRENT_TIMESTAMP WHERE supplier_id = ? AND ingredient_id = ?',
-        [newPrice, req.supplierAccount.supplier_id, linkedIngredient.id]
+        'UPDATE supplier_prices SET price = ?, last_updated = CURRENT_TIMESTAMP WHERE supplier_id = ? AND ingredient_id = ? AND restaurant_id = ?',
+        [newPrice, req.supplierAccount.supplier_id, linkedIngredient.id, rid]
       );
       // Record in price history
       run(
-        'INSERT INTO price_history (ingredient_id, supplier_id, price) VALUES (?, ?, ?)',
-        [linkedIngredient.id, req.supplierAccount.supplier_id, newPrice]
+        'INSERT INTO price_history (restaurant_id, ingredient_id, supplier_id, price) VALUES (?, ?, ?, ?)',
+        [rid, linkedIngredient.id, req.supplierAccount.supplier_id, newPrice]
       );
     }
   }
 
-  const updated = get('SELECT * FROM supplier_catalog WHERE id = ?', [id]);
+  const updated = get('SELECT * FROM supplier_catalog WHERE id = ? AND restaurant_id = ?', [id, rid]);
   res.json(updated);
 });
 
 // DELETE /catalog/:id — Remove product
 router.delete('/catalog/:id', requireSupplierAuth, (req, res) => {
+  const rid = req.supplierAccount.restaurant_id;
   const id = Number(req.params.id);
-  const item = get('SELECT * FROM supplier_catalog WHERE id = ? AND supplier_id = ?', [id, req.supplierAccount.supplier_id]);
+  const item = get('SELECT * FROM supplier_catalog WHERE id = ? AND supplier_id = ? AND restaurant_id = ?', [id, req.supplierAccount.supplier_id, rid]);
   if (!item) {
     return res.status(404).json({ error: 'Produit introuvable' });
   }
 
   // Create notification for removal
   run(
-    'INSERT INTO price_change_notifications (supplier_id, product_name, old_price, new_price, change_type) VALUES (?, ?, ?, NULL, ?)',
-    [req.supplierAccount.supplier_id, item.product_name, item.price, 'removed']
+    'INSERT INTO price_change_notifications (restaurant_id, supplier_id, product_name, old_price, new_price, change_type) VALUES (?, ?, ?, ?, NULL, ?)',
+    [rid, req.supplierAccount.supplier_id, item.product_name, item.price, 'removed']
   );
 
-  run('DELETE FROM supplier_catalog WHERE id = ?', [id]);
+  run('DELETE FROM supplier_catalog WHERE id = ? AND restaurant_id = ?', [id, rid]);
   res.json({ success: true });
 });
 
 // PUT /catalog/:id/availability — Toggle availability
 router.put('/catalog/:id/availability', requireSupplierAuth, (req, res) => {
+  const rid = req.supplierAccount.restaurant_id;
   const id = Number(req.params.id);
-  const item = get('SELECT * FROM supplier_catalog WHERE id = ? AND supplier_id = ?', [id, req.supplierAccount.supplier_id]);
+  const item = get('SELECT * FROM supplier_catalog WHERE id = ? AND supplier_id = ? AND restaurant_id = ?', [id, req.supplierAccount.supplier_id, rid]);
   if (!item) {
     return res.status(404).json({ error: 'Produit introuvable' });
   }
@@ -412,25 +428,26 @@ router.put('/catalog/:id/availability', requireSupplierAuth, (req, res) => {
   const { available } = req.body;
   const newAvailable = available != null ? (available ? 1 : 0) : (item.available ? 0 : 1);
 
-  run('UPDATE supplier_catalog SET available = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [newAvailable, id]);
+  run('UPDATE supplier_catalog SET available = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?', [newAvailable, id, rid]);
 
   // Notify if product becomes unavailable
   if (!newAvailable) {
     run(
-      'INSERT INTO price_change_notifications (supplier_id, product_name, old_price, new_price, change_type) VALUES (?, ?, ?, ?, ?)',
-      [req.supplierAccount.supplier_id, item.product_name, item.price, item.price, 'unavailable']
+      'INSERT INTO price_change_notifications (restaurant_id, supplier_id, product_name, old_price, new_price, change_type) VALUES (?, ?, ?, ?, ?, ?)',
+      [rid, req.supplierAccount.supplier_id, item.product_name, item.price, item.price, 'unavailable']
     );
   }
 
-  const updated = get('SELECT * FROM supplier_catalog WHERE id = ?', [id]);
+  const updated = get('SELECT * FROM supplier_catalog WHERE id = ? AND restaurant_id = ?', [id, rid]);
   res.json(updated);
 });
 
 // GET /history — Supplier's change history
 router.get('/history', requireSupplierAuth, (req, res) => {
+  const rid = req.supplierAccount.restaurant_id;
   const history = all(
-    'SELECT * FROM price_change_notifications WHERE supplier_id = ? ORDER BY created_at DESC LIMIT 50',
-    [req.supplierAccount.supplier_id]
+    'SELECT * FROM price_change_notifications WHERE supplier_id = ? AND restaurant_id = ? ORDER BY created_at DESC LIMIT 50',
+    [req.supplierAccount.supplier_id, rid]
   );
   res.json(history);
 });
@@ -443,6 +460,7 @@ router.get('/history', requireSupplierAuth, (req, res) => {
 router.post('/delivery-notes', requireSupplierAuth, (req, res) => {
   const { delivery_date, notes, items } = req.body;
   const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'Au moins un produit est requis' });
@@ -453,16 +471,16 @@ router.post('/delivery-notes', requireSupplierAuth, (req, res) => {
     let totalAmount = 0;
 
     const noteResult = run(
-      'INSERT INTO delivery_notes (supplier_id, delivery_date, notes) VALUES (?, ?, ?)',
-      [supplierId, delivery_date || null, notes || null]
+      'INSERT INTO delivery_notes (restaurant_id, supplier_id, delivery_date, notes) VALUES (?, ?, ?, ?)',
+      [rid, supplierId, delivery_date || null, notes || null]
     );
     const noteId = noteResult.lastInsertRowid;
 
     for (const item of items) {
-      // Try to match ingredient by name
+      // Try to match ingredient by name (scoped to this tenant)
       let ingredientId = null;
       if (item.product_name) {
-        const matched = get('SELECT id FROM ingredients WHERE name LIKE ? COLLATE NOCASE', [item.product_name.trim()]);
+        const matched = get('SELECT id FROM ingredients WHERE name LIKE ? COLLATE NOCASE AND restaurant_id = ?', [item.product_name.trim(), rid]);
         if (matched) ingredientId = matched.id;
       }
 
@@ -470,9 +488,9 @@ router.post('/delivery-notes', requireSupplierAuth, (req, res) => {
       totalAmount += lineTotal;
 
       run(
-        `INSERT INTO delivery_note_items (delivery_note_id, ingredient_id, product_name, quantity, unit, price_per_unit, batch_number, dlc, temperature_required, fishing_zone, fishing_method, origin, sanitary_approval, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [noteId, ingredientId, item.product_name, item.quantity || 0, item.unit || 'kg',
+        `INSERT INTO delivery_note_items (restaurant_id, delivery_note_id, ingredient_id, product_name, quantity, unit, price_per_unit, batch_number, dlc, temperature_required, fishing_zone, fishing_method, origin, sanitary_approval, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [rid, noteId, ingredientId, item.product_name, item.quantity || 0, item.unit || 'kg',
          item.price_per_unit || null, item.batch_number || null, item.dlc || null,
          item.temperature_required || null, item.fishing_zone || null, item.fishing_method || null,
          item.origin || null, item.sanitary_approval || null, item.notes || null]
@@ -480,11 +498,11 @@ router.post('/delivery-notes', requireSupplierAuth, (req, res) => {
     }
 
     // Update total
-    run('UPDATE delivery_notes SET total_amount = ? WHERE id = ?', [totalAmount, noteId]);
+    run('UPDATE delivery_notes SET total_amount = ? WHERE id = ? AND restaurant_id = ?', [totalAmount, noteId, rid]);
 
     // Return the full note
-    const note = get('SELECT * FROM delivery_notes WHERE id = ?', [noteId]);
-    const noteItems = all('SELECT * FROM delivery_note_items WHERE delivery_note_id = ?', [noteId]);
+    const note = get('SELECT * FROM delivery_notes WHERE id = ? AND restaurant_id = ?', [noteId, rid]);
+    const noteItems = all('SELECT * FROM delivery_note_items WHERE delivery_note_id = ? AND restaurant_id = ?', [noteId, rid]);
     return { ...note, items: noteItems };
   });
 
@@ -499,13 +517,14 @@ router.post('/delivery-notes', requireSupplierAuth, (req, res) => {
 // GET /delivery-notes — List supplier's delivery notes
 router.get('/delivery-notes', requireSupplierAuth, (req, res) => {
   const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
   const notes = all(`
     SELECT dn.*,
-           (SELECT COUNT(*) FROM delivery_note_items WHERE delivery_note_id = dn.id) as item_count
+           (SELECT COUNT(*) FROM delivery_note_items WHERE delivery_note_id = dn.id AND restaurant_id = ?) as item_count
     FROM delivery_notes dn
-    WHERE dn.supplier_id = ?
+    WHERE dn.supplier_id = ? AND dn.restaurant_id = ?
     ORDER BY dn.created_at DESC
-  `, [supplierId]);
+  `, [rid, supplierId, rid]);
   res.json(notes);
 });
 
@@ -513,11 +532,12 @@ router.get('/delivery-notes', requireSupplierAuth, (req, res) => {
 router.get('/delivery-notes/:id', requireSupplierAuth, (req, res) => {
   const id = Number(req.params.id);
   const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
 
-  const note = get('SELECT * FROM delivery_notes WHERE id = ? AND supplier_id = ?', [id, supplierId]);
+  const note = get('SELECT * FROM delivery_notes WHERE id = ? AND supplier_id = ? AND restaurant_id = ?', [id, supplierId, rid]);
   if (!note) return res.status(404).json({ error: 'Bon de livraison introuvable' });
 
-  const items = all('SELECT * FROM delivery_note_items WHERE delivery_note_id = ?', [id]);
+  const items = all('SELECT * FROM delivery_note_items WHERE delivery_note_id = ? AND restaurant_id = ?', [id, rid]);
   res.json({ ...note, items });
 });
 
