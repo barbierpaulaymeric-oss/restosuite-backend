@@ -20,8 +20,14 @@ function verifyPin(pin, hash) {
   return bcrypt.compareSync(pin, hash);
 }
 
+const SUPPLIER_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 function generateToken() {
   return crypto.randomBytes(32).toString('hex');
+}
+
+function tokenExpiresAt() {
+  return new Date(Date.now() + SUPPLIER_TOKEN_TTL_MS).toISOString();
 }
 
 // ─── Middleware: Authenticate supplier via token ───
@@ -32,6 +38,10 @@ function requireSupplierAuth(req, res, next) {
   }
   const account = get('SELECT sa.*, s.name as supplier_name FROM supplier_accounts sa JOIN suppliers s ON s.id = sa.supplier_id WHERE sa.access_token = ?', [token]);
   if (!account) {
+    return res.status(401).json({ error: 'Token invalide ou expiré' });
+  }
+  // Reject tokens that have no expiry (issued before this fix) or have expired
+  if (!account.token_expires_at || new Date(account.token_expires_at) < new Date()) {
     return res.status(401).json({ error: 'Token invalide ou expiré' });
   }
   req.supplierAccount = account;
@@ -235,9 +245,9 @@ router.post('/member-pin', (req, res) => {
     return res.status(401).json({ error: 'PIN incorrect' });
   }
 
-  // Generate access token
+  // Generate access token with 30-day expiry
   const token = generateToken();
-  run('UPDATE supplier_accounts SET access_token = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?', [token, account.id]);
+  run('UPDATE supplier_accounts SET access_token = ?, token_expires_at = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?', [token, tokenExpiresAt(), account.id]);
 
   res.json({
     token,
@@ -269,7 +279,7 @@ router.post('/quick-login', (req, res) => {
   if (members.length === 1) {
     const account = members[0];
     const token = generateToken();
-    run('UPDATE supplier_accounts SET access_token = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?', [token, account.id]);
+    run('UPDATE supplier_accounts SET access_token = ?, token_expires_at = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?', [token, tokenExpiresAt(), account.id]);
     return res.json({
       token,
       supplier_id: supplier.id,
