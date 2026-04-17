@@ -132,10 +132,10 @@ router.post('/stop', requireAuth, (req, res) => {
     // Calculate recap metrics from orders during this session
     const sessionOrders = all(
       `SELECT o.id, o.created_at, o.updated_at, o.total_cost, o.status,
-              (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) as item_count
+              (SELECT COUNT(*) FROM order_items WHERE order_id = o.id AND restaurant_id = ?) as item_count
        FROM orders o
-       WHERE o.created_at >= ? AND o.status != 'annulé'`,
-      [activeSession.started_at]
+       WHERE o.restaurant_id = ? AND o.created_at >= ? AND o.status != 'annulé'`,
+      [account.restaurant_id, account.restaurant_id, activeSession.started_at]
     );
 
     const totalOrders = sessionOrders.length;
@@ -157,11 +157,11 @@ router.post('/stop', requireAuth, (req, res) => {
     const peakHourResult = all(
       `SELECT strftime('%H', created_at) as hour, COUNT(*) as count
        FROM orders
-       WHERE created_at >= ? AND status != 'annulé'
+       WHERE restaurant_id = ? AND created_at >= ? AND status != 'annulé'
        GROUP BY hour
        ORDER BY count DESC
        LIMIT 1`,
-      [activeSession.started_at]
+      [account.restaurant_id, activeSession.started_at]
     );
 
     const peakHour = peakHourResult.length > 0 ? peakHourResult[0].hour : null;
@@ -176,11 +176,14 @@ router.post('/stop', requireAuth, (req, res) => {
            avg_ticket_time_min = ?,
            peak_hour = ?,
            status = 'stopped'
-       WHERE id = ?`,
-      [totalOrders, totalItems, totalRevenue, avgTicketTimeMin, peakHour, activeSession.id]
+       WHERE id = ? AND restaurant_id = ?`,
+      [totalOrders, totalItems, totalRevenue, avgTicketTimeMin, peakHour, activeSession.id, account.restaurant_id]
     );
 
-    const updatedSession = get('SELECT * FROM service_sessions WHERE id = ?', [activeSession.id]);
+    const updatedSession = get(
+      'SELECT * FROM service_sessions WHERE id = ? AND restaurant_id = ?',
+      [activeSession.id, account.restaurant_id]
+    );
 
     res.json({
       success: true,
@@ -221,8 +224,8 @@ router.get('/active', requireAuth, (req, res) => {
 
     // Count pending orders
     const pendingOrders = get(
-      `SELECT COUNT(*) as count FROM orders WHERE status IN ('envoyé','en_cours')`,
-      []
+      `SELECT COUNT(*) as count FROM orders WHERE restaurant_id = ? AND status IN ('envoyé','en_cours')`,
+      [account.restaurant_id]
     );
 
     // Calculate current session metrics
@@ -231,8 +234,8 @@ router.get('/active', requireAuth, (req, res) => {
         COUNT(*) as total_orders,
         AVG(CAST((julianday('now') - julianday(created_at)) * 1440 AS FLOAT)) as avg_ticket_time_min
        FROM orders
-       WHERE created_at >= ? AND status != 'annulé'`,
-      [activeSession.started_at]
+       WHERE restaurant_id = ? AND created_at >= ? AND status != 'annulé'`,
+      [account.restaurant_id, activeSession.started_at]
     );
 
     res.json({
