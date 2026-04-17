@@ -88,6 +88,19 @@ app.use('/api/accounts/login', authLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/pin-login', authLimiter);
+app.use('/api/auth/staff-login', authLimiter);
+app.use('/api/auth/staff-pin', authLimiter);
+app.use('/api/auth/logout', authLimiter);
+
+// Admin endpoints (backup, export-db, etc.) — strict per-IP limit
+const adminLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: IS_TEST ? 100000 : 30,
+  message: { error: 'Limite admin atteinte. Réessayez dans une heure.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/admin/', adminLimiter);
 
 // ─── Error log rotation (skip in test mode) ───
 if (!IS_TEST) {

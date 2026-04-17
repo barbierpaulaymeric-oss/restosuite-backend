@@ -71,7 +71,7 @@ router.put('/ingredients/:id', requireAuth, (req, res) => {
 
     // Audit trail (allergen declaration is regulatory under INCO)
     try {
-      const { writeAudit } = require('../audit-log');
+      const { writeAudit } = require('../lib/audit-log');
       writeAudit({
         restaurant_id: req.user.restaurant_id,
         account_id: req.user.id,
