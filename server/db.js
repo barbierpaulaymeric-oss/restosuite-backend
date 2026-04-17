@@ -1965,6 +1965,57 @@ try {
   console.warn('⚠️ Phase 2 migration error:', e.message);
 }
 
+// ─── Alto AI personalization: preferences, learning, shortcuts ───
+// No FK REFERENCES (keeps :memory: test DB happy — matches cooling_logs convention)
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_preferences (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      account_id INTEGER,
+      pref_key TEXT NOT NULL,
+      pref_value TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(restaurant_id, account_id, pref_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_preferences_restaurant ON ai_preferences(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_ai_preferences_lookup ON ai_preferences(restaurant_id, account_id, pref_key);
+
+    CREATE TABLE IF NOT EXISTS ai_learning (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      account_id INTEGER,
+      action_type TEXT NOT NULL,
+      outcome TEXT NOT NULL CHECK(outcome IN ('confirmed','rejected','modified')),
+      user_message TEXT,
+      action_params TEXT,
+      feedback_notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_learning_restaurant ON ai_learning(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_ai_learning_recent ON ai_learning(restaurant_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS ai_shortcuts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      account_id INTEGER,
+      trigger_phrase TEXT NOT NULL,
+      action_type TEXT NOT NULL,
+      action_template TEXT,
+      description TEXT,
+      usage_count INTEGER DEFAULT 0,
+      last_used_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_shortcuts_restaurant ON ai_shortcuts(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_ai_shortcuts_trigger ON ai_shortcuts(restaurant_id, trigger_phrase);
+  `);
+  console.log('✅ Migration: ai_preferences, ai_learning, ai_shortcuts tables ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration ai_* tables error:', e.message);
+}
+
 // ─── audit_log (append-only, immutable by convention) ───
 try {
   db.exec(`CREATE TABLE IF NOT EXISTS audit_log (

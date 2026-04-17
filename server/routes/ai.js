@@ -8,7 +8,57 @@ const fs = require('fs');
 const router = Router();
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+// ─── Smart model selection ─────────────────────────────────────────────
+// Task-type → model tier. Adjustable per restaurant via ai_preferences
+// key 'ai_model_tier' with values 'eco' | 'standard' | 'premium'.
+const MODEL_BY_TIER = {
+  eco:      { simple: 'gemini-2.0-flash',  medium: 'gemini-2.0-flash', complex: 'gemini-2.5-flash' },
+  standard: { simple: 'gemini-2.0-flash',  medium: 'gemini-2.5-flash', complex: 'gemini-2.5-flash' },
+  premium:  { simple: 'gemini-2.5-flash',  medium: 'gemini-2.5-flash', complex: 'gemini-2.5-flash' },
+};
+
+// Classify a task type into a complexity bucket.
+// simple: short HACCP log / voice parse / deterministic extraction
+// medium: conversational chat with action detection
+// complex: multimodal (OCR/images/invoices) and multi-step reasoning
+const TASK_COMPLEXITY = {
+  'parse-voice':     'simple',
+  'modify-voice':    'simple',
+  'chef':            'medium',
+  'assistant':       'medium',
+  'suggest-suppliers': 'medium',
+  'menu-suggestions':  'medium',
+  'scan-invoice':    'complex',
+  'scan-mercuriale': 'complex',
+};
+
+function selectModel(taskType, restaurantId) {
+  const bucket = TASK_COMPLEXITY[taskType] || 'medium';
+  let tier = 'standard';
+  if (restaurantId) {
+    try {
+      const row = get(
+        `SELECT pref_value FROM ai_preferences
+          WHERE restaurant_id = ? AND pref_key = 'ai_model_tier'
+          ORDER BY account_id IS NULL, updated_at DESC LIMIT 1`,
+        [restaurantId]
+      );
+      if (row && ['eco', 'standard', 'premium'].includes(row.pref_value)) {
+        tier = row.pref_value;
+      }
+    } catch (_) { /* table may not exist in older DBs; fall through */ }
+  }
+  const table = MODEL_BY_TIER[tier] || MODEL_BY_TIER.standard;
+  return table[bucket] || 'gemini-2.5-flash';
+}
+
+function buildGeminiUrl(model) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+}
+
+// Backwards-compatible default (medium / standard tier)
+const GEMINI_URL = buildGeminiUrl('gemini-2.5-flash');
 
 // ─── Multer config for invoice uploads ───
 const uploadDir = '/tmp/restosuite-uploads';
@@ -167,7 +217,7 @@ router.post('/parse-voice', async (req, res) => {
   if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
 
   try {
-    const response = await fetch(GEMINI_URL, {
+    const response = await fetch(buildGeminiUrl(selectModel('parse-voice', req.user?.restaurant_id)), {
       signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -322,7 +372,7 @@ router.post('/modify-voice', async (req, res) => {
   }
 
   try {
-    const response = await fetch(GEMINI_URL, {
+    const response = await fetch(buildGeminiUrl(selectModel('modify-voice', rid)), {
       signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -464,7 +514,7 @@ router.post('/scan-invoice', upload.single('invoice'), async (req, res) => {
   const prompt = "Extrais les données de cette facture fournisseur de restaurant. Retourne un JSON avec : supplier_name, invoice_number, invoice_date, items (array de {product_name, quantity, unit, unit_price, total_price, batch_number, dlc}), total_ht, tva, total_ttc. Si un champ n'est pas visible, mets null.";
 
   try {
-    const response = await fetch(GEMINI_URL, {
+    const response = await fetch(buildGeminiUrl(selectModel('scan-invoice', req.user?.restaurant_id)), {
       signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -578,7 +628,7 @@ Retourne un JSON avec :
 Si un champ n'est pas visible, mets null. Extrais TOUS les produits listés, même les catégories.`;
 
   try {
-    const response = await fetch(GEMINI_URL, {
+    const response = await fetch(buildGeminiUrl(selectModel('scan-mercuriale', req.user?.restaurant_id)), {
       signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -818,7 +868,7 @@ Réponds en JSON avec cette structure :
   "daily_special": {"name": "...", "description": "...", "key_ingredients": ["..."]}
 }`;
 
-    const geminiRes = await fetch(GEMINI_URL, {
+    const geminiRes = await fetch(buildGeminiUrl(selectModel('menu-suggestions', req.user?.restaurant_id)), {
       signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -865,10 +915,14 @@ router.post('/chef', async (req, res) => {
     // Build restaurant context from real data
     const context = buildRestaurantContext();
 
+    // Load personalization context (preferences, recent learning, shortcuts)
+    const perso = loadPersonalizationContext(req.user?.restaurant_id, req.user?.id);
+
     const systemPrompt = `Tu es Alto, l'assistant culinaire intelligent de RestoSuite. Tu connais parfaitement ce restaurant et ses données.
 
 CONTEXTE DU RESTAURANT :
 ${context}
+${perso.block}
 
 RÈGLES :
 - Réponds en français, de manière concise et professionnelle
@@ -879,6 +933,7 @@ RÈGLES :
 - Tu peux suggérer des optimisations basées sur les données
 - Utilise les ratios standards de la restauration (food cost 25-30%, etc.)
 - Formate tes réponses de manière claire avec des paragraphes courts
+- Respecte les préférences utilisateur ci-dessus (tutoiement/vouvoiement, type d'établissement, etc.)
 
 DOMAINES D'EXPERTISE :
 - Fiches techniques et costing
@@ -919,7 +974,7 @@ DOMAINES D'EXPERTISE :
       parts: [{ text: message }]
     });
 
-    const response = await fetch(GEMINI_URL, {
+    const response = await fetch(buildGeminiUrl(selectModel('chef', req.user?.restaurant_id)), {
       signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -958,6 +1013,43 @@ router.post('/assistant', async (req, res) => {
   if (!message) return res.status(400).json({ error: 'Message requis' });
 
   try {
+    // ─── Shortcut fuzzy match — skip Gemini if a trigger matches ───
+    const shortcutHit = matchShortcut(user.restaurant_id, message);
+    if (shortcutHit) {
+      // Bump usage counter + last_used
+      try {
+        run(
+          `UPDATE ai_shortcuts
+              SET usage_count = COALESCE(usage_count, 0) + 1,
+                  last_used_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND restaurant_id = ?`,
+          [shortcutHit.id, user.restaurant_id]
+        );
+      } catch (_) {}
+
+      let templateObj = null;
+      if (shortcutHit.action_template) {
+        try {
+          templateObj = typeof shortcutHit.action_template === 'string'
+            ? JSON.parse(shortcutHit.action_template)
+            : shortcutHit.action_template;
+        } catch (_) { templateObj = null; }
+      }
+
+      const action = {
+        type: shortcutHit.action_type,
+        description: shortcutHit.description || `Raccourci : ${shortcutHit.trigger_phrase}`,
+        params: (templateObj && typeof templateObj === 'object') ? templateObj : {},
+        requires_confirmation: true,
+      };
+      const filtered = filterActionsByRole([action], user.role);
+      return res.json({
+        reply: `Raccourci détecté : « ${shortcutHit.trigger_phrase} ».`,
+        actions: filtered,
+        shortcut_used: shortcutHit.id,
+      });
+    }
+
     // Build restaurant context from real data
     const context = buildRestaurantContext();
 
@@ -967,11 +1059,22 @@ router.post('/assistant', async (req, res) => {
       pageContext = buildPageContext(context_page, context_id);
     }
 
+    // Load personalization + onboarding state
+    const perso = loadPersonalizationContext(user.restaurant_id, user.id);
+    const onboardingBlock = perso.onboardingComplete
+      ? ''
+      : `\n\nONBOARDING (PREMIÈRE UTILISATION) :
+L'utilisateur n'a pas encore configuré Alto. Dans ta réponse, pose-lui 2 questions courtes avant toute autre chose :
+1. Quel type d'établissement ? (bistrot, brasserie, gastronomique, cantine, traiteur, food-truck, autre)
+2. Préfère-t-il le tutoiement ou le vouvoiement ?
+Explique brièvement que ses réponses vont personnaliser Alto. Ne propose aucune action (actions: []) tant que l'onboarding n'est pas fait.`;
+
     const systemPrompt = `Tu es Alto, l'assistant culinaire intelligent de RestoSuite. Tu connais parfaitement ce restaurant et ses données, et tu aides le chef et l'équipe à saisir tous leurs relevés HACCP et opérationnels en langage naturel (voix ou texte).
 
 CONTEXTE DU RESTAURANT :
 ${context}
 ${pageContext}
+${perso.block}${onboardingBlock}
 
 CAPACITÉS D'ACTION :
 Tu peux détecter les demandes d'action et retourner un plan d'action structuré dans le champ \`actions\`. Types d'actions disponibles :
@@ -1075,7 +1178,7 @@ DOMAINES D'EXPERTISE :
     });
 
     // First call: get text response and action detection
-    const response = await fetch(GEMINI_URL, {
+    const response = await fetch(buildGeminiUrl(selectModel('assistant', user.restaurant_id)), {
       signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1785,10 +1888,45 @@ router.post('/execute-action', async (req, res) => {
         return res.status(400).json({ error: `Action non reconnue: ${type}` });
     }
 
+    // Log confirmed action to ai_learning (personalization signal)
+    writeLearning({
+      restaurant_id: rid,
+      account_id: user.id,
+      action_type: type,
+      outcome: 'confirmed',
+      user_message: req.body?.user_message || null,
+      action_params: params,
+      feedback_notes: null,
+    });
+
     res.json(result);
   } catch (e) {
     console.error('Execute action error:', e);
     res.status(500).json({ error: 'Erreur exécution action' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// POST /api/ai/reject-action — Log a rejected action for learning
+// ═══════════════════════════════════════════
+router.post('/reject-action', (req, res) => {
+  const { type, params, reason, user_message } = req.body || {};
+  const user = req.user;
+  if (!type) return res.status(400).json({ error: 'type requis' });
+  try {
+    writeLearning({
+      restaurant_id: user.restaurant_id,
+      account_id: user.id,
+      action_type: type,
+      outcome: 'rejected',
+      user_message: user_message || null,
+      action_params: params || null,
+      feedback_notes: reason || null,
+    });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Reject action error:', e);
+    res.status(500).json({ error: 'Erreur enregistrement rejet' });
   }
 });
 
@@ -1902,6 +2040,143 @@ function buildRestaurantContext() {
     return parts.join('\n');
   } catch (e) {
     return 'Données du restaurant non disponibles: ' + e.message;
+  }
+}
+
+// ─── Personalization helpers ─────────────────────────────────────────
+
+function writeLearning({ restaurant_id, account_id, action_type, outcome, user_message, action_params, feedback_notes }) {
+  try {
+    const paramsJson = action_params == null
+      ? null
+      : (typeof action_params === 'string' ? action_params : JSON.stringify(action_params));
+    run(
+      `INSERT INTO ai_learning
+         (restaurant_id, account_id, action_type, outcome, user_message, action_params, feedback_notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [restaurant_id, account_id || null, action_type, outcome, user_message || null, paramsJson, feedback_notes || null]
+    );
+  } catch (e) {
+    // Soft-fail: learning must never block an action
+    console.warn('writeLearning warn:', e.message);
+  }
+}
+
+// Normalize a phrase for fuzzy matching: lowercase, strip accents, collapse whitespace
+function normalizePhrase(str) {
+  if (!str) return '';
+  return String(str)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Fuzzy match a user message against stored shortcuts for this restaurant.
+// Returns the first shortcut whose normalized trigger is contained in the
+// normalized message (or vice-versa for short triggers).
+function matchShortcut(restaurantId, message) {
+  if (!restaurantId || !message) return null;
+  try {
+    const rows = all(
+      `SELECT id, trigger_phrase, action_type, action_template, description, usage_count
+         FROM ai_shortcuts
+        WHERE restaurant_id = ?`,
+      [restaurantId]
+    );
+    if (!rows.length) return null;
+    const normMsg = normalizePhrase(message);
+    if (!normMsg) return null;
+
+    let best = null;
+    let bestLen = 0;
+    for (const row of rows) {
+      const trig = normalizePhrase(row.trigger_phrase);
+      if (!trig) continue;
+      // Require a meaningful trigger (>=3 chars) to avoid spurious hits
+      if (trig.length < 3) continue;
+      if (normMsg === trig || normMsg.includes(trig)) {
+        if (trig.length > bestLen) { best = row; bestLen = trig.length; }
+      }
+    }
+    return best;
+  } catch (_) {
+    return null; // table may not exist in some test runs
+  }
+}
+
+// Load per-user preferences, recent learning, and shortcuts as a textual
+// block injectable into a Gemini system prompt.
+function loadPersonalizationContext(restaurantId, accountId) {
+  const empty = { block: '', onboardingComplete: true, preferences: {}, learning: [], shortcuts: [] };
+  if (!restaurantId) return empty;
+  try {
+    const prefRows = all(
+      `SELECT pref_key, pref_value FROM ai_preferences
+        WHERE restaurant_id = ? AND (account_id = ? OR account_id IS NULL)`,
+      [restaurantId, accountId || null]
+    );
+    const preferences = {};
+    for (const p of prefRows) preferences[p.pref_key] = p.pref_value;
+
+    const learning = all(
+      `SELECT action_type, outcome, user_message, feedback_notes, created_at
+         FROM ai_learning
+        WHERE restaurant_id = ?
+        ORDER BY created_at DESC
+        LIMIT 50`,
+      [restaurantId]
+    );
+
+    const shortcuts = all(
+      `SELECT trigger_phrase, action_type, description, usage_count
+         FROM ai_shortcuts
+        WHERE restaurant_id = ?
+        ORDER BY usage_count DESC
+        LIMIT 20`,
+      [restaurantId]
+    );
+
+    const onboardingComplete = preferences.onboarding_complete === '1'
+      || preferences.onboarding_complete === 'true'
+      || !!preferences.establishment_type;
+
+    const prefLines = Object.keys(preferences).length
+      ? Object.entries(preferences).map(([k, v]) => `- ${k} : ${v}`).join('\n')
+      : '- (aucune préférence enregistrée)';
+
+    // Summarize learning: counts by outcome + top confirmed action types
+    const confirmedCounts = {};
+    const rejectedCounts = {};
+    for (const l of learning) {
+      if (l.outcome === 'confirmed') confirmedCounts[l.action_type] = (confirmedCounts[l.action_type] || 0) + 1;
+      else if (l.outcome === 'rejected') rejectedCounts[l.action_type] = (rejectedCounts[l.action_type] || 0) + 1;
+    }
+    const topConfirmed = Object.entries(confirmedCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([t, c]) => `${t} (${c}×)`).join(', ') || '—';
+    const topRejected = Object.entries(rejectedCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([t, c]) => `${t} (${c}×)`).join(', ') || '—';
+
+    const shortcutLines = shortcuts.length
+      ? shortcuts.map(s => `- "${s.trigger_phrase}" → ${s.action_type} (${s.usage_count || 0}× utilisé)`).join('\n')
+      : '- (aucun raccourci)';
+
+    const block = `\n\nPERSONNALISATION ALTO :
+Préférences utilisateur :
+${prefLines}
+
+Apprentissage (50 dernières actions) :
+- Actions confirmées fréquentes : ${topConfirmed}
+- Actions rejetées : ${topRejected}
+
+Raccourcis personnalisés :
+${shortcutLines}`;
+
+    return { block, onboardingComplete, preferences, learning, shortcuts };
+  } catch (e) {
+    // Table may not exist yet — return inert block
+    return empty;
   }
 }
 

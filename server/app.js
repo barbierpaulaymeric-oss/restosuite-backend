@@ -214,6 +214,7 @@ app.use('/api/suppliers', require('./routes/suppliers'));
 app.use('/api/prices', require('./routes/prices'));
 app.use('/api/recipes', require('./routes/recipes'));
 app.use('/api/ai', require('./routes/ai'));
+app.use('/api/ai-preferences', require('./routes/ai-preferences'));
 app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/haccp/witness-meals', require('./routes/witness-meals'));
 app.use('/api/haccp', require('./routes/haccp'));
