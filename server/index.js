@@ -87,6 +87,25 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/pin-login', authLimiter);
 
+// Staff auth — 4-digit PINs are brute-forceable, keep limit tight
+const staffAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Trop de tentatives, réessayez dans 15 minutes' },
+});
+app.use('/api/auth/staff-login', staffAuthLimiter);
+app.use('/api/auth/staff-pin', staffAuthLimiter);
+
+// Supplier portal auth — same tight limit as main auth
+const supplierAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Trop de tentatives, réessayez dans 15 minutes' },
+});
+app.use('/api/supplier-portal/company-login', supplierAuthLimiter);
+app.use('/api/supplier-portal/member-pin', supplierAuthLimiter);
+app.use('/api/supplier-portal/quick-login', supplierAuthLimiter);
+
 // ─── DB Backup ───
 backupDatabase(); // on startup
 setInterval(backupDatabase, 6 * 60 * 60 * 1000); // every 6 hours
