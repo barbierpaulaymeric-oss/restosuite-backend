@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════
-// AI Chef — Assistant IA contextuel
+// Alto (legacy /chef view) — contextual chat variant
+// Kept for the legacy /chef route (redirected to /ia by router)
 // ═══════════════════════════════════════════
 
 let _chefHistory = [];
@@ -17,16 +18,16 @@ async function renderAIChef() {
           <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Accueil
         </a>
         <h1 style="display:flex;align-items:center;gap:8px">
-          <i data-lucide="chef-hat" style="width:28px;height:28px;vertical-align:middle;margin-right:8px"></i>Chef IA
+          <i data-lucide="sparkles" style="width:28px;height:28px;vertical-align:middle;margin-right:8px"></i>Alto
         </h1>
-        <p class="text-secondary" style="font-size:var(--text-sm)">Assistant expert qui connaît votre restaurant</p>
+        <p class="text-secondary" style="font-size:var(--text-sm)">Assistant culinaire intelligent qui connaît votre restaurant</p>
       </div>
 
       <div id="chef-messages" style="flex:1;overflow-y:auto;padding:var(--space-3) 0;display:flex;flex-direction:column;gap:var(--space-3)">
         <div class="chef-msg chef-msg--ai">
-          <div class="chef-msg__avatar">👨‍🍳</div>
+          <div class="chef-msg__avatar">✨</div>
           <div class="chef-msg__bubble">
-            <p>Bonjour ! Je suis <strong>Chef</strong>, votre assistant IA RestoSuite.</p>
+            <p>Bonjour ! Je suis <strong>Alto</strong>, votre assistant culinaire intelligent.</p>
             <p style="margin-top:8px">Je connais vos fiches techniques, vos stocks, vos fournisseurs et vos données HACCP. Posez-moi vos questions !</p>
             <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
               <button class="chef-suggestion" onclick="sendChefSuggestion('Quel est mon food cost moyen et comment l\\'améliorer ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Food cost</button>
@@ -41,7 +42,7 @@ async function renderAIChef() {
 
       <div style="flex-shrink:0;padding:var(--space-3) 0;border-top:1px solid var(--border-light)">
         <form id="chef-form" style="display:flex;gap:var(--space-2)">
-          <input type="text" id="chef-input" class="input" placeholder="Posez votre question à Chef…"
+          <input type="text" id="chef-input" class="input" placeholder="Posez votre question à Alto…"
             style="flex:1;font-size:var(--text-base)" autocomplete="off">
           <button type="submit" class="btn btn-primary" id="chef-send-btn" style="padding:8px 16px">
             <i data-lucide="send" style="width:18px;height:18px"></i>
@@ -110,7 +111,7 @@ async function sendChefMessage(message) {
   typing.className = 'chef-msg chef-msg--ai';
   typing.id = 'chef-typing';
   typing.innerHTML = `
-    <div class="chef-msg__avatar">👨‍🍳</div>
+    <div class="chef-msg__avatar">✨</div>
     <div class="chef-msg__bubble"><div class="chef-typing"><span></span><span></span><span></span></div></div>
   `;
   messagesEl.appendChild(typing);
@@ -132,7 +133,7 @@ async function sendChefMessage(message) {
     const aiMsg = document.createElement('div');
     aiMsg.className = 'chef-msg chef-msg--ai';
     aiMsg.innerHTML = `
-      <div class="chef-msg__avatar">👨‍🍳</div>
+      <div class="chef-msg__avatar">✨</div>
       <div class="chef-msg__bubble">${formatChefReply(result.reply)}</div>
     `;
     messagesEl.appendChild(aiMsg);
@@ -141,7 +142,7 @@ async function sendChefMessage(message) {
     const errMsg = document.createElement('div');
     errMsg.className = 'chef-msg chef-msg--ai';
     errMsg.innerHTML = `
-      <div class="chef-msg__avatar">👨‍🍳</div>
+      <div class="chef-msg__avatar">✨</div>
       <div class="chef-msg__bubble" style="border-color:var(--color-danger)">
         <p style="color:var(--color-danger)">Désolé, une erreur est survenue : ${escapeHtml(e.message)}</p>
       </div>

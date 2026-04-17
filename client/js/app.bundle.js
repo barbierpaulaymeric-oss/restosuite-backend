@@ -19526,16 +19526,16 @@ async function renderAIChef() {
           <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Accueil
         </a>
         <h1 style="display:flex;align-items:center;gap:8px">
-          <i data-lucide="chef-hat" style="width:28px;height:28px;vertical-align:middle;margin-right:8px"></i>Chef IA
+          <i data-lucide="sparkles" style="width:28px;height:28px;vertical-align:middle;margin-right:8px"></i>Alto
         </h1>
-        <p class="text-secondary" style="font-size:var(--text-sm)">Assistant expert qui conna\xEEt votre restaurant</p>
+        <p class="text-secondary" style="font-size:var(--text-sm)">Assistant culinaire intelligent qui conna\xEEt votre restaurant</p>
       </div>
 
       <div id="chef-messages" style="flex:1;overflow-y:auto;padding:var(--space-3) 0;display:flex;flex-direction:column;gap:var(--space-3)">
         <div class="chef-msg chef-msg--ai">
-          <div class="chef-msg__avatar">\u{1F468}\u200D\u{1F373}</div>
+          <div class="chef-msg__avatar">\u2728</div>
           <div class="chef-msg__bubble">
-            <p>Bonjour ! Je suis <strong>Chef</strong>, votre assistant IA RestoSuite.</p>
+            <p>Bonjour ! Je suis <strong>Alto</strong>, votre assistant culinaire intelligent.</p>
             <p style="margin-top:8px">Je connais vos fiches techniques, vos stocks, vos fournisseurs et vos donn\xE9es HACCP. Posez-moi vos questions !</p>
             <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
               <button class="chef-suggestion" onclick="sendChefSuggestion('Quel est mon food cost moyen et comment l\\'am\xE9liorer ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Food cost</button>
@@ -19550,7 +19550,7 @@ async function renderAIChef() {
 
       <div style="flex-shrink:0;padding:var(--space-3) 0;border-top:1px solid var(--border-light)">
         <form id="chef-form" style="display:flex;gap:var(--space-2)">
-          <input type="text" id="chef-input" class="input" placeholder="Posez votre question \xE0 Chef\u2026"
+          <input type="text" id="chef-input" class="input" placeholder="Posez votre question \xE0 Alto\u2026"
             style="flex:1;font-size:var(--text-base)" autocomplete="off">
           <button type="submit" class="btn btn-primary" id="chef-send-btn" style="padding:8px 16px">
             <i data-lucide="send" style="width:18px;height:18px"></i>
@@ -19612,7 +19612,7 @@ async function sendChefMessage(message) {
   typing.className = "chef-msg chef-msg--ai";
   typing.id = "chef-typing";
   typing.innerHTML = `
-    <div class="chef-msg__avatar">\u{1F468}\u200D\u{1F373}</div>
+    <div class="chef-msg__avatar">\u2728</div>
     <div class="chef-msg__bubble"><div class="chef-typing"><span></span><span></span><span></span></div></div>
   `;
   messagesEl.appendChild(typing);
@@ -19628,7 +19628,7 @@ async function sendChefMessage(message) {
     const aiMsg = document.createElement("div");
     aiMsg.className = "chef-msg chef-msg--ai";
     aiMsg.innerHTML = `
-      <div class="chef-msg__avatar">\u{1F468}\u200D\u{1F373}</div>
+      <div class="chef-msg__avatar">\u2728</div>
       <div class="chef-msg__bubble">${formatChefReply(result.reply)}</div>
     `;
     messagesEl.appendChild(aiMsg);
@@ -19637,7 +19637,7 @@ async function sendChefMessage(message) {
     const errMsg = document.createElement("div");
     errMsg.className = "chef-msg chef-msg--ai";
     errMsg.innerHTML = `
-      <div class="chef-msg__avatar">\u{1F468}\u200D\u{1F373}</div>
+      <div class="chef-msg__avatar">\u2728</div>
       <div class="chef-msg__bubble" style="border-color:var(--color-danger)">
         <p style="color:var(--color-danger)">D\xE9sol\xE9, une erreur est survenue : ${escapeHtml(e.message)}</p>
       </div>
@@ -19662,22 +19662,22 @@ async function renderAIAssistant() {
     <div style="display:flex;flex-direction:column;height:calc(100vh - 80px);max-width:900px;margin:0 auto;padding:var(--space-3)">
       <div class="view-header" style="flex-shrink:0;margin-bottom:var(--space-4)">
         <h1 style="display:flex;align-items:center;gap:8px;margin:0">
-          <i data-lucide="brain" style="width:28px;height:28px;vertical-align:middle;margin-right:8px"></i>Assistant IA
+          <i data-lucide="sparkles" style="width:28px;height:28px;vertical-align:middle;margin-right:8px"></i>Alto
         </h1>
-        <p class="text-secondary" style="font-size:var(--text-sm);margin-top:4px">Chef expert \xB7 Recommandations intelligentes \xB7 Actions confirm\xE9es</p>
+        <p class="text-secondary" style="font-size:var(--text-sm);margin-top:4px">Assistant culinaire intelligent \xB7 Voix &amp; texte \xB7 Actions confirm\xE9es</p>
       </div>
 
       <div id="ai-messages" style="flex:1;overflow-y:auto;padding:var(--space-3) 0;display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-4)">
         <div class="ai-msg ai-msg--ai">
-          <div class="ai-msg__avatar">\u{1F9E0}</div>
+          <div class="ai-msg__avatar">\u2728</div>
           <div class="ai-msg__bubble">
-            <p>Bonjour ! Je suis votre <strong>Assistant IA</strong> RestoSuite.</p>
-            <p style="margin-top:8px">Je connais vos fiches techniques, vos stocks, vos fournisseurs et vos donn\xE9es HACCP. Je peux vous aider et ex\xE9cuter des actions avec votre confirmation.</p>
+            <p>Bonjour ! Je suis <strong>Alto</strong>, votre assistant culinaire intelligent.</p>
+            <p style="margin-top:8px">Parlez-moi ou \xE9crivez&nbsp;: je peux enregistrer vos relev\xE9s HACCP (temp\xE9ratures, nettoyages, cuissons, refroidissements, non-conformit\xE9s, plats t\xE9moins, tra\xE7abilit\xE9\u2026), g\xE9rer vos stocks et commandes, ou analyser vos donn\xE9es. Vous validez, j\u2019ex\xE9cute.</p>
             <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
-              <button class="ai-suggestion" onclick="sendAISuggestion('Quel est mon food cost moyen et comment l\\'am\xE9liorer ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Food cost</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Quels ingr\xE9dients sont en stock bas ?')"><i data-lucide="package" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Stock</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Optimise les marges de mes plats')"><i data-lucide="dollar-sign" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Marges</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Enregistre une temp\xE9rature de 5\xB0C en chambre froide')"><i data-lucide="thermometer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>HACCP</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Frigo 1 \xE0 3,2\xB0C, frigo 2 \xE0 4\xB0C, chambre froide \xE0 -18\xB0C')"><i data-lucide="thermometer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Relev\xE9 T\xB0 group\xE9</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('J\\'ai nettoy\xE9 les plans de travail, la trancheuse et les frigos')"><i data-lucide="sparkles" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Nettoyages</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Refroidissement blanquette, d\xE9part 72\xB0C, arriv\xE9e 8\xB0C en 1h45')"><i data-lucide="snowflake" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Refroidissement</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Quel est mon food cost moyen ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Food cost</button>
             </div>
           </div>
         </div>
@@ -19688,7 +19688,7 @@ async function renderAIAssistant() {
           <button type="button" class="btn" id="ai-voice-btn" style="padding:8px 12px;background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-secondary)" title="Enregistrer au micro">
             <i data-lucide="mic" style="width:18px;height:18px"></i>
           </button>
-          <input type="text" id="ai-input" class="input" placeholder="Posez votre question \xE0 l'Assistant IA\u2026"
+          <input type="text" id="ai-input" class="input" placeholder="Parlez \xE0 Alto ou \xE9crivez votre demande\u2026"
             style="flex:1;font-size:var(--text-base)" autocomplete="off">
           <button type="submit" class="btn btn-primary" id="ai-send-btn" style="padding:8px 16px">
             <i data-lucide="send" style="width:18px;height:18px"></i>
@@ -19851,7 +19851,7 @@ async function sendAIMessage(message) {
   typing.className = "ai-msg ai-msg--ai";
   typing.id = "ai-typing";
   typing.innerHTML = `
-    <div class="ai-msg__avatar">\u{1F9E0}</div>
+    <div class="ai-msg__avatar">\u2728</div>
     <div class="ai-msg__bubble"><div class="ai-typing"><span></span><span></span><span></span></div></div>
   `;
   messagesEl.appendChild(typing);
@@ -19867,7 +19867,7 @@ async function sendAIMessage(message) {
     const aiMsg = document.createElement("div");
     aiMsg.className = "ai-msg ai-msg--ai";
     aiMsg.innerHTML = `
-      <div class="ai-msg__avatar">\u{1F9E0}</div>
+      <div class="ai-msg__avatar">\u2728</div>
       <div class="ai-msg__bubble">${formatAIReply(result.reply)}</div>
     `;
     messagesEl.appendChild(aiMsg);
@@ -19897,7 +19897,7 @@ async function sendAIMessage(message) {
     const errMsg = document.createElement("div");
     errMsg.className = "ai-msg ai-msg--ai";
     errMsg.innerHTML = `
-      <div class="ai-msg__avatar">\u{1F9E0}</div>
+      <div class="ai-msg__avatar">\u2728</div>
       <div class="ai-msg__bubble" style="border-color:var(--color-danger)">
         <p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>
       </div>
@@ -19917,7 +19917,7 @@ async function confirmAIAction(type, paramsBase64) {
     const loadingEl = document.createElement("div");
     loadingEl.className = "ai-msg ai-msg--ai";
     loadingEl.innerHTML = `
-      <div class="ai-msg__avatar">\u{1F9E0}</div>
+      <div class="ai-msg__avatar">\u2728</div>
       <div class="ai-msg__bubble"><div class="ai-typing"><span></span><span></span><span></span></div></div>
     `;
     messagesEl.appendChild(loadingEl);
@@ -22673,17 +22673,17 @@ function initFloatingAIBubble() {
       }
     </style>
 
-    <button class="bubble-fab" id="bubble-fab" title="Assistant IA">\u{1F3A4}</button>
+    <button class="bubble-fab" id="bubble-fab" title="Alto \u2014 assistant culinaire">\u{1F3A4}</button>
     <div class="bubble-panel" id="bubble-panel" style="display:none">
       <div class="bubble-header">
-        <h3>Assistant IA</h3>
+        <h3>Alto</h3>
         <button class="bubble-close" id="bubble-close">\u2715</button>
       </div>
       <div class="bubble-messages" id="bubble-messages"></div>
       <div id="bubble-transcript" class="bubble-transcript" style="display:none"></div>
       <div class="bubble-input-area">
         <button class="bubble-voice-btn" id="bubble-voice-btn" title="Enregistrer au micro">\u{1F3A4}</button>
-        <input type="text" class="bubble-text-input" id="bubble-text-input" placeholder="Votre question\u2026" autocomplete="off">
+        <input type="text" class="bubble-text-input" id="bubble-text-input" placeholder="Parlez \xE0 Alto\u2026" autocomplete="off">
         <button class="bubble-send-btn" id="bubble-send-btn" title="Envoyer">\u2B06</button>
       </div>
     </div>
