@@ -1774,4 +1774,26 @@ try {
   if (!e.message.includes('already exists')) console.error('Migration fabrication_diagrams error:', e.message);
 }
 
+// ─── Santé du personnel ───────────────────────────────────────────────────────
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS staff_health_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_id INTEGER,
+      restaurant_id INTEGER,
+      staff_name TEXT NOT NULL,
+      record_type TEXT CHECK(record_type IN ('aptitude','visite_medicale','maladie','blessure','formation_hygiene')) NOT NULL,
+      date_record TEXT NOT NULL,
+      date_expiry TEXT,
+      notes TEXT,
+      document_path TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('✅ Migration: staff_health_records table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration staff_health_records error:', e.message);
+}
+
 module.exports = { db, all, get, run };

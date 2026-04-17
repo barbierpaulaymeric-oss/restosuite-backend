@@ -320,6 +320,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/water$/, renderHACCPWater);
   Router.add(/^\/haccp\/pms-audit$/, renderHACCPPmsAudit);
   Router.add(/^\/haccp\/tiac$/, renderHACCPTIAC);
+  Router.add(/^\/haccp\/staff-health$/, renderHACCPStaffHealth);
   Router.add(/^\/settings\/sanitary-approval$/, renderSanitaryApproval);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, () => { location.hash = '#/analytics'; });
