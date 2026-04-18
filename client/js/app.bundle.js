@@ -13856,7 +13856,7 @@ function _svcRenderConfigScreen(app) {
     <div class="svc-config-screen">
       <header class="svc-header">
         <div class="svc-header__left">
-          <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height:28px;width:auto">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:28px;width:auto">
           <span class="svc-header__title">Mode Service</span>
         </div>
         <div class="svc-header__right">
@@ -13927,7 +13927,7 @@ function _svcRenderServiceUI(app, tableCount) {
     <div class="svc-shell">
       <header class="svc-header">
         <div class="svc-header__left">
-          <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height:28px;width:auto">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:28px;width:auto">
           <span class="svc-header__title">Service</span>
           <span class="svc-header__user">\u2014 ${escapeHtml(((_a = _serviceState.account) == null ? void 0 : _a.name) || "")}</span>
         </div>
@@ -14050,7 +14050,7 @@ function _svcShowRecap(recap) {
     <div class="svc-config-screen">
       <header class="svc-header">
         <div class="svc-header__left">
-          <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height:28px;width:auto">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:28px;width:auto">
           <span class="svc-header__title">R\xE9capitulatif du service</span>
         </div>
         <div class="svc-header__right">
@@ -14638,7 +14638,7 @@ async function renderKitchenView() {
     <div class="kitchen-shell">
       <header class="kitchen-header">
         <div class="kitchen-header__left">
-          <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 28px; width: auto;">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto;">
           <span class="kitchen-header__title">Cuisine</span>
         </div>
         <div class="kitchen-header__right">
@@ -16410,7 +16410,7 @@ class LoginView {
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">
           <div class="login-logo">
-            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 80px; width: auto;">
+            <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 80px; width: auto;">
           </div>
           <h1 class="login-title">Resto<span class="text-accent">Suite</span></h1>
           <p class="login-tagline">Votre cuisine tourne. Vos chiffres suivent.</p>
@@ -16455,7 +16455,7 @@ class LoginView {
             <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
           <div class="login-logo">
-            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 60px; width: auto;">
+            <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 60px; width: auto;">
           </div>
           <h2 class="login-subtitle">Connexion g\xE9rant</h2>
 
@@ -16533,7 +16533,7 @@ class LoginView {
             <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
           <div class="login-logo">
-            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 60px; width: auto;">
+            <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 60px; width: auto;">
           </div>
           <h2 class="login-subtitle">Cr\xE9er un compte</h2>
           <p class="login-tagline">Essai gratuit 60 jours \u2014 aucun engagement</p>
@@ -17060,7 +17060,7 @@ function renderSupplierLogin() {
       <div class="login-screen supplier-theme">
         <div class="login-content">
           <div class="login-logo">
-            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 60px; width: auto;">
+            <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 60px; width: auto;">
           </div>
           <h1 class="login-title" style="font-size:var(--text-2xl)">Portail <span style="color:#4A90D9">Fournisseur</span></h1>
           <p class="login-tagline">Connectez-vous \xE0 votre espace fournisseur</p>
@@ -17143,7 +17143,7 @@ function renderSupplierLogin() {
       <div class="login-screen supplier-theme">
         <div class="login-content">
           <div class="login-logo">
-            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 50px; width: auto;">
+            <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 50px; width: auto;">
           </div>
           <h1 class="login-title" style="font-size:var(--text-xl)">${escapeHtml(supplierData.supplier_name)}</h1>
           <p class="login-tagline">Qui se connecte ?</p>
@@ -17297,7 +17297,7 @@ function bootSupplierApp(session) {
     <div class="supplier-shell">
       <header class="supplier-header">
         <div class="supplier-header__left">
-          <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 28px; width: auto; margin-right: 8px;">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto; margin-right: 8px;">
           <div>
             <span class="supplier-header__title">Portail Fournisseur</span>
             <span class="supplier-header__name">${escapeHtml(session.supplier_name || session.name)}</span>

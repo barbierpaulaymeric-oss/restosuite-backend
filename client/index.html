@@ -8,13 +8,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="RestoSuite">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="assets/logo-icon.svg">
   <title>RestoSuite</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Caveat:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="/manifest.json">
-  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.png">
   <script src="/js/lucide.min.js"></script>
 </head>
 <body>
@@ -22,7 +23,7 @@
 
   <!-- Loading screen (shown during cold start / slow API) -->
   <div id="loading-screen" style="display:none; position:fixed; inset:0; z-index:9999; background:#0F1923; align-items:center; justify-content:center; flex-direction:column;">
-    <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height:80px; margin-bottom:24px;">
+    <img src="assets/logo-full.svg" alt="RestoSuite" style="height:80px; margin-bottom:24px;">
     <div style="color:#F7F5F2; font-family:Inter,sans-serif; font-size:18px; font-weight:600; margin-bottom:16px;">RestoSuite</div>
     <div style="width:200px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
       <div id="loading-bar" style="width:0%; height:100%; background:#E8722A; border-radius:2px; transition:width 0.5s;"></div>
@@ -34,7 +35,7 @@
   <!-- Navigation — Bottom bar mobile, top bar desktop -->
   <nav class="nav-bottom" id="nav">
     <div class="nav-brand">
-      <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 28px; width: auto;">
+      <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto;">
     </div>
     <div class="nav-links">
       <span class="nav-category" data-category="cuisine" aria-hidden="true">Cuisine</span>

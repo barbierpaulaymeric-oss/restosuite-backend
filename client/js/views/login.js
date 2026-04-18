@@ -52,7 +52,7 @@ class LoginView {
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">
           <div class="login-logo">
-            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 80px; width: auto;">
+            <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 80px; width: auto;">
           </div>
           <h1 class="login-title">Resto<span class="text-accent">Suite</span></h1>
           <p class="login-tagline">Votre cuisine tourne. Vos chiffres suivent.</p>
@@ -99,7 +99,7 @@ class LoginView {
             <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
           <div class="login-logo">
-            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 60px; width: auto;">
+            <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 60px; width: auto;">
           </div>
           <h2 class="login-subtitle">Connexion gérant</h2>
 
@@ -179,7 +179,7 @@ class LoginView {
             <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
           <div class="login-logo">
-            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 60px; width: auto;">
+            <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 60px; width: auto;">
           </div>
           <h2 class="login-subtitle">Créer un compte</h2>
           <p class="login-tagline">Essai gratuit 60 jours — aucun engagement</p>

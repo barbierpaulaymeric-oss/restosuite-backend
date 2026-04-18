@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="RestoSuite">
+  <title>RestoSuite</title>
+  <!-- Filled navy circle — for dark backgrounds -->
+  <path d="M 100 14 C 148 14 186 54 185 101 C 186 147 147 186 100 185 C 53 186 14 148 15 100 C 14 53 53 16 100 14 Z"
+        fill="#1B2A4A"/>
+  <!-- cream Fraunces serif R -->
+  <text x="100" y="148" font-family="'Fraunces', 'Georgia', 'Times New Roman', serif" font-size="150" font-weight="600"
+        fill="#F5EFE6" text-anchor="middle">R</text>
+  <!-- orange accent dot -->
+  <circle cx="142" cy="150" r="7" fill="#C45A18"/>
+</svg>

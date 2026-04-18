@@ -1,11 +1,12 @@
-const CACHE_NAME = 'restosuite-v1';
+const CACHE_NAME = 'restosuite-v2';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
   '/js/app.js',
   '/js/router.js',
   '/js/api.js',
-  '/assets/logo-outline-thin.png',
+  '/assets/logo-icon.svg',
+  '/assets/logo-full.svg',
   '/assets/icon-192.png',
   '/manifest.json'
 ];

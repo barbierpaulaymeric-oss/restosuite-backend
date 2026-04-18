@@ -23,7 +23,7 @@ function renderSupplierLogin() {
       <div class="login-screen supplier-theme">
         <div class="login-content">
           <div class="login-logo">
-            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 60px; width: auto;">
+            <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 60px; width: auto;">
           </div>
           <h1 class="login-title" style="font-size:var(--text-2xl)">Portail <span style="color:#4A90D9">Fournisseur</span></h1>
           <p class="login-tagline">Connectez-vous à votre espace fournisseur</p>
@@ -120,7 +120,7 @@ function renderSupplierLogin() {
       <div class="login-screen supplier-theme">
         <div class="login-content">
           <div class="login-logo">
-            <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 50px; width: auto;">
+            <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 50px; width: auto;">
           </div>
           <h1 class="login-title" style="font-size:var(--text-xl)">${escapeHtml(supplierData.supplier_name)}</h1>
           <p class="login-tagline">Qui se connecte ?</p>

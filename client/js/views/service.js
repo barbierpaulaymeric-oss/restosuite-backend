@@ -73,7 +73,7 @@ function _svcRenderConfigScreen(app) {
     <div class="svc-config-screen">
       <header class="svc-header">
         <div class="svc-header__left">
-          <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height:28px;width:auto">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:28px;width:auto">
           <span class="svc-header__title">Mode Service</span>
         </div>
         <div class="svc-header__right">
@@ -147,7 +147,7 @@ function _svcRenderServiceUI(app, tableCount) {
     <div class="svc-shell">
       <header class="svc-header">
         <div class="svc-header__left">
-          <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height:28px;width:auto">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:28px;width:auto">
           <span class="svc-header__title">Service</span>
           <span class="svc-header__user">— ${escapeHtml(_serviceState.account?.name || '')}</span>
         </div>
@@ -287,7 +287,7 @@ function _svcShowRecap(recap) {
     <div class="svc-config-screen">
       <header class="svc-header">
         <div class="svc-header__left">
-          <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height:28px;width:auto">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:28px;width:auto">
           <span class="svc-header__title">Récapitulatif du service</span>
         </div>
         <div class="svc-header__right">

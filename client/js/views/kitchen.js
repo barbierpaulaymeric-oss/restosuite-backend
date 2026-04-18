@@ -18,7 +18,7 @@ async function renderKitchenView() {
     <div class="kitchen-shell">
       <header class="kitchen-header">
         <div class="kitchen-header__left">
-          <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 28px; width: auto;">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto;">
           <span class="kitchen-header__title">Cuisine</span>
         </div>
         <div class="kitchen-header__right">

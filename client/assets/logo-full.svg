@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 200" role="img" aria-label="RestoSuite">
+  <title>RestoSuite</title>
+  <!-- R monogram inside hand-drawn navy circle -->
+  <g>
+    <path d="M 100 14 C 148 14 186 54 185 101 C 186 147 147 186 100 185 C 53 186 14 148 15 100 C 14 53 53 16 100 14 Z"
+          fill="none" stroke="#1B2A4A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="100" y="148" font-family="'Fraunces', 'Georgia', 'Times New Roman', serif" font-size="150" font-weight="600"
+          fill="#1B2A4A" text-anchor="middle">R</text>
+    <circle cx="142" cy="150" r="7" fill="#C45A18"/>
+  </g>
+  <!-- RestoSuite wordmark — Fraunces with italic S pivot -->
+  <text x="232" y="138" font-family="'Fraunces', 'Georgia', 'Times New Roman', serif" font-size="120" font-weight="500" fill="#1B2A4A">Resto<tspan font-style="italic" font-weight="500">S</tspan>uite</text>
+</svg>
