@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
 const { validate, customerValidation } = require('../middleware/validate');
+const { writeAudit } = require('../lib/audit-log');
 const router = Router();
 
 // Apply auth to all CRM routes (customer PII must be auth-gated)
@@ -106,12 +107,18 @@ router.get('/customers', (req, res) => {
 router.get('/customers/:id', (req, res) => {
   try {
     const id = Number(req.params.id);
-    const customer = get('SELECT * FROM customers WHERE id = ?', [id]);
+    const rid = req.user.restaurant_id;
+    const customer = get('SELECT * FROM customers WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!customer) return res.status(404).json({ error: 'Client non trouvé' });
 
-    const transactions = all('SELECT * FROM loyalty_transactions WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50', [id]);
-    const reservations = all('SELECT * FROM reservations WHERE customer_email = ? OR customer_phone = ? ORDER BY reservation_date DESC LIMIT 20',
-      [customer.email, customer.phone]);
+    const transactions = all(
+      'SELECT * FROM loyalty_transactions WHERE customer_id = ? AND restaurant_id = ? ORDER BY created_at DESC LIMIT 50',
+      [id, rid]
+    );
+    const reservations = all(
+      'SELECT * FROM reservations WHERE restaurant_id = ? AND (customer_email = ? OR customer_phone = ?) ORDER BY reservation_date DESC LIMIT 20',
+      [rid, customer.email, customer.phone]
+    );
 
     res.json({
       ...customer,
@@ -151,7 +158,12 @@ router.post('/customers', validate(customerValidation), (req, res) => {
 router.put('/customers/:id', (req, res) => {
   try {
     const id = Number(req.params.id);
+    const rid = req.user.restaurant_id;
     const { name, email, phone, birthday, notes, tags, vip, opt_in_marketing } = req.body;
+
+    // Guard: cross-tenant target = 404 (feedback_cross_tenant_404_not_403)
+    const before = get('SELECT * FROM customers WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    if (!before) return res.status(404).json({ error: 'Client non trouvé' });
 
     run(`UPDATE customers SET
       name = COALESCE(?, name),
@@ -163,9 +175,21 @@ router.put('/customers/:id', (req, res) => {
       vip = COALESCE(?, vip),
       opt_in_marketing = COALESCE(?, opt_in_marketing),
       updated_at = datetime('now')
-      WHERE id = ?`,
-      [name, email, phone, birthday, notes, tags ? JSON.stringify(tags) : null, vip, opt_in_marketing, id]
+      WHERE id = ? AND restaurant_id = ?`,
+      [name, email, phone, birthday, notes, tags ? JSON.stringify(tags) : null, vip, opt_in_marketing, id, rid]
     );
+
+    try {
+      writeAudit({
+        restaurant_id: rid,
+        account_id: req.user.id || null,
+        table_name: 'customers',
+        record_id: id,
+        action: 'update',
+        old_values: before,
+        new_values: { name, email, phone, birthday, notes, tags, vip, opt_in_marketing },
+      });
+    } catch {}
 
     res.json({ ok: true });
   } catch (e) {
@@ -177,8 +201,13 @@ router.put('/customers/:id', (req, res) => {
 router.post('/customers/:id/visit', (req, res) => {
   try {
     const id = Number(req.params.id);
+    const rid = req.user.restaurant_id;
     const { amount, order_id } = req.body;
     const spent = amount || 0;
+
+    // Guard tenant before mutating
+    const exists = get('SELECT id FROM customers WHERE id = ? AND restaurant_id = ?', [id, rid]);
+    if (!exists) return res.status(404).json({ error: 'Client non trouvé' });
 
     // Update customer stats
     run(`UPDATE customers SET
@@ -187,24 +216,30 @@ router.post('/customers/:id/visit', (req, res) => {
       avg_ticket = (total_spent + ?) / (total_visits + 1),
       last_visit = datetime('now'),
       updated_at = datetime('now')
-      WHERE id = ?`,
-      [spent, spent, id]
+      WHERE id = ? AND restaurant_id = ?`,
+      [spent, spent, id, rid]
     );
 
     // Award loyalty points (1 point per euro spent)
     const pointsEarned = Math.floor(spent);
     if (pointsEarned > 0) {
-      run('UPDATE customers SET loyalty_points = loyalty_points + ? WHERE id = ?', [pointsEarned, id]);
-      run(`INSERT INTO loyalty_transactions (customer_id, points, type, description, order_id)
-        VALUES (?, ?, 'earn', ?, ?)`,
-        [id, pointsEarned, `Visite : ${spent.toFixed(2)}€`, order_id || null]
+      run(
+        'UPDATE customers SET loyalty_points = loyalty_points + ? WHERE id = ? AND restaurant_id = ?',
+        [pointsEarned, id, rid]
+      );
+      run(`INSERT INTO loyalty_transactions (restaurant_id, customer_id, points, type, description, order_id)
+        VALUES (?, ?, ?, 'earn', ?, ?)`,
+        [rid, id, pointsEarned, `Visite : ${spent.toFixed(2)}€`, order_id || null]
       );
     }
 
     // Auto-VIP at 500 points or 10 visits
-    const customer = get('SELECT loyalty_points, total_visits FROM customers WHERE id = ?', [id]);
+    const customer = get(
+      'SELECT loyalty_points, total_visits, vip FROM customers WHERE id = ? AND restaurant_id = ?',
+      [id, rid]
+    );
     if (customer && (customer.loyalty_points >= 500 || customer.total_visits >= 10) && !customer.vip) {
-      run('UPDATE customers SET vip = 1 WHERE id = ?', [id]);
+      run('UPDATE customers SET vip = 1 WHERE id = ? AND restaurant_id = ?', [id, rid]);
     }
 
     res.json({ ok: true, points_earned: pointsEarned });
@@ -247,9 +282,16 @@ router.post('/customers/:id/redeem/:rewardId', (req, res) => {
   try {
     const customerId = Number(req.params.id);
     const rewardId = Number(req.params.rewardId);
+    const rid = req.user.restaurant_id;
 
-    const customer = get('SELECT * FROM customers WHERE id = ?', [customerId]);
-    const reward = get('SELECT * FROM loyalty_rewards WHERE id = ? AND is_active = 1', [rewardId]);
+    const customer = get(
+      'SELECT * FROM customers WHERE id = ? AND restaurant_id = ?',
+      [customerId, rid]
+    );
+    const reward = get(
+      'SELECT * FROM loyalty_rewards WHERE id = ? AND restaurant_id = ? AND is_active = 1',
+      [rewardId, rid]
+    );
 
     if (!customer) return res.status(404).json({ error: 'Client non trouvé' });
     if (!reward) return res.status(404).json({ error: 'Récompense non trouvée' });
@@ -258,16 +300,33 @@ router.post('/customers/:id/redeem/:rewardId', (req, res) => {
     }
 
     // Deduct points
-    run('UPDATE customers SET loyalty_points = loyalty_points - ? WHERE id = ?', [reward.points_required, customerId]);
+    run(
+      'UPDATE customers SET loyalty_points = loyalty_points - ? WHERE id = ? AND restaurant_id = ?',
+      [reward.points_required, customerId, rid]
+    );
 
     // Record transaction
-    run(`INSERT INTO loyalty_transactions (customer_id, points, type, description)
-      VALUES (?, ?, 'redeem', ?)`,
-      [customerId, -reward.points_required, `Récompense : ${reward.name}`]
+    run(`INSERT INTO loyalty_transactions (restaurant_id, customer_id, points, type, description)
+      VALUES (?, ?, ?, 'redeem', ?)`,
+      [rid, customerId, -reward.points_required, `Récompense : ${reward.name}`]
     );
 
     // Update reward counter
-    run('UPDATE loyalty_rewards SET times_redeemed = times_redeemed + 1 WHERE id = ?', [rewardId]);
+    run(
+      'UPDATE loyalty_rewards SET times_redeemed = times_redeemed + 1 WHERE id = ? AND restaurant_id = ?',
+      [rewardId, rid]
+    );
+
+    try {
+      writeAudit({
+        restaurant_id: rid,
+        account_id: req.user.id || null,
+        table_name: 'loyalty_transactions',
+        record_id: customerId,
+        action: 'create',
+        new_values: { customer_id: customerId, reward_id: rewardId, points: -reward.points_required },
+      });
+    } catch {}
 
     res.json({ ok: true, message: `Récompense "${reward.name}" utilisée` });
   } catch (e) {

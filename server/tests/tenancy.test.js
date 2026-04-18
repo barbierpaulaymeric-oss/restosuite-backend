@@ -288,3 +288,65 @@ describe('P0: PUT/DELETE /api/accounts/:id must be tenant-scoped (IDOR)', () => 
     expect(after.name).toBe('StaffR100-renamed');
   });
 });
+
+describe('P0: CRM customer routes must be tenant-scoped (EVAL_ULTIMATE IDOR)', () => {
+  beforeAll(() => {
+    // Tenants R100/R200 already seeded above; add dedicated CRM fixtures
+    run("INSERT OR IGNORE INTO customers (id, restaurant_id, name, email, phone, loyalty_points) VALUES (5101, 100, 'CrmR100', 'crm100@test.fr', '0101010101', 600)");
+    run("INSERT OR IGNORE INTO customers (id, restaurant_id, name, email, phone, loyalty_points) VALUES (5102, 200, 'CrmR200', 'crm200@test.fr', '0202020202', 600)");
+    run("INSERT OR IGNORE INTO loyalty_rewards (id, restaurant_id, name, points_required, is_active) VALUES (7101, 100, 'RewR100', 50, 1)");
+    run("INSERT OR IGNORE INTO loyalty_rewards (id, restaurant_id, name, points_required, is_active) VALUES (7102, 200, 'RewR200', 50, 1)");
+  });
+
+  const asR100 = authHeader({ id: 1001, role: 'gerant', restaurant_id: 100 });
+
+  it('GET /customers/:id — 404 on cross-tenant target, not 200 (IDOR read)', async () => {
+    const res = await request(app).get('/api/crm/customers/5102').set(asR100);
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /customers/:id — 200 on own-tenant target', async () => {
+    const res = await request(app).get('/api/crm/customers/5101').set(asR100);
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('CrmR100');
+  });
+
+  it('PUT /customers/:id — 404 on cross-tenant target, state unchanged (IDOR tamper)', async () => {
+    const res = await request(app)
+      .put('/api/crm/customers/5102')
+      .set(asR100)
+      .send({ name: 'PWNED' });
+    expect(res.status).toBe(404);
+    const after = get('SELECT name FROM customers WHERE id = ?', [5102]);
+    expect(after.name).toBe('CrmR200');
+  });
+
+  it('POST /customers/:id/visit — 404 on cross-tenant target, stats unchanged (IDOR write)', async () => {
+    const before = get('SELECT total_visits, loyalty_points FROM customers WHERE id = ?', [5102]);
+    const res = await request(app)
+      .post('/api/crm/customers/5102/visit')
+      .set(asR100)
+      .send({ amount: 99 });
+    expect(res.status).toBe(404);
+    const after = get('SELECT total_visits, loyalty_points FROM customers WHERE id = ?', [5102]);
+    expect(after.total_visits).toBe(before.total_visits);
+    expect(after.loyalty_points).toBe(before.loyalty_points);
+  });
+
+  it('POST /customers/:id/redeem/:rewardId — 404 on cross-tenant customer, points unchanged (IDOR redeem)', async () => {
+    const before = get('SELECT loyalty_points FROM customers WHERE id = ?', [5102]);
+    const res = await request(app)
+      .post('/api/crm/customers/5102/redeem/7102')
+      .set(asR100);
+    expect(res.status).toBe(404);
+    const after = get('SELECT loyalty_points FROM customers WHERE id = ?', [5102]);
+    expect(after.loyalty_points).toBe(before.loyalty_points);
+  });
+
+  it('POST /customers/:id/redeem/:rewardId — 404 on cross-tenant reward even if customer belongs to caller', async () => {
+    const res = await request(app)
+      .post('/api/crm/customers/5101/redeem/7102')
+      .set(asR100);
+    expect(res.status).toBe(404);
+  });
+});
