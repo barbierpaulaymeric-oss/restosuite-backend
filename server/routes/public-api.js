@@ -358,8 +358,8 @@ router.post('/v1/orders', apiKeyAuth, requirePermission('write:orders'), (req, r
     const orderId = Number(result.lastInsertRowid);
 
     for (const item of items) {
-      run(`INSERT INTO order_items (order_id, recipe_id, quantity, status) VALUES (?, ?, ?, 'attente')`,
-        [orderId, item.recipe_id, item.quantity || 1]
+      run(`INSERT INTO order_items (order_id, recipe_id, quantity, status, restaurant_id) VALUES (?, ?, ?, 'attente', ?)`,
+        [orderId, item.recipe_id, item.quantity || 1, rid]
       );
     }
 

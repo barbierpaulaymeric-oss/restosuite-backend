@@ -469,8 +469,8 @@ router.post('/:id/receive', (req, res) => {
         // Update price history (price_history may be tenant-scoped; include if column present)
         if (item.unit_price > 0) {
           run(
-            'INSERT INTO price_history (ingredient_id, supplier_id, price, recorded_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
-            [item.ingredient_id, po.supplier_id, item.unit_price]
+            'INSERT INTO price_history (ingredient_id, supplier_id, price, recorded_at, restaurant_id) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)',
+            [item.ingredient_id, po.supplier_id, item.unit_price, rid]
           );
 
           // Update supplier_prices (tenant-scoped)

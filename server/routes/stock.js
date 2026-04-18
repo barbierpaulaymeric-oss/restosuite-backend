@@ -128,9 +128,9 @@ router.post('/reception', validate(stockReceptionValidation), (req, res) => {
       // 3. Créer une entrée HACCP traçabilité automatiquement
       const supplier = supplier_id ? get('SELECT name FROM suppliers WHERE id = ? AND restaurant_id = ?', [supplier_id, rid]) : null;
       run(
-        `INSERT INTO traceability_logs (product_name, supplier, batch_number, dlc, temperature_at_reception, quantity, unit, received_by, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [ingredient.name, supplier ? supplier.name : null, batch_number || null, dlc || null, temperature ?? null, quantity, unit, recorded_by || null, notes || null]
+        `INSERT INTO traceability_logs (product_name, supplier, batch_number, dlc, temperature_at_reception, quantity, unit, received_by, notes, restaurant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [ingredient.name, supplier ? supplier.name : null, batch_number || null, dlc || null, temperature ?? null, quantity, unit, recorded_by || null, notes || null, rid]
       );
 
       // 4. Track price history for mercuriale

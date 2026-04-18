@@ -176,10 +176,10 @@ router.put('/:id/receive', (req, res) => {
 
         // 1. Create traceability log
         run(
-          `INSERT INTO traceability_logs (product_name, supplier, batch_number, dlc, temperature_at_reception, quantity, unit, received_by, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO traceability_logs (product_name, supplier, batch_number, dlc, temperature_at_reception, quantity, unit, received_by, notes, restaurant_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [dbItem.product_name, note.supplier_name, dbItem.batch_number || null, dbItem.dlc || null,
-           temperature_measured ?? dbItem.temperature_required ?? null, dbItem.quantity, dbItem.unit, account, dbItem.notes || null]
+           temperature_measured ?? dbItem.temperature_required ?? null, dbItem.quantity, dbItem.unit, account, dbItem.notes || null, rid]
         );
 
         // 2. Create stock_movement if ingredient_id exists
@@ -223,8 +223,8 @@ router.put('/:id/receive', (req, res) => {
               );
             }
             // Price history
-            run('INSERT INTO price_history (ingredient_id, supplier_id, price) VALUES (?, ?, ?)',
-              [dbItem.ingredient_id, note.supplier_id, dbItem.price_per_unit]);
+            run('INSERT INTO price_history (ingredient_id, supplier_id, price, restaurant_id) VALUES (?, ?, ?, ?)',
+              [dbItem.ingredient_id, note.supplier_id, dbItem.price_per_unit, rid]);
           }
         }
       } else if (itemStatus === 'rejected') {

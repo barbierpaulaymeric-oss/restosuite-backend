@@ -35,18 +35,19 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemi
 // - Pic d'activité
 // ═══════════════════════════════════════════
 
-// Cache predictions for 4 hours
-let _predCache = null;
-let _predCacheTime = 0;
+// Cache predictions for 4 hours — keyed by restaurant_id to prevent cross-tenant leak
+const _predCache = new Map(); // rid -> { result, time }
 const PRED_TTL = 4 * 60 * 60 * 1000;
 
 // GET /api/predictions/demand — Prédiction de demande pour les 7 prochains jours
 router.get('/demand', async (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const forceRefresh = req.query.refresh === 'true';
 
-    if (!forceRefresh && _predCache && (Date.now() - _predCacheTime) < PRED_TTL) {
-      return res.json({ ..._predCache, cached: true });
+    const cached = _predCache.get(rid);
+    if (!forceRefresh && cached && (Date.now() - cached.time) < PRED_TTL) {
+      return res.json({ ...cached.result, cached: true });
     }
 
     // Collect historical data (last 90 days)
@@ -59,10 +60,12 @@ router.get('/demand', async (req, res) => {
              COUNT(*) as order_count,
              COALESCE(SUM(o.total_cost), 0) as revenue
       FROM orders o
-      WHERE o.status NOT IN ('annulé', 'cancelled') AND date(o.created_at) >= ?
+      WHERE o.restaurant_id = ?
+        AND o.status NOT IN ('annulé', 'cancelled')
+        AND date(o.created_at) >= ?
       GROUP BY date(o.created_at)
       ORDER BY day
-    `, [ninetyDaysAgo]);
+    `, [rid, ninetyDaysAgo]);
 
     // Top recipes by day of week
     const recipesByDow = all(`
@@ -70,12 +73,14 @@ router.get('/demand', async (req, res) => {
              oi.recipe_id, r.name as recipe_name,
              SUM(oi.quantity) as total_qty
       FROM order_items oi
-      JOIN orders o ON o.id = oi.order_id
-      JOIN recipes r ON r.id = oi.recipe_id
-      WHERE o.status NOT IN ('annulé', 'cancelled') AND date(o.created_at) >= ?
+      JOIN orders o ON o.id = oi.order_id AND o.restaurant_id = ?
+      JOIN recipes r ON r.id = oi.recipe_id AND r.restaurant_id = ?
+      WHERE oi.restaurant_id = ?
+        AND o.status NOT IN ('annulé', 'cancelled')
+        AND date(o.created_at) >= ?
       GROUP BY dow, oi.recipe_id
       ORDER BY dow, total_qty DESC
-    `, [ninetyDaysAgo]);
+    `, [rid, rid, rid, ninetyDaysAgo]);
 
     // Hourly patterns
     const hourlyPatterns = all(`
@@ -83,9 +88,11 @@ router.get('/demand', async (req, res) => {
              strftime('%w', o.created_at) as dow,
              COUNT(*) as order_count
       FROM orders o
-      WHERE o.status NOT IN ('annulé', 'cancelled') AND date(o.created_at) >= ?
+      WHERE o.restaurant_id = ?
+        AND o.status NOT IN ('annulé', 'cancelled')
+        AND date(o.created_at) >= ?
       GROUP BY hour, dow
-    `, [ninetyDaysAgo]);
+    `, [rid, ninetyDaysAgo]);
 
     // Calculate averages per day of week
     const dowNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -154,7 +161,7 @@ router.get('/demand', async (req, res) => {
       .slice(0, 5);
 
     // Stock suggestions for next 7 days
-    const stockSuggestions = await calculateStockSuggestions(forecast, ninetyDaysAgo);
+    const stockSuggestions = await calculateStockSuggestions(forecast, ninetyDaysAgo, rid);
 
     // Try AI-enhanced insights
     let aiInsight = null;
@@ -172,8 +179,7 @@ router.get('/demand', async (req, res) => {
       cached: false
     };
 
-    _predCache = result;
-    _predCacheTime = Date.now();
+    _predCache.set(rid, { result, time: Date.now() });
 
     res.json(result);
   } catch (e) {
@@ -183,7 +189,7 @@ router.get('/demand', async (req, res) => {
 });
 
 // Calculate stock to order based on predicted demand
-async function calculateStockSuggestions(forecast, since) {
+async function calculateStockSuggestions(forecast, since, rid) {
   try {
     // Get recipe → ingredient mapping with quantities
     const totalExpectedByIngredient = {};
@@ -193,9 +199,9 @@ async function calculateStockSuggestions(forecast, since) {
         const ingredients = all(`
           SELECT ri.ingredient_id, ri.gross_quantity, ri.unit, i.name
           FROM recipe_ingredients ri
-          JOIN ingredients i ON i.id = ri.ingredient_id
-          WHERE ri.recipe_id = ? AND ri.sub_recipe_id IS NULL
-        `, [recipe.recipe_id]);
+          JOIN ingredients i ON i.id = ri.ingredient_id AND i.restaurant_id = ?
+          WHERE ri.recipe_id = ? AND ri.restaurant_id = ? AND ri.sub_recipe_id IS NULL
+        `, [rid, recipe.recipe_id, rid]);
 
         for (const ing of ingredients) {
           const key = ing.ingredient_id;
@@ -210,7 +216,7 @@ async function calculateStockSuggestions(forecast, since) {
     // Compare with current stock
     const suggestions = [];
     for (const [id, data] of Object.entries(totalExpectedByIngredient)) {
-      const stock = get('SELECT quantity FROM stock WHERE ingredient_id = ?', [Number(id)]);
+      const stock = get('SELECT quantity FROM stock WHERE ingredient_id = ? AND restaurant_id = ?', [Number(id), rid]);
       const currentQty = stock ? stock.quantity : 0;
       const deficit = data.needed - currentQty;
 
@@ -267,6 +273,7 @@ Réponds avec UN seul paragraphe concis et actionable.`;
 // POST /api/predictions/accuracy — Enregistrer la précision d'une prédiction
 router.post('/accuracy', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const { date, predicted_orders, actual_orders } = req.body;
     if (!date) return res.status(400).json({ error: 'Date requise' });
     if (predicted_orders == null || actual_orders == null) {
@@ -283,14 +290,14 @@ router.post('/accuracy', (req, res) => {
     }
 
     run(
-      `INSERT INTO prediction_accuracy (date, predicted_orders, actual_orders, accuracy_pct)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(date) DO UPDATE SET
+      `INSERT INTO prediction_accuracy (restaurant_id, date, predicted_orders, actual_orders, accuracy_pct)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(restaurant_id, date) DO UPDATE SET
          predicted_orders = excluded.predicted_orders,
          actual_orders = excluded.actual_orders,
          accuracy_pct = excluded.accuracy_pct,
          recorded_at = datetime('now')`,
-      [date, predicted, actual, accuracy_pct]
+      [rid, date, predicted, actual, accuracy_pct]
     );
 
     res.json({ ok: true, date, predicted_orders: predicted, actual_orders: actual, accuracy_pct });
@@ -302,15 +309,16 @@ router.post('/accuracy', (req, res) => {
 // GET /api/predictions/accuracy — Historique de précision des prédictions
 router.get('/accuracy', (req, res) => {
   try {
+    const rid = req.user.restaurant_id;
     const days = Math.min(Number(req.query.days) || 30, 365);
     const dateFrom = new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
 
     const records = all(
       `SELECT date, predicted_orders, actual_orders, accuracy_pct
        FROM prediction_accuracy
-       WHERE date >= ?
+       WHERE restaurant_id = ? AND date >= ?
        ORDER BY date DESC`,
-      [dateFrom]
+      [rid, dateFrom]
     );
 
     const avgAccuracy = records.length > 0

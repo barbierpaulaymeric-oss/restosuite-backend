@@ -350,3 +350,73 @@ describe('P0: CRM customer routes must be tenant-scoped (EVAL_ULTIMATE IDOR)', (
     expect(res.status).toBe(404);
   });
 });
+
+describe('P0: GET /api/predictions/* must be tenant-scoped (module cache + queries)', () => {
+  beforeAll(() => {
+    // R100 / R200 already seeded above. Seed orders + order_items + recipes for each tenant.
+    run("INSERT OR IGNORE INTO recipes (id, name, restaurant_id) VALUES (8100, 'DishR100', 100)");
+    run("INSERT OR IGNORE INTO recipes (id, name, restaurant_id) VALUES (8200, 'DishR200', 200)");
+    // Two orders per tenant, today, status 'servi'
+    for (let i = 0; i < 2; i++) {
+      const info100 = run(
+        "INSERT INTO orders (table_number, status, total_cost, restaurant_id) VALUES (?, 'servi', 42, 100)",
+        [10 + i]
+      );
+      run(
+        "INSERT INTO order_items (order_id, recipe_id, quantity, restaurant_id) VALUES (?, 8100, 1, 100)",
+        [info100.lastInsertRowid]
+      );
+      const info200 = run(
+        "INSERT INTO orders (table_number, status, total_cost, restaurant_id) VALUES (?, 'servi', 88, 200)",
+        [20 + i]
+      );
+      run(
+        "INSERT INTO order_items (order_id, recipe_id, quantity, restaurant_id) VALUES (?, 8200, 5, 200)",
+        [info200.lastInsertRowid]
+      );
+    }
+    // prediction_accuracy per tenant
+    run("INSERT OR IGNORE INTO prediction_accuracy (restaurant_id, date, predicted_orders, actual_orders, accuracy_pct) VALUES (100, date('now','-1 day'), 10, 10, 100)");
+    run("INSERT OR IGNORE INTO prediction_accuracy (restaurant_id, date, predicted_orders, actual_orders, accuracy_pct) VALUES (200, date('now','-1 day'), 99, 99, 99)");
+  });
+
+  it('GET /api/predictions/demand forecasts only caller-tenant orders (no cross-tenant cache leak)', async () => {
+    // Hit R100 first — warms the cache keyed by rid=100
+    const res100 = await request(app)
+      .get('/api/predictions/demand')
+      .set(authHeader({ id: 1001, role: 'gerant', restaurant_id: 100 }));
+    expect(res100.status).toBe(200);
+    // Top recipes for today-ish should never include R200's dish
+    const names100 = res100.body.forecast.flatMap(f => f.top_recipes.map(r => r.name));
+    expect(names100).not.toContain('DishR200');
+
+    // Then R200 — must NOT receive R100's cached payload
+    const res200 = await request(app)
+      .get('/api/predictions/demand')
+      .set(authHeader({ id: 1002, role: 'gerant', restaurant_id: 200 }));
+    expect(res200.status).toBe(200);
+    const names200 = res200.body.forecast.flatMap(f => f.top_recipes.map(r => r.name));
+    expect(names200).not.toContain('DishR100');
+  });
+
+  it('GET /api/predictions/accuracy returns only caller-tenant accuracy records', async () => {
+    const res = await request(app)
+      .get('/api/predictions/accuracy')
+      .set(authHeader({ id: 1001, role: 'gerant', restaurant_id: 100 }));
+    expect(res.status).toBe(200);
+    const pcts = (res.body.records || []).map(r => r.accuracy_pct);
+    expect(pcts).not.toContain(99); // R200's value
+  });
+
+  it('POST /api/predictions/accuracy upsert scoped to caller tenant only', async () => {
+    const res = await request(app)
+      .post('/api/predictions/accuracy')
+      .set(authHeader({ id: 1001, role: 'gerant', restaurant_id: 100 }))
+      .send({ date: '2099-01-01', predicted_orders: 5, actual_orders: 5 });
+    expect(res.status).toBe(200);
+    const r100 = get('SELECT predicted_orders FROM prediction_accuracy WHERE restaurant_id = 100 AND date = ?', ['2099-01-01']);
+    const r200 = get('SELECT predicted_orders FROM prediction_accuracy WHERE restaurant_id = 200 AND date = ?', ['2099-01-01']);
+    expect(r100 && r100.predicted_orders).toBe(5);
+    expect(r200).toBeFalsy();
+  });
+});
