@@ -156,9 +156,13 @@ describe('Public API — docs + key-by-query', () => {
     expect(Array.isArray(res.body.endpoints)).toBe(true);
   });
 
-  it('api_key accepted as query parameter', async () => {
+  // PENTEST_REPORT C3.4 — query-string API keys are REJECTED. They leak into
+  // access logs, browser history, Referer headers, and error-monitoring
+  // breadcrumbs. The only accepted transport is the X-API-Key header.
+  it('api_key in query string is rejected with 400', async () => {
     const apiKey = await createKey();
     const res = await request(app).get(`/api/public/v1/menu?api_key=${apiKey}`);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/X-API-Key header/);
   });
 });
