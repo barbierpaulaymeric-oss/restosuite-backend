@@ -108,6 +108,71 @@ document.addEventListener('keydown', function(e) {
   }
 }, true);
 
+// ─── Global: auto-apply ARIA + focus-trap to every .modal-overlay inserted into DOM ───
+// EVAL_ULTIMATE: only 6/129 modals had role=dialog + aria-modal + trapFocus.
+// Rather than editing 129 call sites, this observer enforces the pattern on
+// every modal overlay added to the DOM — WCAG 2.1 AA 4.1.2 compliant.
+(function autoEnhanceModals() {
+  function enhance(node) {
+    if (!(node instanceof HTMLElement)) return;
+    if (!node.classList || !node.classList.contains('modal-overlay')) return;
+    if (node.__a11yEnhanced) return;
+    node.__a11yEnhanced = true;
+
+    if (!node.getAttribute('role')) node.setAttribute('role', 'dialog');
+    if (!node.getAttribute('aria-modal')) node.setAttribute('aria-modal', 'true');
+
+    // If the overlay or its inner .modal has a heading, label the dialog by it.
+    if (!node.getAttribute('aria-labelledby') && !node.getAttribute('aria-label')) {
+      const heading = node.querySelector('h1,h2,h3,h4,[data-modal-title]');
+      if (heading) {
+        if (!heading.id) heading.id = 'modal-title-' + Math.random().toString(36).slice(2, 9);
+        node.setAttribute('aria-labelledby', heading.id);
+      } else {
+        node.setAttribute('aria-label', 'Boîte de dialogue');
+      }
+    }
+
+    // Focus trap — stored on the node so it can be released on removal.
+    try {
+      node.__releaseFocus = trapFocus(node);
+    } catch {}
+  }
+
+  function release(node) {
+    if (!(node instanceof HTMLElement)) return;
+    if (typeof node.__releaseFocus === 'function') {
+      try { node.__releaseFocus(); } catch {}
+      node.__releaseFocus = null;
+    }
+  }
+
+  if (typeof MutationObserver === 'undefined' || !document.body) {
+    // SSR / test env — skip.
+    return;
+  }
+
+  const observer = new MutationObserver((muts) => {
+    for (const m of muts) {
+      m.addedNodes && m.addedNodes.forEach((n) => {
+        if (!(n instanceof HTMLElement)) return;
+        enhance(n);
+        // Deep scan in case the overlay was inserted inside a wrapper
+        n.querySelectorAll && n.querySelectorAll('.modal-overlay').forEach(enhance);
+      });
+      m.removedNodes && m.removedNodes.forEach((n) => {
+        if (!(n instanceof HTMLElement)) return;
+        release(n);
+        n.querySelectorAll && n.querySelectorAll('.modal-overlay').forEach(release);
+      });
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  // Retroactively upgrade modals already in the DOM
+  document.querySelectorAll('.modal-overlay').forEach(enhance);
+})();
+
 // ─── Focus-trap helper for modals ──────────────────────────────────────────
 // Usage:
 //   const release = trapFocus(modalOverlay);

@@ -806,8 +806,8 @@ function renderStars(rating, interactive = false, onChange = null) {
   return html;
 }
 function escapeHtml(str) {
-  if (!str) return "";
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  if (str == null) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 function getSupplierToken() {
   return sessionStorage.getItem("restosuite_supplier_token");
@@ -850,6 +850,9 @@ function formatQuantity(qty, unit) {
 function showConfirmModal(title, message, onConfirm, options = {}) {
   const confirmText = options.confirmText || "Confirmer";
   const confirmClass = options.confirmClass || "btn btn-danger";
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const safeTitle = esc(title);
+  const safeMessage = esc(message).replace(/\n/g, "<br>");
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay confirm-modal-overlay";
   overlay.setAttribute("role", "dialog");
@@ -860,17 +863,24 @@ function showConfirmModal(title, message, onConfirm, options = {}) {
       <div style="font-size:2rem;margin-bottom:12px">
         <i data-lucide="alert-triangle" style="width:40px;height:40px;color:var(--color-danger)"></i>
       </div>
-      <h3 id="confirm-modal-title" style="margin-bottom:8px">${title}</h3>
-      <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:20px">${message}</p>
+      <h3 id="confirm-modal-title" style="margin-bottom:8px">${safeTitle}</h3>
+      <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:20px">${safeMessage}</p>
       <div class="actions-row" style="justify-content:center">
-        <button class="${confirmClass}" id="confirm-yes">${confirmText}</button>
+        <button class="${confirmClass}" id="confirm-yes">${esc(confirmText)}</button>
         <button class="btn btn-secondary" id="confirm-no">Annuler</button>
       </div>
     </div>
   `;
   document.body.appendChild(overlay);
   if (window.lucide) lucide.createIcons();
-  const closeModal = () => overlay.remove();
+  const releaseFocus = trapFocus(overlay);
+  const closeModal = () => {
+    try {
+      releaseFocus();
+    } catch (e) {
+    }
+    overlay.remove();
+  };
   overlay.querySelector("#confirm-yes").onclick = () => {
     closeModal();
     onConfirm();
@@ -905,6 +915,103 @@ document.addEventListener("keydown", function(e) {
     }
   }
 }, true);
+(function autoEnhanceModals() {
+  function enhance(node) {
+    if (!(node instanceof HTMLElement)) return;
+    if (!node.classList || !node.classList.contains("modal-overlay")) return;
+    if (node.__a11yEnhanced) return;
+    node.__a11yEnhanced = true;
+    if (!node.getAttribute("role")) node.setAttribute("role", "dialog");
+    if (!node.getAttribute("aria-modal")) node.setAttribute("aria-modal", "true");
+    if (!node.getAttribute("aria-labelledby") && !node.getAttribute("aria-label")) {
+      const heading = node.querySelector("h1,h2,h3,h4,[data-modal-title]");
+      if (heading) {
+        if (!heading.id) heading.id = "modal-title-" + Math.random().toString(36).slice(2, 9);
+        node.setAttribute("aria-labelledby", heading.id);
+      } else {
+        node.setAttribute("aria-label", "Bo\xEEte de dialogue");
+      }
+    }
+    try {
+      node.__releaseFocus = trapFocus(node);
+    } catch (e) {
+    }
+  }
+  function release(node) {
+    if (!(node instanceof HTMLElement)) return;
+    if (typeof node.__releaseFocus === "function") {
+      try {
+        node.__releaseFocus();
+      } catch (e) {
+      }
+      node.__releaseFocus = null;
+    }
+  }
+  if (typeof MutationObserver === "undefined" || !document.body) {
+    return;
+  }
+  const observer = new MutationObserver((muts) => {
+    for (const m of muts) {
+      m.addedNodes && m.addedNodes.forEach((n) => {
+        if (!(n instanceof HTMLElement)) return;
+        enhance(n);
+        n.querySelectorAll && n.querySelectorAll(".modal-overlay").forEach(enhance);
+      });
+      m.removedNodes && m.removedNodes.forEach((n) => {
+        if (!(n instanceof HTMLElement)) return;
+        release(n);
+        n.querySelectorAll && n.querySelectorAll(".modal-overlay").forEach(release);
+      });
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  document.querySelectorAll(".modal-overlay").forEach(enhance);
+})();
+function trapFocus(container) {
+  if (!container) return () => {
+  };
+  const previouslyFocused = document.activeElement;
+  const FOCUSABLE = [
+    "a[href]",
+    "button:not([disabled])",
+    "textarea:not([disabled])",
+    "input:not([disabled])",
+    "select:not([disabled])",
+    '[tabindex]:not([tabindex="-1"])'
+  ].join(",");
+  const getFocusable = () => Array.from(container.querySelectorAll(FOCUSABLE)).filter((el) => el.offsetParent !== null || el === document.activeElement);
+  const first = getFocusable()[0];
+  if (first) {
+    try {
+      first.focus();
+    } catch (e) {
+    }
+  }
+  const onKey = (e) => {
+    if (e.key !== "Tab") return;
+    const focusable = getFocusable();
+    if (focusable.length === 0) return;
+    const firstEl = focusable[0];
+    const lastEl = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === firstEl) {
+      e.preventDefault();
+      lastEl.focus();
+    } else if (!e.shiftKey && document.activeElement === lastEl) {
+      e.preventDefault();
+      firstEl.focus();
+    }
+  };
+  container.addEventListener("keydown", onKey);
+  return function release() {
+    container.removeEventListener("keydown", onKey);
+    if (previouslyFocused && typeof previouslyFocused.focus === "function") {
+      try {
+        previouslyFocused.focus();
+      } catch (e) {
+      }
+    }
+  };
+}
 async function renderOnboardingChecklist() {
   const container = document.getElementById("dashboard-onboarding");
   if (!container) return;
@@ -967,29 +1074,30 @@ async function renderDashboard() {
     <div id="dashboard-onboarding"></div>
     <div id="dashboard-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
 
-    <div id="dashboard-alerts"></div>
-    <div id="ai-suggestions-container"></div>
-    <div id="daily-tip-container"></div>
+    <div id="dashboard-alerts" role="region" aria-live="polite" aria-label="Alertes du jour"></div>
+    <div id="ai-suggestions-container" role="region" aria-label="Suggestions IA"></div>
+    <div id="daily-tip-container" role="region" aria-label="Astuce du jour"></div>
 
     <div class="page-header">
       <h1>Fiches Techniques</h1>
-      ${perms.edit_recipes ? `<a href="#/new" class="btn btn-primary"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle fiche</a>` : ""}
+      ${perms.edit_recipes ? `<a href="#/new" class="btn btn-primary" aria-label="Cr\xE9er une nouvelle fiche technique"><i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouvelle fiche</a>` : ""}
     </div>
-    <div class="search-bar">
-      <span class="search-icon"><i data-lucide="search"></i></span>
-      <input type="text" id="recipe-search" placeholder="Rechercher une fiche..." autocomplete="off">
+    <div class="search-bar" role="search">
+      <label for="recipe-search" class="visually-hidden">Rechercher une fiche</label>
+      <span class="search-icon" aria-hidden="true"><i data-lucide="search"></i></span>
+      <input type="search" id="recipe-search" placeholder="Rechercher une fiche..." autocomplete="off" aria-label="Rechercher une fiche">
     </div>
-    <div class="recipe-type-filters" style="display:flex;gap:8px;margin-bottom:16px;overflow-x:auto">
-      <button class="haccp-subnav__link active" data-type="">Tous</button>
-      <button class="haccp-subnav__link" data-type="plat">\u{1F37D}\uFE0F Plats</button>
-      <button class="haccp-subnav__link" data-type="sous_recette">\u{1F4CB} Sous-recettes</button>
-      <button class="haccp-subnav__link" data-type="base">\u{1FAD5} Bases</button>
+    <div class="recipe-type-filters" role="tablist" aria-label="Filtrer par type de fiche" style="display:flex;gap:8px;margin-bottom:16px;overflow-x:auto">
+      <button class="haccp-subnav__link active" role="tab" aria-selected="true" data-type="">Tous</button>
+      <button class="haccp-subnav__link" role="tab" aria-selected="false" data-type="plat">\u{1F37D}\uFE0F Plats</button>
+      <button class="haccp-subnav__link" role="tab" aria-selected="false" data-type="sous_recette">\u{1F4CB} Sous-recettes</button>
+      <button class="haccp-subnav__link" role="tab" aria-selected="false" data-type="base">\u{1FAD5} Bases</button>
     </div>
-    <div id="recipe-list">
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
+    <div id="recipe-list" role="region" aria-live="polite" aria-label="Liste des fiches techniques">
+      <div class="skeleton skeleton-card" aria-hidden="true"></div>
+      <div class="skeleton skeleton-card" aria-hidden="true"></div>
+      <div class="skeleton skeleton-card" aria-hidden="true"></div>
+      <div class="skeleton skeleton-card" aria-hidden="true"></div>
     </div>
   `;
   lucide.createIcons();
@@ -1073,8 +1181,12 @@ async function renderDashboard() {
   });
   document.querySelectorAll(".recipe-type-filters button").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".recipe-type-filters button").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".recipe-type-filters button").forEach((b) => {
+        b.classList.remove("active");
+        b.setAttribute("aria-selected", "false");
+      });
       btn.classList.add("active");
+      btn.setAttribute("aria-selected", "true");
       currentTypeFilter = btn.dataset.type;
       renderList(searchInput.value, currentTypeFilter);
     });
@@ -1828,28 +1940,28 @@ async function renderRecipeForm(editId) {
   app.innerHTML = `
     <div class="page-header">
       <div>
-        <a href="#/" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px"></i> Retour</a>
+        <a href="#/" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px" aria-hidden="true"></i> Retour</a>
         <h1 style="margin-top:4px">${isEdit ? "Modifier la fiche" : "Nouvelle fiche technique"}</h1>
       </div>
     </div>
 
     ${!isEdit ? `
     <div class="mic-container">
-      <button class="mic-btn" id="mic-btn" onclick="toggleMic()">
-        <i data-lucide="mic"></i>
+      <button class="mic-btn" id="mic-btn" onclick="toggleMic()" aria-label="Dicter la recette au micro" aria-pressed="false">
+        <i data-lucide="mic" aria-hidden="true"></i>
       </button>
-      <div class="mic-status" id="mic-status">Appuyez pour dicter votre recette</div>
+      <div class="mic-status" id="mic-status" aria-live="polite">Appuyez pour dicter votre recette</div>
     </div>
     ` : ""}
 
     <div id="recipe-form-content">
       <div class="form-row">
         <div class="form-group">
-          <label>Nom du plat</label>
-          <input type="text" class="form-control" id="f-name" value="${escapeHtml((recipe == null ? void 0 : recipe.name) || "")}" placeholder="Tartare de b\u0153uf...">
+          <label for="f-name">Nom du plat</label>
+          <input type="text" class="form-control" id="f-name" value="${escapeHtml((recipe == null ? void 0 : recipe.name) || "")}" placeholder="Tartare de b\u0153uf..." required aria-required="true">
         </div>
         <div class="form-group">
-          <label>Cat\xE9gorie</label>
+          <label for="f-category">Cat\xE9gorie</label>
           <select class="form-control" id="f-category">
             <option value="">\u2014</option>
             ${["entr\xE9e", "plat", "dessert", "boisson", "amuse-bouche", "accompagnement", "sauce", "base"].map(
@@ -1861,7 +1973,7 @@ async function renderRecipeForm(editId) {
 
       <div class="form-row">
         <div class="form-group">
-          <label>Type de recette</label>
+          <label for="f-recipe-type">Type de recette</label>
           <select class="form-control" id="f-recipe-type" onchange="onRecipeTypeChange()">
             <option value="plat" ${recipeType === "plat" ? "selected" : ""}>\u{1F37D}\uFE0F Plat final</option>
             <option value="sous_recette" ${recipeType === "sous_recette" ? "selected" : ""}>\u{1F4CB} Sous-recette</option>
@@ -1869,35 +1981,38 @@ async function renderRecipeForm(editId) {
           </select>
         </div>
         <div class="form-group" id="f-price-group" style="${recipeType === "plat" ? "" : "display:none"}">
-          <label>Prix de vente TTC (\u20AC)</label>
+          <label for="f-price">Prix de vente TTC (\u20AC)</label>
           <input type="number" class="form-control" id="f-price" value="${(recipe == null ? void 0 : recipe.selling_price) || ""}" step="0.5" min="0" oninput="updateLiveMargin()">
         </div>
       </div>
 
       <div class="form-row-3">
         <div class="form-group">
-          <label>Portions</label>
+          <label for="f-portions">Portions</label>
           <input type="number" class="form-control" id="f-portions" value="${(recipe == null ? void 0 : recipe.portions) || 1}" min="1">
         </div>
         <div class="form-group">
-          <label>Pr\xE9paration (min)</label>
+          <label for="f-prep">Pr\xE9paration (min)</label>
           <input type="number" class="form-control" id="f-prep" value="${(recipe == null ? void 0 : recipe.prep_time_min) || ""}" min="0">
         </div>
         <div class="form-group">
-          <label>Cuisson (min)</label>
+          <label for="f-cooking">Cuisson (min)</label>
           <input type="number" class="form-control" id="f-cooking" value="${(recipe == null ? void 0 : recipe.cooking_time_min) || ""}" min="0">
         </div>
       </div>
 
-      <div class="section-title">Ingr\xE9dients</div>
-      <div id="ing-list"></div>
-      <div style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
+      <h2 class="section-title" id="ingredients-section">Ingr\xE9dients</h2>
+      <div id="ing-list" role="list" aria-labelledby="ingredients-section"></div>
+      <div role="group" aria-label="Ajouter un ingr\xE9dient" style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
         <div class="autocomplete-wrapper" style="flex:1;min-width:150px">
-          <input type="text" class="form-control" id="add-ing-name" placeholder="Nom de l'ingr\xE9dient" autocomplete="off">
-          <div class="autocomplete-list hidden" id="ing-autocomplete"></div>
+          <label for="add-ing-name" class="visually-hidden">Nom de l'ingr\xE9dient</label>
+          <input type="text" class="form-control" id="add-ing-name" placeholder="Nom de l'ingr\xE9dient" autocomplete="off" aria-label="Nom de l'ingr\xE9dient">
+          <div class="autocomplete-list hidden" id="ing-autocomplete" role="listbox"></div>
         </div>
-        <input type="number" class="form-control" id="add-ing-qty" placeholder="Qt\xE9" style="width:80px" step="any">
-        <select class="form-control" id="add-ing-unit" style="width:80px">
+        <label for="add-ing-qty" class="visually-hidden">Quantit\xE9</label>
+        <input type="number" class="form-control" id="add-ing-qty" placeholder="Qt\xE9" style="width:80px" step="any" aria-label="Quantit\xE9">
+        <label for="add-ing-unit" class="visually-hidden">Unit\xE9</label>
+        <select class="form-control" id="add-ing-unit" style="width:80px" aria-label="Unit\xE9">
           <option value="g">g</option>
           <option value="kg">kg</option>
           <option value="cl">cl</option>
@@ -1905,48 +2020,53 @@ async function renderRecipeForm(editId) {
           <option value="pi\xE8ce">pi\xE8ce</option>
           <option value="botte">botte</option>
         </select>
-        <input type="number" class="form-control" id="add-ing-waste" placeholder="Perte%" style="width:80px" step="any" min="0" max="100">
-        <input type="text" class="form-control" id="add-ing-notes" placeholder="Notes" style="width:120px">
-        <button class="btn btn-primary btn-sm" onclick="addIngredientLine()"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
+        <label for="add-ing-waste" class="visually-hidden">Pourcentage de perte</label>
+        <input type="number" class="form-control" id="add-ing-waste" placeholder="Perte%" style="width:80px" step="any" min="0" max="100" aria-label="Pourcentage de perte">
+        <label for="add-ing-notes" class="visually-hidden">Notes ingr\xE9dient</label>
+        <input type="text" class="form-control" id="add-ing-notes" placeholder="Notes" style="width:120px" aria-label="Notes ingr\xE9dient">
+        <button class="btn btn-primary btn-sm" onclick="addIngredientLine()" aria-label="Ajouter l'ingr\xE9dient"><i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i></button>
       </div>
 
-      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+      <h2 class="section-title" id="sub-recipes-section" style="display:flex;justify-content:space-between;align-items:center">
         <span>Sous-recettes</span>
-      </div>
-      <div id="sub-recipe-list"></div>
-      <div style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
-        <select class="form-control" id="add-sub-recipe" style="flex:1;min-width:180px">
+      </h2>
+      <div id="sub-recipe-list" role="list" aria-labelledby="sub-recipes-section"></div>
+      <div role="group" aria-label="Ajouter une sous-recette" style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
+        <label for="add-sub-recipe" class="visually-hidden">Sous-recette</label>
+        <select class="form-control" id="add-sub-recipe" style="flex:1;min-width:180px" aria-label="Sous-recette">
           <option value="">\u2014 Choisir une sous-recette \u2014</option>
           ${allRecipesForSub.map((r) => `<option value="${r.id}">${r.recipe_type === "base" ? "\u{1FAD5}" : "\u{1F4CB}"} ${escapeHtml(r.name)}</option>`).join("")}
         </select>
-        <input type="number" class="form-control" id="add-sub-qty" placeholder="Portions" style="width:100px" step="any" min="0.1" value="1">
-        <button class="btn btn-primary btn-sm" onclick="addSubRecipeLine()"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
+        <label for="add-sub-qty" class="visually-hidden">Portions de sous-recette</label>
+        <input type="number" class="form-control" id="add-sub-qty" placeholder="Portions" style="width:100px" step="any" min="0.1" value="1" aria-label="Portions de sous-recette">
+        <button class="btn btn-primary btn-sm" onclick="addSubRecipeLine()" aria-label="Ajouter la sous-recette"><i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i></button>
       </div>
       ${allRecipesForSub.length === 0 ? `<p class="text-muted" style="font-size:var(--text-xs);margin-top:4px">Aucune sous-recette disponible. Cr\xE9ez d'abord des fiches de type "Sous-recette" ou "Base".</p>` : ""}
 
-      <div class="section-title">Proc\xE9dure</div>
-      <div id="steps-list"></div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <input type="text" class="form-control" id="add-step" placeholder="Nouvelle \xE9tape..." style="flex:1">
-        <button class="btn btn-primary btn-sm" onclick="addStepLine()"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
+      <h2 class="section-title" id="steps-section">Proc\xE9dure</h2>
+      <div id="steps-list" aria-labelledby="steps-section"></div>
+      <div role="group" aria-label="Ajouter une \xE9tape" style="display:flex;gap:8px;margin-top:8px">
+        <label for="add-step" class="visually-hidden">Nouvelle \xE9tape</label>
+        <input type="text" class="form-control" id="add-step" placeholder="Nouvelle \xE9tape..." style="flex:1" aria-label="Nouvelle \xE9tape">
+        <button class="btn btn-primary btn-sm" onclick="addStepLine()" aria-label="Ajouter l'\xE9tape"><i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i></button>
       </div>
 
-      <div class="section-title">Tarification</div>
+      <h2 class="section-title">Tarification</h2>
       <div class="form-row">
         <div class="form-group" id="f-price-section">
-          <label>Food Cost</label>
-          <div id="live-margin" style="padding:12px 16px;font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:var(--text-secondary)">\u2014</div>
+          <label for="live-margin">Food Cost</label>
+          <div id="live-margin" role="status" aria-live="polite" style="padding:12px 16px;font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:var(--text-secondary)">\u2014</div>
         </div>
       </div>
 
       <div class="form-group">
-        <label>Notes</label>
+        <label for="f-notes">Notes</label>
         <textarea class="form-control" id="f-notes" rows="2">${escapeHtml((recipe == null ? void 0 : recipe.notes) || "")}</textarea>
       </div>
 
       <div class="actions-row">
         <button class="btn btn-primary" onclick="saveRecipe(${editId || "null"})">
-          <i data-lucide="${isEdit ? "save" : "check"}" style="width:18px;height:18px"></i>
+          <i data-lucide="${isEdit ? "save" : "check"}" style="width:18px;height:18px" aria-hidden="true"></i>
           ${isEdit ? "Enregistrer" : "Cr\xE9er la fiche"}
         </button>
         <a href="#/" class="btn btn-secondary">Annuler</a>
@@ -2018,12 +2138,12 @@ function renderIngredientLines() {
   el.innerHTML = formIngredients.map((ing, i) => {
     const net = ing.waste_percent > 0 ? (ing.gross_quantity * (1 - ing.waste_percent / 100)).toFixed(1) : ing.gross_quantity;
     return `
-      <div class="ing-line">
+      <div class="ing-line" role="listitem">
         <span class="ing-name">${escapeHtml(ing.name)} ${ing.notes ? `<span class="ing-notes">(${escapeHtml(ing.notes)})</span>` : ""}</span>
         <span class="ing-qty">${ing.gross_quantity}${ing.unit}</span>
         <span class="ing-qty text-muted">\u2192 ${net}${ing.unit}</span>
         <span class="text-muted" style="font-size:var(--text-sm);font-family:var(--font-mono)">${ing.waste_percent}%</span>
-        <span class="ing-remove" role="button" tabindex="0" aria-label="Retirer l'ingr\xE9dient" onclick="removeIngredient(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeIngredient(${i})}"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+        <span class="ing-remove" role="button" tabindex="0" aria-label="Retirer l'ingr\xE9dient ${escapeHtml(ing.name)}" onclick="removeIngredient(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeIngredient(${i})}"><i data-lucide="x" style="width:16px;height:16px" aria-hidden="true"></i></span>
       </div>
     `;
   }).join("");
@@ -2038,11 +2158,11 @@ function renderSubRecipeLines() {
     return;
   }
   el.innerHTML = formSubRecipes.map((sr, i) => `
-    <div class="ing-line">
-      <span class="ing-name">\u{1F4CB} ${escapeHtml(sr.name)}</span>
+    <div class="ing-line" role="listitem">
+      <span class="ing-name"><span aria-hidden="true">\u{1F4CB}</span> ${escapeHtml(sr.name)}</span>
       <span class="ing-qty">${sr.quantity} portion${sr.quantity !== 1 ? "s" : ""}</span>
       <span class="ing-qty text-muted">${sr.cost > 0 ? formatCurrency(sr.cost) : ""}</span>
-      <span class="ing-remove" role="button" tabindex="0" aria-label="Retirer la sous-recette" onclick="removeSubRecipe(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeSubRecipe(${i})}"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+      <span class="ing-remove" role="button" tabindex="0" aria-label="Retirer la sous-recette ${escapeHtml(sr.name)}" onclick="removeSubRecipe(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeSubRecipe(${i})}"><i data-lucide="x" style="width:16px;height:16px" aria-hidden="true"></i></span>
     </div>
   `).join("");
   lucide.createIcons();
@@ -2219,6 +2339,7 @@ function startMic() {
   recognition.onstart = () => {
     isRecording = true;
     btn.classList.add("recording");
+    btn.setAttribute("aria-pressed", "true");
     status.textContent = "\xC9coute en cours\u2026 Parlez naturellement";
     status.className = "mic-status recording";
   };
@@ -2263,6 +2384,7 @@ function startMic() {
     if (isRecording) {
       isRecording = false;
       btn.classList.remove("recording");
+      btn.setAttribute("aria-pressed", "false");
     }
   };
   recognition.start();
@@ -2272,7 +2394,10 @@ function stopMic() {
     isRecording = false;
     recognition.stop();
     const btn = document.getElementById("mic-btn");
-    if (btn) btn.classList.remove("recording");
+    if (btn) {
+      btn.classList.remove("recording");
+      btn.setAttribute("aria-pressed", "false");
+    }
   }
 }
 function populateFromAI(parsed) {
@@ -2754,44 +2879,45 @@ async function renderStockDashboard() {
   const isGerant = account && account.role === "gerant";
   app.innerHTML = `
     <div class="view-header">
-      <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Stock</h1>
+      <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Stock</h1>
       <p class="text-secondary">Vue d'ensemble du stock actuel</p>
     </div>
-    <div id="delivery-pending-banner" style="margin-bottom:var(--space-4)"></div>
-    <div class="stock-actions" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5);flex-wrap:wrap">
+    <div id="delivery-pending-banner" role="region" aria-live="polite" aria-label="Livraisons en attente" style="margin-bottom:var(--space-4)"></div>
+    <nav class="stock-actions" aria-label="Actions stock" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5);flex-wrap:wrap">
       <a href="#/deliveries" class="btn btn-primary btn-lg" id="btn-deliveries-link" style="flex:1;min-width:180px;text-decoration:none;text-align:center">
-        \u{1F69A} Livraisons
+        <span aria-hidden="true">\u{1F69A}</span> Livraisons
       </a>
       <a href="#/stock/reception" class="btn btn-accent btn-lg" style="flex:1;min-width:180px;text-decoration:none;text-align:center">
-        \u{1F4E5} R\xE9ception
+        <span aria-hidden="true">\u{1F4E5}</span> R\xE9ception
       </a>
       <a href="#/scan-invoice" class="btn btn-secondary" style="flex:1;min-width:160px;text-decoration:none;text-align:center">
-        \u{1F4F7} Scanner facture
+        <span aria-hidden="true">\u{1F4F7}</span> Scanner facture
       </a>
       ${isGerant ? `
       <button class="btn btn-secondary" id="stock-inventory-btn" style="flex:1;min-width:140px">
-        \u{1F4CB} Inventaire
+        <span aria-hidden="true">\u{1F4CB}</span> Inventaire
       </button>
       ` : ""}
       <a href="#/stock/movements" class="btn btn-secondary" style="min-width:120px;text-decoration:none;text-align:center">
-        \u{1F4CA} Historique
+        <span aria-hidden="true">\u{1F4CA}</span> Historique
       </a>
       ${isGerant ? `
       <a href="#/stock/variance" class="btn btn-secondary" style="min-width:140px;text-decoration:none;text-align:center">
-        \u{1F4C9} \xC9carts
+        <span aria-hidden="true">\u{1F4C9}</span> \xC9carts
       </a>
       ` : ""}
+    </nav>
+    <div class="search-bar" role="search" style="margin-bottom:var(--space-5)">
+      <label for="stock-search" class="visually-hidden">Rechercher un ingr\xE9dient</label>
+      <input type="search" id="stock-search" placeholder="Rechercher un ingr\xE9dient..." class="input" aria-label="Rechercher un ingr\xE9dient" style="width:100%">
     </div>
-    <div class="search-bar" style="margin-bottom:var(--space-5)">
-      <input type="text" id="stock-search" placeholder="Rechercher un ingr\xE9dient..." class="input" style="width:100%">
-    </div>
-    <div id="stock-alerts-section"></div>
-    <div id="stock-content">
-      <div class="skeleton skeleton-row"></div>
-      <div class="skeleton skeleton-row"></div>
-      <div class="skeleton skeleton-row"></div>
-      <div class="skeleton skeleton-row"></div>
-      <div class="skeleton skeleton-row"></div>
+    <div id="stock-alerts-section" role="region" aria-live="polite" aria-label="Alertes stock"></div>
+    <div id="stock-content" role="region" aria-label="Liste du stock" aria-live="polite">
+      <div class="skeleton skeleton-row" aria-hidden="true"></div>
+      <div class="skeleton skeleton-row" aria-hidden="true"></div>
+      <div class="skeleton skeleton-row" aria-hidden="true"></div>
+      <div class="skeleton skeleton-row" aria-hidden="true"></div>
+      <div class="skeleton skeleton-row" aria-hidden="true"></div>
     </div>
   `;
   if (window.lucide) lucide.createIcons();
@@ -2943,22 +3069,26 @@ async function showInventoryModal() {
   }
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "inv-modal-title");
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:var(--z-modal-backdrop);display:flex;align-items:center;justify-content:center;padding:var(--space-4)";
   overlay.innerHTML = `
     <div class="modal" style="background:var(--bg-elevated);border-radius:var(--radius-xl);padding:var(--space-6);max-width:500px;width:100%;max-height:80vh;overflow-y:auto">
-      <h2 style="margin-bottom:var(--space-4)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Inventaire</h2>
+      <h2 id="inv-modal-title" style="margin-bottom:var(--space-4)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Inventaire</h2>
       <div class="form-group" style="margin-bottom:var(--space-4)">
-        <label class="form-label">Ingr\xE9dient</label>
-        <select id="inv-ingredient" class="input">
+        <label class="form-label" for="inv-ingredient">Ingr\xE9dient</label>
+        <select id="inv-ingredient" class="input" aria-required="true">
           <option value="">\u2014 S\xE9lectionner \u2014</option>
           ${ingredients.map((i) => `<option value="${i.id}" data-unit="${escapeHtml(i.default_unit || "kg")}">${escapeHtml(i.name)}</option>`).join("")}
         </select>
       </div>
       <div class="form-group" style="margin-bottom:var(--space-4)">
-        <label class="form-label">Quantit\xE9 r\xE9elle</label>
+        <label class="form-label" for="inv-qty">Quantit\xE9 r\xE9elle</label>
         <div style="display:flex;gap:var(--space-2)">
-          <input type="number" id="inv-qty" class="input" step="0.01" min="0" placeholder="0" style="flex:1">
-          <input type="text" id="inv-unit" class="input" value="kg" style="width:80px" readonly>
+          <input type="number" id="inv-qty" class="input" step="0.01" min="0" placeholder="0" aria-required="true" style="flex:1">
+          <label for="inv-unit" class="visually-hidden">Unit\xE9</label>
+          <input type="text" id="inv-unit" class="input" value="kg" style="width:80px" readonly aria-label="Unit\xE9">
         </div>
       </div>
       <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
@@ -2968,15 +3098,31 @@ async function showInventoryModal() {
     </div>
   `;
   document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  const releaseFocus = trapFocus(overlay);
+  const closeModal = () => {
+    try {
+      releaseFocus();
+    } catch (e) {
+    }
+    overlay.remove();
+  };
+  const escHandler = (e) => {
+    if (e.key === "Escape") {
+      closeModal();
+      document.removeEventListener("keydown", escHandler);
+    }
+  };
+  document.addEventListener("keydown", escHandler);
   const ingredientSelect = overlay.querySelector("#inv-ingredient");
   const unitInput = overlay.querySelector("#inv-unit");
   ingredientSelect.addEventListener("change", () => {
     const opt = ingredientSelect.options[ingredientSelect.selectedIndex];
     unitInput.value = opt.dataset.unit || "kg";
   });
-  overlay.querySelector("#inv-cancel").addEventListener("click", () => overlay.remove());
+  overlay.querySelector("#inv-cancel").addEventListener("click", closeModal);
   overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) overlay.remove();
+    if (e.target === overlay) closeModal();
   });
   overlay.querySelector("#inv-save").addEventListener("click", async () => {
     const ingredientId = Number(ingredientSelect.value);
@@ -2994,7 +3140,7 @@ async function showInventoryModal() {
         recorded_by: account ? account.id : null
       });
       showToast("Inventaire enregistr\xE9", "success");
-      overlay.remove();
+      closeModal();
       await loadStock();
     } catch (e) {
       showToast(e.message, "error");
@@ -3737,8 +3883,8 @@ async function renderHACCPDashboard() {
                   <span class="haccp-zone-card__range">${zone.min_temp}\xB0 / ${zone.max_temp}\xB0</span>
                 </div>
                 <div class="haccp-zone-card__time">${lastTime}</div>
-                <button class="btn btn-primary haccp-record-btn" data-zone-id="${zone.id}" data-zone-name="${escapeHtml(zone.name)}" data-min="${zone.min_temp}" data-max="${zone.max_temp}">
-                  <i data-lucide="thermometer" style="width:18px;height:18px"></i> Relever
+                <button class="btn btn-primary haccp-record-btn" data-zone-id="${zone.id}" data-zone-name="${escapeHtml(zone.name)}" data-min="${zone.min_temp}" data-max="${zone.max_temp}" aria-label="Relever la temp\xE9rature de ${escapeHtml(zone.name)}">
+                  <i data-lucide="thermometer" style="width:18px;height:18px" aria-hidden="true"></i> Relever
                 </button>
               </div>
             `;
@@ -3757,12 +3903,14 @@ async function renderHACCPDashboard() {
           </div>
         </div>
 
-        <div class="haccp-cleaning-list">
+        <div class="haccp-cleaning-list" role="list" aria-label="T\xE2ches de nettoyage du jour">
           ${cleaningData.tasks.map((task) => `
-            <div class="haccp-cleaning-item ${task.done_today ? "haccp-cleaning-item--done" : ""}">
-              <button class="haccp-cleaning-check ${task.done_today ? "checked" : ""}" 
-                      data-task-id="${task.id}" ${task.done_today ? "disabled" : ""}>
-                ${task.done_today ? "\u2713" : ""}
+            <div class="haccp-cleaning-item ${task.done_today ? "haccp-cleaning-item--done" : ""}" role="listitem">
+              <button class="haccp-cleaning-check ${task.done_today ? "checked" : ""}"
+                      data-task-id="${task.id}" ${task.done_today ? "disabled" : ""}
+                      aria-label="${task.done_today ? "T\xE2che effectu\xE9e" : "Marquer comme effectu\xE9e"} : ${escapeHtml(task.name)}"
+                      aria-pressed="${task.done_today ? "true" : "false"}">
+                <span aria-hidden="true">${task.done_today ? "\u2713" : ""}</span>
               </button>
               <div class="haccp-cleaning-item__info">
                 <span class="haccp-cleaning-item__name">${escapeHtml(task.name)}</span>
@@ -3846,40 +3994,54 @@ function showTemperatureModal(zoneId, zoneName, minTemp, maxTemp) {
   const account = getAccount();
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "temp-modal-title");
   overlay.innerHTML = `
     <div class="modal">
-      <h2><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Relev\xE9 \u2014 ${escapeHtml(zoneName)}</h2>
+      <h2 id="temp-modal-title"><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Relev\xE9 \u2014 ${escapeHtml(zoneName)}</h2>
       <p class="text-secondary text-sm" style="margin-bottom:var(--space-4)">Plage normale : ${minTemp}\xB0C \xE0 ${maxTemp}\xB0C</p>
       <div class="form-group">
-        <label>Temp\xE9rature (\xB0C)</label>
-        <input type="number" step="0.1" class="form-control haccp-temp-input" id="modal-temp" 
-               placeholder="ex: 3.5" inputmode="decimal" autofocus
+        <label for="modal-temp">Temp\xE9rature (\xB0C)</label>
+        <input type="number" step="0.1" class="form-control haccp-temp-input" id="modal-temp"
+               placeholder="ex: 3.5" inputmode="decimal" autofocus required
+               aria-required="true"
                style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)">
       </div>
       <div class="form-group">
-        <label>Notes (optionnel)</label>
+        <label for="modal-notes">Notes (optionnel)</label>
         <input type="text" class="form-control" id="modal-notes" placeholder="ex: porte rest\xE9e ouverte">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
-        <button class="btn btn-secondary" id="modal-cancel">Annuler</button>
+        <button class="btn btn-secondary" id="modal-cancel" aria-label="Annuler et fermer">Annuler</button>
         <button class="btn btn-primary" id="modal-save" style="min-width:140px">
-          <i data-lucide="check" style="width:18px;height:18px"></i> Enregistrer
+          <i data-lucide="check" style="width:18px;height:18px" aria-hidden="true"></i> Enregistrer
         </button>
       </div>
     </div>
   `;
   document.body.appendChild(overlay);
   if (window.lucide) lucide.createIcons();
+  const releaseFocus = typeof trapFocus === "function" ? trapFocus(overlay) : () => {
+  };
+  const closeOverlay = () => {
+    try {
+      releaseFocus();
+    } catch (e) {
+    }
+    overlay.remove();
+  };
   const tempInput = document.getElementById("modal-temp");
   tempInput.focus();
   overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) overlay.remove();
+    if (e.target === overlay) closeOverlay();
   });
-  document.getElementById("modal-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("modal-cancel").addEventListener("click", closeOverlay);
   document.getElementById("modal-save").addEventListener("click", async () => {
     const temperature = parseFloat(tempInput.value);
     if (isNaN(temperature)) {
       tempInput.classList.add("form-control--error");
+      tempInput.setAttribute("aria-invalid", "true");
       return;
     }
     const notes = document.getElementById("modal-notes").value.trim();
@@ -3890,7 +4052,7 @@ function showTemperatureModal(zoneId, zoneName, minTemp, maxTemp) {
         notes: notes || null,
         recorded_by: account ? account.id : null
       });
-      overlay.remove();
+      closeOverlay();
       const isAlert = temperature < minTemp || temperature > maxTemp;
       showToast(isAlert ? `\u26A0\uFE0F ALERTE : ${temperature}\xB0C hors norme !` : `\u2705 ${temperature}\xB0C enregistr\xE9`, isAlert ? "error" : "success");
       renderHACCPDashboard();
@@ -3900,6 +4062,12 @@ function showTemperatureModal(zoneId, zoneName, minTemp, maxTemp) {
   });
   tempInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") document.getElementById("modal-save").click();
+  });
+  document.addEventListener("keydown", function escHandler(e) {
+    if (e.key === "Escape" && document.body.contains(overlay)) {
+      closeOverlay();
+      document.removeEventListener("keydown", escHandler);
+    }
   });
 }
 async function renderHACCPTemperatures() {
@@ -3920,24 +4088,26 @@ async function renderHACCPTemperatures() {
           <span class="breadcrumb-current">Temp\xE9ratures</span>
         </nav>
         <div class="page-header">
-          <h1><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Temp\xE9ratures</h1>
-          <button class="btn btn-primary" id="btn-new-temp">
-            <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau relev\xE9
+          <h1><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Temp\xE9ratures</h1>
+          <button class="btn btn-primary" id="btn-new-temp" aria-label="Cr\xE9er un nouveau relev\xE9 de temp\xE9rature">
+            <i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouveau relev\xE9
           </button>
         </div>
 
         ${HACCP_SUBNAV_FULL}
 
         <!-- Filters -->
-        <div class="haccp-filters">
+        <div class="haccp-filters" role="search" aria-label="Filtrer les relev\xE9s">
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
-            <select class="form-control" id="filter-zone" style="min-height:40px">
+            <label for="filter-zone" class="visually-hidden">Zone</label>
+            <select class="form-control" id="filter-zone" style="min-height:40px" aria-label="Filtrer par zone">
               <option value="">Toutes les zones</option>
               ${zones.map((z) => `<option value="${z.id}">${escapeHtml(z.name)}</option>`).join("")}
             </select>
           </div>
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
-            <input type="date" class="form-control" id="filter-date" lang="fr" style="min-height:40px">
+            <label for="filter-date" class="visually-hidden">Date</label>
+            <input type="date" class="form-control" id="filter-date" lang="fr" style="min-height:40px" aria-label="Filtrer par date">
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-filter">Filtrer</button>
         </div>
@@ -4072,45 +4242,67 @@ function showNewTempModal(zones) {
   const account = getAccount();
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "new-temp-modal-title");
   overlay.innerHTML = `
     <div class="modal">
-      <h2><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouveau relev\xE9</h2>
+      <h2 id="new-temp-modal-title"><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Nouveau relev\xE9</h2>
       <div class="form-group">
-        <label>Zone</label>
-        <select class="form-control" id="modal-zone">
+        <label for="modal-zone">Zone</label>
+        <select class="form-control" id="modal-zone" aria-required="true">
           ${zones.map((z) => `<option value="${z.id}" data-min="${z.min_temp}" data-max="${z.max_temp}">${escapeHtml(z.name)}</option>`).join("")}
         </select>
       </div>
       <div class="form-group">
-        <label>Temp\xE9rature (\xB0C)</label>
+        <label for="modal-temp">Temp\xE9rature (\xB0C)</label>
         <input type="number" step="0.1" class="form-control" id="modal-temp" placeholder="ex: 3.5" inputmode="decimal"
+               required aria-required="true"
                style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)">
       </div>
       <div class="form-group">
-        <label>Notes (optionnel)</label>
+        <label for="modal-notes">Notes (optionnel)</label>
         <input type="text" class="form-control" id="modal-notes" placeholder="ex: porte rest\xE9e ouverte">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="modal-cancel">Annuler</button>
         <button class="btn btn-primary" id="modal-save" style="min-width:140px">
-          <i data-lucide="check" style="width:18px;height:18px"></i> Enregistrer
+          <i data-lucide="check" style="width:18px;height:18px" aria-hidden="true"></i> Enregistrer
         </button>
       </div>
     </div>
   `;
   document.body.appendChild(overlay);
   if (window.lucide) lucide.createIcons();
+  const releaseFocus = trapFocus(overlay);
+  const closeModal = () => {
+    try {
+      releaseFocus();
+    } catch (e) {
+    }
+    overlay.remove();
+  };
+  const escHandler = (e) => {
+    if (e.key === "Escape") {
+      closeModal();
+      document.removeEventListener("keydown", escHandler);
+    }
+  };
+  document.addEventListener("keydown", escHandler);
   overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) overlay.remove();
+    if (e.target === overlay) closeModal();
   });
-  document.getElementById("modal-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("modal-cancel").addEventListener("click", closeModal);
   document.getElementById("modal-save").addEventListener("click", async () => {
     const zoneId = Number(document.getElementById("modal-zone").value);
-    const temperature = parseFloat(document.getElementById("modal-temp").value);
+    const tempInput = document.getElementById("modal-temp");
+    const temperature = parseFloat(tempInput.value);
     if (isNaN(temperature)) {
-      document.getElementById("modal-temp").classList.add("form-control--error");
+      tempInput.classList.add("form-control--error");
+      tempInput.setAttribute("aria-invalid", "true");
       return;
     }
+    tempInput.removeAttribute("aria-invalid");
     const notes = document.getElementById("modal-notes").value.trim();
     try {
       await API.recordTemperature({
@@ -4119,7 +4311,7 @@ function showNewTempModal(zones) {
         notes: notes || null,
         recorded_by: account ? account.id : null
       });
-      overlay.remove();
+      closeModal();
       showToast("Relev\xE9 enregistr\xE9 \u2713", "success");
       renderHACCPTemperatures();
     } catch (err) {
@@ -4133,15 +4325,18 @@ function showZoneModal(data) {
   if (existing) existing.remove();
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "zone-modal-title");
   overlay.innerHTML = `
     <div class="modal">
-      <h2>${isEdit ? '<i data-lucide="pencil" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Modifier la zone' : '<i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouvelle zone'}</h2>
+      <h2 id="zone-modal-title">${isEdit ? '<i data-lucide="pencil" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Modifier la zone' : '<i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Nouvelle zone'}</h2>
       <div class="form-group">
-        <label>Nom</label>
-        <input type="text" class="form-control" id="zone-name" value="${isEdit ? escapeHtml(data.name) : ""}" placeholder="ex: Frigo 3">
+        <label for="zone-name">Nom</label>
+        <input type="text" class="form-control" id="zone-name" value="${isEdit ? escapeHtml(data.name) : ""}" placeholder="ex: Frigo 3" required aria-required="true">
       </div>
       <div class="form-group">
-        <label>Type</label>
+        <label for="zone-type">Type</label>
         <select class="form-control" id="zone-type">
           <option value="fridge" ${isEdit && data.type === "fridge" ? "selected" : ""}>Frigo</option>
           <option value="freezer" ${isEdit && data.type === "freezer" ? "selected" : ""}>Cong\xE9lateur</option>
@@ -4150,11 +4345,11 @@ function showZoneModal(data) {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Temp min (\xB0C)</label>
+          <label for="zone-min">Temp min (\xB0C)</label>
           <input type="number" step="0.5" class="form-control" id="zone-min" value="${isEdit ? data.min : "0"}">
         </div>
         <div class="form-group">
-          <label>Temp max (\xB0C)</label>
+          <label for="zone-max">Temp max (\xB0C)</label>
           <input type="number" step="0.5" class="form-control" id="zone-max" value="${isEdit ? data.max : "4"}">
         </div>
       </div>
@@ -4165,10 +4360,26 @@ function showZoneModal(data) {
     </div>
   `;
   document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  const releaseFocus = trapFocus(overlay);
+  const closeModal = () => {
+    try {
+      releaseFocus();
+    } catch (e) {
+    }
+    overlay.remove();
+  };
+  const escHandler = (e) => {
+    if (e.key === "Escape") {
+      closeModal();
+      document.removeEventListener("keydown", escHandler);
+    }
+  };
+  document.addEventListener("keydown", escHandler);
   overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) overlay.remove();
+    if (e.target === overlay) closeModal();
   });
-  document.getElementById("zone-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("zone-cancel").addEventListener("click", closeModal);
   document.getElementById("zone-save").addEventListener("click", async () => {
     const payload = {
       name: document.getElementById("zone-name").value.trim(),
@@ -4186,7 +4397,7 @@ function showZoneModal(data) {
       } else {
         await API.createHACCPZone(payload);
       }
-      overlay.remove();
+      closeModal();
       showToast(isEdit ? "Zone modifi\xE9e \u2713" : "Zone cr\xE9\xE9e \u2713", "success");
       renderHACCPTemperatures();
     } catch (err) {
@@ -6294,19 +6505,19 @@ function showNCResolveModal(id, title) {
 }
 const ALLERGEN_LABELS = {
   gluten: { label: "Gluten", icon: "\u{1F33E}" },
-  crustaceans: { label: "Crustac\xE9s", icon: "\u{1F980}" },
-  eggs: { label: "\u0152ufs", icon: "\u{1F95A}" },
-  fish: { label: "Poissons", icon: "\u{1F41F}" },
-  peanuts: { label: "Arachides", icon: "\u{1F95C}" },
-  soybeans: { label: "Soja", icon: "\u{1FAD8}" },
-  milk: { label: "Lait", icon: "\u{1F95B}" },
-  nuts: { label: "Fruits \xE0 coque", icon: "\u{1F330}" },
-  celery: { label: "C\xE9leri", icon: "\u{1F33F}" },
-  mustard: { label: "Moutarde", icon: "\u{1F7E1}" },
+  crustaces: { label: "Crustac\xE9s", icon: "\u{1F980}" },
+  oeufs: { label: "\u0152ufs", icon: "\u{1F95A}" },
+  poissons: { label: "Poissons", icon: "\u{1F41F}" },
+  arachides: { label: "Arachides", icon: "\u{1F95C}" },
+  soja: { label: "Soja", icon: "\u{1FAD8}" },
+  lait: { label: "Lait", icon: "\u{1F95B}" },
+  fruits_coque: { label: "Fruits \xE0 coque", icon: "\u{1F330}" },
+  celeri: { label: "C\xE9leri", icon: "\u{1F33F}" },
+  moutarde: { label: "Moutarde", icon: "\u{1F7E1}" },
   sesame: { label: "S\xE9same", icon: "\u26AA" },
-  sulphites: { label: "Sulfites", icon: "\u{1F377}" },
+  sulfites: { label: "Sulfites", icon: "\u{1F377}" },
   lupin: { label: "Lupin", icon: "\u{1F338}" },
-  molluscs: { label: "Mollusques", icon: "\u{1F41A}" }
+  mollusques: { label: "Mollusques", icon: "\u{1F41A}" }
 };
 async function renderHACCPAllergens() {
   const app = document.getElementById("app");
@@ -10884,7 +11095,7 @@ async function renderTraceabilityDownstream() {
     allItems = await loadItems();
     filteredItems = allItems;
   } catch (e) {
-    app.innerHTML = `<div class="error-state"><p>Erreur lors du chargement : ${e.message}</p></div>`;
+    app.innerHTML = `<div class="error-state"><p>Erreur lors du chargement : ${escapeHtml(e.message)}</p></div>`;
     return;
   }
   function computeKPIs(items) {
@@ -16178,8 +16389,8 @@ class LoginView {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">
-          <button class="login-back" id="back-btn">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          <button class="login-back" id="back-btn" aria-label="Revenir \xE0 l'\xE9cran pr\xE9c\xE9dent">
+            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
           <div class="login-logo">
             <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 60px; width: auto;">
@@ -16188,16 +16399,16 @@ class LoginView {
 
           <div style="text-align:left;width:100%;margin-top:var(--space-4)">
             <div class="form-group">
-              <label>Email</label>
-              <input type="email" class="form-control" id="login-email" placeholder="votre@email.com" autocomplete="email">
+              <label for="login-email">Email</label>
+              <input type="email" class="form-control" id="login-email" placeholder="votre@email.com" autocomplete="email" required>
             </div>
             <div class="form-group">
-              <label>Mot de passe</label>
-              <input type="password" class="form-control" id="login-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="current-password">
+              <label for="login-password">Mot de passe</label>
+              <input type="password" class="form-control" id="login-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="current-password" required>
             </div>
           </div>
 
-          <div id="login-error" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
+          <div id="login-error" role="alert" aria-live="assertive" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
 
           <button class="btn btn-primary" id="login-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             Se connecter
@@ -16256,8 +16467,8 @@ class LoginView {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">
-          <button class="login-back" id="back-btn">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          <button class="login-back" id="back-btn" aria-label="Revenir \xE0 l'\xE9cran pr\xE9c\xE9dent">
+            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
           <div class="login-logo">
             <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 60px; width: auto;">
@@ -16268,25 +16479,25 @@ class LoginView {
           <div style="text-align:left;width:100%;margin-top:var(--space-4)">
             <div style="display:flex;gap:var(--space-3)">
               <div class="form-group" style="flex:1">
-                <label>Pr\xE9nom</label>
+                <label for="reg-firstname">Pr\xE9nom</label>
                 <input type="text" class="form-control" id="reg-firstname" placeholder="Paul" autocomplete="given-name">
               </div>
               <div class="form-group" style="flex:1">
-                <label>Nom</label>
+                <label for="reg-lastname">Nom</label>
                 <input type="text" class="form-control" id="reg-lastname" placeholder="Dupont" autocomplete="family-name">
               </div>
             </div>
             <div class="form-group">
-              <label>Email</label>
-              <input type="email" class="form-control" id="reg-email" placeholder="votre@email.com" autocomplete="email">
+              <label for="reg-email">Email</label>
+              <input type="email" class="form-control" id="reg-email" placeholder="votre@email.com" autocomplete="email" required>
             </div>
             <div class="form-group">
-              <label>Mot de passe (6 caract\xE8res min.)</label>
-              <input type="password" class="form-control" id="reg-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password">
+              <label for="reg-password">Mot de passe (6 caract\xE8res min.)</label>
+              <input type="password" class="form-control" id="reg-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password" required aria-describedby="reg-password-help">
             </div>
             <div class="form-group">
-              <label>Confirmer le mot de passe</label>
-              <input type="password" class="form-control" id="reg-password2" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password">
+              <label for="reg-password2">Confirmer le mot de passe</label>
+              <input type="password" class="form-control" id="reg-password2" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password" required>
             </div>
             <div style="margin-top:var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--border-default)">
               <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md)">
@@ -16298,7 +16509,7 @@ class LoginView {
                 </div>
               </div>
               <div class="form-group">
-                <label>Mot de passe \xE9quipe (partag\xE9 avec le staff)</label>
+                <label for="reg-staff-password">Mot de passe \xE9quipe (partag\xE9 avec le staff)</label>
                 <input type="text" class="form-control" id="reg-staff-password" placeholder="ex: resto2026" autocomplete="off"
                        style="font-family:var(--font-mono);letter-spacing:0.05em">
               </div>
@@ -16306,7 +16517,7 @@ class LoginView {
             </div>
           </div>
 
-          <div id="reg-error" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
+          <div id="reg-error" role="alert" aria-live="assertive" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
 
           <button class="btn btn-primary" id="reg-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             Cr\xE9er mon compte
@@ -16370,8 +16581,8 @@ class LoginView {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">
-          <button class="login-back" id="back-btn">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          <button class="login-back" id="back-btn" aria-label="Revenir \xE0 l'\xE9cran pr\xE9c\xE9dent">
+            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
           <div style="margin-bottom:var(--space-4)">
             <span style="font-size:2.5rem">\u{1F465}</span>
@@ -16381,12 +16592,12 @@ class LoginView {
 
           <div style="text-align:left;width:100%;margin-top:var(--space-4)">
             <div class="form-group">
-              <label>Mot de passe restaurant</label>
-              <input type="password" class="form-control" id="staff-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="off" style="text-align:center;font-size:1.2rem;letter-spacing:4px">
+              <label for="staff-password">Mot de passe restaurant</label>
+              <input type="password" class="form-control" id="staff-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="off" style="text-align:center;font-size:1.2rem;letter-spacing:4px" required>
             </div>
           </div>
 
-          <div id="staff-error" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
+          <div id="staff-error" role="alert" aria-live="assertive" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
 
           <button class="btn btn-primary" id="staff-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             Continuer
@@ -16439,22 +16650,22 @@ class LoginView {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:500px">
-          <button class="login-back" id="back-btn">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          <button class="login-back" id="back-btn" aria-label="Revenir \xE0 l'\xE9cran pr\xE9c\xE9dent">
+            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
           <h2 class="login-subtitle">${escapeHtml(this.restaurantName)}</h2>
           <p class="login-tagline">Qui \xEAtes-vous ?</p>
 
-          <div class="team-picker-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:16px;margin-top:var(--space-5);width:100%">
+          <div class="team-picker-grid" role="list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:16px;margin-top:var(--space-5);width:100%">
             ${this.staffMembers.map((m) => `
-              <button class="team-picker-card" data-id="${m.id}" style="
+              <button class="team-picker-card" data-id="${m.id}" role="listitem" aria-label="${escapeHtml(m.name)} \u2014 ${escapeHtml(_getRoleLabel(m.role).replace(/[^\p{L}\s]/gu, "").trim())}" style="
                 display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px 12px;
                 border-radius:var(--radius-lg);border:2px solid var(--border-primary);
                 background:var(--bg-secondary);cursor:pointer;transition:all 0.2s;
               ">
                 ${renderAvatar(m.name, 56)}
                 <span style="font-weight:600;font-size:var(--text-sm);color:var(--text-primary);text-align:center">${escapeHtml(m.name)}</span>
-                <span style="font-size:11px;color:var(--text-tertiary)">${_getRoleLabel(m.role)}</span>
+                <span style="font-size:11px;color:var(--text-tertiary)" aria-hidden="true">${_getRoleLabel(m.role)}</span>
               </button>
             `).join("")}
           </div>
@@ -16489,8 +16700,8 @@ class LoginView {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content pin-content">
-          <button class="login-back" id="pin-back">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          <button class="login-back" id="pin-back" aria-label="Revenir au choix d'utilisateur">
+            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
 
           <div style="margin-bottom:var(--space-3)">
@@ -16499,29 +16710,29 @@ class LoginView {
           <h2 class="login-subtitle">${escapeHtml(member.name)}</h2>
           <p class="login-tagline">Entrez votre PIN</p>
 
-          <div class="pin-dots" id="pin-dots">
-            <span class="pin-dot"></span>
-            <span class="pin-dot"></span>
-            <span class="pin-dot"></span>
-            <span class="pin-dot"></span>
+          <div class="pin-dots" id="pin-dots" role="status" aria-live="polite" aria-label="Chiffres saisis">
+            <span class="pin-dot" aria-hidden="true"></span>
+            <span class="pin-dot" aria-hidden="true"></span>
+            <span class="pin-dot" aria-hidden="true"></span>
+            <span class="pin-dot" aria-hidden="true"></span>
           </div>
 
-          <div class="pin-error" id="pin-error"></div>
+          <div class="pin-error" id="pin-error" role="alert" aria-live="assertive"></div>
 
-          <div class="pin-pad" id="pin-pad">
-            <button class="pin-key" data-digit="1">1</button>
-            <button class="pin-key" data-digit="2">2</button>
-            <button class="pin-key" data-digit="3">3</button>
-            <button class="pin-key" data-digit="4">4</button>
-            <button class="pin-key" data-digit="5">5</button>
-            <button class="pin-key" data-digit="6">6</button>
-            <button class="pin-key" data-digit="7">7</button>
-            <button class="pin-key" data-digit="8">8</button>
-            <button class="pin-key" data-digit="9">9</button>
-            <button class="pin-key pin-key--empty"></button>
-            <button class="pin-key" data-digit="0">0</button>
-            <button class="pin-key pin-key--delete" id="pin-delete">
-              <i data-lucide="delete" style="width:24px;height:24px"></i>
+          <div class="pin-pad" id="pin-pad" role="group" aria-label="Pav\xE9 num\xE9rique PIN">
+            <button class="pin-key" data-digit="1" aria-label="1">1</button>
+            <button class="pin-key" data-digit="2" aria-label="2">2</button>
+            <button class="pin-key" data-digit="3" aria-label="3">3</button>
+            <button class="pin-key" data-digit="4" aria-label="4">4</button>
+            <button class="pin-key" data-digit="5" aria-label="5">5</button>
+            <button class="pin-key" data-digit="6" aria-label="6">6</button>
+            <button class="pin-key" data-digit="7" aria-label="7">7</button>
+            <button class="pin-key" data-digit="8" aria-label="8">8</button>
+            <button class="pin-key" data-digit="9" aria-label="9">9</button>
+            <button class="pin-key pin-key--empty" aria-hidden="true" tabindex="-1"></button>
+            <button class="pin-key" data-digit="0" aria-label="0">0</button>
+            <button class="pin-key pin-key--delete" id="pin-delete" aria-label="Effacer le dernier chiffre">
+              <i data-lucide="delete" style="width:24px;height:24px" aria-hidden="true"></i>
             </button>
           </div>
         </div>
@@ -16570,8 +16781,8 @@ class LoginView {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content pin-content">
-          <button class="login-back" id="pin-back">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          <button class="login-back" id="pin-back" aria-label="Revenir au choix d'utilisateur">
+            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
 
           <div style="margin-bottom:var(--space-3)">
@@ -16580,29 +16791,29 @@ class LoginView {
           <h2 class="login-subtitle">${escapeHtml(member.name)}</h2>
           <p class="login-tagline" id="create-pin-label">Cr\xE9ez votre code PIN (4 chiffres)</p>
 
-          <div class="pin-dots" id="pin-dots">
-            <span class="pin-dot"></span>
-            <span class="pin-dot"></span>
-            <span class="pin-dot"></span>
-            <span class="pin-dot"></span>
+          <div class="pin-dots" id="pin-dots" role="status" aria-live="polite" aria-label="Chiffres saisis">
+            <span class="pin-dot" aria-hidden="true"></span>
+            <span class="pin-dot" aria-hidden="true"></span>
+            <span class="pin-dot" aria-hidden="true"></span>
+            <span class="pin-dot" aria-hidden="true"></span>
           </div>
 
-          <div class="pin-error" id="pin-error"></div>
+          <div class="pin-error" id="pin-error" role="alert" aria-live="assertive"></div>
 
-          <div class="pin-pad" id="pin-pad">
-            <button class="pin-key" data-digit="1">1</button>
-            <button class="pin-key" data-digit="2">2</button>
-            <button class="pin-key" data-digit="3">3</button>
-            <button class="pin-key" data-digit="4">4</button>
-            <button class="pin-key" data-digit="5">5</button>
-            <button class="pin-key" data-digit="6">6</button>
-            <button class="pin-key" data-digit="7">7</button>
-            <button class="pin-key" data-digit="8">8</button>
-            <button class="pin-key" data-digit="9">9</button>
-            <button class="pin-key pin-key--empty"></button>
-            <button class="pin-key" data-digit="0">0</button>
-            <button class="pin-key pin-key--delete" id="pin-delete">
-              <i data-lucide="delete" style="width:24px;height:24px"></i>
+          <div class="pin-pad" id="pin-pad" role="group" aria-label="Pav\xE9 num\xE9rique PIN">
+            <button class="pin-key" data-digit="1" aria-label="1">1</button>
+            <button class="pin-key" data-digit="2" aria-label="2">2</button>
+            <button class="pin-key" data-digit="3" aria-label="3">3</button>
+            <button class="pin-key" data-digit="4" aria-label="4">4</button>
+            <button class="pin-key" data-digit="5" aria-label="5">5</button>
+            <button class="pin-key" data-digit="6" aria-label="6">6</button>
+            <button class="pin-key" data-digit="7" aria-label="7">7</button>
+            <button class="pin-key" data-digit="8" aria-label="8">8</button>
+            <button class="pin-key" data-digit="9" aria-label="9">9</button>
+            <button class="pin-key pin-key--empty" aria-hidden="true" tabindex="-1"></button>
+            <button class="pin-key" data-digit="0" aria-label="0">0</button>
+            <button class="pin-key pin-key--delete" id="pin-delete" aria-label="Effacer le dernier chiffre">
+              <i data-lucide="delete" style="width:24px;height:24px" aria-hidden="true"></i>
             </button>
           </div>
         </div>
@@ -19662,36 +19873,40 @@ async function renderAIAssistant() {
     <div style="display:flex;flex-direction:column;height:calc(100vh - 80px);max-width:900px;margin:0 auto;padding:var(--space-3)">
       <div class="view-header" style="flex-shrink:0;margin-bottom:var(--space-4)">
         <h1 style="display:flex;align-items:center;gap:8px;margin:0">
-          <i data-lucide="sparkles" style="width:28px;height:28px;vertical-align:middle;margin-right:8px"></i>Alto
+          <i data-lucide="sparkles" style="width:28px;height:28px;vertical-align:middle;margin-right:8px" aria-hidden="true"></i>Alto
         </h1>
         <p class="text-secondary" style="font-size:var(--text-sm);margin-top:4px">Assistant culinaire intelligent \xB7 Voix &amp; texte \xB7 Actions confirm\xE9es</p>
       </div>
 
-      <div id="ai-messages" style="flex:1;overflow-y:auto;padding:var(--space-3) 0;display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-4)">
+      <div id="ai-messages" role="log" aria-live="polite" aria-label="Conversation avec Alto"
+           style="flex:1;overflow-y:auto;padding:var(--space-3) 0;display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-4)">
         <div class="ai-msg ai-msg--ai">
-          <div class="ai-msg__avatar">\u2728</div>
+          <div class="ai-msg__avatar" aria-hidden="true">\u2728</div>
           <div class="ai-msg__bubble">
             <p>Bonjour ! Je suis <strong>Alto</strong>, votre assistant culinaire intelligent.</p>
             <p style="margin-top:8px">Parlez-moi ou \xE9crivez&nbsp;: je peux enregistrer vos relev\xE9s HACCP (temp\xE9ratures, nettoyages, cuissons, refroidissements, non-conformit\xE9s, plats t\xE9moins, tra\xE7abilit\xE9\u2026), g\xE9rer vos stocks et commandes, ou analyser vos donn\xE9es. Vous validez, j\u2019ex\xE9cute.</p>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
-              <button class="ai-suggestion" onclick="sendAISuggestion('Frigo 1 \xE0 3,2\xB0C, frigo 2 \xE0 4\xB0C, chambre froide \xE0 -18\xB0C')"><i data-lucide="thermometer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Relev\xE9 T\xB0 group\xE9</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('J\\'ai nettoy\xE9 les plans de travail, la trancheuse et les frigos')"><i data-lucide="sparkles" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Nettoyages</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Refroidissement blanquette, d\xE9part 72\xB0C, arriv\xE9e 8\xB0C en 1h45')"><i data-lucide="snowflake" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Refroidissement</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Quel est mon food cost moyen ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Food cost</button>
+            <div role="group" aria-label="Suggestions de requ\xEAtes" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
+              <button class="ai-suggestion" onclick="sendAISuggestion('Frigo 1 \xE0 3,2\xB0C, frigo 2 \xE0 4\xB0C, chambre froide \xE0 -18\xB0C')"><i data-lucide="thermometer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" aria-hidden="true"></i>Relev\xE9 T\xB0 group\xE9</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('J\\'ai nettoy\xE9 les plans de travail, la trancheuse et les frigos')"><i data-lucide="sparkles" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" aria-hidden="true"></i>Nettoyages</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Refroidissement blanquette, d\xE9part 72\xB0C, arriv\xE9e 8\xB0C en 1h45')"><i data-lucide="snowflake" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" aria-hidden="true"></i>Refroidissement</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Quel est mon food cost moyen ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" aria-hidden="true"></i>Food cost</button>
             </div>
           </div>
         </div>
       </div>
 
       <div style="flex-shrink:0;padding:var(--space-3);border:1px solid var(--border-light);border-radius:var(--radius-lg);background:var(--bg-sunken)">
-        <form id="ai-form" style="display:flex;gap:var(--space-2)">
-          <button type="button" class="btn" id="ai-voice-btn" style="padding:8px 12px;background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-secondary)" title="Enregistrer au micro">
-            <i data-lucide="mic" style="width:18px;height:18px"></i>
+        <form id="ai-form" role="search" aria-label="Envoyer un message \xE0 Alto" style="display:flex;gap:var(--space-2)">
+          <label for="ai-input" class="visually-hidden">Message \xE0 Alto</label>
+          <button type="button" class="btn" id="ai-voice-btn" aria-label="Dicter au micro" aria-pressed="false"
+                  style="padding:8px 12px;background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-secondary)" title="Enregistrer au micro">
+            <i data-lucide="mic" style="width:18px;height:18px" aria-hidden="true"></i>
           </button>
           <input type="text" id="ai-input" class="input" placeholder="Parlez \xE0 Alto ou \xE9crivez votre demande\u2026"
+            aria-label="Message \xE0 Alto"
             style="flex:1;font-size:var(--text-base)" autocomplete="off">
-          <button type="submit" class="btn btn-primary" id="ai-send-btn" style="padding:8px 16px">
-            <i data-lucide="send" style="width:18px;height:18px"></i>
+          <button type="submit" class="btn btn-primary" id="ai-send-btn" aria-label="Envoyer le message" style="padding:8px 16px">
+            <i data-lucide="send" style="width:18px;height:18px" aria-hidden="true"></i>
           </button>
         </form>
       </div>
@@ -19785,7 +20000,9 @@ function toggleAIVoice() {
   if (_aiVoiceRecognition) {
     _aiVoiceRecognition.abort();
     _aiVoiceRecognition = null;
-    document.getElementById("ai-voice-btn").style.opacity = "1";
+    const btn2 = document.getElementById("ai-voice-btn");
+    btn2.style.opacity = "1";
+    btn2.setAttribute("aria-pressed", "false");
     return;
   }
   _aiVoiceRecognition = new recognition2();
@@ -19796,6 +20013,7 @@ function toggleAIVoice() {
   btn.style.opacity = "0.6";
   btn.style.background = "var(--color-accent)";
   btn.style.color = "white";
+  btn.setAttribute("aria-pressed", "true");
   let transcript = "";
   _aiVoiceRecognition.onresult = (event) => {
     for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -19810,6 +20028,7 @@ function toggleAIVoice() {
       btn.style.opacity = "1";
       btn.style.background = "";
       btn.style.color = "";
+      btn.setAttribute("aria-pressed", "false");
       sendAIMessage(transcript.trim());
       _aiVoiceRecognition = null;
     }
@@ -19818,6 +20037,7 @@ function toggleAIVoice() {
     btn.style.opacity = "1";
     btn.style.background = "";
     btn.style.color = "";
+    btn.setAttribute("aria-pressed", "false");
     if (event.error !== "no-speech") {
       showToast("Erreur vocale: " + event.error, "error");
     }
@@ -19827,6 +20047,7 @@ function toggleAIVoice() {
     btn.style.opacity = "1";
     btn.style.background = "";
     btn.style.color = "";
+    btn.setAttribute("aria-pressed", "false");
     _aiVoiceRecognition = null;
   };
   _aiVoiceRecognition.start();
@@ -19842,17 +20063,19 @@ async function sendAIMessage(message) {
   if (voiceBtn) voiceBtn.disabled = true;
   const userMsg = document.createElement("div");
   userMsg.className = "ai-msg ai-msg--user";
+  userMsg.setAttribute("role", "listitem");
   userMsg.innerHTML = `
-    <div class="ai-msg__avatar">\u{1F464}</div>
-    <div class="ai-msg__bubble">${escapeHtml(message)}</div>
+    <div class="ai-msg__avatar" aria-hidden="true">\u{1F464}</div>
+    <div class="ai-msg__bubble"><span class="visually-hidden">Vous : </span>${escapeHtml(message)}</div>
   `;
   messagesEl.appendChild(userMsg);
   const typing = document.createElement("div");
   typing.className = "ai-msg ai-msg--ai";
   typing.id = "ai-typing";
+  typing.setAttribute("aria-label", "Alto r\xE9dige une r\xE9ponse");
   typing.innerHTML = `
-    <div class="ai-msg__avatar">\u2728</div>
-    <div class="ai-msg__bubble"><div class="ai-typing"><span></span><span></span><span></span></div></div>
+    <div class="ai-msg__avatar" aria-hidden="true">\u2728</div>
+    <div class="ai-msg__bubble"><div class="ai-typing" aria-hidden="true"><span></span><span></span><span></span></div></div>
   `;
   messagesEl.appendChild(typing);
   messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -19866,9 +20089,10 @@ async function sendAIMessage(message) {
     typing.remove();
     const aiMsg = document.createElement("div");
     aiMsg.className = "ai-msg ai-msg--ai";
+    aiMsg.setAttribute("role", "listitem");
     aiMsg.innerHTML = `
-      <div class="ai-msg__avatar">\u2728</div>
-      <div class="ai-msg__bubble">${formatAIReply(result.reply)}</div>
+      <div class="ai-msg__avatar" aria-hidden="true">\u2728</div>
+      <div class="ai-msg__bubble"><span class="visually-hidden">Alto : </span>${formatAIReply(result.reply)}</div>
     `;
     messagesEl.appendChild(aiMsg);
     if (result.actions && result.actions.length > 0) {
@@ -19876,18 +20100,27 @@ async function sendAIMessage(message) {
         if (!action.requires_confirmation) continue;
         const actionEl = document.createElement("div");
         actionEl.className = "ai-msg ai-msg--ai";
+        actionEl.setAttribute("role", "region");
+        actionEl.setAttribute("aria-label", "Action propos\xE9e par Alto");
         actionEl.innerHTML = `
-          <div class="ai-msg__avatar"></div>
+          <div class="ai-msg__avatar" aria-hidden="true"></div>
           <div class="ai-action-card">
             <div class="ai-action-title">
-              <i data-lucide="zap" style="width:16px;height:16px"></i> ${escapeHtml(action.description)}
+              <i data-lucide="zap" style="width:16px;height:16px" aria-hidden="true"></i> ${escapeHtml(action.description)}
             </div>
-            <div class="ai-action-buttons">
-              <button class="ai-action-confirm" onclick="confirmAIAction('${action.type}', '${btoa(JSON.stringify(action.params))}')">\u2713 Confirmer</button>
-              <button class="ai-action-cancel" onclick="dismissAction(this)">\u2715 Annuler</button>
+            <div class="ai-action-buttons" role="group" aria-label="Valider ou annuler l'action">
+              <button class="ai-action-confirm" aria-label="Confirmer l'action" type="button">\u2713 Confirmer</button>
+              <button class="ai-action-cancel" aria-label="Annuler l'action" type="button">\u2715 Annuler</button>
             </div>
           </div>
         `;
+        const confirmBtn = actionEl.querySelector(".ai-action-confirm");
+        const cancelBtn = actionEl.querySelector(".ai-action-cancel");
+        const capturedAction = { type: String(action.type || ""), params: action.params };
+        confirmBtn.addEventListener("click", () => {
+          confirmAIAction(capturedAction.type, btoa(JSON.stringify(capturedAction.params)));
+        });
+        cancelBtn.addEventListener("click", () => dismissAction(cancelBtn));
         messagesEl.appendChild(actionEl);
         if (window.lucide) lucide.createIcons();
       }
@@ -19896,8 +20129,9 @@ async function sendAIMessage(message) {
     typing.remove();
     const errMsg = document.createElement("div");
     errMsg.className = "ai-msg ai-msg--ai";
+    errMsg.setAttribute("role", "alert");
     errMsg.innerHTML = `
-      <div class="ai-msg__avatar">\u2728</div>
+      <div class="ai-msg__avatar" aria-hidden="true">\u2728</div>
       <div class="ai-msg__bubble" style="border-color:var(--color-danger)">
         <p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>
       </div>
@@ -19933,14 +20167,14 @@ async function confirmAIAction(type, paramsBase64) {
       resultMsg.innerHTML = `
         <div class="ai-msg__avatar">\u2713</div>
         <div class="ai-msg__bubble" style="background:var(--color-success-light);border-color:var(--color-success)">
-          <p style="color:var(--color-success);font-weight:500">${result.message}</p>
+          <p style="color:var(--color-success);font-weight:500">${escapeHtml(result.message)}</p>
         </div>
       `;
     } else {
       resultMsg.innerHTML = `
         <div class="ai-msg__avatar">\u2715</div>
         <div class="ai-msg__bubble" style="border-color:var(--color-danger)">
-          <p style="color:var(--color-danger)">${result.error || "Impossible d'ex\xE9cuter l'action"}</p>
+          <p style="color:var(--color-danger)">${escapeHtml(result.error || "Impossible d'ex\xE9cuter l'action")}</p>
         </div>
       `;
     }
@@ -19954,7 +20188,8 @@ function dismissAction(btn) {
   btn.closest(".ai-action-card").parentElement.remove();
 }
 function formatAIReply(text) {
-  return text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\*(.*?)\*/g, "<em>$1</em>").replace(/`(.*?)`/g, '<code style="background:rgba(0,0,0,0.1);padding:2px 4px;border-radius:3px">$1</code>').replace(/^### (.*$)/gm, '<h4 style="margin:12px 0 6px;font-size:var(--text-sm)">$1</h4>').replace(/^## (.*$)/gm, '<h3 style="margin:12px 0 6px">$1</h3>').replace(/^- (.*$)/gm, '<li style="margin-left:16px">$1</li>').replace(/^(\d+)\. (.*$)/gm, '<li style="margin-left:16px">$2</li>').replace(/\n{2,}/g, '</p><p style="margin-top:8px">').replace(/\n/g, "<br>");
+  const safe = escapeHtml(text || "");
+  return safe.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\*(.*?)\*/g, "<em>$1</em>").replace(/`(.*?)`/g, '<code style="background:rgba(0,0,0,0.1);padding:2px 4px;border-radius:3px">$1</code>').replace(/^### (.*$)/gm, '<h4 style="margin:12px 0 6px;font-size:var(--text-sm)">$1</h4>').replace(/^## (.*$)/gm, '<h3 style="margin:12px 0 6px">$1</h3>').replace(/^- (.*$)/gm, '<li style="margin-left:16px">$1</li>').replace(/^(\d+)\. (.*$)/gm, '<li style="margin-left:16px">$2</li>').replace(/\n{2,}/g, '</p><p style="margin-top:8px">').replace(/\n/g, "<br>");
 }
 async function renderMenuEngineering() {
   const app = document.getElementById("app");
@@ -22846,10 +23081,17 @@ function showBubbleActions(actions) {
     actionEl.innerHTML = `
       <div style="margin-bottom: 8px; font-weight: 600">${escapeHtml(action.description)}</div>
       <div style="display: flex; gap: 6px">
-        <button onclick="confirmBubbleAction('${action.type}', '${btoa(JSON.stringify(action.params))}'" style="flex: 1; padding: 4px 8px; background: var(--color-accent); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: var(--text-xs)">Confirmer</button>
-        <button onclick="closeBubbleAction(this)" style="flex: 1; padding: 4px 8px; background: transparent; color: var(--text-secondary); border: 1px solid var(--border-light); border-radius: 4px; cursor: pointer; font-size: var(--text-xs)">Annuler</button>
+        <button class="bubble-action-confirm" type="button" style="flex: 1; padding: 4px 8px; background: var(--color-accent); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: var(--text-xs)">Confirmer</button>
+        <button class="bubble-action-cancel" type="button" style="flex: 1; padding: 4px 8px; background: transparent; color: var(--text-secondary); border: 1px solid var(--border-light); border-radius: 4px; cursor: pointer; font-size: var(--text-xs)">Annuler</button>
       </div>
     `;
+    const confirmBtn = actionEl.querySelector(".bubble-action-confirm");
+    const cancelBtn = actionEl.querySelector(".bubble-action-cancel");
+    const capturedAction = { type: String(action.type || ""), params: action.params };
+    confirmBtn.addEventListener("click", () => {
+      confirmBubbleAction(capturedAction.type, btoa(JSON.stringify(capturedAction.params)));
+    });
+    cancelBtn.addEventListener("click", () => closeBubbleAction(cancelBtn));
     messagesEl.appendChild(actionEl);
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
