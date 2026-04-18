@@ -25,26 +25,43 @@ if (!IS_TEST) {
   errorTracker.installProcessHandlers();
 }
 
-// Validate JWT_SECRET on startup
-const DEV_JWT_SECRET = 'restosuite-dev-secret-2026';
-if (process.env.NODE_ENV === 'production') {
-  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEV_JWT_SECRET) {
-    console.error('❌ FATAL: JWT_SECRET must be set to a strong secret in production.');
+// Validate JWT_SECRET on startup — fail-closed in any env except tests.
+// Tests set JWT_SECRET in tests/helpers/env.js; any other env must set it explicitly.
+if (!IS_TEST) {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+    console.error('❌ FATAL: JWT_SECRET must be set to a strong secret (32+ chars).');
+    console.error('   Set JWT_SECRET in your environment variables and restart.');
     process.exit(1);
   }
-} else if (!IS_TEST && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)) {
-  console.warn('⚠️  WARNING: JWT_SECRET not set or too short. Using default (NOT SAFE FOR PRODUCTION).');
 }
+
+// Trust the first reverse proxy (Render puts nginx in front of Node). Without this,
+// express-rate-limit + req.ip see the proxy's IP for every request → global lockout
+// for honest users and no per-client throttling for brute-forcers.
+app.set('trust proxy', 1);
 
 // Request-ID must come first so every subsequent middleware + logger sees req.id
 app.use(requestId);
 
 app.use(compression());
 
+// CORS: explicit allowlist in production + localhost whitelist in dev. Never echo
+// arbitrary origins while credentials:true — would leak auth cookies/headers to any
+// hostile site the dev happens to open while holding a local session.
+const DEV_CORS_ALLOWLIST = [
+  /^https?:\/\/localhost(:\d+)?$/,
+  /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+];
+const PROD_CORS_ALLOWLIST = ['https://www.restosuite.fr', 'https://restosuite.fr'];
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? ['https://www.restosuite.fr', 'https://restosuite.fr']
-    : true,
+  origin: (origin, cb) => {
+    // Same-origin / curl / server-to-server requests have no Origin header.
+    if (!origin) return cb(null, true);
+    if (process.env.NODE_ENV === 'production') {
+      return cb(null, PROD_CORS_ALLOWLIST.includes(origin));
+    }
+    return cb(null, DEV_CORS_ALLOWLIST.some(rx => rx.test(origin)));
+  },
   credentials: true
 }));
 
@@ -177,10 +194,10 @@ if (!IS_TEST) {
 // ─── Soft JWT decode (populates req.user for planGate without enforcing auth) ──
 {
   const _jwt = require('jsonwebtoken');
-  const _jwtSecret = process.env.JWT_SECRET || DEV_JWT_SECRET;
   app.use((req, res, next) => {
     const auth = req.headers.authorization;
-    if (auth && auth.startsWith('Bearer ')) {
+    const _jwtSecret = process.env.JWT_SECRET;
+    if (auth && auth.startsWith('Bearer ') && _jwtSecret) {
       try { req.user = _jwt.verify(auth.split(' ')[1], _jwtSecret); } catch {}
     }
     next();
@@ -296,13 +313,15 @@ app.post('/api/admin/backup', requireAuth, (req, res) => {
   res.json({ ok: true, message: 'Backup effectué' });
 });
 
+// /api/admin/export-db REMOVED — previously streamed the entire multi-tenant SQLite
+// file to any authenticated gérant (PENTEST_REPORT C1.1). Per-tenant data exports
+// should go through domain-specific CSV/PDF endpoints (HACCP, traçabilité, etc.)
+// that already scope by req.user.restaurant_id.
 app.get('/api/admin/export-db', requireAuth, (req, res) => {
-  if (req.user.role !== 'gerant') return res.status(403).json({ error: 'Réservé au gérant' });
-  const dbPath = path.join(__dirname, 'data', 'restosuite.db');
-  if (!require('fs').existsSync(dbPath)) {
-    return res.status(404).json({ error: 'No database found' });
-  }
-  res.download(dbPath, 'restosuite-backup.db');
+  res.status(410).json({
+    error: 'Endpoint supprimé pour des raisons de sécurité (fuite multi-tenant). ' +
+      'Utilisez les exports par domaine : /api/haccp/export, /api/traceability/export, etc.'
+  });
 });
 
 app.get('/api/health', (req, res) => {
