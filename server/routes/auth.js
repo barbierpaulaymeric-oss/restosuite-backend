@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { all, get, run } = require('../db');
+const { parseCookies, serializeCookie, appendSetCookie } = require('../lib/cookie');
 
 const router = express.Router();
 // No hardcoded fallback — app.js/index.js fail-close on startup if JWT_SECRET is
@@ -18,6 +19,36 @@ function getJwtSecret() {
   return s;
 }
 const JWT_EXPIRY = '30d';
+const JWT_COOKIE_NAME = 'jwt';
+const JWT_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
+
+// ─── JWT cookie helpers ───
+// The token is carried in an HttpOnly + Secure + SameSite=Strict cookie so it's
+// not readable from XSS (localStorage is). CSRF is mitigated by a matching
+// `csrf` JWT claim compared to the X-CSRF-Token header on mutating requests.
+function issueAuthCookie(res, token) {
+  const cookie = serializeCookie(JWT_COOKIE_NAME, token, {
+    httpOnly: true,
+    // In tests the app runs over http; cookies with Secure won't stick. In every
+    // other env we require TLS — the production app already enforces HTTPS.
+    secure: process.env.NODE_ENV !== 'test',
+    sameSite: 'Strict',
+    path: '/',
+    maxAge: JWT_COOKIE_MAX_AGE,
+  });
+  appendSetCookie(res, cookie);
+}
+
+function clearAuthCookie(res) {
+  const cookie = serializeCookie(JWT_COOKIE_NAME, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV !== 'test',
+    sameSite: 'Strict',
+    path: '/',
+    maxAge: 0,
+  });
+  appendSetCookie(res, cookie);
+}
 
 // ─── JWT revocation (blacklist) ───
 // A token is identified by its `jti` claim (issued at registration / login) and stays
@@ -135,12 +166,16 @@ function recordAccountPinAttempt(accountId, success) {
 
 function generateToken(account) {
   // Include a unique jti so individual tokens can be revoked without rotating JWT_SECRET.
+  // Include a per-token csrf secret so the X-CSRF-Token header can be matched by
+  // the csrf middleware without any extra server-side store.
   const jti = crypto.randomBytes(16).toString('hex');
-  return jwt.sign(
-    { id: account.id, email: account.email, role: account.role, restaurant_id: account.restaurant_id, jti },
+  const csrf = crypto.randomBytes(32).toString('hex');
+  const token = jwt.sign(
+    { id: account.id, email: account.email, role: account.role, restaurant_id: account.restaurant_id, jti, csrf },
     getJwtSecret(),
     { expiresIn: JWT_EXPIRY }
   );
+  return { token, csrf };
 }
 
 function hashPin(pin) {
@@ -152,12 +187,26 @@ function verifyPin(pin, hash) {
 }
 
 // ─── Middleware: requireAuth ───
+// Accepts EITHER the `jwt` HttpOnly cookie (preferred for browser clients —
+// protected by CSRF middleware) OR an `Authorization: Bearer ...` header
+// (kept for API/test clients that don't carry cookies). The cookie takes
+// precedence so an XSS-stolen Bearer can't override a live cookie session.
 function requireAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Token requis' });
+  let token;
+  let via;
+  const cookies = parseCookies(req.headers.cookie || '');
+  if (cookies[JWT_COOKIE_NAME]) {
+    token = cookies[JWT_COOKIE_NAME];
+    via = 'cookie';
+  } else {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+      via = 'bearer';
+    }
   }
-  const token = authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Token requis' });
+
   try {
     const decoded = jwt.verify(token, getJwtSecret());
     if (isTokenRevoked(decoded.jti)) {
@@ -165,6 +214,7 @@ function requireAuth(req, res, next) {
     }
     req.user = decoded;
     req.token = token;
+    req._authVia = via;
     next();
   } catch (e) {
     return res.status(401).json({ error: 'Token invalide ou expiré' });
@@ -239,10 +289,12 @@ router.post('/register', async (req, res) => {
     const accountId = accountResult.lastInsertRowid;
     const account = get('SELECT * FROM accounts WHERE id = ?', [accountId]);
 
-    const token = generateToken(account);
+    const { token, csrf } = generateToken(account);
+    issueAuthCookie(res, token);
 
     res.json({
       token,
+      csrf_token: csrf,
       account: {
         id: account.id,
         name: account.name,
@@ -282,7 +334,8 @@ router.post('/login', async (req, res) => {
   // Update last_login
   run('UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [account.id]);
 
-  const token = generateToken(account);
+  const { token, csrf } = generateToken(account);
+  issueAuthCookie(res, token);
 
   // Get restaurant info
   const restaurant = account.restaurant_id
@@ -291,6 +344,7 @@ router.post('/login', async (req, res) => {
 
   res.json({
     token,
+    csrf_token: csrf,
     account: {
       id: account.id,
       name: account.name,
@@ -362,13 +416,15 @@ router.post('/pin-login', async (req, res) => {
   // Update last_login
   run('UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [account.id]);
 
-  const token = generateToken(account);
+  const { token, csrf } = generateToken(account);
+  issueAuthCookie(res, token);
   const restaurant = account.restaurant_id
     ? get('SELECT * FROM restaurants WHERE id = ?', [account.restaurant_id])
     : null;
 
   res.json({
     token,
+    csrf_token: csrf,
     account: {
       id: account.id,
       name: account.name,
@@ -517,10 +573,12 @@ router.post('/staff-pin', async (req, res) => {
   run('UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [account_id]);
 
   // Generate JWT token
-  const token = generateToken(account);
+  const { token, csrf } = generateToken(account);
+  issueAuthCookie(res, token);
 
   res.json({
     token,
+    csrf_token: csrf,
     account: {
       id: account.id,
       name: account.name,
@@ -612,6 +670,8 @@ router.post('/logout', requireAuth, (req, res) => {
         [jti, req.user.id, exp]
       );
     }
+    // Clear the HttpOnly auth cookie so the browser drops its session immediately.
+    clearAuthCookie(res);
     res.json({ ok: true });
   } catch (e) {
     console.error('Logout error:', e);

@@ -193,16 +193,34 @@ if (!IS_TEST) {
 }
 
 // ─── Soft JWT decode (populates req.user for planGate without enforcing auth) ──
+// Reads the token from either the Authorization header (API/tests) or the
+// HttpOnly `jwt` cookie (browser clients). Failures are silent — planGate and
+// requireAuth still enforce their own rules.
 {
   const _jwt = require('jsonwebtoken');
+  const { parseCookies } = require('./lib/cookie');
   app.use((req, res, next) => {
-    const auth = req.headers.authorization;
     const _jwtSecret = process.env.JWT_SECRET;
-    if (auth && auth.startsWith('Bearer ') && _jwtSecret) {
-      try { req.user = _jwt.verify(auth.split(' ')[1], _jwtSecret); } catch {}
+    let token = null;
+    const auth = req.headers.authorization;
+    if (auth && auth.startsWith('Bearer ')) {
+      token = auth.split(' ')[1];
+    } else {
+      const cookies = parseCookies(req.headers.cookie || '');
+      if (cookies.jwt) token = cookies.jwt;
+    }
+    if (token && _jwtSecret) {
+      try { req.user = _jwt.verify(token, _jwtSecret); } catch {}
     }
     next();
   });
+}
+
+// ─── CSRF: enforced for cookie-authenticated mutating requests ───
+// Bearer-authed calls (API/tests) bypass this — see server/lib/csrf.js.
+{
+  const { csrfProtection } = require('./lib/csrf');
+  app.use(csrfProtection);
 }
 
 // ─── Plan Gating (skip in test mode — requireAuth in each route still enforces 401) ───

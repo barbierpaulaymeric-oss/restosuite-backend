@@ -2,20 +2,43 @@
 // RestoSuite — API Client
 // ═══════════════════════════════════════════
 
+// ─── CSRF token — held in memory only (never in localStorage/sessionStorage) ───
+// Populated from the `csrf_token` field of login/register/pin-login responses.
+// Sent as `X-CSRF-Token` on every mutating request so the server can match it
+// against the JWT's `csrf` claim (see server/lib/csrf.js).
+let __csrfToken = null;
+function setCsrfToken(t) { __csrfToken = t || null; }
+function getCsrfToken() { return __csrfToken; }
+
 const API = {
   base: window.location.origin + '/api',
 
   async request(path, options = {}) {
     const url = this.base + path;
     const config = {
+      // Send the HttpOnly `jwt` cookie on every request. CORS is configured to
+      // allow credentials from the same origin + the production allowlist.
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       ...options,
     };
+    // Make sure header object is always present even if options overrode it.
+    config.headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    config.credentials = 'include';
 
-    // Inject JWT token if available
-    const token = localStorage.getItem('restosuite_token');
-    if (token) {
-      config.headers['Authorization'] = 'Bearer ' + token;
+    // CSRF: required on mutating requests when auth comes from the cookie.
+    const method = (options.method || 'GET').toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD' && __csrfToken) {
+      config.headers['X-CSRF-Token'] = __csrfToken;
+    }
+
+    // Legacy: some existing sessions may still have a Bearer token in
+    // localStorage (pre-cookie rollout). Keep sending it as a fallback so the
+    // user isn't logged out mid-session. Both transports are accepted by
+    // requireAuth; cookie takes precedence when both are present.
+    const legacyToken = localStorage.getItem('restosuite_token');
+    if (legacyToken && !config.headers['Authorization']) {
+      config.headers['Authorization'] = 'Bearer ' + legacyToken;
     }
 
     // Inject account_id header for trial middleware (legacy compat)
@@ -32,6 +55,7 @@ const API = {
       // JWT expired or invalid — force re-login
       localStorage.removeItem('restosuite_token');
       localStorage.removeItem('restosuite_account');
+      __csrfToken = null;
       if (window.location.hash !== '#/login') {
         window.location.hash = '#/login';
         window.location.reload();
@@ -128,15 +152,22 @@ const API = {
     return this.request(`/recipes/${id}/pdf`);
   },
 
-  // Auth
-  register(data) {
-    return this.request('/auth/register', { method: 'POST', body: data });
+  // Auth — each login response carries `csrf_token`; stash it in memory so
+  // subsequent mutating requests can echo it in X-CSRF-Token.
+  async register(data) {
+    const r = await this.request('/auth/register', { method: 'POST', body: data });
+    if (r && r.csrf_token) setCsrfToken(r.csrf_token);
+    return r;
   },
-  login(data) {
-    return this.request('/auth/login', { method: 'POST', body: data });
+  async login(data) {
+    const r = await this.request('/auth/login', { method: 'POST', body: data });
+    if (r && r.csrf_token) setCsrfToken(r.csrf_token);
+    return r;
   },
-  pinLogin(data) {
-    return this.request('/auth/pin-login', { method: 'POST', body: data });
+  async pinLogin(data) {
+    const r = await this.request('/auth/pin-login', { method: 'POST', body: data });
+    if (r && r.csrf_token) setCsrfToken(r.csrf_token);
+    return r;
   },
   getMe() {
     return this.request('/auth/me');
@@ -146,8 +177,10 @@ const API = {
   staffLogin(password) {
     return this.request('/auth/staff-login', { method: 'POST', body: { password } });
   },
-  staffPinLogin(account_id, pin, is_creation = false) {
-    return this.request('/auth/staff-pin', { method: 'POST', body: { account_id, pin, is_creation } });
+  async staffPinLogin(account_id, pin, is_creation = false) {
+    const r = await this.request('/auth/staff-pin', { method: 'POST', body: { account_id, pin, is_creation } });
+    if (r && r.csrf_token) setCsrfToken(r.csrf_token);
+    return r;
   },
   setStaffPassword(password) {
     return this.request('/auth/staff-password', { method: 'PUT', body: { password } });
@@ -565,10 +598,16 @@ const API = {
   async scanMercuriale(file) {
     const formData = new FormData();
     formData.append('mercuriale', file);
-    const token = localStorage.getItem('restosuite_token');
+    // Multipart upload — cookie is sent via credentials:'include'. Add CSRF and
+    // the legacy Bearer fallback (in case the session predates the cookie rollout).
+    const headers = {};
+    if (__csrfToken) headers['X-CSRF-Token'] = __csrfToken;
+    const legacyToken = localStorage.getItem('restosuite_token');
+    if (legacyToken) headers['Authorization'] = 'Bearer ' + legacyToken;
     const res = await fetch(this.base + '/ai/scan-mercuriale', {
       method: 'POST',
-      headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+      credentials: 'include',
+      headers,
       body: formData
     });
     if (!res.ok) {

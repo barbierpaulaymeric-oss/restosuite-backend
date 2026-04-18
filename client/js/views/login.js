@@ -701,9 +701,22 @@ function applyRole(role) {
 function logout() {
   // Clear trial status polling interval
   clearTrialStatusInterval();
+  // Fire-and-forget: invalidates the JWT server-side (blacklist) AND clears the
+  // HttpOnly cookie via Set-Cookie Max-Age=0. Even if this fails (network), the
+  // client state is still wiped below.
+  try {
+    fetch((window.location.origin) + '/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+      headers: (typeof getCsrfToken === 'function' && getCsrfToken())
+        ? { 'X-CSRF-Token': getCsrfToken() }
+        : {},
+    }).catch(() => {});
+  } catch {}
   localStorage.removeItem('restosuite_account');
   localStorage.removeItem('restosuite_token');
   localStorage.removeItem('restosuite_role');
+  if (typeof setCsrfToken === 'function') setCsrfToken(null);
   document.body.className = '';
   location.hash = '';
   location.reload();

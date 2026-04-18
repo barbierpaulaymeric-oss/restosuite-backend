@@ -17,16 +17,32 @@ var __spreadValues = (a, b) => {
   return a;
 };
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+let __csrfToken = null;
+function setCsrfToken(t) {
+  __csrfToken = t || null;
+}
+function getCsrfToken() {
+  return __csrfToken;
+}
 const API = {
   base: window.location.origin + "/api",
   async request(path, options = {}) {
     const url = this.base + path;
     const config = __spreadValues({
+      // Send the HttpOnly `jwt` cookie on every request. CORS is configured to
+      // allow credentials from the same origin + the production allowlist.
+      credentials: "include",
       headers: { "Content-Type": "application/json" }
     }, options);
-    const token = localStorage.getItem("restosuite_token");
-    if (token) {
-      config.headers["Authorization"] = "Bearer " + token;
+    config.headers = __spreadValues({ "Content-Type": "application/json" }, options.headers || {});
+    config.credentials = "include";
+    const method = (options.method || "GET").toUpperCase();
+    if (method !== "GET" && method !== "HEAD" && __csrfToken) {
+      config.headers["X-CSRF-Token"] = __csrfToken;
+    }
+    const legacyToken = localStorage.getItem("restosuite_token");
+    if (legacyToken && !config.headers["Authorization"]) {
+      config.headers["Authorization"] = "Bearer " + legacyToken;
     }
     const account = typeof getAccount === "function" ? getAccount() : null;
     if (account && account.id) {
@@ -39,6 +55,7 @@ const API = {
     if (res.status === 401) {
       localStorage.removeItem("restosuite_token");
       localStorage.removeItem("restosuite_account");
+      __csrfToken = null;
       if (window.location.hash !== "#/login") {
         window.location.hash = "#/login";
         window.location.reload();
@@ -128,15 +145,22 @@ const API = {
   getRecipePdf(id) {
     return this.request(`/recipes/${id}/pdf`);
   },
-  // Auth
-  register(data) {
-    return this.request("/auth/register", { method: "POST", body: data });
+  // Auth — each login response carries `csrf_token`; stash it in memory so
+  // subsequent mutating requests can echo it in X-CSRF-Token.
+  async register(data) {
+    const r = await this.request("/auth/register", { method: "POST", body: data });
+    if (r && r.csrf_token) setCsrfToken(r.csrf_token);
+    return r;
   },
-  login(data) {
-    return this.request("/auth/login", { method: "POST", body: data });
+  async login(data) {
+    const r = await this.request("/auth/login", { method: "POST", body: data });
+    if (r && r.csrf_token) setCsrfToken(r.csrf_token);
+    return r;
   },
-  pinLogin(data) {
-    return this.request("/auth/pin-login", { method: "POST", body: data });
+  async pinLogin(data) {
+    const r = await this.request("/auth/pin-login", { method: "POST", body: data });
+    if (r && r.csrf_token) setCsrfToken(r.csrf_token);
+    return r;
   },
   getMe() {
     return this.request("/auth/me");
@@ -145,8 +169,10 @@ const API = {
   staffLogin(password) {
     return this.request("/auth/staff-login", { method: "POST", body: { password } });
   },
-  staffPinLogin(account_id, pin, is_creation = false) {
-    return this.request("/auth/staff-pin", { method: "POST", body: { account_id, pin, is_creation } });
+  async staffPinLogin(account_id, pin, is_creation = false) {
+    const r = await this.request("/auth/staff-pin", { method: "POST", body: { account_id, pin, is_creation } });
+    if (r && r.csrf_token) setCsrfToken(r.csrf_token);
+    return r;
   },
   setStaffPassword(password) {
     return this.request("/auth/staff-password", { method: "PUT", body: { password } });
@@ -731,10 +757,14 @@ const API = {
   async scanMercuriale(file) {
     const formData = new FormData();
     formData.append("mercuriale", file);
-    const token = localStorage.getItem("restosuite_token");
+    const headers = {};
+    if (__csrfToken) headers["X-CSRF-Token"] = __csrfToken;
+    const legacyToken = localStorage.getItem("restosuite_token");
+    if (legacyToken) headers["Authorization"] = "Bearer " + legacyToken;
     const res = await fetch(this.base + "/ai/scan-mercuriale", {
       method: "POST",
-      headers: token ? { "Authorization": "Bearer " + token } : {},
+      credentials: "include",
+      headers,
       body: formData
     });
     if (!res.ok) {
@@ -16964,9 +16994,19 @@ function applyRole(role) {
 }
 function logout() {
   clearTrialStatusInterval();
+  try {
+    fetch(window.location.origin + "/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+      headers: typeof getCsrfToken === "function" && getCsrfToken() ? { "X-CSRF-Token": getCsrfToken() } : {}
+    }).catch(() => {
+    });
+  } catch (e) {
+  }
   localStorage.removeItem("restosuite_account");
   localStorage.removeItem("restosuite_token");
   localStorage.removeItem("restosuite_role");
+  if (typeof setCsrfToken === "function") setCsrfToken(null);
   document.body.className = "";
   location.hash = "";
   location.reload();
