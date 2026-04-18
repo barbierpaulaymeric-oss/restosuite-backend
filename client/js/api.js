@@ -643,8 +643,15 @@ function renderStars(rating, interactive = false, onChange = null) {
 }
 
 function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  if (str == null) return '';
+  // Escape both double AND single quotes so the helper is safe inside attribute
+  // contexts delimited by either (e.g., onclick='...'). See feedback_escape_at_helper.md.
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ─── Supplier session helpers ───

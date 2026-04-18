@@ -272,6 +272,12 @@ async function sendAIMessage(message) {
         actionEl.className = 'ai-msg ai-msg--ai';
         actionEl.setAttribute('role', 'region');
         actionEl.setAttribute('aria-label', 'Action proposée par Alto');
+        // PENTEST_REPORT C7.1: action.type and the base64 params were interpolated
+        // raw into onclick="..." with single-quote delimiters. A model-controlled
+        // string containing `'` could break out and execute arbitrary JS.
+        // escapeHtml now covers both quote variants; we also build the element
+        // and bind the handler programmatically so there's no HTML-string sink
+        // for the action payload at all.
         actionEl.innerHTML = `
           <div class="ai-msg__avatar" aria-hidden="true"></div>
           <div class="ai-action-card">
@@ -279,11 +285,18 @@ async function sendAIMessage(message) {
               <i data-lucide="zap" style="width:16px;height:16px" aria-hidden="true"></i> ${escapeHtml(action.description)}
             </div>
             <div class="ai-action-buttons" role="group" aria-label="Valider ou annuler l'action">
-              <button class="ai-action-confirm" aria-label="Confirmer l'action" onclick="confirmAIAction('${action.type}', '${btoa(JSON.stringify(action.params))}')">✓ Confirmer</button>
-              <button class="ai-action-cancel" aria-label="Annuler l'action" onclick="dismissAction(this)">✕ Annuler</button>
+              <button class="ai-action-confirm" aria-label="Confirmer l'action" type="button">✓ Confirmer</button>
+              <button class="ai-action-cancel" aria-label="Annuler l'action" type="button">✕ Annuler</button>
             </div>
           </div>
         `;
+        const confirmBtn = actionEl.querySelector('.ai-action-confirm');
+        const cancelBtn = actionEl.querySelector('.ai-action-cancel');
+        const capturedAction = { type: String(action.type || ''), params: action.params };
+        confirmBtn.addEventListener('click', () => {
+          confirmAIAction(capturedAction.type, btoa(JSON.stringify(capturedAction.params)));
+        });
+        cancelBtn.addEventListener('click', () => dismissAction(cancelBtn));
         messagesEl.appendChild(actionEl);
         if (window.lucide) lucide.createIcons();
       }
@@ -332,18 +345,20 @@ async function confirmAIAction(type, paramsBase64) {
 
     const resultMsg = document.createElement('div');
     resultMsg.className = 'ai-msg ai-msg--ai';
+    // PENTEST_REPORT C7.3: escape server-returned strings before innerHTML to
+    // prevent XSS when the backend surfaces model-influenced content.
     if (result.success) {
       resultMsg.innerHTML = `
         <div class="ai-msg__avatar">✓</div>
         <div class="ai-msg__bubble" style="background:var(--color-success-light);border-color:var(--color-success)">
-          <p style="color:var(--color-success);font-weight:500">${result.message}</p>
+          <p style="color:var(--color-success);font-weight:500">${escapeHtml(result.message)}</p>
         </div>
       `;
     } else {
       resultMsg.innerHTML = `
         <div class="ai-msg__avatar">✕</div>
         <div class="ai-msg__bubble" style="border-color:var(--color-danger)">
-          <p style="color:var(--color-danger)">${result.error || 'Impossible d\'exécuter l\'action'}</p>
+          <p style="color:var(--color-danger)">${escapeHtml(result.error || 'Impossible d\'exécuter l\'action')}</p>
         </div>
       `;
     }
@@ -359,8 +374,11 @@ function dismissAction(btn) {
 }
 
 function formatAIReply(text) {
-  // Basic markdown-like formatting
-  return text
+  // PENTEST_REPORT C7.2: escape first, THEN apply markdown substitutions. The
+  // previous version fed raw model output (attacker-influenceable via prompt
+  // injection) straight into innerHTML → stored XSS + JWT exfil from localStorage.
+  const safe = escapeHtml(text || '');
+  return safe
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/`(.*?)`/g, '<code style="background:rgba(0,0,0,0.1);padding:2px 4px;border-radius:3px">$1</code>')

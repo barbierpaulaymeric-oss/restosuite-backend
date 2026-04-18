@@ -457,13 +457,25 @@ function showBubbleActions(actions) {
       font-size: var(--text-xs);
     `;
 
+    // PENTEST_REPORT C7.1: the original inline onclick interpolated action.type and
+    // the base64 params directly inside single-quote-delimited HTML attributes,
+    // with a broken unclosed `'` that widened the break-out surface further.
+    // Bind handlers programmatically so user/model-influenced strings never touch
+    // the attribute parser.
     actionEl.innerHTML = `
       <div style="margin-bottom: 8px; font-weight: 600">${escapeHtml(action.description)}</div>
       <div style="display: flex; gap: 6px">
-        <button onclick="confirmBubbleAction('${action.type}', '${btoa(JSON.stringify(action.params))}'" style="flex: 1; padding: 4px 8px; background: var(--color-accent); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: var(--text-xs)">Confirmer</button>
-        <button onclick="closeBubbleAction(this)" style="flex: 1; padding: 4px 8px; background: transparent; color: var(--text-secondary); border: 1px solid var(--border-light); border-radius: 4px; cursor: pointer; font-size: var(--text-xs)">Annuler</button>
+        <button class="bubble-action-confirm" type="button" style="flex: 1; padding: 4px 8px; background: var(--color-accent); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: var(--text-xs)">Confirmer</button>
+        <button class="bubble-action-cancel" type="button" style="flex: 1; padding: 4px 8px; background: transparent; color: var(--text-secondary); border: 1px solid var(--border-light); border-radius: 4px; cursor: pointer; font-size: var(--text-xs)">Annuler</button>
       </div>
     `;
+    const confirmBtn = actionEl.querySelector('.bubble-action-confirm');
+    const cancelBtn = actionEl.querySelector('.bubble-action-cancel');
+    const capturedAction = { type: String(action.type || ''), params: action.params };
+    confirmBtn.addEventListener('click', () => {
+      confirmBubbleAction(capturedAction.type, btoa(JSON.stringify(capturedAction.params)));
+    });
+    cancelBtn.addEventListener('click', () => closeBubbleAction(cancelBtn));
 
     messagesEl.appendChild(actionEl);
   }
