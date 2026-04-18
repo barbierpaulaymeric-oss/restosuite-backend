@@ -11,31 +11,46 @@
       --color-accent-light: rgba(232,114,42,0.12);
       --color-success: #2D8B55;
       --color-danger: #D93025;
-      
+      --color-sage: #6B7A5A;
+      --color-sage-light: rgba(107,122,90,0.14);
+
       --bg-base: #0F1723;
       --bg-elevated: #1B2A4A;
       --bg-sunken: #0A1019;
+      --bg-paper: #F5EFE6;
+      --bg-paper-warm: #EFE7D8;
       --text-primary: #F7F5F2;
       --text-secondary: #9CA3AF;
       --text-tertiary: #6B7280;
+      --text-on-paper: #23201B;
+      --text-on-paper-muted: #6A6358;
       --border-default: #2A3F6B;
       --border-light: #1E3055;
-      
+      --border-paper: rgba(35,32,27,0.12);
+
       --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-mono: 'JetBrains Mono', 'Courier New', monospace;
-      
+      --font-serif: 'Fraunces', 'Georgia', 'Times New Roman', serif;
+      --font-hand: 'Caveat', 'Brush Script MT', cursive;
+
       --radius-sm: 6px;
       --radius-md: 10px;
-      --radius-lg: 12px;
-      --radius-xl: 16px;
-      
+      --radius-lg: 14px;
+      --radius-xl: 18px;
+
       --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
       --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
       --shadow-accent: 0 4px 16px rgba(232,114,42,0.3);
-      
+      --shadow-paper: 0 2px 6px rgba(35,32,27,0.06), 0 12px 28px rgba(35,32,27,0.08);
+
       --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
       --transition-base: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       --transition-slow: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+      /* Subtle grain noise SVG data URI (two overlayed turbulence patterns) */
+      --grain-bg: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.14  0 0 0 0 0.13  0 0 0 0 0.11  0 0 0 0.22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      /* Hand-drawn wavy underline */
+      --underline-hand: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'><path d='M2 6 Q 18 1 34 5 T 66 5 T 98 5 T 118 6' fill='none' stroke='%23E8722A' stroke-width='2.2' stroke-linecap='round'/></svg>");
     }
     
     html { scroll-behavior: smooth; }
@@ -49,10 +64,59 @@
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       overflow-x: hidden;
+      position: relative;
     }
-    
+
+    /* Global subtle grain overlay — editorial warmth on dark + paper sections */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: var(--grain-bg);
+      background-size: 180px 180px;
+      opacity: 0.35;
+      mix-blend-mode: overlay;
+      z-index: 1;
+    }
+
+    header, section, footer, .sticky-cta, .cookie-banner { position: relative; z-index: 2; }
+
     a { color: inherit; text-decoration: none; }
     img { max-width: 100%; display: block; }
+
+    /* ============================================
+       TYPOGRAPHY — Fraunces for editorial warmth
+       ============================================ */
+    h1, h2, .serif-display {
+      font-family: var(--font-serif);
+      font-weight: 600;
+      font-style: normal;
+      font-optical-sizing: auto;
+      letter-spacing: -0.015em;
+    }
+
+    /* Caveat handwritten accent class */
+    .handwritten {
+      font-family: var(--font-hand);
+      font-weight: 600;
+      font-style: normal;
+      letter-spacing: 0;
+      line-height: 0.9;
+      display: inline-block;
+      transform: rotate(-2deg);
+      padding: 0 0.08em;
+      font-size: 1.12em;
+    }
+
+    /* Hand-drawn wavy underline on key accent words */
+    .underline-hand {
+      background-image: var(--underline-hand);
+      background-repeat: no-repeat;
+      background-position: 0 100%;
+      background-size: 100% 0.35em;
+      padding-bottom: 0.18em;
+    }
     
     /* ============================================
        UTILITY
@@ -686,6 +750,23 @@
       transition: all var(--transition-base);
       position: relative;
       overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15), 0 6px 18px rgba(0,0,0,0.12);
+    }
+
+    /* Subtle paper-like rotation on feature cards — editorial scrapbook feel */
+    .features__grid .feature-card:nth-child(6n+1) { transform: rotate(-1.2deg); margin-top: 12px; }
+    .features__grid .feature-card:nth-child(6n+2) { transform: rotate(1.4deg); margin-top: -8px; }
+    .features__grid .feature-card:nth-child(6n+3) { transform: rotate(-0.6deg); margin-top: 20px; }
+    .features__grid .feature-card:nth-child(6n+4) { transform: rotate(1.8deg); margin-top: 4px; }
+    .features__grid .feature-card:nth-child(6n+5) { transform: rotate(-1.8deg); margin-top: 16px; }
+    .features__grid .feature-card:nth-child(6n)   { transform: rotate(1deg);    margin-top: -4px; }
+
+    .features__grid .feature-card:hover {
+      transform: rotate(0deg) translateY(-3px);
+    }
+
+    @media (max-width: 639px) {
+      .features__grid .feature-card { transform: none !important; margin-top: 0 !important; }
     }
     
     .feature-card::before {
@@ -1439,6 +1520,125 @@
         transition: none;
       }
       .mockup__mic-icon { animation: none; }
+      .features__grid .feature-card,
+      .handwritten,
+      .hero h1 .handwritten.accent { transform: none !important; }
+    }
+
+    /* ============================================
+       PAPER-CREAM LIGHT SECTIONS (editorial warmth)
+       ============================================ */
+    .section--paper {
+      background:
+        radial-gradient(ellipse 80% 50% at 50% 0%, rgba(232,114,42,0.05), transparent 60%),
+        var(--bg-paper);
+      color: var(--text-on-paper);
+      border-top: 1px solid var(--border-paper);
+      border-bottom: 1px solid var(--border-paper);
+    }
+
+    .section--paper .section-header h2,
+    .section--paper h2,
+    .section--paper h3 { color: var(--text-on-paper); }
+
+    .section--paper .section-header p,
+    .section--paper p { color: var(--text-on-paper-muted); }
+
+    .section--paper .feature-card,
+    .section--paper .pillar-card {
+      background: #FBF7EF;
+      border: 1px solid var(--border-paper);
+      box-shadow: var(--shadow-paper);
+      color: var(--text-on-paper);
+    }
+
+    .section--paper .feature-card h3,
+    .section--paper .pillar-card h3 { color: var(--text-on-paper); }
+
+    .section--paper .feature-card p,
+    .section--paper .pillar-card__list li { color: var(--text-on-paper-muted); }
+
+    .section--paper .pillar-card__list li strong { color: var(--text-on-paper); }
+
+    .section--paper .feature-card__icon,
+    .section--paper .pillar-card__icon { background: var(--color-accent-light); }
+
+    /* Sage green secondary accent — every 4th pillar card for variety */
+    .section--paper .pillar-card:nth-child(4n+3) .pillar-card__icon {
+      background: var(--color-sage-light);
+      color: var(--color-sage);
+    }
+
+    .section--paper .faq-item {
+      background: #FBF7EF;
+      border-color: var(--border-paper);
+    }
+    .section--paper .faq-item__question { color: var(--text-on-paper); }
+    .section--paper .faq-item__answer-inner { color: var(--text-on-paper-muted); }
+
+    /* Pricing cards on paper */
+    .section--paper .pricing-card {
+      background: #FBF7EF;
+      border: 1px solid var(--border-paper);
+      box-shadow: var(--shadow-paper);
+      color: var(--text-on-paper);
+    }
+    .section--paper .pricing-card--pro {
+      border-color: var(--color-accent);
+      box-shadow: var(--shadow-paper), 0 0 36px rgba(232,114,42,0.12);
+    }
+    .section--paper .pricing-card__name { color: var(--text-on-paper); }
+    .section--paper .pricing-card__desc { color: var(--text-on-paper-muted); }
+    .section--paper .pricing-card__amount { color: var(--text-on-paper); }
+    .section--paper .pricing-card__period { color: var(--text-on-paper-muted); }
+    .section--paper .pricing-card__features li { color: var(--text-on-paper-muted); }
+    .section--paper .btn--secondary {
+      color: var(--text-on-paper);
+      border-color: var(--border-paper);
+    }
+    .section--paper .btn--secondary:hover {
+      color: var(--color-accent);
+      border-color: var(--color-accent);
+    }
+
+    /* ============================================
+       HERO h1 — editorial serif + handwritten span
+       ============================================ */
+    .hero h1 {
+      font-family: var(--font-serif);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .hero h1 .accent { color: var(--color-accent); }
+
+    .hero h1 .handwritten.accent {
+      font-family: var(--font-hand);
+      font-weight: 700;
+      letter-spacing: 0;
+      display: inline-block;
+      transform: rotate(-3deg);
+      padding: 0 0.12em;
+      font-size: 1.15em;
+      position: relative;
+    }
+
+    .hero h1 .handwritten.accent::after {
+      content: '';
+      position: absolute;
+      left: 0.1em;
+      right: 0.1em;
+      bottom: -0.02em;
+      height: 0.28em;
+      background-image: var(--underline-hand);
+      background-repeat: no-repeat;
+      background-size: 100% 100%;
+      pointer-events: none;
+    }
+
+    /* Softer rounded corners globally */
+    .pricing-card, .pillar-card, .feature-card, .blog-card, .faq-item {
+      border-radius: var(--radius-xl);
     }
 
     .cookie-banner {
