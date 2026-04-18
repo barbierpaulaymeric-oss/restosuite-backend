@@ -72,7 +72,11 @@ app.use((req, res, next) => {
   // (the main CSS-XSS vector) while allowing existing `style="..."` attributes used
   // throughout innerHTML templates. Refactoring those ~5k attributes to classes is
   // tracked separately; this gives us defense in depth today without breaking the UI.
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://js.stripe.com; style-src 'self' https://fonts.googleapis.com; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.stripe.com https://generativelanguage.googleapis.com; frame-src https://js.stripe.com;");
+  // CSP3 script-src split (mirrors the style-src split): `script-src-elem`
+  // restricts <script> sources, while `script-src-attr 'unsafe-inline'`
+  // permits the 150+ legacy inline `onclick="…"` handlers in client/js/views.
+  // Refactor to addEventListener is tracked; this unbreaks the UI under strict CSP.
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://js.stripe.com; script-src-elem 'self' https://cdnjs.cloudflare.com https://js.stripe.com; script-src-attr 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.stripe.com https://generativelanguage.googleapis.com; frame-src https://js.stripe.com;");
   if (process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
