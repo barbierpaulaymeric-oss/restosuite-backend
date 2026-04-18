@@ -16,6 +16,17 @@ function getStripe() {
 // POST /api/stripe/webhook (PUBLIC — Stripe signature verification)
 // Stripe webhook to handle subscription events
 // ─────────────────────────────────────────────
+// Idempotency table — dedupes Stripe's intentional retries and any replayed events
+// that pass signature verification (PENTEST_REPORT C3.1). INSERT OR IGNORE is
+// cheap; bail with 200 if we've already processed this event_id.
+try {
+  run(`CREATE TABLE IF NOT EXISTS processed_stripe_events (
+    event_id TEXT PRIMARY KEY,
+    event_type TEXT,
+    received_at TEXT DEFAULT (datetime('now'))
+  )`);
+} catch {}
+
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const s = getStripe();
   if (!s) return res.status(503).send('Stripe not configured');
@@ -23,14 +34,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   const sig = req.headers['stripe-signature'];
   let event;
 
+  // Fail-closed in ALL non-test environments (PENTEST_REPORT C3.2). A dev/staging
+  // deploy without STRIPE_WEBHOOK_SECRET previously parsed raw JSON with no
+  // signature check — attackers forged checkout.session.completed events.
+  const IS_TEST = process.env.NODE_ENV === 'test';
   try {
     if (!process.env.STRIPE_WEBHOOK_SECRET) {
-      // CRITICAL: In production, webhook secret MUST be set
-      if (process.env.NODE_ENV === 'production') {
-        console.error('WEBHOOK REJECTED: STRIPE_WEBHOOK_SECRET not set in production');
+      if (!IS_TEST) {
+        console.error('WEBHOOK REJECTED: STRIPE_WEBHOOK_SECRET must be set');
         return res.status(400).json({ error: 'Webhook secret not configured' });
       }
-      // In development without webhook secret, parse body directly (for testing only)
+      // In the test env only, parse the raw body so unit tests can exercise the
+      // handler without mounting a real Stripe signing secret.
       event = JSON.parse(req.body.toString());
     } else {
       event = s.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
@@ -38,6 +53,25 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Idempotency gate — dedupe on event.id
+  if (event && event.id) {
+    try {
+      const ins = run(
+        'INSERT OR IGNORE INTO processed_stripe_events (event_id, event_type) VALUES (?, ?)',
+        [event.id, event.type || null]
+      );
+      if (ins && ins.changes === 0) {
+        // Already processed — ack so Stripe stops retrying.
+        return res.json({ received: true, duplicate: true });
+      }
+    } catch (e) {
+      // If the idempotency insert fails, surface 500 so Stripe retries rather
+      // than double-applying on the second pass.
+      console.error('Stripe event idempotency insert failed:', e.message);
+      return res.status(500).json({ error: 'Idempotency store unavailable' });
+    }
   }
 
   try {
@@ -80,7 +114,16 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       }
     }
   } catch (err) {
+    // Roll back the idempotency claim so Stripe retries per its documented policy
+    // (PENTEST_REPORT C5.2). Previously returned 200 on failure → Stripe saw
+    // success, never retried, and DB state diverged from Stripe's view.
     console.error('Webhook processing error:', err);
+    try {
+      if (event && event.id) {
+        run('DELETE FROM processed_stripe_events WHERE event_id = ?', [event.id]);
+      }
+    } catch {}
+    return res.status(500).json({ error: 'Webhook processing failed' });
   }
 
   res.json({ received: true });
@@ -103,11 +146,13 @@ router.post('/create-checkout', async (req, res) => {
       });
     }
 
-    const { accountId } = req.body;
-
+    // IMPORTANT: identify the subscriber from the authenticated session, NOT from
+    // req.body.accountId (PENTEST_REPORT C5.1). Previously an attacker could
+    // trigger a Checkout for a victim's account and poison their subscription row
+    // on the resulting webhook.
+    const accountId = req.user && req.user.id;
     if (!accountId) {
-      // If no account, redirect to app for login first
-      return res.json({ url: '/app' });
+      return res.status(401).json({ error: 'Authentification requise' });
     }
 
     // Check if account exists
