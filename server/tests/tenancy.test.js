@@ -212,3 +212,79 @@ describe('C-1: routes must filter by caller restaurant_id, not hardcoded 1', () 
     expect(scores).not.toContain(20);
   });
 });
+
+describe('P0: PUT/DELETE /api/accounts/:id must be tenant-scoped (IDOR)', () => {
+  const bcrypt = require('bcryptjs');
+
+  beforeAll(() => {
+    const pw = bcrypt.hashSync('Secure1pass', 10);
+    // R100 and R200 seeded by the C-2 beforeAll above. Add two equipier targets.
+    run(
+      "INSERT OR IGNORE INTO accounts (id, name, email, password_hash, role, restaurant_id, permissions) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [2001, 'StaffR100', 'staff-idor-r100@test.fr', pw, 'equipier', 100, JSON.stringify({ view_recipes: true })]
+    );
+    run(
+      "INSERT OR IGNORE INTO accounts (id, name, email, password_hash, role, restaurant_id, permissions) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [2002, 'StaffR200', 'staff-idor-r200@test.fr', pw, 'equipier', 200, JSON.stringify({ view_recipes: true })]
+    );
+  });
+
+  it('PUT /:id blocks gérant of R100 from renaming an account in R200', async () => {
+    const res = await request(app)
+      .put('/api/accounts/2002')
+      .set(authHeader({ id: 1001, role: 'gerant', restaurant_id: 100 }))
+      .send({ name: 'PWNED' });
+    expect(res.status).toBe(404);
+    const after = get('SELECT name FROM accounts WHERE id = ?', [2002]);
+    expect(after.name).toBe('StaffR200');
+  });
+
+  it('PUT /:id/reset-pin blocks cross-tenant PIN reset', async () => {
+    run('UPDATE accounts SET pin = ? WHERE id = ?', [bcrypt.hashSync('1234', 10), 2002]);
+    const res = await request(app)
+      .put('/api/accounts/2002/reset-pin')
+      .set(authHeader({ id: 1001, role: 'gerant', restaurant_id: 100 }));
+    expect(res.status).toBe(404);
+    const after = get('SELECT pin FROM accounts WHERE id = ?', [2002]);
+    expect(after.pin).not.toBeNull();
+  });
+
+  it('DELETE /:id blocks cross-tenant account deletion', async () => {
+    const res = await request(app)
+      .delete('/api/accounts/2002')
+      .set(authHeader({ id: 1001, role: 'gerant', restaurant_id: 100 }));
+    expect(res.status).toBe(404);
+    const after = get('SELECT id FROM accounts WHERE id = ?', [2002]);
+    expect(after).toBeTruthy();
+  });
+
+  it('PUT /:id allows non-gérant to update their own name but not role/permissions', async () => {
+    const resName = await request(app)
+      .put('/api/accounts/2001')
+      .set(authHeader({ id: 2001, role: 'equipier', restaurant_id: 100 }))
+      .send({ name: 'StaffR100-self' });
+    expect(resName.status).toBe(200);
+    const after = get('SELECT name, role FROM accounts WHERE id = ?', [2001]);
+    expect(after.name).toBe('StaffR100-self');
+    expect(after.role).toBe('equipier');
+
+    // Role escalation attempt must be refused
+    const resRole = await request(app)
+      .put('/api/accounts/2001')
+      .set(authHeader({ id: 2001, role: 'equipier', restaurant_id: 100 }))
+      .send({ role: 'gerant' });
+    expect(resRole.status).toBe(403);
+    const after2 = get('SELECT role FROM accounts WHERE id = ?', [2001]);
+    expect(after2.role).toBe('equipier');
+  });
+
+  it('PUT /:id allows same-tenant gérant to rename a staff account', async () => {
+    const res = await request(app)
+      .put('/api/accounts/2001')
+      .set(authHeader({ id: 1001, role: 'gerant', restaurant_id: 100 }))
+      .send({ name: 'StaffR100-renamed' });
+    expect(res.status).toBe(200);
+    const after = get('SELECT name FROM accounts WHERE id = ?', [2001]);
+    expect(after.name).toBe('StaffR100-renamed');
+  });
+});

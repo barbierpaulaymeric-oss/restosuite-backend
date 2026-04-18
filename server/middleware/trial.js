@@ -5,6 +5,8 @@
 const { get } = require('../db');
 
 const TRIAL_DAYS = 60;
+// Note: `requireWriteAccess` middleware was removed 2026-04-18 — it was exported
+// but never imported anywhere (server-side plan gating uses different logic).
 
 /**
  * Determine account status based on trial + subscription.
@@ -49,29 +51,4 @@ function getAccountStatusById(accountId) {
   return getAccountStatus(account, subscription);
 }
 
-/**
- * Express middleware: block write operations if trial expired.
- * Expects account ID in req.body.account_id, req.query.account_id,
- * or req.headers['x-account-id'].
- */
-function requireWriteAccess(req, res, next) {
-  const accountId = req.body?.account_id || req.query?.account_id || req.headers['x-account-id'];
-
-  // No account ID → let through (will be caught by other auth if needed)
-  if (!accountId) return next();
-
-  const status = getAccountStatusById(Number(accountId));
-
-  if (status.readOnly) {
-    return res.status(403).json({
-      error: 'Votre essai gratuit est terminé. Passez en Pro pour continuer.',
-      code: 'TRIAL_EXPIRED'
-    });
-  }
-
-  // Attach status to request for downstream use
-  req.accountStatus = status;
-  next();
-}
-
-module.exports = { getAccountStatus, getAccountStatusById, requireWriteAccess, TRIAL_DAYS };
+module.exports = { getAccountStatus, getAccountStatusById, TRIAL_DAYS };

@@ -8,6 +8,7 @@ const bcrypt = require('bcryptjs');
 const { all, get, run } = require('../db');
 const { getAccountStatusById } = require('../middleware/trial');
 const { requireAuth, JWT_SECRET } = require('./auth');
+const { writeAudit } = require('../lib/audit-log');
 const router = express.Router();
 
 function hashPin(pin) {
@@ -181,24 +182,47 @@ router.get('/:id/status', (req, res) => {
   res.json(status);
 });
 
-// PUT /api/accounts/:id — update account (gerant only)
+// PUT /api/accounts/:id — update account (same-tenant gérant OR self-update)
+// IDOR fix: scope target lookup + UPDATE by caller.restaurant_id.
+// Non-gérant may only update their own account, and cannot change role/permissions.
 router.put('/:id', (req, res) => {
-  const { id } = req.params;
+  const targetId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(targetId)) {
+    return res.status(400).json({ error: 'id invalide' });
+  }
   const { name, permissions } = req.body;
 
-  // Verify caller is gerant (using authenticated user from requireAuth)
-  const caller = get('SELECT role FROM accounts WHERE id = ?', [req.user.id]);
-  if (!caller || caller.role !== 'gerant') {
+  const callerId = parseInt(req.user.id, 10);
+  const callerRole = req.user.role;
+  const callerRid = req.user.restaurant_id;
+  const isSelf = callerId === targetId;
+  const isGerant = callerRole === 'gerant';
+
+  if (!callerRid) {
+    return res.status(400).json({ error: 'restaurant_id manquant dans le contexte' });
+  }
+
+  // Only gérant may modify OTHER accounts; anyone may update their own
+  if (!isSelf && !isGerant) {
     return res.status(403).json({ error: 'Accès refusé — gérant uniquement' });
   }
 
-  const account = get('SELECT * FROM accounts WHERE id = ?', [id]);
+  // Non-gérant self-update cannot escalate role or rewrite permissions
+  if (!isGerant && (req.body.role !== undefined || req.body.permissions !== undefined)) {
+    return res.status(403).json({ error: 'Vous ne pouvez pas modifier votre rôle ou vos permissions' });
+  }
+
+  // Tenant-scoped lookup — target must belong to caller's restaurant
+  const account = get(
+    'SELECT * FROM accounts WHERE id = ? AND restaurant_id = ?',
+    [targetId, callerRid]
+  );
   if (!account) {
     return res.status(404).json({ error: 'Compte introuvable' });
   }
 
-  // Cannot modify gerant permissions
-  if (account.role === 'gerant') {
+  // Cannot modify another gérant's permissions (self-gérant edit is still allowed)
+  if (account.role === 'gerant' && !isSelf) {
     return res.status(403).json({ error: 'Impossible de modifier les permissions du gérant' });
   }
 
@@ -210,12 +234,12 @@ router.put('/:id', (req, res) => {
     params.push(name.trim());
   }
 
-  if (req.body.role && VALID_ROLES.includes(req.body.role) && req.body.role !== 'gerant') {
+  if (isGerant && req.body.role && VALID_ROLES.includes(req.body.role) && req.body.role !== 'gerant') {
     updates.push('role = ?');
     params.push(req.body.role);
   }
 
-  if (permissions) {
+  if (isGerant && permissions) {
     // Always keep view_recipes true
     const sanitized = {
       view_recipes: true,
@@ -250,28 +274,54 @@ router.put('/:id', (req, res) => {
     return res.status(400).json({ error: 'Rien à modifier' });
   }
 
-  params.push(id);
-  run(`UPDATE accounts SET ${updates.join(', ')} WHERE id = ?`, params);
+  params.push(targetId, callerRid);
+  run(`UPDATE accounts SET ${updates.join(', ')} WHERE id = ? AND restaurant_id = ?`, params);
 
-  const updated = get('SELECT id, name, role, permissions, created_at, last_login FROM accounts WHERE id = ?', [id]);
+  const updated = get(
+    'SELECT id, name, role, permissions, created_at, last_login FROM accounts WHERE id = ? AND restaurant_id = ?',
+    [targetId, callerRid]
+  );
+  try {
+    writeAudit({
+      restaurant_id: callerRid,
+      account_id: callerId,
+      table_name: 'accounts',
+      record_id: targetId,
+      action: 'update',
+      old_values: { name: account.name, role: account.role, permissions: account.permissions },
+      new_values: { name: updated.name, role: updated.role, permissions: updated.permissions },
+    });
+  } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+
   res.json({
     ...updated,
     permissions: JSON.parse(updated.permissions)
   });
 });
 
-// PUT /api/accounts/:id/reset-pin — reset member PIN (gérant only)
-// This forces the member to create a new PIN on next login
+// PUT /api/accounts/:id/reset-pin — reset member PIN (same-tenant gérant only)
+// IDOR fix: scope target lookup + UPDATE by caller.restaurant_id.
 router.put('/:id/reset-pin', (req, res) => {
-  const { id } = req.params;
-
-  // Verify caller is gérant (using authenticated user from requireAuth)
-  const caller = get('SELECT role FROM accounts WHERE id = ?', [req.user.id]);
-  if (!caller || caller.role !== 'gerant') {
-    return res.status(403).json({ error: 'Accès refusé — gérant uniquement' });
+  const targetId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(targetId)) {
+    return res.status(400).json({ error: 'id invalide' });
   }
 
-  const account = get('SELECT * FROM accounts WHERE id = ?', [id]);
+  const callerId = parseInt(req.user.id, 10);
+  const callerRole = req.user.role;
+  const callerRid = req.user.restaurant_id;
+
+  if (callerRole !== 'gerant') {
+    return res.status(403).json({ error: 'Accès refusé — gérant uniquement' });
+  }
+  if (!callerRid) {
+    return res.status(400).json({ error: 'restaurant_id manquant dans le contexte' });
+  }
+
+  const account = get(
+    'SELECT * FROM accounts WHERE id = ? AND restaurant_id = ?',
+    [targetId, callerRid]
+  );
   if (!account) {
     return res.status(404).json({ error: 'Compte introuvable' });
   }
@@ -280,26 +330,49 @@ router.put('/:id/reset-pin', (req, res) => {
     return res.status(403).json({ error: 'Impossible de réinitialiser le PIN du gérant' });
   }
 
-  run('UPDATE accounts SET pin = NULL WHERE id = ?', [id]);
+  run('UPDATE accounts SET pin = NULL WHERE id = ? AND restaurant_id = ?', [targetId, callerRid]);
+  try {
+    writeAudit({
+      restaurant_id: callerRid,
+      account_id: callerId,
+      table_name: 'accounts',
+      record_id: targetId,
+      action: 'update',
+      old_values: { pin: '***set***' },
+      new_values: { pin: null, reset: true },
+    });
+  } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
   res.json({ success: true, message: 'PIN réinitialisé. Le membre devra créer un nouveau PIN à sa prochaine connexion.' });
 });
 
-// DELETE /api/accounts/:id — delete account (gerant only)
+// DELETE /api/accounts/:id — delete account (same-tenant gérant only)
+// IDOR fix: scope target lookup + DELETE by caller.restaurant_id.
 router.delete('/:id', (req, res) => {
-  const { id } = req.params;
+  const targetId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(targetId)) {
+    return res.status(400).json({ error: 'id invalide' });
+  }
 
-  // Verify caller is gerant (using authenticated user from requireAuth)
-  const caller = get('SELECT role FROM accounts WHERE id = ?', [req.user.id]);
-  if (!caller || caller.role !== 'gerant') {
+  const callerId = parseInt(req.user.id, 10);
+  const callerRole = req.user.role;
+  const callerRid = req.user.restaurant_id;
+
+  if (callerRole !== 'gerant') {
     return res.status(403).json({ error: 'Accès refusé — gérant uniquement' });
+  }
+  if (!callerRid) {
+    return res.status(400).json({ error: 'restaurant_id manquant dans le contexte' });
   }
 
   // Cannot delete own account
-  if (parseInt(req.user.id) === parseInt(id)) {
+  if (callerId === targetId) {
     return res.status(400).json({ error: 'Impossible de supprimer votre propre compte' });
   }
 
-  const account = get('SELECT * FROM accounts WHERE id = ?', [id]);
+  const account = get(
+    'SELECT * FROM accounts WHERE id = ? AND restaurant_id = ?',
+    [targetId, callerRid]
+  );
   if (!account) {
     return res.status(404).json({ error: 'Compte introuvable' });
   }
@@ -308,7 +381,18 @@ router.delete('/:id', (req, res) => {
     return res.status(403).json({ error: 'Impossible de supprimer le compte gérant' });
   }
 
-  run('DELETE FROM accounts WHERE id = ?', [id]);
+  run('DELETE FROM accounts WHERE id = ? AND restaurant_id = ?', [targetId, callerRid]);
+  try {
+    writeAudit({
+      restaurant_id: callerRid,
+      account_id: callerId,
+      table_name: 'accounts',
+      record_id: targetId,
+      action: 'delete',
+      old_values: { name: account.name, role: account.role, email: account.email },
+      new_values: null,
+    });
+  } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
   res.json({ success: true });
 });
 
