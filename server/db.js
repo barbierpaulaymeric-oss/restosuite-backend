@@ -1342,6 +1342,16 @@ try {
     db.exec("ALTER TABLE accounts ADD COLUMN training_notes TEXT DEFAULT ''");
     console.log('✅ Migration: added training_notes to accounts');
   }
+  // EVAL_ULTIMATE: per-account PIN lockout (global IP-based limiter is
+  // trivially parallelised across a botnet; 4-digit PIN keyspace = 10⁴).
+  if (!accColsFull.some(c => c.name === 'failed_pin_attempts')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN failed_pin_attempts INTEGER DEFAULT 0");
+    console.log('✅ Migration: added failed_pin_attempts to accounts');
+  }
+  if (!accColsFull.some(c => c.name === 'pin_locked_until')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN pin_locked_until DATETIME");
+    console.log('✅ Migration: added pin_locked_until to accounts');
+  }
 } catch (e) {
   console.error('Migration accounts zones/skills error:', e.message);
 }

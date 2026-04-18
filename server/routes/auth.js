@@ -86,6 +86,53 @@ function recordPinAttempt(identifier, success) {
   pinAttempts.set(identifier, attempt);
 }
 
+// ── Per-account DB-persisted PIN lockout ──
+// The in-memory map above is keyed per IP+account, so a botnet can
+// parallelise brute force across many IPs. These helpers persist the
+// counter on the accounts row itself (`failed_pin_attempts`, `pin_locked_until`)
+// so the limit is global per account across all instances/IPs.
+const PER_ACCOUNT_MAX = 10;
+const PER_ACCOUNT_LOCK_MS = 30 * 60 * 1000; // 30 minutes
+
+function checkAccountPinLock(accountId) {
+  try {
+    const row = get('SELECT failed_pin_attempts, pin_locked_until FROM accounts WHERE id = ?', [accountId]);
+    if (!row) return { locked: false };
+    if (row.pin_locked_until) {
+      const until = new Date(row.pin_locked_until).getTime();
+      if (Number.isFinite(until) && until > Date.now()) {
+        return { locked: true, remainingMs: until - Date.now() };
+      }
+      // Lock expired — reset counters opportunistically.
+      try {
+        run('UPDATE accounts SET failed_pin_attempts = 0, pin_locked_until = NULL WHERE id = ?', [accountId]);
+      } catch {}
+    }
+    return { locked: false };
+  } catch {
+    return { locked: false };
+  }
+}
+
+function recordAccountPinAttempt(accountId, success) {
+  if (!accountId) return;
+  try {
+    if (success) {
+      run('UPDATE accounts SET failed_pin_attempts = 0, pin_locked_until = NULL WHERE id = ?', [accountId]);
+      return;
+    }
+    const row = get('SELECT failed_pin_attempts FROM accounts WHERE id = ?', [accountId]);
+    if (!row) return;
+    const next = (row.failed_pin_attempts || 0) + 1;
+    if (next >= PER_ACCOUNT_MAX) {
+      const lockUntil = new Date(Date.now() + PER_ACCOUNT_LOCK_MS).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+      run('UPDATE accounts SET failed_pin_attempts = ?, pin_locked_until = ? WHERE id = ?', [next, lockUntil, accountId]);
+    } else {
+      run('UPDATE accounts SET failed_pin_attempts = ? WHERE id = ?', [next, accountId]);
+    }
+  } catch {}
+}
+
 function generateToken(account) {
   // Include a unique jti so individual tokens can be revoked without rotating JWT_SECRET.
   const jti = crypto.randomBytes(16).toString('hex');
@@ -297,11 +344,20 @@ router.post('/pin-login', async (req, res) => {
 
   if (!account) {
     recordPinAttempt(lockoutKey, false);
+    // We don't know which account they were aiming at here (multi-match).
     return res.status(401).json({ error: 'PIN incorrect' });
+  }
+
+  // Per-account lock (survives IP rotation / multi-instance deploys)
+  const acctLock = checkAccountPinLock(account.id);
+  if (acctLock.locked) {
+    const minutesRemaining = Math.ceil(acctLock.remainingMs / 60000);
+    return res.status(429).json({ error: `Compte verrouillé. Réessayez dans ${minutesRemaining} minutes.` });
   }
 
   // Record successful attempt
   recordPinAttempt(lockoutKey, true);
+  recordAccountPinAttempt(account.id, true);
 
   // Update last_login
   run('UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [account.id]);
@@ -433,6 +489,13 @@ router.post('/staff-pin', async (req, res) => {
     return res.status(429).json({ error: `Trop de tentatives. Veuillez réessayer dans ${minutesRemaining} minutes.` });
   }
 
+  // Per-account lock — survives IP rotation (distributed brute-force).
+  const acctLock = checkAccountPinLock(account_id);
+  if (acctLock.locked) {
+    const minutesRemaining = Math.ceil(acctLock.remainingMs / 60000);
+    return res.status(429).json({ error: `Compte verrouillé. Réessayez dans ${minutesRemaining} minutes.` });
+  }
+
   const account = get('SELECT * FROM accounts WHERE id = ?', [account_id]);
   if (!account) {
     recordPinAttempt(staffLockoutKey, false);
@@ -444,9 +507,11 @@ router.post('/staff-pin', async (req, res) => {
   // holding an authenticated session.
   if (!account.pin || !(await verifyPin(pin, account.pin))) {
     recordPinAttempt(staffLockoutKey, false);
+    recordAccountPinAttempt(account_id, false);
     return res.status(401).json({ error: 'PIN incorrect' });
   }
   recordPinAttempt(staffLockoutKey, true);
+  recordAccountPinAttempt(account_id, true);
 
   // Update last_login
   run('UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [account_id]);
