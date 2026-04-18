@@ -37,9 +37,21 @@ router.post('/zones', (req, res) => {
       }
     }
 
+    // Legal thresholds (Arrêté du 21/12/2009, Règlement CE 853/2004):
+    //  - Enceintes positives (fridge) : max ≤ +4°C
+    //  - Enceintes négatives (freezer) : max ≤ -18°C
+    const effectiveType = type || 'fridge';
+    const effectiveMax = max_temp ?? (effectiveType === 'freezer' ? -18 : 4);
+    if (effectiveType === 'fridge' && effectiveMax > 4) {
+      return res.status(400).json({ error: 'Zone positive (fridge) : la température maximale légale est +4°C (Arrêté 21/12/2009)' });
+    }
+    if (effectiveType === 'freezer' && effectiveMax > -18) {
+      return res.status(400).json({ error: 'Zone négative (freezer) : la température maximale légale est -18°C (Règlement CE 853/2004)' });
+    }
+
     const info = run(
       'INSERT INTO temperature_zones (restaurant_id, name, type, min_temp, max_temp) VALUES (?, ?, ?, ?, ?)',
-      [rid, name, type || 'fridge', min_temp ?? 0, max_temp ?? 4]
+      [rid, name, effectiveType, min_temp ?? 0, effectiveMax]
     );
     const zone = get('SELECT * FROM temperature_zones WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
     try {
@@ -73,9 +85,19 @@ router.put('/zones/:id', (req, res) => {
       }
     }
 
+    // Legal thresholds (see POST /zones)
+    const effectiveType = type || existing.type;
+    const effectiveMax = max_temp ?? existing.max_temp;
+    if (effectiveType === 'fridge' && effectiveMax > 4) {
+      return res.status(400).json({ error: 'Zone positive (fridge) : la température maximale légale est +4°C (Arrêté 21/12/2009)' });
+    }
+    if (effectiveType === 'freezer' && effectiveMax > -18) {
+      return res.status(400).json({ error: 'Zone négative (freezer) : la température maximale légale est -18°C (Règlement CE 853/2004)' });
+    }
+
     run(
       'UPDATE temperature_zones SET name = ?, type = ?, min_temp = ?, max_temp = ? WHERE id = ? AND restaurant_id = ?',
-      [name || existing.name, type || existing.type, min_temp ?? existing.min_temp, max_temp ?? existing.max_temp, id, rid]
+      [name || existing.name, effectiveType, min_temp ?? existing.min_temp, effectiveMax, id, rid]
     );
     const updated = get('SELECT * FROM temperature_zones WHERE id = ? AND restaurant_id = ?', [id, rid]);
     try {
@@ -718,6 +740,17 @@ router.post('/cooling', requireAuth, (req, res) => {
     if (!product_name || !start_time || temp_start == null) {
       return res.status(400).json({ error: 'product_name, start_time et temp_start sont obligatoires' });
     }
+    if (typeof temp_start !== 'number' || temp_start < 0 || temp_start > 300) {
+      return res.status(400).json({ error: 'temp_start doit être un nombre entre 0 et 300°C' });
+    }
+    // Chronological sanity: 63°C marker must come after start; 10°C after 63°C
+    if (time_at_63c && new Date(time_at_63c) < new Date(start_time)) {
+      return res.status(400).json({ error: 'time_at_63c doit être postérieur à start_time' });
+    }
+    if (time_at_63c && time_at_10c && new Date(time_at_10c) < new Date(time_at_63c)) {
+      return res.status(400).json({ error: 'time_at_10c doit être postérieur à time_at_63c' });
+    }
+    // Legal compliance: 63°C → 10°C ≤ 2 h (Arrêté 21/12/2009 — refroidissement rapide)
     let is_compliant = null;
     if (time_at_63c && time_at_10c) {
       const diffMs = new Date(time_at_10c) - new Date(time_at_63c);
@@ -800,6 +833,13 @@ router.post('/reheating', requireAuth, (req, res) => {
     if (!product_name || !start_time || temp_start == null) {
       return res.status(400).json({ error: 'product_name, start_time et temp_start sont obligatoires' });
     }
+    if (typeof temp_start !== 'number' || temp_start < 0 || temp_start > 300) {
+      return res.status(400).json({ error: 'temp_start doit être un nombre entre 0 et 300°C' });
+    }
+    if (time_at_63c && new Date(time_at_63c) < new Date(start_time)) {
+      return res.status(400).json({ error: 'time_at_63c doit être postérieur à start_time' });
+    }
+    // Legal compliance: remise en température ≥ 63°C à cœur en ≤ 1 h (Arrêté 21/12/2009)
     let is_compliant = null;
     if (time_at_63c) {
       const diffMs = new Date(time_at_63c) - new Date(start_time);
@@ -1163,6 +1203,14 @@ router.post('/cooking', (req, res) => {
     if (typeof target_temperature !== 'number' || target_temperature < 0 || target_temperature > 300) {
       return res.status(400).json({ error: 'target_temperature doit être un nombre entre 0 et 300°C' });
     }
+    // Legal minimum cooking temperature (Arrêté 21/12/2009, DGAL/SDSSA/N2012-8156):
+    //  - Cœur du produit doit atteindre ≥ 63°C pour la plupart des produits cuits
+    if (target_temperature < 63) {
+      return res.status(400).json({ error: 'target_temperature doit être ≥ 63°C (température légale minimale de cuisson à cœur, Arrêté 21/12/2009)' });
+    }
+    if (typeof measured_temperature !== 'number' || measured_temperature < 0 || measured_temperature > 300) {
+      return res.status(400).json({ error: 'measured_temperature doit être un nombre entre 0 et 300°C' });
+    }
     if (typeof measured_temperature !== 'number' || measured_temperature < -50 || measured_temperature > 300) {
       return res.status(400).json({ error: 'measured_temperature doit être un nombre entre -50 et 300°C' });
     }
@@ -1213,6 +1261,9 @@ router.put('/cooking/:id', (req, res) => {
 
     if (typeof merged.target_temperature !== 'number' || merged.target_temperature < 0 || merged.target_temperature > 300) {
       return res.status(400).json({ error: 'target_temperature doit être un nombre entre 0 et 300°C' });
+    }
+    if (merged.target_temperature < 63) {
+      return res.status(400).json({ error: 'target_temperature doit être ≥ 63°C (température légale minimale de cuisson à cœur, Arrêté 21/12/2009)' });
     }
     if (typeof merged.measured_temperature !== 'number' || merged.measured_temperature < -50 || merged.measured_temperature > 300) {
       return res.status(400).json({ error: 'measured_temperature doit être un nombre entre -50 et 300°C' });
