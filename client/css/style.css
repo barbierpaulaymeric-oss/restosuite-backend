@@ -3,7 +3,7 @@
    Dark mode par défaut · Mobile-first · Touch-optimized
    ═══════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Fonts loaded via <link> in index.html (Outfit + Fraunces + Caveat + JetBrains Mono) */
 
 /* ─── Design Tokens ─── */
 :root {
@@ -15,7 +15,7 @@
   /* Secondaire */
   --color-secondary: #F7F5F2;
 
-  /* Accent */
+  /* Accent — aligné sur landing warm orange */
   --color-accent: #C45A18;
   --color-accent-hover: #A84C12;
   --color-accent-light: rgba(196, 90, 24, 0.12);
@@ -23,11 +23,17 @@
   /* Fonctionnelles */
   --color-success: #2D8B55;
   --color-success-light: rgba(45, 139, 85, 0.12);
+  --color-sage: #6B7A5A;
+  --color-sage-light: rgba(107, 122, 90, 0.14);
   --color-warning: #E5A100;
   --color-warning-light: rgba(229, 161, 0, 0.12);
   --color-danger: #D93025;
   --color-danger-light: rgba(217, 48, 37, 0.12);
   --color-info: #4A90D9;
+
+  /* Charcoal — ink softened from pure black */
+  --color-ink: #221F1C;
+  --color-ink-soft: #3A362F;
 
   /* Surfaces — Dark mode default */
   --bg-base: #0F1723;
@@ -35,6 +41,8 @@
   --bg-secondary: #1A2840;
   --bg-tertiary: #253655;
   --bg-card: #1B2A4A;
+  --bg-card-light: #F5EFE6; /* warm paper cream — for light surfaces / callouts */
+  --bg-paper: #F5EFE6;
   --bg-sunken: #0A1019;
   --text-primary: #F7F5F2;
   --text-secondary: #9CA3AF;
@@ -42,8 +50,13 @@
   --border-default: #2A3F6B;
   --border-light: #1E3055;
 
+  /* Grain overlay (data-URI SVG) — very subtle */
+  --grain-overlay: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.13 0 0 0 0 0.12 0 0 0 0 0.11 0 0 0 0.045 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+
   /* Font families */
   --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-serif: 'Fraunces', 'Georgia', 'Times New Roman', serif;
+  --font-hand: 'Caveat', 'Brush Script MT', cursive;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 
   /* Scale — Mobile first */
@@ -77,23 +90,24 @@
   --space-12: 48px;
   --space-16: 64px;
 
-  /* Border radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* Border radius — softened, editorial feel */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
   --radius-full: 9999px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(15, 23, 35, 0.2);
-  --shadow-md: 0 4px 12px rgba(15, 23, 35, 0.25);
-  --shadow-lg: 0 8px 24px rgba(15, 23, 35, 0.35);
-  --shadow-accent: 0 4px 16px rgba(196, 90, 24, 0.3);
+  /* Shadows — warm, slightly amber-tinted */
+  --shadow-sm: 0 1px 2px rgba(34, 31, 28, 0.16);
+  --shadow-md: 0 6px 18px rgba(34, 31, 28, 0.14), 0 1px 2px rgba(34, 31, 28, 0.08);
+  --shadow-lg: 0 16px 40px rgba(34, 31, 28, 0.22), 0 2px 6px rgba(34, 31, 28, 0.1);
+  --shadow-warm: 0 8px 24px rgba(196, 90, 24, 0.14), 0 1px 2px rgba(34, 31, 28, 0.08);
+  --shadow-accent: 0 6px 18px rgba(196, 90, 24, 0.32);
 
-  /* Transitions */
-  --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-base: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-slow: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Transitions — uniform 0.2s ease smooth */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
 
   /* Z-index */
   --z-dropdown: 10;
@@ -111,24 +125,25 @@
 
 /* ─── Light Theme ─── */
 [data-theme="light"] {
-  --bg-sunken: #F0F0F0;
-  --bg-base: #FFFFFF;
-  --bg-elevated: #F7F7F7;
-  --bg-secondary: #F7F7F7;
-  --bg-tertiary: #EBEBEB;
+  --bg-sunken: #EFE8DC;
+  --bg-base: #FBF8F3;
+  --bg-elevated: #FFFFFF;
+  --bg-secondary: #F5EFE6;
+  --bg-tertiary: #EFE8DC;
   --bg-card: #FFFFFF;
-  --text-primary: #1B2A4A;
-  --text-secondary: #4A5568;
-  --text-tertiary: #718096;
-  --border-default: #E2E8F0;
-  --border-light: #EDF2F7;
-  --color-primary: #1B2A4A;
-  --color-primary-light: #2A3F6B;
+  --bg-card-light: #F5EFE6;
+  --text-primary: #221F1C;
+  --text-secondary: #55504A;
+  --text-tertiary: #78716A;
+  --border-default: #E6DECF;
+  --border-light: #EFE8DC;
+  --color-primary: #221F1C;
+  --color-primary-light: #3A362F;
   --color-accent: #C45A18;
   --color-accent-hover: #A84C12;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 2px rgba(34, 31, 28, 0.06);
+  --shadow-md: 0 6px 18px rgba(34, 31, 28, 0.08), 0 1px 2px rgba(34, 31, 28, 0.04);
+  --shadow-lg: 0 16px 40px rgba(34, 31, 28, 0.12), 0 2px 6px rgba(34, 31, 28, 0.06);
 }
 
 [data-theme="light"] .login-screen {
@@ -218,19 +233,53 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Typography ─── */
-h1 {
-  font: 700 var(--text-2xl)/var(--leading-tight) var(--font-sans);
+/* ─── Typography — Fraunces editorial headings ─── */
+h1, .page-title {
+  font: 600 var(--text-2xl)/var(--leading-tight) var(--font-serif);
   letter-spacing: var(--tracking-tight);
   color: var(--text-primary);
+  font-optical-sizing: auto;
 }
 h2 {
-  font: 600 var(--text-xl)/var(--leading-tight) var(--font-sans);
+  font: 600 var(--text-xl)/var(--leading-tight) var(--font-serif);
   letter-spacing: var(--tracking-tight);
+  color: var(--text-primary);
+  font-optical-sizing: auto;
 }
 h3 {
   font: 600 var(--text-lg)/var(--leading-tight) var(--font-sans);
+  color: var(--text-primary);
 }
+
+/* Handwritten accent — use Caveat for annotations, KPI labels, margin notes */
+.handwritten {
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: 1.35em;
+  line-height: 1;
+  color: var(--color-accent);
+  letter-spacing: 0;
+}
+.handwritten--sage  { color: var(--color-sage); }
+.handwritten--ink   { color: var(--color-ink); }
+[data-theme="light"] .handwritten--ink { color: var(--color-ink); }
+
+/* KPI annotation — small handwritten margin note next to a figure */
+.kpi-note {
+  display: inline-block;
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--color-sage);
+  transform: rotate(-4deg);
+  margin-left: var(--space-2);
+  vertical-align: baseline;
+}
+.kpi-note--ok      { color: var(--color-sage); }      /* "conforme", "bien!" */
+.kpi-note--warm    { color: var(--color-accent); }    /* "à revoir" */
+.kpi-note--warn    { color: var(--color-warning); }
+.kpi-note--danger  { color: var(--color-danger); }
 
 .data-value, .price, .quantity, .percentage {
   font-family: var(--font-mono);
@@ -264,6 +313,30 @@ h3 {
   width: 100%;
   justify-content: space-around;
   align-items: center;
+}
+
+/* Category labels — hidden on mobile tab bar, shown as inline hints on desktop */
+.nav-category {
+  display: none;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(247, 245, 242, 0.45);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  pointer-events: none;
+  user-select: none;
+  align-self: center;
+  border-left: 1px solid rgba(247, 245, 242, 0.12);
+  height: 22px;
+  display: none;
+  align-items: center;
+}
+.nav-category[data-category="cuisine"] { border-left: none; padding-left: 0; }
+[data-theme="light"] .nav-category {
+  color: rgba(34, 31, 28, 0.5);
+  border-left-color: rgba(34, 31, 28, 0.12);
 }
 
 .nav-link {
@@ -366,6 +439,10 @@ h3 {
     color: var(--color-accent);
     background: var(--color-accent-light);
   }
+
+  .nav-category {
+    display: inline-flex;
+  }
 }
 
 /* ═══════════════════════════════════════════
@@ -422,7 +499,7 @@ h3 {
   width: 100%;
   padding: var(--space-3) var(--space-4) var(--space-3) 44px;
   background: var(--bg-sunken);
-  border: 1.5px solid var(--border-default);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
   font: 400 var(--text-base)/var(--leading-normal) var(--font-sans);
@@ -457,24 +534,53 @@ h3 {
    CARDS
    ═══════════════════════════════════════════ */
 .card {
+  position: relative;
   background: var(--bg-elevated);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
   margin-bottom: var(--space-3);
-  transition: all var(--transition-base);
+  transition: box-shadow var(--transition-base), transform var(--transition-base), border-color var(--transition-base);
   cursor: pointer;
   border-left: 4px solid transparent;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
+/* Subtle grain texture — editorial warmth */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain-overlay);
+  background-size: 160px 160px;
+  opacity: 0.45;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  z-index: 0;
+}
+.card > * { position: relative; z-index: 1; }
+
 .card:hover {
-  box-shadow: 0 6px 16px rgba(27, 42, 74, 0.3);
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
+  border-color: rgba(196, 90, 24, 0.25);
 }
 
 .card:active {
   transform: scale(0.99);
 }
+
+/* Paper-cream variant — for light callouts in dark surfaces */
+.card--paper {
+  background: var(--bg-card-light);
+  color: var(--color-ink);
+  border-color: #E6DECF;
+  box-shadow: var(--shadow-warm);
+}
+.card--paper .card-title,
+.card--paper h2,
+.card--paper h3 { color: var(--color-ink); }
 
 /* Food cost colored left border */
 .card--cost-good {
@@ -486,6 +592,24 @@ h3 {
 .card--cost-danger {
   border-left-color: var(--color-danger);
 }
+
+/* ─── Alert cards — colored left border accents ─── */
+.alert-card,
+.card--alert {
+  position: relative;
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-light);
+  border-left: 4px solid var(--color-info);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
+}
+.alert-card--success, .card--alert-success { border-left-color: var(--color-success); }
+.alert-card--sage,    .card--alert-sage    { border-left-color: var(--color-sage); }
+.alert-card--warning, .card--alert-warning { border-left-color: var(--color-warning); }
+.alert-card--danger,  .card--alert-danger  { border-left-color: var(--color-danger); }
+.alert-card--accent,  .card--alert-accent  { border-left-color: var(--color-accent); }
 
 .card-header {
   display: flex;
@@ -596,7 +720,7 @@ h3 {
 .btn-secondary {
   background: transparent;
   color: var(--text-primary);
-  border: 1.5px solid var(--border-default);
+  border: 1px solid var(--border-default);
 }
 .btn-secondary:hover {
   border-color: var(--color-accent);
@@ -745,7 +869,7 @@ h3 {
   width: 100%;
   padding: var(--space-3) var(--space-4);
   background: var(--bg-sunken);
-  border: 1.5px solid var(--border-default);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
   font: 400 var(--text-base)/var(--leading-normal) var(--font-sans);
@@ -1417,7 +1541,7 @@ tr:has(td[colspan]) td {
   align-items: center;
   gap: var(--space-4);
   padding: 0 var(--space-5);
-  border: 1.5px solid var(--border-default);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-xl);
   background: transparent;
   color: var(--text-primary);
@@ -1596,7 +1720,7 @@ tr:has(td[colspan]) td {
   gap: var(--space-4);
   padding: var(--space-4) var(--space-5);
   background: var(--bg-elevated);
-  border: 1.5px solid var(--border-default);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-xl);
   cursor: pointer;
   transition: all var(--transition-base);
@@ -1663,7 +1787,7 @@ tr:has(td[colspan]) td {
   height: 16px;
   border-radius: 50%;
   background: var(--bg-sunken);
-  border: 2px solid var(--border-default);
+  border: 1px solid var(--border-default);
   transition: all var(--transition-fast);
 }
 
@@ -1915,7 +2039,7 @@ tr:has(td[colspan]) td {
   appearance: none;
   -webkit-appearance: none;
   background: var(--bg-sunken);
-  border: 2px solid var(--border-default);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   position: relative;
   cursor: pointer;
@@ -2146,7 +2270,7 @@ tr:has(td[colspan]) td {
   height: 40px;
   min-width: 40px;
   border-radius: var(--radius-md);
-  border: 2px solid var(--border-default);
+  border: 1px solid var(--border-default);
   background: transparent;
   color: transparent;
   cursor: pointer;
@@ -3679,7 +3803,7 @@ tr:has(td[colspan]) td {
   gap: 4px;
   aspect-ratio: 1;
   min-height: 72px;
-  border: 2px solid var(--border-default);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--bg-elevated);
   cursor: pointer;
@@ -4630,7 +4754,7 @@ body.role-salle { padding-top: 0 !important; padding-bottom: 0 !important; }
   align-items: center;
   justify-content: center;
   aspect-ratio: 1;
-  border: 2px solid var(--border-default);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--bg-elevated);
   cursor: pointer;
