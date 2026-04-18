@@ -120,6 +120,31 @@ router.post('/', (req, res) => {
   }
 });
 
+// PENTEST_REPORT A.4 — order / item status state machine. Previously any
+// client could PUT any string into `status`, which broke downstream stats
+// queries (SUM over 'annulé' vs case-sensitivity) and let a salle member
+// resurrect a 'terminé'/'annulé' order. Terminal states are sticky.
+const ORDER_STATUS_TRANSITIONS = {
+  en_cours:                ['en_attente_validation', 'envoyé', 'annulé'],
+  en_attente_validation:   ['en_cours', 'envoyé', 'annulé'],
+  'envoyé':                ['prêt', 'annulé'],
+  'prêt':                  ['servi', 'annulé'],
+  servi:                   ['terminé', 'annulé'],
+  'terminé':               [],
+  'annulé':                [],
+  // Legacy row from public-api: initial status is 'reçu' which predates the
+  // main lifecycle. Allow it to enter en_cours / envoyé / annulé.
+  'reçu':                  ['en_cours', 'envoyé', 'annulé'],
+};
+const ITEM_STATUS_TRANSITIONS = {
+  en_attente: ['prêt', 'annulé'],
+  'prêt':     ['servi', 'annulé'],
+  servi:      [],
+  'annulé':   [],
+  // Legacy
+  attente:    ['prêt', 'annulé'],
+};
+
 // ═══════════════════════════════════════════
 // PUT /api/orders/:id — Modifier statut commande
 // ═══════════════════════════════════════════
@@ -131,6 +156,16 @@ router.put('/:id', (req, res) => {
   if (!order) return res.status(404).json({ error: 'Commande introuvable' });
 
   if (status) {
+    const allowed = ORDER_STATUS_TRANSITIONS[order.status];
+    if (!allowed) {
+      return res.status(409).json({ error: `État actuel inconnu: ${order.status}` });
+    }
+    if (status !== order.status && !allowed.includes(status)) {
+      return res.status(409).json({
+        error: `Transition invalide: ${order.status} → ${status}`,
+        allowed,
+      });
+    }
     run('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?', [status, id, rid]);
   }
   if (notes !== undefined) {
@@ -161,6 +196,18 @@ router.put('/:id/items/:itemId', (req, res) => {
     [itemId, orderId, rid]
   );
   if (!item) return res.status(404).json({ error: 'Item introuvable' });
+
+  // PENTEST_REPORT A.4 — enforce item state machine.
+  const allowedItem = ITEM_STATUS_TRANSITIONS[item.status];
+  if (!allowedItem) {
+    return res.status(409).json({ error: `État item inconnu: ${item.status}` });
+  }
+  if (status !== item.status && !allowedItem.includes(status)) {
+    return res.status(409).json({
+      error: `Transition item invalide: ${item.status} → ${status}`,
+      allowed: allowedItem,
+    });
+  }
 
   run('UPDATE order_items SET status = ? WHERE id = ? AND restaurant_id = ?', [status, itemId, rid]);
 

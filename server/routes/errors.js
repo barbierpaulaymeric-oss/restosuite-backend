@@ -5,13 +5,25 @@ const path = require('path');
 const { requireAuth } = require('./auth');
 
 const LOG_PATH = path.join(__dirname, '..', 'data', 'errors.log');
+const LOG_ROTATED_PATH = LOG_PATH + '.1';
 const MAX_LINES = 1000;
+// PENTEST_REPORT A.5 — rotate at 5 MiB to prevent a scripted client from
+// DoSing the disk via /report. We keep exactly one rotation (.1) so the
+// on-disk footprint is bounded to ~10 MiB per tenant install.
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
 
 // ─── Helpers ───
 
 function appendError(entry) {
   const dir = path.dirname(LOG_PATH);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  // Rotate before writing if the file is at/over the cap.
+  try {
+    const stat = fs.statSync(LOG_PATH);
+    if (stat.size >= MAX_LOG_BYTES) {
+      try { fs.renameSync(LOG_PATH, LOG_ROTATED_PATH); } catch (_) { /* best-effort */ }
+    }
+  } catch (_) { /* file may not exist yet */ }
   const line = JSON.stringify(entry) + '\n';
   fs.appendFileSync(LOG_PATH, line, 'utf8');
 }

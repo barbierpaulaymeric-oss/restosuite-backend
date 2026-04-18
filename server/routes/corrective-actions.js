@@ -118,24 +118,29 @@ router.get('/log', (req, res) => {
   }
 });
 
-// POST /api/corrective-actions/log — create log entry
+// POST /api/corrective-actions/log — create log entry.
+// PENTEST_REPORT C6.1 — started_at is SERVER-generated. HACCP regulations
+// (DDPP audit) require tamper-evident timestamps; letting the client set
+// started_at lets staff back/forward-date corrective actions to hide late
+// response or fabricate timely reactions after the fact.
 router.post('/log', (req, res) => {
   try {
     const rid = req.user.restaurant_id;
     const {
       template_id, category, trigger_description, action_taken,
-      responsible_person, started_at, notes, related_record_id, related_record_type,
+      responsible_person, notes, related_record_id, related_record_type,
     } = req.body;
     if (!category) return res.status(400).json({ error: 'category est requis' });
     if (!VALID_CATEGORIES.includes(category)) return res.status(400).json({ error: 'category invalide' });
 
+    const serverStartedAt = new Date().toISOString();
     const info = run(
       `INSERT INTO corrective_actions_log
         (restaurant_id, template_id, category, trigger_description, action_taken, responsible_person,
          started_at, status, notes, related_record_id, related_record_type)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'en_cours', ?, ?, ?)`,
       [rid, template_id || null, category, trigger_description || null, action_taken || null,
-       responsible_person || null, started_at || new Date().toISOString(),
+       responsible_person || null, serverStartedAt,
        notes || null, related_record_id || null, related_record_type || null]
     );
     const item = get('SELECT * FROM corrective_actions_log WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
@@ -156,22 +161,31 @@ router.put('/log/:id', (req, res) => {
     const existing = get('SELECT * FROM corrective_actions_log WHERE id = ? AND restaurant_id = ?', [id, rid]);
     if (!existing) return res.status(404).json({ error: 'Entrée introuvable' });
 
-    const { action_taken, responsible_person, started_at, completed_at, status, notes } = req.body;
+    // PENTEST_REPORT C6.1 — started_at is immutable once the row is created.
+    // completed_at is SERVER-set exactly once, on the transition to 'terminé'.
+    // We deliberately drop any client-supplied started_at / completed_at.
+    const { action_taken, responsible_person, status, notes } = req.body;
     if (status && !VALID_STATUSES.includes(status)) return res.status(400).json({ error: 'status invalide' });
+
+    // Stamp completed_at the first time the row flips to 'terminé'; preserve
+    // the stamp on every subsequent update so rollbacks can't re-ouvrir then
+    // re-stamp a forward-dated closure.
+    let serverCompletedAt = existing.completed_at || null;
+    if (status === 'terminé' && !serverCompletedAt) {
+      serverCompletedAt = new Date().toISOString();
+    }
 
     run(
       `UPDATE corrective_actions_log SET
         action_taken = COALESCE(?, action_taken),
         responsible_person = COALESCE(?, responsible_person),
-        started_at = COALESCE(?, started_at),
-        completed_at = COALESCE(?, completed_at),
+        completed_at = ?,
         status = COALESCE(?, status),
         notes = COALESCE(?, notes)
        WHERE id = ? AND restaurant_id = ?`,
       [action_taken !== undefined ? action_taken : null,
        responsible_person !== undefined ? responsible_person : null,
-       started_at !== undefined ? started_at : null,
-       completed_at !== undefined ? completed_at : null,
+       serverCompletedAt,
        status || null,
        notes !== undefined ? notes : null,
        id, rid]
