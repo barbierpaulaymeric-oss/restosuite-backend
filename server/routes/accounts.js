@@ -130,6 +130,9 @@ router.get('/', (req, res) => {
 });
 
 // POST /api/accounts — create account
+// Role assignment is restricted to gérants (PENTEST_REPORT C2.2). A non-gérant
+// calling this endpoint can only create équipier accounts; any other requested
+// role is silently downgraded to 'equipier'.
 router.post('/', (req, res) => {
   try {
     const { name, pin } = req.body;
@@ -138,14 +141,24 @@ router.post('/', (req, res) => {
       return res.status(400).json({ error: 'Le nom est requis' });
     }
 
-    // PIN is optional — member will create their own on first login
+    // PIN is optional — member will create their own via /api/auth/staff-pin/create
     const pinValue = pin && /^\d{4}$/.test(pin.toString()) ? pin : null;
 
     // Check if this is the first account → becomes gerant
     const existing = all('SELECT id FROM accounts');
     const isFirst = existing.length === 0;
     const requestedRole = req.body.role;
-    const role = isFirst ? 'gerant' : (requestedRole && VALID_ROLES.includes(requestedRole) ? requestedRole : 'equipier');
+    const callerIsGerant = req.user && req.user.role === 'gerant';
+
+    let role;
+    if (isFirst) {
+      role = 'gerant';
+    } else if (callerIsGerant && requestedRole && VALID_ROLES.includes(requestedRole)) {
+      role = requestedRole;
+    } else {
+      // Non-gérants may only create 'equipier' regardless of requested role.
+      role = 'equipier';
+    }
     const permissions = getPermissionsForRole(role);
 
     const hashedPin = pinValue ? hashPin(pinValue) : null;
@@ -176,9 +189,26 @@ router.post('/', (req, res) => {
 });
 
 // GET /api/accounts/:id/status — trial/subscription status
+// Tenant-scoped — prior version allowed ID enumeration across tenants and leaked
+// subscription tier / trial-end dates (PENTEST_REPORT C1.3). Cross-tenant miss
+// returns 404 per feedback_cross_tenant_404_not_403.
 router.get('/:id/status', (req, res) => {
-  const { id } = req.params;
-  const status = getAccountStatusById(Number(id));
+  const targetId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(targetId)) {
+    return res.status(400).json({ error: 'id invalide' });
+  }
+  const callerRid = req.user && req.user.restaurant_id;
+  if (!callerRid) {
+    return res.status(400).json({ error: 'restaurant_id manquant dans le contexte' });
+  }
+  const target = get(
+    'SELECT id FROM accounts WHERE id = ? AND restaurant_id = ?',
+    [targetId, callerRid]
+  );
+  if (!target) {
+    return res.status(404).json({ error: 'Compte introuvable' });
+  }
+  const status = getAccountStatusById(targetId);
   res.json(status);
 });
 

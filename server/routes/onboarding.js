@@ -145,21 +145,36 @@ router.put('/step/3', (req, res) => {
 });
 
 // ─── PUT /api/onboarding/step/4 — Équipe ───
+// Role assignment restricted: only a gérant may set non-équipier roles
+// (PENTEST_REPORT C2.3). Restricted set excludes 'gerant' to prevent intra-tenant
+// privilege escalation via onboarding; new gérants must go through a separate
+// admin-provisioning flow.
+const ONBOARDING_TEAM_ROLES = ['equipier', 'cuisinier'];
+
 router.put('/step/4', async (req, res) => {
   const { members, staff_password } = req.body;
-  const account = get('SELECT restaurant_id FROM accounts WHERE id = ?', [req.user.id]);
+  const account = get('SELECT restaurant_id, role FROM accounts WHERE id = ?', [req.user.id]);
 
   if (!account || !account.restaurant_id) {
     return res.status(400).json({ error: 'Restaurant non trouvé' });
   }
 
+  const callerIsGerant = account.role === 'gerant';
   const defaultPerms = JSON.stringify({ view_recipes: true, view_costs: false, edit_recipes: false, view_suppliers: false, export_pdf: false });
 
   if (Array.isArray(members)) {
     for (const m of members) {
       if (!m.name || !m.name.trim()) continue;
 
-      const role = m.role || 'cuisinier';
+      // Only gérants may assign a role. Non-gérants always create équipier.
+      // 'gerant' is never allowed here — create additional gérants via the
+      // dedicated /api/accounts flow under gérant auth.
+      let role;
+      if (callerIsGerant && m.role && ONBOARDING_TEAM_ROLES.includes(m.role)) {
+        role = m.role;
+      } else {
+        role = 'equipier';
+      }
       const perms = defaultPerms;
 
       run(
