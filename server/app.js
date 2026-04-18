@@ -11,9 +11,19 @@ require('./db'); // initializes tables synchronously
 const { requireAuth } = require('./routes/auth');
 const { planGate } = require('./middleware/plan-gate');
 const { appendError, LOG_PATH, MAX_LINES } = require('./routes/errors');
+const { requestId } = require('./lib/request-id');
+const logger = require('./lib/logger');
+const errorTracker = require('./lib/error-tracker');
 
 const app = express();
 const IS_TEST = process.env.NODE_ENV === 'test';
+
+// Initialize observability (Sentry if SENTRY_DSN set, otherwise no-op over logger).
+// Skip in tests — we don't want Sentry spam from test failures.
+if (!IS_TEST) {
+  errorTracker.init();
+  errorTracker.installProcessHandlers();
+}
 
 // Validate JWT_SECRET on startup
 const DEV_JWT_SECRET = 'restosuite-dev-secret-2026';
@@ -25,6 +35,9 @@ if (process.env.NODE_ENV === 'production') {
 } else if (!IS_TEST && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)) {
   console.warn('⚠️  WARNING: JWT_SECRET not set or too short. Using default (NOT SAFE FOR PRODUCTION).');
 }
+
+// Request-ID must come first so every subsequent middleware + logger sees req.id
+app.use(requestId);
 
 app.use(compression());
 
@@ -345,17 +358,26 @@ if (!IS_TEST) {
 }
 
 app.use((err, req, res, next) => {
+  const route = `${req.method} ${req.path}`;
   const entry = {
     ts: new Date().toISOString(),
     origin: 'server',
     type: 'unhandled',
-    route: `${req.method} ${req.path}`,
+    route,
+    request_id: req.id,
     message: err.message || String(err),
     stack: err.stack ? err.stack.slice(0, 2000) : undefined,
   };
-  if (!IS_TEST) console.error('Unhandled error:', entry.route, err.message);
+  if (!IS_TEST) {
+    errorTracker.capture(err, {
+      request_id: req.id,
+      route,
+      user_id: req.user && req.user.id,
+      restaurant_id: req.user && req.user.restaurant_id,
+    });
+  }
   try { appendError(entry); } catch {}
-  res.status(500).json({ error: 'Internal server error' });
+  res.status(500).json({ error: 'Internal server error', request_id: req.id });
 });
 
 module.exports = app;
