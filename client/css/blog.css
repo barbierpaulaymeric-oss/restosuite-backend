@@ -223,8 +223,8 @@
 
 /* ---- CTA box ---- */
 .blog-cta {
-  background: linear-gradient(135deg, rgba(232,114,42,0.12), rgba(232,114,42,0.04));
-  border: 1px solid rgba(232,114,42,0.25);
+  background: linear-gradient(135deg, rgba(196,90,24,0.12), rgba(196,90,24,0.04));
+  border: 1px solid rgba(196,90,24,0.25);
   border-radius: var(--radius-xl);
   padding: 32px;
   text-align: center;
@@ -263,14 +263,14 @@
   white-space: nowrap;
   background: var(--color-accent);
   color: #fff;
-  box-shadow: 0 4px 16px rgba(232,114,42,0.3);
+  box-shadow: 0 4px 16px rgba(196,90,24,0.3);
   text-decoration: none;
 }
 
 .blog-cta .btn:hover {
   background: var(--color-accent-hover);
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(232,114,42,0.4);
+  box-shadow: 0 6px 24px rgba(196,90,24,0.4);
 }
 
 .blog-cta .blog-cta__note {
