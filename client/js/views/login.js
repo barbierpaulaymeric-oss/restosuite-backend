@@ -95,8 +95,8 @@ class LoginView {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">
-          <button class="login-back" id="back-btn">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          <button class="login-back" id="back-btn" aria-label="Revenir à l'écran précédent">
+            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
           <div class="login-logo">
             <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 60px; width: auto;">
@@ -105,16 +105,16 @@ class LoginView {
 
           <div style="text-align:left;width:100%;margin-top:var(--space-4)">
             <div class="form-group">
-              <label>Email</label>
-              <input type="email" class="form-control" id="login-email" placeholder="votre@email.com" autocomplete="email">
+              <label for="login-email">Email</label>
+              <input type="email" class="form-control" id="login-email" placeholder="votre@email.com" autocomplete="email" required>
             </div>
             <div class="form-group">
-              <label>Mot de passe</label>
-              <input type="password" class="form-control" id="login-password" placeholder="••••••••" autocomplete="current-password">
+              <label for="login-password">Mot de passe</label>
+              <input type="password" class="form-control" id="login-password" placeholder="••••••••" autocomplete="current-password" required>
             </div>
           </div>
 
-          <div id="login-error" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
+          <div id="login-error" role="alert" aria-live="assertive" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
 
           <button class="btn btn-primary" id="login-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             Se connecter
@@ -175,8 +175,8 @@ class LoginView {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">
-          <button class="login-back" id="back-btn">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          <button class="login-back" id="back-btn" aria-label="Revenir à l'écran précédent">
+            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
           <div class="login-logo">
             <img src="assets/logo-outline-thin.png" alt="RestoSuite" style="height: 60px; width: auto;">
@@ -187,25 +187,25 @@ class LoginView {
           <div style="text-align:left;width:100%;margin-top:var(--space-4)">
             <div style="display:flex;gap:var(--space-3)">
               <div class="form-group" style="flex:1">
-                <label>Prénom</label>
+                <label for="reg-firstname">Prénom</label>
                 <input type="text" class="form-control" id="reg-firstname" placeholder="Paul" autocomplete="given-name">
               </div>
               <div class="form-group" style="flex:1">
-                <label>Nom</label>
+                <label for="reg-lastname">Nom</label>
                 <input type="text" class="form-control" id="reg-lastname" placeholder="Dupont" autocomplete="family-name">
               </div>
             </div>
             <div class="form-group">
-              <label>Email</label>
-              <input type="email" class="form-control" id="reg-email" placeholder="votre@email.com" autocomplete="email">
+              <label for="reg-email">Email</label>
+              <input type="email" class="form-control" id="reg-email" placeholder="votre@email.com" autocomplete="email" required>
             </div>
             <div class="form-group">
-              <label>Mot de passe (6 caractères min.)</label>
-              <input type="password" class="form-control" id="reg-password" placeholder="••••••••" autocomplete="new-password">
+              <label for="reg-password">Mot de passe (6 caractères min.)</label>
+              <input type="password" class="form-control" id="reg-password" placeholder="••••••••" autocomplete="new-password" required aria-describedby="reg-password-help">
             </div>
             <div class="form-group">
-              <label>Confirmer le mot de passe</label>
-              <input type="password" class="form-control" id="reg-password2" placeholder="••••••••" autocomplete="new-password">
+              <label for="reg-password2">Confirmer le mot de passe</label>
+              <input type="password" class="form-control" id="reg-password2" placeholder="••••••••" autocomplete="new-password" required>
             </div>
             <div style="margin-top:var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--border-default)">
               <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md)">
@@ -217,7 +217,7 @@ class LoginView {
                 </div>
               </div>
               <div class="form-group">
-                <label>Mot de passe équipe (partagé avec le staff)</label>
+                <label for="reg-staff-password">Mot de passe équipe (partagé avec le staff)</label>
                 <input type="text" class="form-control" id="reg-staff-password" placeholder="ex: resto2026" autocomplete="off"
                        style="font-family:var(--font-mono);letter-spacing:0.05em">
               </div>
@@ -225,7 +225,7 @@ class LoginView {
             </div>
           </div>
 
-          <div id="reg-error" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
+          <div id="reg-error" role="alert" aria-live="assertive" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
 
           <button class="btn btn-primary" id="reg-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             Créer mon compte
@@ -287,8 +287,8 @@ class LoginView {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">
-          <button class="login-back" id="back-btn">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          <button class="login-back" id="back-btn" aria-label="Revenir à l'écran précédent">
+            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
           <div style="margin-bottom:var(--space-4)">
             <span style="font-size:2.5rem">👥</span>
@@ -298,12 +298,12 @@ class LoginView {
 
           <div style="text-align:left;width:100%;margin-top:var(--space-4)">
             <div class="form-group">
-              <label>Mot de passe restaurant</label>
-              <input type="password" class="form-control" id="staff-password" placeholder="••••••••" autocomplete="off" style="text-align:center;font-size:1.2rem;letter-spacing:4px">
+              <label for="staff-password">Mot de passe restaurant</label>
+              <input type="password" class="form-control" id="staff-password" placeholder="••••••••" autocomplete="off" style="text-align:center;font-size:1.2rem;letter-spacing:4px" required>
             </div>
           </div>
 
-          <div id="staff-error" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
+          <div id="staff-error" role="alert" aria-live="assertive" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
 
           <button class="btn btn-primary" id="staff-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             Continuer
@@ -362,22 +362,22 @@ class LoginView {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:500px">
-          <button class="login-back" id="back-btn">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          <button class="login-back" id="back-btn" aria-label="Revenir à l'écran précédent">
+            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
           <h2 class="login-subtitle">${escapeHtml(this.restaurantName)}</h2>
           <p class="login-tagline">Qui êtes-vous ?</p>
 
-          <div class="team-picker-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:16px;margin-top:var(--space-5);width:100%">
+          <div class="team-picker-grid" role="list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:16px;margin-top:var(--space-5);width:100%">
             ${this.staffMembers.map(m => `
-              <button class="team-picker-card" data-id="${m.id}" style="
+              <button class="team-picker-card" data-id="${m.id}" role="listitem" aria-label="${escapeHtml(m.name)} — ${escapeHtml(_getRoleLabel(m.role).replace(/[^\p{L}\s]/gu, '').trim())}" style="
                 display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px 12px;
                 border-radius:var(--radius-lg);border:2px solid var(--border-primary);
                 background:var(--bg-secondary);cursor:pointer;transition:all 0.2s;
               ">
                 ${renderAvatar(m.name, 56)}
                 <span style="font-weight:600;font-size:var(--text-sm);color:var(--text-primary);text-align:center">${escapeHtml(m.name)}</span>
-                <span style="font-size:11px;color:var(--text-tertiary)">${_getRoleLabel(m.role)}</span>
+                <span style="font-size:11px;color:var(--text-tertiary)" aria-hidden="true">${_getRoleLabel(m.role)}</span>
               </button>
             `).join('')}
           </div>
@@ -416,8 +416,8 @@ class LoginView {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content pin-content">
-          <button class="login-back" id="pin-back">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          <button class="login-back" id="pin-back" aria-label="Revenir au choix d'utilisateur">
+            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
 
           <div style="margin-bottom:var(--space-3)">
@@ -426,29 +426,29 @@ class LoginView {
           <h2 class="login-subtitle">${escapeHtml(member.name)}</h2>
           <p class="login-tagline">Entrez votre PIN</p>
 
-          <div class="pin-dots" id="pin-dots">
-            <span class="pin-dot"></span>
-            <span class="pin-dot"></span>
-            <span class="pin-dot"></span>
-            <span class="pin-dot"></span>
+          <div class="pin-dots" id="pin-dots" role="status" aria-live="polite" aria-label="Chiffres saisis">
+            <span class="pin-dot" aria-hidden="true"></span>
+            <span class="pin-dot" aria-hidden="true"></span>
+            <span class="pin-dot" aria-hidden="true"></span>
+            <span class="pin-dot" aria-hidden="true"></span>
           </div>
 
-          <div class="pin-error" id="pin-error"></div>
+          <div class="pin-error" id="pin-error" role="alert" aria-live="assertive"></div>
 
-          <div class="pin-pad" id="pin-pad">
-            <button class="pin-key" data-digit="1">1</button>
-            <button class="pin-key" data-digit="2">2</button>
-            <button class="pin-key" data-digit="3">3</button>
-            <button class="pin-key" data-digit="4">4</button>
-            <button class="pin-key" data-digit="5">5</button>
-            <button class="pin-key" data-digit="6">6</button>
-            <button class="pin-key" data-digit="7">7</button>
-            <button class="pin-key" data-digit="8">8</button>
-            <button class="pin-key" data-digit="9">9</button>
-            <button class="pin-key pin-key--empty"></button>
-            <button class="pin-key" data-digit="0">0</button>
-            <button class="pin-key pin-key--delete" id="pin-delete">
-              <i data-lucide="delete" style="width:24px;height:24px"></i>
+          <div class="pin-pad" id="pin-pad" role="group" aria-label="Pavé numérique PIN">
+            <button class="pin-key" data-digit="1" aria-label="1">1</button>
+            <button class="pin-key" data-digit="2" aria-label="2">2</button>
+            <button class="pin-key" data-digit="3" aria-label="3">3</button>
+            <button class="pin-key" data-digit="4" aria-label="4">4</button>
+            <button class="pin-key" data-digit="5" aria-label="5">5</button>
+            <button class="pin-key" data-digit="6" aria-label="6">6</button>
+            <button class="pin-key" data-digit="7" aria-label="7">7</button>
+            <button class="pin-key" data-digit="8" aria-label="8">8</button>
+            <button class="pin-key" data-digit="9" aria-label="9">9</button>
+            <button class="pin-key pin-key--empty" aria-hidden="true" tabindex="-1"></button>
+            <button class="pin-key" data-digit="0" aria-label="0">0</button>
+            <button class="pin-key pin-key--delete" id="pin-delete" aria-label="Effacer le dernier chiffre">
+              <i data-lucide="delete" style="width:24px;height:24px" aria-hidden="true"></i>
             </button>
           </div>
         </div>
@@ -503,8 +503,8 @@ class LoginView {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content pin-content">
-          <button class="login-back" id="pin-back">
-            <i data-lucide="arrow-left" style="width:20px;height:20px"></i> Retour
+          <button class="login-back" id="pin-back" aria-label="Revenir au choix d'utilisateur">
+            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
 
           <div style="margin-bottom:var(--space-3)">
@@ -513,29 +513,29 @@ class LoginView {
           <h2 class="login-subtitle">${escapeHtml(member.name)}</h2>
           <p class="login-tagline" id="create-pin-label">Créez votre code PIN (4 chiffres)</p>
 
-          <div class="pin-dots" id="pin-dots">
-            <span class="pin-dot"></span>
-            <span class="pin-dot"></span>
-            <span class="pin-dot"></span>
-            <span class="pin-dot"></span>
+          <div class="pin-dots" id="pin-dots" role="status" aria-live="polite" aria-label="Chiffres saisis">
+            <span class="pin-dot" aria-hidden="true"></span>
+            <span class="pin-dot" aria-hidden="true"></span>
+            <span class="pin-dot" aria-hidden="true"></span>
+            <span class="pin-dot" aria-hidden="true"></span>
           </div>
 
-          <div class="pin-error" id="pin-error"></div>
+          <div class="pin-error" id="pin-error" role="alert" aria-live="assertive"></div>
 
-          <div class="pin-pad" id="pin-pad">
-            <button class="pin-key" data-digit="1">1</button>
-            <button class="pin-key" data-digit="2">2</button>
-            <button class="pin-key" data-digit="3">3</button>
-            <button class="pin-key" data-digit="4">4</button>
-            <button class="pin-key" data-digit="5">5</button>
-            <button class="pin-key" data-digit="6">6</button>
-            <button class="pin-key" data-digit="7">7</button>
-            <button class="pin-key" data-digit="8">8</button>
-            <button class="pin-key" data-digit="9">9</button>
-            <button class="pin-key pin-key--empty"></button>
-            <button class="pin-key" data-digit="0">0</button>
-            <button class="pin-key pin-key--delete" id="pin-delete">
-              <i data-lucide="delete" style="width:24px;height:24px"></i>
+          <div class="pin-pad" id="pin-pad" role="group" aria-label="Pavé numérique PIN">
+            <button class="pin-key" data-digit="1" aria-label="1">1</button>
+            <button class="pin-key" data-digit="2" aria-label="2">2</button>
+            <button class="pin-key" data-digit="3" aria-label="3">3</button>
+            <button class="pin-key" data-digit="4" aria-label="4">4</button>
+            <button class="pin-key" data-digit="5" aria-label="5">5</button>
+            <button class="pin-key" data-digit="6" aria-label="6">6</button>
+            <button class="pin-key" data-digit="7" aria-label="7">7</button>
+            <button class="pin-key" data-digit="8" aria-label="8">8</button>
+            <button class="pin-key" data-digit="9" aria-label="9">9</button>
+            <button class="pin-key pin-key--empty" aria-hidden="true" tabindex="-1"></button>
+            <button class="pin-key" data-digit="0" aria-label="0">0</button>
+            <button class="pin-key pin-key--delete" id="pin-delete" aria-label="Effacer le dernier chiffre">
+              <i data-lucide="delete" style="width:24px;height:24px" aria-hidden="true"></i>
             </button>
           </div>
         </div>

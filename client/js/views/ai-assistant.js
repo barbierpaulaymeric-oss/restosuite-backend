@@ -15,36 +15,40 @@ async function renderAIAssistant() {
     <div style="display:flex;flex-direction:column;height:calc(100vh - 80px);max-width:900px;margin:0 auto;padding:var(--space-3)">
       <div class="view-header" style="flex-shrink:0;margin-bottom:var(--space-4)">
         <h1 style="display:flex;align-items:center;gap:8px;margin:0">
-          <i data-lucide="sparkles" style="width:28px;height:28px;vertical-align:middle;margin-right:8px"></i>Alto
+          <i data-lucide="sparkles" style="width:28px;height:28px;vertical-align:middle;margin-right:8px" aria-hidden="true"></i>Alto
         </h1>
         <p class="text-secondary" style="font-size:var(--text-sm);margin-top:4px">Assistant culinaire intelligent · Voix &amp; texte · Actions confirmées</p>
       </div>
 
-      <div id="ai-messages" style="flex:1;overflow-y:auto;padding:var(--space-3) 0;display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-4)">
+      <div id="ai-messages" role="log" aria-live="polite" aria-label="Conversation avec Alto"
+           style="flex:1;overflow-y:auto;padding:var(--space-3) 0;display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-4)">
         <div class="ai-msg ai-msg--ai">
-          <div class="ai-msg__avatar">✨</div>
+          <div class="ai-msg__avatar" aria-hidden="true">✨</div>
           <div class="ai-msg__bubble">
             <p>Bonjour ! Je suis <strong>Alto</strong>, votre assistant culinaire intelligent.</p>
             <p style="margin-top:8px">Parlez-moi ou écrivez&nbsp;: je peux enregistrer vos relevés HACCP (températures, nettoyages, cuissons, refroidissements, non-conformités, plats témoins, traçabilité…), gérer vos stocks et commandes, ou analyser vos données. Vous validez, j’exécute.</p>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
-              <button class="ai-suggestion" onclick="sendAISuggestion('Frigo 1 à 3,2°C, frigo 2 à 4°C, chambre froide à -18°C')"><i data-lucide="thermometer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Relevé T° groupé</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('J\\'ai nettoyé les plans de travail, la trancheuse et les frigos')"><i data-lucide="sparkles" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Nettoyages</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Refroidissement blanquette, départ 72°C, arrivée 8°C en 1h45')"><i data-lucide="snowflake" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Refroidissement</button>
-              <button class="ai-suggestion" onclick="sendAISuggestion('Quel est mon food cost moyen ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Food cost</button>
+            <div role="group" aria-label="Suggestions de requêtes" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
+              <button class="ai-suggestion" onclick="sendAISuggestion('Frigo 1 à 3,2°C, frigo 2 à 4°C, chambre froide à -18°C')"><i data-lucide="thermometer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" aria-hidden="true"></i>Relevé T° groupé</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('J\\'ai nettoyé les plans de travail, la trancheuse et les frigos')"><i data-lucide="sparkles" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" aria-hidden="true"></i>Nettoyages</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Refroidissement blanquette, départ 72°C, arrivée 8°C en 1h45')"><i data-lucide="snowflake" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" aria-hidden="true"></i>Refroidissement</button>
+              <button class="ai-suggestion" onclick="sendAISuggestion('Quel est mon food cost moyen ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" aria-hidden="true"></i>Food cost</button>
             </div>
           </div>
         </div>
       </div>
 
       <div style="flex-shrink:0;padding:var(--space-3);border:1px solid var(--border-light);border-radius:var(--radius-lg);background:var(--bg-sunken)">
-        <form id="ai-form" style="display:flex;gap:var(--space-2)">
-          <button type="button" class="btn" id="ai-voice-btn" style="padding:8px 12px;background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-secondary)" title="Enregistrer au micro">
-            <i data-lucide="mic" style="width:18px;height:18px"></i>
+        <form id="ai-form" role="search" aria-label="Envoyer un message à Alto" style="display:flex;gap:var(--space-2)">
+          <label for="ai-input" class="visually-hidden">Message à Alto</label>
+          <button type="button" class="btn" id="ai-voice-btn" aria-label="Dicter au micro" aria-pressed="false"
+                  style="padding:8px 12px;background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-secondary)" title="Enregistrer au micro">
+            <i data-lucide="mic" style="width:18px;height:18px" aria-hidden="true"></i>
           </button>
           <input type="text" id="ai-input" class="input" placeholder="Parlez à Alto ou écrivez votre demande…"
+            aria-label="Message à Alto"
             style="flex:1;font-size:var(--text-base)" autocomplete="off">
-          <button type="submit" class="btn btn-primary" id="ai-send-btn" style="padding:8px 16px">
-            <i data-lucide="send" style="width:18px;height:18px"></i>
+          <button type="submit" class="btn btn-primary" id="ai-send-btn" aria-label="Envoyer le message" style="padding:8px 16px">
+            <i data-lucide="send" style="width:18px;height:18px" aria-hidden="true"></i>
           </button>
         </form>
       </div>
@@ -144,7 +148,9 @@ function toggleAIVoice() {
   if (_aiVoiceRecognition) {
     _aiVoiceRecognition.abort();
     _aiVoiceRecognition = null;
-    document.getElementById('ai-voice-btn').style.opacity = '1';
+    const btn = document.getElementById('ai-voice-btn');
+    btn.style.opacity = '1';
+    btn.setAttribute('aria-pressed', 'false');
     return;
   }
 
@@ -157,6 +163,7 @@ function toggleAIVoice() {
   btn.style.opacity = '0.6';
   btn.style.background = 'var(--color-accent)';
   btn.style.color = 'white';
+  btn.setAttribute('aria-pressed', 'true');
 
   let transcript = '';
 
@@ -174,6 +181,7 @@ function toggleAIVoice() {
       btn.style.opacity = '1';
       btn.style.background = '';
       btn.style.color = '';
+      btn.setAttribute('aria-pressed', 'false');
       sendAIMessage(transcript.trim());
       _aiVoiceRecognition = null;
     }
@@ -183,6 +191,7 @@ function toggleAIVoice() {
     btn.style.opacity = '1';
     btn.style.background = '';
     btn.style.color = '';
+    btn.setAttribute('aria-pressed', 'false');
     if (event.error !== 'no-speech') {
       showToast('Erreur vocale: ' + event.error, 'error');
     }
@@ -193,6 +202,7 @@ function toggleAIVoice() {
     btn.style.opacity = '1';
     btn.style.background = '';
     btn.style.color = '';
+    btn.setAttribute('aria-pressed', 'false');
     _aiVoiceRecognition = null;
   };
 
@@ -212,9 +222,10 @@ async function sendAIMessage(message) {
   // Add user message
   const userMsg = document.createElement('div');
   userMsg.className = 'ai-msg ai-msg--user';
+  userMsg.setAttribute('role', 'listitem');
   userMsg.innerHTML = `
-    <div class="ai-msg__avatar">👤</div>
-    <div class="ai-msg__bubble">${escapeHtml(message)}</div>
+    <div class="ai-msg__avatar" aria-hidden="true">👤</div>
+    <div class="ai-msg__bubble"><span class="visually-hidden">Vous : </span>${escapeHtml(message)}</div>
   `;
   messagesEl.appendChild(userMsg);
 
@@ -222,9 +233,10 @@ async function sendAIMessage(message) {
   const typing = document.createElement('div');
   typing.className = 'ai-msg ai-msg--ai';
   typing.id = 'ai-typing';
+  typing.setAttribute('aria-label', 'Alto rédige une réponse');
   typing.innerHTML = `
-    <div class="ai-msg__avatar">✨</div>
-    <div class="ai-msg__bubble"><div class="ai-typing"><span></span><span></span><span></span></div></div>
+    <div class="ai-msg__avatar" aria-hidden="true">✨</div>
+    <div class="ai-msg__bubble"><div class="ai-typing" aria-hidden="true"><span></span><span></span><span></span></div></div>
   `;
   messagesEl.appendChild(typing);
   messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -244,9 +256,10 @@ async function sendAIMessage(message) {
     // Add AI response
     const aiMsg = document.createElement('div');
     aiMsg.className = 'ai-msg ai-msg--ai';
+    aiMsg.setAttribute('role', 'listitem');
     aiMsg.innerHTML = `
-      <div class="ai-msg__avatar">✨</div>
-      <div class="ai-msg__bubble">${formatAIReply(result.reply)}</div>
+      <div class="ai-msg__avatar" aria-hidden="true">✨</div>
+      <div class="ai-msg__bubble"><span class="visually-hidden">Alto : </span>${formatAIReply(result.reply)}</div>
     `;
     messagesEl.appendChild(aiMsg);
 
@@ -257,15 +270,17 @@ async function sendAIMessage(message) {
 
         const actionEl = document.createElement('div');
         actionEl.className = 'ai-msg ai-msg--ai';
+        actionEl.setAttribute('role', 'region');
+        actionEl.setAttribute('aria-label', 'Action proposée par Alto');
         actionEl.innerHTML = `
-          <div class="ai-msg__avatar"></div>
+          <div class="ai-msg__avatar" aria-hidden="true"></div>
           <div class="ai-action-card">
             <div class="ai-action-title">
-              <i data-lucide="zap" style="width:16px;height:16px"></i> ${escapeHtml(action.description)}
+              <i data-lucide="zap" style="width:16px;height:16px" aria-hidden="true"></i> ${escapeHtml(action.description)}
             </div>
-            <div class="ai-action-buttons">
-              <button class="ai-action-confirm" onclick="confirmAIAction('${action.type}', '${btoa(JSON.stringify(action.params))}')">✓ Confirmer</button>
-              <button class="ai-action-cancel" onclick="dismissAction(this)">✕ Annuler</button>
+            <div class="ai-action-buttons" role="group" aria-label="Valider ou annuler l'action">
+              <button class="ai-action-confirm" aria-label="Confirmer l'action" onclick="confirmAIAction('${action.type}', '${btoa(JSON.stringify(action.params))}')">✓ Confirmer</button>
+              <button class="ai-action-cancel" aria-label="Annuler l'action" onclick="dismissAction(this)">✕ Annuler</button>
             </div>
           </div>
         `;
@@ -277,8 +292,9 @@ async function sendAIMessage(message) {
     typing.remove();
     const errMsg = document.createElement('div');
     errMsg.className = 'ai-msg ai-msg--ai';
+    errMsg.setAttribute('role', 'alert');
     errMsg.innerHTML = `
-      <div class="ai-msg__avatar">✨</div>
+      <div class="ai-msg__avatar" aria-hidden="true">✨</div>
       <div class="ai-msg__bubble" style="border-color:var(--color-danger)">
         <p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>
       </div>

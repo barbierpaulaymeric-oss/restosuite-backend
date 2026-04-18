@@ -98,8 +98,8 @@ async function renderHACCPDashboard() {
                   <span class="haccp-zone-card__range">${zone.min_temp}° / ${zone.max_temp}°</span>
                 </div>
                 <div class="haccp-zone-card__time">${lastTime}</div>
-                <button class="btn btn-primary haccp-record-btn" data-zone-id="${zone.id}" data-zone-name="${escapeHtml(zone.name)}" data-min="${zone.min_temp}" data-max="${zone.max_temp}">
-                  <i data-lucide="thermometer" style="width:18px;height:18px"></i> Relever
+                <button class="btn btn-primary haccp-record-btn" data-zone-id="${zone.id}" data-zone-name="${escapeHtml(zone.name)}" data-min="${zone.min_temp}" data-max="${zone.max_temp}" aria-label="Relever la température de ${escapeHtml(zone.name)}">
+                  <i data-lucide="thermometer" style="width:18px;height:18px" aria-hidden="true"></i> Relever
                 </button>
               </div>
             `;
@@ -118,12 +118,14 @@ async function renderHACCPDashboard() {
           </div>
         </div>
 
-        <div class="haccp-cleaning-list">
+        <div class="haccp-cleaning-list" role="list" aria-label="Tâches de nettoyage du jour">
           ${cleaningData.tasks.map(task => `
-            <div class="haccp-cleaning-item ${task.done_today ? 'haccp-cleaning-item--done' : ''}">
-              <button class="haccp-cleaning-check ${task.done_today ? 'checked' : ''}" 
-                      data-task-id="${task.id}" ${task.done_today ? 'disabled' : ''}>
-                ${task.done_today ? '✓' : ''}
+            <div class="haccp-cleaning-item ${task.done_today ? 'haccp-cleaning-item--done' : ''}" role="listitem">
+              <button class="haccp-cleaning-check ${task.done_today ? 'checked' : ''}"
+                      data-task-id="${task.id}" ${task.done_today ? 'disabled' : ''}
+                      aria-label="${task.done_today ? 'Tâche effectuée' : 'Marquer comme effectuée'} : ${escapeHtml(task.name)}"
+                      aria-pressed="${task.done_today ? 'true' : 'false'}">
+                <span aria-hidden="true">${task.done_today ? '✓' : ''}</span>
               </button>
               <div class="haccp-cleaning-item__info">
                 <span class="haccp-cleaning-item__name">${escapeHtml(task.name)}</span>
@@ -215,24 +217,28 @@ function showTemperatureModal(zoneId, zoneName, minTemp, maxTemp) {
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'temp-modal-title');
   overlay.innerHTML = `
     <div class="modal">
-      <h2><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Relevé — ${escapeHtml(zoneName)}</h2>
+      <h2 id="temp-modal-title"><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Relevé — ${escapeHtml(zoneName)}</h2>
       <p class="text-secondary text-sm" style="margin-bottom:var(--space-4)">Plage normale : ${minTemp}°C à ${maxTemp}°C</p>
       <div class="form-group">
-        <label>Température (°C)</label>
-        <input type="number" step="0.1" class="form-control haccp-temp-input" id="modal-temp" 
-               placeholder="ex: 3.5" inputmode="decimal" autofocus
+        <label for="modal-temp">Température (°C)</label>
+        <input type="number" step="0.1" class="form-control haccp-temp-input" id="modal-temp"
+               placeholder="ex: 3.5" inputmode="decimal" autofocus required
+               aria-required="true"
                style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)">
       </div>
       <div class="form-group">
-        <label>Notes (optionnel)</label>
+        <label for="modal-notes">Notes (optionnel)</label>
         <input type="text" class="form-control" id="modal-notes" placeholder="ex: porte restée ouverte">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
-        <button class="btn btn-secondary" id="modal-cancel">Annuler</button>
+        <button class="btn btn-secondary" id="modal-cancel" aria-label="Annuler et fermer">Annuler</button>
         <button class="btn btn-primary" id="modal-save" style="min-width:140px">
-          <i data-lucide="check" style="width:18px;height:18px"></i> Enregistrer
+          <i data-lucide="check" style="width:18px;height:18px" aria-hidden="true"></i> Enregistrer
         </button>
       </div>
     </div>
@@ -241,17 +247,25 @@ function showTemperatureModal(zoneId, zoneName, minTemp, maxTemp) {
   document.body.appendChild(overlay);
   if (window.lucide) lucide.createIcons();
 
+  // Focus trap — restores focus to trigger on close
+  const releaseFocus = (typeof trapFocus === 'function') ? trapFocus(overlay) : () => {};
+  const closeOverlay = () => {
+    try { releaseFocus(); } catch {}
+    overlay.remove();
+  };
+
   const tempInput = document.getElementById('modal-temp');
   tempInput.focus();
 
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.remove();
+    if (e.target === overlay) closeOverlay();
   });
-  document.getElementById('modal-cancel').addEventListener('click', () => overlay.remove());
+  document.getElementById('modal-cancel').addEventListener('click', closeOverlay);
   document.getElementById('modal-save').addEventListener('click', async () => {
     const temperature = parseFloat(tempInput.value);
     if (isNaN(temperature)) {
       tempInput.classList.add('form-control--error');
+      tempInput.setAttribute('aria-invalid', 'true');
       return;
     }
     const notes = document.getElementById('modal-notes').value.trim();
@@ -262,7 +276,7 @@ function showTemperatureModal(zoneId, zoneName, minTemp, maxTemp) {
         notes: notes || null,
         recorded_by: account ? account.id : null
       });
-      overlay.remove();
+      closeOverlay();
       const isAlert = temperature < minTemp || temperature > maxTemp;
       showToast(isAlert ? `⚠️ ALERTE : ${temperature}°C hors norme !` : `✅ ${temperature}°C enregistré`, isAlert ? 'error' : 'success');
       renderHACCPDashboard();
@@ -274,5 +288,13 @@ function showTemperatureModal(zoneId, zoneName, minTemp, maxTemp) {
   // Enter key to submit
   tempInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('modal-save').click();
+  });
+
+  // ESC to close
+  document.addEventListener('keydown', function escHandler(e) {
+    if (e.key === 'Escape' && document.body.contains(overlay)) {
+      closeOverlay();
+      document.removeEventListener('keydown', escHandler);
+    }
   });
 }

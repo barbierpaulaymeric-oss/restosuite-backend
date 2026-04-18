@@ -67,29 +67,30 @@ async function renderDashboard() {
     <div id="dashboard-onboarding"></div>
     <div id="dashboard-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
 
-    <div id="dashboard-alerts"></div>
-    <div id="ai-suggestions-container"></div>
-    <div id="daily-tip-container"></div>
+    <div id="dashboard-alerts" role="region" aria-live="polite" aria-label="Alertes du jour"></div>
+    <div id="ai-suggestions-container" role="region" aria-label="Suggestions IA"></div>
+    <div id="daily-tip-container" role="region" aria-label="Astuce du jour"></div>
 
     <div class="page-header">
       <h1>Fiches Techniques</h1>
-      ${perms.edit_recipes ? `<a href="#/new" class="btn btn-primary"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle fiche</a>` : ''}
+      ${perms.edit_recipes ? `<a href="#/new" class="btn btn-primary" aria-label="Créer une nouvelle fiche technique"><i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouvelle fiche</a>` : ''}
     </div>
-    <div class="search-bar">
-      <span class="search-icon"><i data-lucide="search"></i></span>
-      <input type="text" id="recipe-search" placeholder="Rechercher une fiche..." autocomplete="off">
+    <div class="search-bar" role="search">
+      <label for="recipe-search" class="visually-hidden">Rechercher une fiche</label>
+      <span class="search-icon" aria-hidden="true"><i data-lucide="search"></i></span>
+      <input type="search" id="recipe-search" placeholder="Rechercher une fiche..." autocomplete="off" aria-label="Rechercher une fiche">
     </div>
-    <div class="recipe-type-filters" style="display:flex;gap:8px;margin-bottom:16px;overflow-x:auto">
-      <button class="haccp-subnav__link active" data-type="">Tous</button>
-      <button class="haccp-subnav__link" data-type="plat">🍽️ Plats</button>
-      <button class="haccp-subnav__link" data-type="sous_recette">📋 Sous-recettes</button>
-      <button class="haccp-subnav__link" data-type="base">🫕 Bases</button>
+    <div class="recipe-type-filters" role="tablist" aria-label="Filtrer par type de fiche" style="display:flex;gap:8px;margin-bottom:16px;overflow-x:auto">
+      <button class="haccp-subnav__link active" role="tab" aria-selected="true" data-type="">Tous</button>
+      <button class="haccp-subnav__link" role="tab" aria-selected="false" data-type="plat">🍽️ Plats</button>
+      <button class="haccp-subnav__link" role="tab" aria-selected="false" data-type="sous_recette">📋 Sous-recettes</button>
+      <button class="haccp-subnav__link" role="tab" aria-selected="false" data-type="base">🫕 Bases</button>
     </div>
-    <div id="recipe-list">
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
+    <div id="recipe-list" role="region" aria-live="polite" aria-label="Liste des fiches techniques">
+      <div class="skeleton skeleton-card" aria-hidden="true"></div>
+      <div class="skeleton skeleton-card" aria-hidden="true"></div>
+      <div class="skeleton skeleton-card" aria-hidden="true"></div>
+      <div class="skeleton skeleton-card" aria-hidden="true"></div>
     </div>
   `;
   lucide.createIcons();
@@ -193,8 +194,12 @@ async function renderDashboard() {
   // Type filter buttons
   document.querySelectorAll('.recipe-type-filters button').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.recipe-type-filters button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.recipe-type-filters button').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+      });
       btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
       currentTypeFilter = btn.dataset.type;
       renderList(searchInput.value, currentTypeFilter);
     });

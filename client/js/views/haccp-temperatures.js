@@ -23,24 +23,26 @@ async function renderHACCPTemperatures() {
           <span class="breadcrumb-current">Températures</span>
         </nav>
         <div class="page-header">
-          <h1><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Températures</h1>
-          <button class="btn btn-primary" id="btn-new-temp">
-            <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau relevé
+          <h1><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Températures</h1>
+          <button class="btn btn-primary" id="btn-new-temp" aria-label="Créer un nouveau relevé de température">
+            <i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouveau relevé
           </button>
         </div>
 
         ${HACCP_SUBNAV_FULL}
 
         <!-- Filters -->
-        <div class="haccp-filters">
+        <div class="haccp-filters" role="search" aria-label="Filtrer les relevés">
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
-            <select class="form-control" id="filter-zone" style="min-height:40px">
+            <label for="filter-zone" class="visually-hidden">Zone</label>
+            <select class="form-control" id="filter-zone" style="min-height:40px" aria-label="Filtrer par zone">
               <option value="">Toutes les zones</option>
               ${zones.map(z => `<option value="${z.id}">${escapeHtml(z.name)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
-            <input type="date" class="form-control" id="filter-date" lang="fr" style="min-height:40px">
+            <label for="filter-date" class="visually-hidden">Date</label>
+            <input type="date" class="form-control" id="filter-date" lang="fr" style="min-height:40px" aria-label="Filtrer par date">
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-filter">Filtrer</button>
         </div>
@@ -188,28 +190,32 @@ function showNewTempModal(zones) {
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'new-temp-modal-title');
   overlay.innerHTML = `
     <div class="modal">
-      <h2><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouveau relevé</h2>
+      <h2 id="new-temp-modal-title"><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Nouveau relevé</h2>
       <div class="form-group">
-        <label>Zone</label>
-        <select class="form-control" id="modal-zone">
+        <label for="modal-zone">Zone</label>
+        <select class="form-control" id="modal-zone" aria-required="true">
           ${zones.map(z => `<option value="${z.id}" data-min="${z.min_temp}" data-max="${z.max_temp}">${escapeHtml(z.name)}</option>`).join('')}
         </select>
       </div>
       <div class="form-group">
-        <label>Température (°C)</label>
+        <label for="modal-temp">Température (°C)</label>
         <input type="number" step="0.1" class="form-control" id="modal-temp" placeholder="ex: 3.5" inputmode="decimal"
+               required aria-required="true"
                style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)">
       </div>
       <div class="form-group">
-        <label>Notes (optionnel)</label>
+        <label for="modal-notes">Notes (optionnel)</label>
         <input type="text" class="form-control" id="modal-notes" placeholder="ex: porte restée ouverte">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="modal-cancel">Annuler</button>
         <button class="btn btn-primary" id="modal-save" style="min-width:140px">
-          <i data-lucide="check" style="width:18px;height:18px"></i> Enregistrer
+          <i data-lucide="check" style="width:18px;height:18px" aria-hidden="true"></i> Enregistrer
         </button>
       </div>
     </div>
@@ -218,15 +224,25 @@ function showNewTempModal(zones) {
   document.body.appendChild(overlay);
   if (window.lucide) lucide.createIcons();
 
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.getElementById('modal-cancel').addEventListener('click', () => overlay.remove());
+  const releaseFocus = trapFocus(overlay);
+  const closeModal = () => { try { releaseFocus(); } catch {} overlay.remove(); };
+  const escHandler = (e) => {
+    if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
+
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('modal-save').addEventListener('click', async () => {
     const zoneId = Number(document.getElementById('modal-zone').value);
-    const temperature = parseFloat(document.getElementById('modal-temp').value);
+    const tempInput = document.getElementById('modal-temp');
+    const temperature = parseFloat(tempInput.value);
     if (isNaN(temperature)) {
-      document.getElementById('modal-temp').classList.add('form-control--error');
+      tempInput.classList.add('form-control--error');
+      tempInput.setAttribute('aria-invalid', 'true');
       return;
     }
+    tempInput.removeAttribute('aria-invalid');
     const notes = document.getElementById('modal-notes').value.trim();
     try {
       await API.recordTemperature({
@@ -235,7 +251,7 @@ function showNewTempModal(zones) {
         notes: notes || null,
         recorded_by: account ? account.id : null
       });
-      overlay.remove();
+      closeModal();
       showToast('Relevé enregistré ✓', 'success');
       renderHACCPTemperatures();
     } catch (err) {
@@ -251,15 +267,18 @@ function showZoneModal(data) {
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'zone-modal-title');
   overlay.innerHTML = `
     <div class="modal">
-      <h2>${isEdit ? '<i data-lucide="pencil" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Modifier la zone' : '<i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouvelle zone'}</h2>
+      <h2 id="zone-modal-title">${isEdit ? '<i data-lucide="pencil" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Modifier la zone' : '<i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Nouvelle zone'}</h2>
       <div class="form-group">
-        <label>Nom</label>
-        <input type="text" class="form-control" id="zone-name" value="${isEdit ? escapeHtml(data.name) : ''}" placeholder="ex: Frigo 3">
+        <label for="zone-name">Nom</label>
+        <input type="text" class="form-control" id="zone-name" value="${isEdit ? escapeHtml(data.name) : ''}" placeholder="ex: Frigo 3" required aria-required="true">
       </div>
       <div class="form-group">
-        <label>Type</label>
+        <label for="zone-type">Type</label>
         <select class="form-control" id="zone-type">
           <option value="fridge" ${isEdit && data.type === 'fridge' ? 'selected' : ''}>Frigo</option>
           <option value="freezer" ${isEdit && data.type === 'freezer' ? 'selected' : ''}>Congélateur</option>
@@ -268,11 +287,11 @@ function showZoneModal(data) {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Temp min (°C)</label>
+          <label for="zone-min">Temp min (°C)</label>
           <input type="number" step="0.5" class="form-control" id="zone-min" value="${isEdit ? data.min : '0'}">
         </div>
         <div class="form-group">
-          <label>Temp max (°C)</label>
+          <label for="zone-max">Temp max (°C)</label>
           <input type="number" step="0.5" class="form-control" id="zone-max" value="${isEdit ? data.max : '4'}">
         </div>
       </div>
@@ -284,8 +303,17 @@ function showZoneModal(data) {
   `;
 
   document.body.appendChild(overlay);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.getElementById('zone-cancel').addEventListener('click', () => overlay.remove());
+  if (window.lucide) lucide.createIcons();
+
+  const releaseFocus = trapFocus(overlay);
+  const closeModal = () => { try { releaseFocus(); } catch {} overlay.remove(); };
+  const escHandler = (e) => {
+    if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
+
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  document.getElementById('zone-cancel').addEventListener('click', closeModal);
   document.getElementById('zone-save').addEventListener('click', async () => {
     const payload = {
       name: document.getElementById('zone-name').value.trim(),
@@ -300,7 +328,7 @@ function showZoneModal(data) {
       } else {
         await API.createHACCPZone(payload);
       }
-      overlay.remove();
+      closeModal();
       showToast(isEdit ? 'Zone modifiée ✓' : 'Zone créée ✓', 'success');
       renderHACCPTemperatures();
     } catch (err) {

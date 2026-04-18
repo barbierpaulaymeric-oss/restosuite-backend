@@ -9,44 +9,45 @@ async function renderStockDashboard() {
 
   app.innerHTML = `
     <div class="view-header">
-      <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Stock</h1>
+      <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Stock</h1>
       <p class="text-secondary">Vue d'ensemble du stock actuel</p>
     </div>
-    <div id="delivery-pending-banner" style="margin-bottom:var(--space-4)"></div>
-    <div class="stock-actions" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5);flex-wrap:wrap">
+    <div id="delivery-pending-banner" role="region" aria-live="polite" aria-label="Livraisons en attente" style="margin-bottom:var(--space-4)"></div>
+    <nav class="stock-actions" aria-label="Actions stock" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5);flex-wrap:wrap">
       <a href="#/deliveries" class="btn btn-primary btn-lg" id="btn-deliveries-link" style="flex:1;min-width:180px;text-decoration:none;text-align:center">
-        🚚 Livraisons
+        <span aria-hidden="true">🚚</span> Livraisons
       </a>
       <a href="#/stock/reception" class="btn btn-accent btn-lg" style="flex:1;min-width:180px;text-decoration:none;text-align:center">
-        📥 Réception
+        <span aria-hidden="true">📥</span> Réception
       </a>
       <a href="#/scan-invoice" class="btn btn-secondary" style="flex:1;min-width:160px;text-decoration:none;text-align:center">
-        📷 Scanner facture
+        <span aria-hidden="true">📷</span> Scanner facture
       </a>
       ${isGerant ? `
       <button class="btn btn-secondary" id="stock-inventory-btn" style="flex:1;min-width:140px">
-        📋 Inventaire
+        <span aria-hidden="true">📋</span> Inventaire
       </button>
       ` : ''}
       <a href="#/stock/movements" class="btn btn-secondary" style="min-width:120px;text-decoration:none;text-align:center">
-        📊 Historique
+        <span aria-hidden="true">📊</span> Historique
       </a>
       ${isGerant ? `
       <a href="#/stock/variance" class="btn btn-secondary" style="min-width:140px;text-decoration:none;text-align:center">
-        📉 Écarts
+        <span aria-hidden="true">📉</span> Écarts
       </a>
       ` : ''}
+    </nav>
+    <div class="search-bar" role="search" style="margin-bottom:var(--space-5)">
+      <label for="stock-search" class="visually-hidden">Rechercher un ingrédient</label>
+      <input type="search" id="stock-search" placeholder="Rechercher un ingrédient..." class="input" aria-label="Rechercher un ingrédient" style="width:100%">
     </div>
-    <div class="search-bar" style="margin-bottom:var(--space-5)">
-      <input type="text" id="stock-search" placeholder="Rechercher un ingrédient..." class="input" style="width:100%">
-    </div>
-    <div id="stock-alerts-section"></div>
-    <div id="stock-content">
-      <div class="skeleton skeleton-row"></div>
-      <div class="skeleton skeleton-row"></div>
-      <div class="skeleton skeleton-row"></div>
-      <div class="skeleton skeleton-row"></div>
-      <div class="skeleton skeleton-row"></div>
+    <div id="stock-alerts-section" role="region" aria-live="polite" aria-label="Alertes stock"></div>
+    <div id="stock-content" role="region" aria-label="Liste du stock" aria-live="polite">
+      <div class="skeleton skeleton-row" aria-hidden="true"></div>
+      <div class="skeleton skeleton-row" aria-hidden="true"></div>
+      <div class="skeleton skeleton-row" aria-hidden="true"></div>
+      <div class="skeleton skeleton-row" aria-hidden="true"></div>
+      <div class="skeleton skeleton-row" aria-hidden="true"></div>
     </div>
   `;
 
@@ -211,23 +212,27 @@ async function showInventoryModal() {
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'inv-modal-title');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:var(--z-modal-backdrop);display:flex;align-items:center;justify-content:center;padding:var(--space-4)';
 
   overlay.innerHTML = `
     <div class="modal" style="background:var(--bg-elevated);border-radius:var(--radius-xl);padding:var(--space-6);max-width:500px;width:100%;max-height:80vh;overflow-y:auto">
-      <h2 style="margin-bottom:var(--space-4)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Inventaire</h2>
+      <h2 id="inv-modal-title" style="margin-bottom:var(--space-4)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Inventaire</h2>
       <div class="form-group" style="margin-bottom:var(--space-4)">
-        <label class="form-label">Ingrédient</label>
-        <select id="inv-ingredient" class="input">
+        <label class="form-label" for="inv-ingredient">Ingrédient</label>
+        <select id="inv-ingredient" class="input" aria-required="true">
           <option value="">— Sélectionner —</option>
           ${ingredients.map(i => `<option value="${i.id}" data-unit="${escapeHtml(i.default_unit || 'kg')}">${escapeHtml(i.name)}</option>`).join('')}
         </select>
       </div>
       <div class="form-group" style="margin-bottom:var(--space-4)">
-        <label class="form-label">Quantité réelle</label>
+        <label class="form-label" for="inv-qty">Quantité réelle</label>
         <div style="display:flex;gap:var(--space-2)">
-          <input type="number" id="inv-qty" class="input" step="0.01" min="0" placeholder="0" style="flex:1">
-          <input type="text" id="inv-unit" class="input" value="kg" style="width:80px" readonly>
+          <input type="number" id="inv-qty" class="input" step="0.01" min="0" placeholder="0" aria-required="true" style="flex:1">
+          <label for="inv-unit" class="visually-hidden">Unité</label>
+          <input type="text" id="inv-unit" class="input" value="kg" style="width:80px" readonly aria-label="Unité">
         </div>
       </div>
       <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
@@ -238,6 +243,14 @@ async function showInventoryModal() {
   `;
 
   document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+
+  const releaseFocus = trapFocus(overlay);
+  const closeModal = () => { try { releaseFocus(); } catch {} overlay.remove(); };
+  const escHandler = (e) => {
+    if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
 
   const ingredientSelect = overlay.querySelector('#inv-ingredient');
   const unitInput = overlay.querySelector('#inv-unit');
@@ -246,8 +259,8 @@ async function showInventoryModal() {
     unitInput.value = opt.dataset.unit || 'kg';
   });
 
-  overlay.querySelector('#inv-cancel').addEventListener('click', () => overlay.remove());
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#inv-cancel').addEventListener('click', closeModal);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
 
   overlay.querySelector('#inv-save').addEventListener('click', async () => {
     const ingredientId = Number(ingredientSelect.value);
@@ -267,7 +280,7 @@ async function showInventoryModal() {
         recorded_by: account ? account.id : null
       });
       showToast('Inventaire enregistré', 'success');
-      overlay.remove();
+      closeModal();
       await loadStock();
     } catch (e) {
       showToast(e.message, 'error');

@@ -60,7 +60,12 @@ function showConfirmModal(title, message, onConfirm, options = {}) {
   document.body.appendChild(overlay);
   if (window.lucide) lucide.createIcons();
 
-  const closeModal = () => overlay.remove();
+  // Trap focus inside the modal and restore focus on close
+  const releaseFocus = trapFocus(overlay);
+  const closeModal = () => {
+    try { releaseFocus(); } catch {}
+    overlay.remove();
+  };
 
   overlay.querySelector('#confirm-yes').onclick = () => {
     closeModal();
@@ -102,3 +107,53 @@ document.addEventListener('keydown', function(e) {
     }
   }
 }, true);
+
+// ─── Focus-trap helper for modals ──────────────────────────────────────────
+// Usage:
+//   const release = trapFocus(modalOverlay);
+//   // ...later when closing the modal:
+//   release();
+// Keeps keyboard focus inside `container` while open, remembers the previously
+// focused element and restores it on release. Also focuses the first focusable
+// child on entry.
+function trapFocus(container) {
+  if (!container) return () => {};
+  const previouslyFocused = document.activeElement;
+  const FOCUSABLE = [
+    'a[href]', 'button:not([disabled])', 'textarea:not([disabled])',
+    'input:not([disabled])', 'select:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+  ].join(',');
+
+  const getFocusable = () => Array.from(container.querySelectorAll(FOCUSABLE))
+    .filter(el => el.offsetParent !== null || el === document.activeElement);
+
+  const first = getFocusable()[0];
+  if (first) {
+    try { first.focus(); } catch {}
+  }
+
+  const onKey = (e) => {
+    if (e.key !== 'Tab') return;
+    const focusable = getFocusable();
+    if (focusable.length === 0) return;
+    const firstEl = focusable[0];
+    const lastEl = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === firstEl) {
+      e.preventDefault();
+      lastEl.focus();
+    } else if (!e.shiftKey && document.activeElement === lastEl) {
+      e.preventDefault();
+      firstEl.focus();
+    }
+  };
+
+  container.addEventListener('keydown', onKey);
+
+  return function release() {
+    container.removeEventListener('keydown', onKey);
+    if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+      try { previouslyFocused.focus(); } catch {}
+    }
+  };
+}

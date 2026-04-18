@@ -80,28 +80,28 @@ async function renderRecipeForm(editId) {
   app.innerHTML = `
     <div class="page-header">
       <div>
-        <a href="#/" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px"></i> Retour</a>
+        <a href="#/" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px" aria-hidden="true"></i> Retour</a>
         <h1 style="margin-top:4px">${isEdit ? 'Modifier la fiche' : 'Nouvelle fiche technique'}</h1>
       </div>
     </div>
 
     ${!isEdit ? `
     <div class="mic-container">
-      <button class="mic-btn" id="mic-btn" onclick="toggleMic()">
-        <i data-lucide="mic"></i>
+      <button class="mic-btn" id="mic-btn" onclick="toggleMic()" aria-label="Dicter la recette au micro" aria-pressed="false">
+        <i data-lucide="mic" aria-hidden="true"></i>
       </button>
-      <div class="mic-status" id="mic-status">Appuyez pour dicter votre recette</div>
+      <div class="mic-status" id="mic-status" aria-live="polite">Appuyez pour dicter votre recette</div>
     </div>
     ` : ''}
 
     <div id="recipe-form-content">
       <div class="form-row">
         <div class="form-group">
-          <label>Nom du plat</label>
-          <input type="text" class="form-control" id="f-name" value="${escapeHtml(recipe?.name || '')}" placeholder="Tartare de bœuf...">
+          <label for="f-name">Nom du plat</label>
+          <input type="text" class="form-control" id="f-name" value="${escapeHtml(recipe?.name || '')}" placeholder="Tartare de bœuf..." required aria-required="true">
         </div>
         <div class="form-group">
-          <label>Catégorie</label>
+          <label for="f-category">Catégorie</label>
           <select class="form-control" id="f-category">
             <option value="">—</option>
             ${['entrée','plat','dessert','boisson','amuse-bouche','accompagnement','sauce','base'].map(c =>
@@ -113,7 +113,7 @@ async function renderRecipeForm(editId) {
 
       <div class="form-row">
         <div class="form-group">
-          <label>Type de recette</label>
+          <label for="f-recipe-type">Type de recette</label>
           <select class="form-control" id="f-recipe-type" onchange="onRecipeTypeChange()">
             <option value="plat" ${recipeType === 'plat' ? 'selected' : ''}>🍽️ Plat final</option>
             <option value="sous_recette" ${recipeType === 'sous_recette' ? 'selected' : ''}>📋 Sous-recette</option>
@@ -121,35 +121,38 @@ async function renderRecipeForm(editId) {
           </select>
         </div>
         <div class="form-group" id="f-price-group" style="${recipeType === 'plat' ? '' : 'display:none'}">
-          <label>Prix de vente TTC (€)</label>
+          <label for="f-price">Prix de vente TTC (€)</label>
           <input type="number" class="form-control" id="f-price" value="${recipe?.selling_price || ''}" step="0.5" min="0" oninput="updateLiveMargin()">
         </div>
       </div>
 
       <div class="form-row-3">
         <div class="form-group">
-          <label>Portions</label>
+          <label for="f-portions">Portions</label>
           <input type="number" class="form-control" id="f-portions" value="${recipe?.portions || 1}" min="1">
         </div>
         <div class="form-group">
-          <label>Préparation (min)</label>
+          <label for="f-prep">Préparation (min)</label>
           <input type="number" class="form-control" id="f-prep" value="${recipe?.prep_time_min || ''}" min="0">
         </div>
         <div class="form-group">
-          <label>Cuisson (min)</label>
+          <label for="f-cooking">Cuisson (min)</label>
           <input type="number" class="form-control" id="f-cooking" value="${recipe?.cooking_time_min || ''}" min="0">
         </div>
       </div>
 
-      <div class="section-title">Ingrédients</div>
-      <div id="ing-list"></div>
-      <div style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
+      <h2 class="section-title" id="ingredients-section">Ingrédients</h2>
+      <div id="ing-list" role="list" aria-labelledby="ingredients-section"></div>
+      <div role="group" aria-label="Ajouter un ingrédient" style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
         <div class="autocomplete-wrapper" style="flex:1;min-width:150px">
-          <input type="text" class="form-control" id="add-ing-name" placeholder="Nom de l'ingrédient" autocomplete="off">
-          <div class="autocomplete-list hidden" id="ing-autocomplete"></div>
+          <label for="add-ing-name" class="visually-hidden">Nom de l'ingrédient</label>
+          <input type="text" class="form-control" id="add-ing-name" placeholder="Nom de l'ingrédient" autocomplete="off" aria-label="Nom de l'ingrédient">
+          <div class="autocomplete-list hidden" id="ing-autocomplete" role="listbox"></div>
         </div>
-        <input type="number" class="form-control" id="add-ing-qty" placeholder="Qté" style="width:80px" step="any">
-        <select class="form-control" id="add-ing-unit" style="width:80px">
+        <label for="add-ing-qty" class="visually-hidden">Quantité</label>
+        <input type="number" class="form-control" id="add-ing-qty" placeholder="Qté" style="width:80px" step="any" aria-label="Quantité">
+        <label for="add-ing-unit" class="visually-hidden">Unité</label>
+        <select class="form-control" id="add-ing-unit" style="width:80px" aria-label="Unité">
           <option value="g">g</option>
           <option value="kg">kg</option>
           <option value="cl">cl</option>
@@ -157,48 +160,53 @@ async function renderRecipeForm(editId) {
           <option value="pièce">pièce</option>
           <option value="botte">botte</option>
         </select>
-        <input type="number" class="form-control" id="add-ing-waste" placeholder="Perte%" style="width:80px" step="any" min="0" max="100">
-        <input type="text" class="form-control" id="add-ing-notes" placeholder="Notes" style="width:120px">
-        <button class="btn btn-primary btn-sm" onclick="addIngredientLine()"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
+        <label for="add-ing-waste" class="visually-hidden">Pourcentage de perte</label>
+        <input type="number" class="form-control" id="add-ing-waste" placeholder="Perte%" style="width:80px" step="any" min="0" max="100" aria-label="Pourcentage de perte">
+        <label for="add-ing-notes" class="visually-hidden">Notes ingrédient</label>
+        <input type="text" class="form-control" id="add-ing-notes" placeholder="Notes" style="width:120px" aria-label="Notes ingrédient">
+        <button class="btn btn-primary btn-sm" onclick="addIngredientLine()" aria-label="Ajouter l'ingrédient"><i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i></button>
       </div>
 
-      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+      <h2 class="section-title" id="sub-recipes-section" style="display:flex;justify-content:space-between;align-items:center">
         <span>Sous-recettes</span>
-      </div>
-      <div id="sub-recipe-list"></div>
-      <div style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
-        <select class="form-control" id="add-sub-recipe" style="flex:1;min-width:180px">
+      </h2>
+      <div id="sub-recipe-list" role="list" aria-labelledby="sub-recipes-section"></div>
+      <div role="group" aria-label="Ajouter une sous-recette" style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
+        <label for="add-sub-recipe" class="visually-hidden">Sous-recette</label>
+        <select class="form-control" id="add-sub-recipe" style="flex:1;min-width:180px" aria-label="Sous-recette">
           <option value="">— Choisir une sous-recette —</option>
           ${allRecipesForSub.map(r => `<option value="${r.id}">${r.recipe_type === 'base' ? '🫕' : '📋'} ${escapeHtml(r.name)}</option>`).join('')}
         </select>
-        <input type="number" class="form-control" id="add-sub-qty" placeholder="Portions" style="width:100px" step="any" min="0.1" value="1">
-        <button class="btn btn-primary btn-sm" onclick="addSubRecipeLine()"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
+        <label for="add-sub-qty" class="visually-hidden">Portions de sous-recette</label>
+        <input type="number" class="form-control" id="add-sub-qty" placeholder="Portions" style="width:100px" step="any" min="0.1" value="1" aria-label="Portions de sous-recette">
+        <button class="btn btn-primary btn-sm" onclick="addSubRecipeLine()" aria-label="Ajouter la sous-recette"><i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i></button>
       </div>
       ${allRecipesForSub.length === 0 ? '<p class="text-muted" style="font-size:var(--text-xs);margin-top:4px">Aucune sous-recette disponible. Créez d\'abord des fiches de type "Sous-recette" ou "Base".</p>' : ''}
 
-      <div class="section-title">Procédure</div>
-      <div id="steps-list"></div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <input type="text" class="form-control" id="add-step" placeholder="Nouvelle étape..." style="flex:1">
-        <button class="btn btn-primary btn-sm" onclick="addStepLine()"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
+      <h2 class="section-title" id="steps-section">Procédure</h2>
+      <div id="steps-list" aria-labelledby="steps-section"></div>
+      <div role="group" aria-label="Ajouter une étape" style="display:flex;gap:8px;margin-top:8px">
+        <label for="add-step" class="visually-hidden">Nouvelle étape</label>
+        <input type="text" class="form-control" id="add-step" placeholder="Nouvelle étape..." style="flex:1" aria-label="Nouvelle étape">
+        <button class="btn btn-primary btn-sm" onclick="addStepLine()" aria-label="Ajouter l'étape"><i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i></button>
       </div>
 
-      <div class="section-title">Tarification</div>
+      <h2 class="section-title">Tarification</h2>
       <div class="form-row">
         <div class="form-group" id="f-price-section">
-          <label>Food Cost</label>
-          <div id="live-margin" style="padding:12px 16px;font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:var(--text-secondary)">—</div>
+          <label for="live-margin">Food Cost</label>
+          <div id="live-margin" role="status" aria-live="polite" style="padding:12px 16px;font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:var(--text-secondary)">—</div>
         </div>
       </div>
 
       <div class="form-group">
-        <label>Notes</label>
+        <label for="f-notes">Notes</label>
         <textarea class="form-control" id="f-notes" rows="2">${escapeHtml(recipe?.notes || '')}</textarea>
       </div>
 
       <div class="actions-row">
         <button class="btn btn-primary" onclick="saveRecipe(${editId || 'null'})">
-          <i data-lucide="${isEdit ? 'save' : 'check'}" style="width:18px;height:18px"></i>
+          <i data-lucide="${isEdit ? 'save' : 'check'}" style="width:18px;height:18px" aria-hidden="true"></i>
           ${isEdit ? 'Enregistrer' : 'Créer la fiche'}
         </button>
         <a href="#/" class="btn btn-secondary">Annuler</a>
@@ -275,12 +283,12 @@ function renderIngredientLines() {
   el.innerHTML = formIngredients.map((ing, i) => {
     const net = ing.waste_percent > 0 ? (ing.gross_quantity * (1 - ing.waste_percent / 100)).toFixed(1) : ing.gross_quantity;
     return `
-      <div class="ing-line">
+      <div class="ing-line" role="listitem">
         <span class="ing-name">${escapeHtml(ing.name)} ${ing.notes ? `<span class="ing-notes">(${escapeHtml(ing.notes)})</span>` : ''}</span>
         <span class="ing-qty">${ing.gross_quantity}${ing.unit}</span>
         <span class="ing-qty text-muted">→ ${net}${ing.unit}</span>
         <span class="text-muted" style="font-size:var(--text-sm);font-family:var(--font-mono)">${ing.waste_percent}%</span>
-        <span class="ing-remove" role="button" tabindex="0" aria-label="Retirer l'ingrédient" onclick="removeIngredient(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeIngredient(${i})}"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+        <span class="ing-remove" role="button" tabindex="0" aria-label="Retirer l'ingrédient ${escapeHtml(ing.name)}" onclick="removeIngredient(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeIngredient(${i})}"><i data-lucide="x" style="width:16px;height:16px" aria-hidden="true"></i></span>
       </div>
     `;
   }).join('');
@@ -296,11 +304,11 @@ function renderSubRecipeLines() {
     return;
   }
   el.innerHTML = formSubRecipes.map((sr, i) => `
-    <div class="ing-line">
-      <span class="ing-name">📋 ${escapeHtml(sr.name)}</span>
+    <div class="ing-line" role="listitem">
+      <span class="ing-name"><span aria-hidden="true">📋</span> ${escapeHtml(sr.name)}</span>
       <span class="ing-qty">${sr.quantity} portion${sr.quantity !== 1 ? 's' : ''}</span>
       <span class="ing-qty text-muted">${sr.cost > 0 ? formatCurrency(sr.cost) : ''}</span>
-      <span class="ing-remove" role="button" tabindex="0" aria-label="Retirer la sous-recette" onclick="removeSubRecipe(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeSubRecipe(${i})}"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+      <span class="ing-remove" role="button" tabindex="0" aria-label="Retirer la sous-recette ${escapeHtml(sr.name)}" onclick="removeSubRecipe(${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();removeSubRecipe(${i})}"><i data-lucide="x" style="width:16px;height:16px" aria-hidden="true"></i></span>
     </div>
   `).join('');
   lucide.createIcons();
@@ -492,6 +500,7 @@ function startMic() {
   recognition.onstart = () => {
     isRecording = true;
     btn.classList.add('recording');
+    btn.setAttribute('aria-pressed', 'true');
     status.textContent = 'Écoute en cours… Parlez naturellement';
     status.className = 'mic-status recording';
   };
@@ -541,6 +550,7 @@ function startMic() {
     if (isRecording) {
       isRecording = false;
       btn.classList.remove('recording');
+      btn.setAttribute('aria-pressed', 'false');
     }
   };
 
@@ -552,7 +562,7 @@ function stopMic() {
     isRecording = false;
     recognition.stop();
     const btn = document.getElementById('mic-btn');
-    if (btn) btn.classList.remove('recording');
+    if (btn) { btn.classList.remove('recording'); btn.setAttribute('aria-pressed', 'false'); }
   }
 }
 
