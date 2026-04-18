@@ -90,11 +90,11 @@ function generateToken(account) {
 }
 
 function hashPin(pin) {
-  return bcrypt.hashSync(pin, 10);
+  return bcrypt.hash(pin, 10);
 }
 
 function verifyPin(pin, hash) {
-  return bcrypt.compareSync(pin, hash);
+  return bcrypt.compare(pin, hash);
 }
 
 // ─── Middleware: requireAuth ───
@@ -118,7 +118,7 @@ function requireAuth(req, res, next) {
 }
 
 // ─── POST /api/auth/register ───
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   const { email, password, first_name, last_name } = req.body;
 
   // Validation
@@ -146,7 +146,7 @@ router.post('/register', (req, res) => {
   }
 
   try {
-    const passwordHash = bcrypt.hashSync(password, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
 
     // Create restaurant (empty)
     const restaurantResult = run('INSERT INTO restaurants (name) VALUES (?)', ['Mon restaurant']);
@@ -154,7 +154,7 @@ router.post('/register', (req, res) => {
 
     // Set staff password if provided during registration
     if (req.body.staff_password && req.body.staff_password.trim()) {
-      const staffHash = bcrypt.hashSync(req.body.staff_password.trim(), 10);
+      const staffHash = await bcrypt.hash(req.body.staff_password.trim(), 10);
       run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [staffHash, restaurantId]);
     }
 
@@ -164,12 +164,13 @@ router.post('/register', (req, res) => {
       view_suppliers: true, export_pdf: true
     });
 
+    const defaultPinHash = await hashPin('0000');
     const accountResult = run(
       `INSERT INTO accounts (name, pin, role, permissions, email, password_hash, first_name, last_name, restaurant_id, onboarding_step, is_owner, trial_start)
        VALUES (?, ?, 'gerant', ?, ?, ?, ?, ?, ?, 0, 1, datetime('now'))`,
       [
         (first_name || '').trim() + (last_name ? ' ' + last_name.trim() : '') || email.split('@')[0],
-        hashPin('0000'),
+        defaultPinHash,
         permissions,
         email.trim().toLowerCase(),
         passwordHash,
@@ -206,7 +207,7 @@ router.post('/register', (req, res) => {
 });
 
 // ─── POST /api/auth/login ───
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -218,7 +219,7 @@ router.post('/login', (req, res) => {
     return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
   }
 
-  if (!account.password_hash || !bcrypt.compareSync(password, account.password_hash)) {
+  if (!account.password_hash || !(await bcrypt.compare(password, account.password_hash))) {
     return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
   }
 
@@ -254,7 +255,7 @@ router.post('/login', (req, res) => {
 // without scoping, a PIN like 1234 set by tenant A would match tenant B's user
 // with the same PIN. Caller must supply restaurant_id (typically obtained via
 // /staff-login first).
-router.post('/pin-login', (req, res) => {
+router.post('/pin-login', async (req, res) => {
   const { pin, restaurant_id } = req.body;
 
   if (!pin || !/^\d{4}$/.test(pin)) {
@@ -279,7 +280,7 @@ router.post('/pin-login', (req, res) => {
   );
   let account = null;
   for (const acc of accounts) {
-    if (verifyPin(pin, acc.pin)) {
+    if (await verifyPin(pin, acc.pin)) {
       account = acc;
       break;
     }
@@ -348,7 +349,7 @@ router.get('/me', requireAuth, (req, res) => {
 
 // ─── POST /api/auth/staff-login ───
 // Staff enters the restaurant's shared password → gets list of team members
-router.post('/staff-login', (req, res) => {
+router.post('/staff-login', async (req, res) => {
   const { password } = req.body;
 
   if (!password) {
@@ -361,7 +362,7 @@ router.post('/staff-login', (req, res) => {
   let matchedRestaurant = null;
 
   for (const r of restaurants) {
-    if (r.staff_password && bcrypt.compareSync(password, r.staff_password)) {
+    if (r.staff_password && (await bcrypt.compare(password, r.staff_password))) {
       matchedRestaurant = r;
       break;
     }
@@ -388,7 +389,7 @@ router.post('/staff-login', (req, res) => {
 
 // ─── POST /api/auth/staff-pin ───
 // Staff member enters their PIN after being selected from the team list
-router.post('/staff-pin', (req, res) => {
+router.post('/staff-pin', async (req, res) => {
   const { account_id, pin, is_creation } = req.body;
 
   if (!account_id || !pin) {
@@ -414,15 +415,15 @@ router.post('/staff-pin', (req, res) => {
   // First-time PIN creation
   if (is_creation) {
     // Only allow creation if no PIN is set yet or PIN is default
-    if (account.pin && !verifyPin('0000', account.pin)) {
+    if (account.pin && !(await verifyPin('0000', account.pin))) {
       return res.status(400).json({ error: 'Un PIN existe déjà. Utilisez votre PIN actuel.' });
     }
     // Set the new PIN
-    const hashedPin = hashPin(pin);
+    const hashedPin = await hashPin(pin);
     run('UPDATE accounts SET pin = ? WHERE id = ?', [hashedPin, account_id]);
   } else {
     // Normal PIN validation
-    if (!account.pin || !verifyPin(pin, account.pin)) {
+    if (!account.pin || !(await verifyPin(pin, account.pin))) {
       recordPinAttempt(staffLockoutKey, false);
       return res.status(401).json({ error: 'PIN incorrect' });
     }
@@ -453,7 +454,7 @@ router.post('/staff-pin', (req, res) => {
 
 // ─── PUT /api/auth/staff-password ───
 // Gérant sets/changes the restaurant staff password
-router.put('/staff-password', requireAuth, (req, res) => {
+router.put('/staff-password', requireAuth, async (req, res) => {
   const { password } = req.body;
 
   if (!password || password.length < 4) {
@@ -469,7 +470,7 @@ router.put('/staff-password', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Aucun restaurant associé' });
   }
 
-  const hashedPassword = bcrypt.hashSync(password, 10);
+  const hashedPassword = await bcrypt.hash(password, 10);
   run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [hashedPassword, account.restaurant_id]);
 
   res.json({ success: true });

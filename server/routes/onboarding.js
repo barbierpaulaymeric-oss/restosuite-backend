@@ -11,7 +11,7 @@ const { requireAuth } = require('./auth');
 const router = express.Router();
 
 function hashPin(pin) {
-  return bcrypt.hashSync(pin, 10);
+  return bcrypt.hash(pin, 10);
 }
 
 // All onboarding routes require auth
@@ -145,7 +145,7 @@ router.put('/step/3', (req, res) => {
 });
 
 // ─── PUT /api/onboarding/step/4 — Équipe ───
-router.put('/step/4', (req, res) => {
+router.put('/step/4', async (req, res) => {
   const { members, staff_password } = req.body;
   const account = get('SELECT restaurant_id FROM accounts WHERE id = ?', [req.user.id]);
 
@@ -172,8 +172,7 @@ router.put('/step/4', (req, res) => {
 
   // Set staff password if provided
   if (staff_password && staff_password.trim()) {
-    const bcrypt = require('bcryptjs');
-    const staffHash = bcrypt.hashSync(staff_password.trim(), 10);
+    const staffHash = await bcrypt.hash(staff_password.trim(), 10);
     run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [staffHash, account.restaurant_id]);
   }
 
