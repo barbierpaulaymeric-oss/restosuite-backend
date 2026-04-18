@@ -10,7 +10,12 @@ const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'restosuite-dev-secret-2026';
+// PENTEST_REPORT C8.2 — no JWT_SECRET fallback. Fail loud at first use.
+function getJwtSecret() {
+  const s = process.env.JWT_SECRET;
+  if (!s) throw new Error('JWT_SECRET not configured');
+  return s;
+}
 
 function hashPin(pin) {
   return bcrypt.hashSync(pin, 10);
@@ -26,17 +31,33 @@ function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// PENTEST_REPORT A.2 — store sha256(access_token) instead of the raw token.
+// The raw token is returned to the supplier once on login; we keep only a
+// one-way digest so a DB leak doesn't hand attackers working session tokens.
+function hashToken(raw) {
+  return crypto.createHash('sha256').update(String(raw)).digest('hex');
+}
+
 function tokenExpiresAt() {
   return new Date(Date.now() + SUPPLIER_TOKEN_TTL_MS).toISOString();
 }
 
 // ─── Middleware: Authenticate supplier via token ───
+// PENTEST_REPORT A.2 — lookup compares sha256(presented token) against stored
+// token_hash. Legacy access_token column is no longer read.
 function requireSupplierAuth(req, res, next) {
   const token = req.headers['x-supplier-token'];
   if (!token) {
     return res.status(401).json({ error: 'Token fournisseur requis' });
   }
-  const account = get('SELECT sa.*, s.name as supplier_name FROM supplier_accounts sa JOIN suppliers s ON s.id = sa.supplier_id WHERE sa.access_token = ?', [token]);
+  const h = hashToken(token);
+  const account = get(
+    `SELECT sa.*, s.name as supplier_name
+       FROM supplier_accounts sa
+       JOIN suppliers s ON s.id = sa.supplier_id
+      WHERE sa.token_hash = ?`,
+    [h]
+  );
   if (!account) {
     return res.status(401).json({ error: 'Token invalide ou expiré' });
   }
@@ -46,6 +67,23 @@ function requireSupplierAuth(req, res, next) {
   }
   req.supplierAccount = account;
   next();
+}
+
+// Ensure the token_hash column exists; backfill from legacy plaintext so any
+// already-issued supplier session keeps working across the deploy.
+try {
+  const cols = all("PRAGMA table_info('supplier_accounts')").map(c => c.name);
+  if (!cols.includes('token_hash')) {
+    run('ALTER TABLE supplier_accounts ADD COLUMN token_hash TEXT');
+  }
+  const legacy = all("SELECT id, access_token FROM supplier_accounts WHERE access_token IS NOT NULL AND (token_hash IS NULL OR token_hash = '')");
+  for (const row of legacy) {
+    run('UPDATE supplier_accounts SET token_hash = ? WHERE id = ?', [hashToken(row.access_token), row.id]);
+  }
+} catch (e) {
+  if (!/duplicate column|no such table/i.test(e && e.message || '')) {
+    console.error('supplier_accounts token_hash migration failed:', e);
+  }
 }
 
 // ═════════════════════════════════════════
@@ -142,12 +180,13 @@ router.post('/accounts/add-member', requireAuth, (req, res) => {
     return res.status(404).json({ error: 'Fournisseur introuvable' });
   }
 
-  // Check PIN uniqueness WITHIN this supplier only
+  // PENTEST_REPORT A.1 — the previous PIN-uniqueness check was broken:
+  // bcrypt salts randomly, so hashing the candidate PIN and comparing against
+  // a stored hash via `=` never matched. The check rejected nothing in
+  // practice. We drop the check entirely — duplicate PINs across members are
+  // acceptable because member selection happens via the picker (member_id is
+  // already part of /member-pin), so no disambiguation is needed.
   const hashedPin = hashPin(pin);
-  const existingPin = get('SELECT id FROM supplier_accounts WHERE supplier_id = ? AND pin = ? AND restaurant_id = ?', [supplier_id, hashedPin, rid]);
-  if (existingPin) {
-    return res.status(409).json({ error: 'Ce PIN est déjà utilisé par un autre membre de votre entreprise' });
-  }
 
   const result = run(
     'INSERT INTO supplier_accounts (restaurant_id, supplier_id, name, email, pin) VALUES (?, ?, ?, ?, ?)',
@@ -202,6 +241,21 @@ router.put('/notifications/read-all', requireAuth, (req, res) => {
 // SUPPLIER SIDE (fournisseur)
 // ═════════════════════════════════════════
 
+// PENTEST_REPORT A.3 — supplier emails are NOT globally unique (they're
+// scoped per-tenant in /invite), so a lookup-by-email-only can return the
+// wrong row across restaurants. We resolve by iterating every row whose email
+// matches and returning the one whose password_hash verifies. In practice
+// dup-email collisions are rare, so this stays O(1) on the common path.
+function findSupplierByCredentials(emailLower, password) {
+  const rows = all('SELECT * FROM suppliers WHERE email = ?', [emailLower]);
+  for (const row of rows) {
+    if (row.password_hash && bcrypt.compareSync(password, row.password_hash)) {
+      return row;
+    }
+  }
+  return null;
+}
+
 // POST /company-login — Supplier company login with email + password
 // Returns supplier info + list of member accounts for the team picker
 router.post('/company-login', (req, res) => {
@@ -210,11 +264,8 @@ router.post('/company-login', (req, res) => {
     return res.status(400).json({ error: 'Email et mot de passe requis' });
   }
 
-  const supplier = get('SELECT * FROM suppliers WHERE email = ?', [email.trim().toLowerCase()]);
+  const supplier = findSupplierByCredentials(email.trim().toLowerCase(), password);
   if (!supplier) {
-    return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
-  }
-  if (!supplier.password_hash || !bcrypt.compareSync(password, supplier.password_hash)) {
     return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
   }
 
@@ -255,9 +306,15 @@ router.post('/member-pin', (req, res) => {
     return res.status(401).json({ error: 'PIN incorrect' });
   }
 
-  // Generate access token with 30-day expiry
+  // Generate access token with 30-day expiry. PENTEST_REPORT A.2 — we store
+  // sha256(token); the raw token is returned to the supplier once, here.
   const token = generateToken();
-  run('UPDATE supplier_accounts SET access_token = ?, token_expires_at = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?', [token, tokenExpiresAt(), account.id]);
+  run(
+    `UPDATE supplier_accounts
+        SET access_token = NULL, token_hash = ?, token_expires_at = ?, last_login = CURRENT_TIMESTAMP
+      WHERE id = ?`,
+    [hashToken(token), tokenExpiresAt(), account.id]
+  );
 
   res.json({
     token,
@@ -276,11 +333,8 @@ router.post('/quick-login', (req, res) => {
     return res.status(400).json({ error: 'Email et mot de passe requis' });
   }
 
-  const supplier = get('SELECT * FROM suppliers WHERE email = ?', [email.trim().toLowerCase()]);
+  const supplier = findSupplierByCredentials(email.trim().toLowerCase(), password);
   if (!supplier) {
-    return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
-  }
-  if (!supplier.password_hash || !bcrypt.compareSync(password, supplier.password_hash)) {
     return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
   }
 
@@ -289,7 +343,12 @@ router.post('/quick-login', (req, res) => {
   if (members.length === 1) {
     const account = members[0];
     const token = generateToken();
-    run('UPDATE supplier_accounts SET access_token = ?, token_expires_at = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?', [token, tokenExpiresAt(), account.id]);
+    run(
+      `UPDATE supplier_accounts
+          SET access_token = NULL, token_hash = ?, token_expires_at = ?, last_login = CURRENT_TIMESTAMP
+        WHERE id = ?`,
+      [hashToken(token), tokenExpiresAt(), account.id]
+    );
     return res.json({
       token,
       supplier_id: supplier.id,
