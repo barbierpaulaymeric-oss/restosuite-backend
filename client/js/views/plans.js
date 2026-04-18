@@ -8,23 +8,25 @@ async function renderPlans(highlightPlan) {
   const account = getAccount();
   if (!account || account.role !== 'gerant') {
     app.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon"><i data-lucide="lock"></i></div>
+      <div class="empty-state" role="alert">
+        <div class="empty-icon" aria-hidden="true"><i data-lucide="lock"></i></div>
         <p>Accès réservé au gérant</p>
-        <a href="#/" class="btn btn-primary">Retour</a>
+        <a href="#/" class="btn btn-primary" aria-label="Retour à l'accueil">Retour</a>
       </div>`;
     if (window.lucide) lucide.createIcons();
     return;
   }
 
   app.innerHTML = `
-    <div class="view-header">
-      <h1><i data-lucide="layers" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Plans & Tarifs</h1>
-      <p class="text-secondary">Choisissez le plan adapté à votre restaurant</p>
-    </div>
-    <div class="plans-loading">
-      <div class="spinner"></div>
-    </div>`;
+    <section role="region" aria-labelledby="plans-heading">
+      <div class="view-header">
+        <h1 id="plans-heading"><i data-lucide="layers" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Plans & Tarifs</h1>
+        <p class="text-secondary">Choisissez le plan adapté à votre restaurant</p>
+      </div>
+      <div class="plans-loading" role="status" aria-live="polite" aria-label="Chargement des plans">
+        <div class="spinner"></div>
+      </div>
+    </section>`;
   if (window.lucide) lucide.createIcons();
 
   try {
@@ -42,7 +44,7 @@ async function renderPlans(highlightPlan) {
     function renderFeature(f) {
       const isSectionTitle = f.startsWith('Tout ');
       return `<li class="plan-feature${isSectionTitle ? ' plan-feature--section' : ''}">
-        ${isSectionTitle ? '' : '<i data-lucide="check" style="width:14px;height:14px;flex-shrink:0;color:var(--color-success)"></i>'}
+        ${isSectionTitle ? '' : '<i data-lucide="check" style="width:14px;height:14px;flex-shrink:0;color:var(--color-success)" aria-hidden="true"></i>'}
         <span>${escapeHtml(f)}</span>
       </li>`;
     }
@@ -55,53 +57,55 @@ async function renderPlans(highlightPlan) {
 
       let btnHtml;
       if (isCurrent) {
-        btnHtml = `<button class="btn btn-secondary btn-sm" disabled>Plan actuel</button>`;
+        btnHtml = `<button class="btn btn-secondary btn-sm" disabled aria-label="${escapeHtml(plan.name)} — votre plan actuel">Plan actuel</button>`;
       } else if (isEnterprise) {
-        btnHtml = `<a href="mailto:contact@restosuite.fr?subject=Plan Enterprise" class="btn btn-outline btn-sm">Nous contacter</a>`;
+        btnHtml = `<a href="mailto:contact@restosuite.fr?subject=Plan Enterprise" class="btn btn-outline btn-sm" aria-label="Contacter le service commercial pour le plan Enterprise">Nous contacter</a>`;
       } else {
         const btnClass = isDowngrade ? 'btn-outline' : 'btn-primary';
         const label = isDowngrade ? 'Passer à ce plan' : `Choisir ${escapeHtml(plan.name)}`;
-        btnHtml = `<button class="btn ${btnClass} btn-sm plan-upgrade-btn" data-plan="${escapeHtml(plan.id)}">${label}</button>`;
+        btnHtml = `<button class="btn ${btnClass} btn-sm plan-upgrade-btn" data-plan="${escapeHtml(plan.id)}" aria-label="${isDowngrade ? 'Passer au plan' : 'Choisir le plan'} ${escapeHtml(plan.name)}">${label}</button>`;
       }
 
       return `
-        <div class="plan-card${isCurrent ? ' plan-card--current' : ''}${isHighlighted && !isCurrent ? ' plan-card--highlighted' : ''}">
-          ${isCurrent ? '<div class="plan-card__current-badge">Plan actuel</div>' : ''}
+        <article class="plan-card${isCurrent ? ' plan-card--current' : ''}${isHighlighted && !isCurrent ? ' plan-card--highlighted' : ''}" aria-label="Plan ${escapeHtml(plan.name)}"${isCurrent ? ' aria-current="true"' : ''}>
+          ${isCurrent ? '<div class="plan-card__current-badge" aria-hidden="true">Plan actuel</div>' : ''}
           ${plan.badge && !isCurrent ? `<div class="plan-card__badge">${escapeHtml(plan.badge)}</div>` : ''}
           <div class="plan-card__header">
             <h2 class="plan-card__name">${escapeHtml(plan.name)}</h2>
-            <div class="plan-card__price">${escapeHtml(plan.label)}</div>
+            <div class="plan-card__price" aria-label="Prix : ${escapeHtml(plan.label)}">${escapeHtml(plan.label)}</div>
             <p class="plan-card__desc">${escapeHtml(plan.description)}</p>
           </div>
-          <ul class="plan-features">
+          <ul class="plan-features" aria-label="Fonctionnalités incluses dans ${escapeHtml(plan.name)}">
             ${plan.features.map(renderFeature).join('')}
           </ul>
           <div class="plan-card__footer">
             ${btnHtml}
           </div>
-        </div>`;
+        </article>`;
     }).join('');
 
     app.innerHTML = `
-      <div class="view-header">
-        <h1><i data-lucide="layers" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Plans & Tarifs</h1>
-        <p class="text-secondary">Choisissez le plan adapté à votre restaurant</p>
-      </div>
+      <section role="region" aria-labelledby="plans-heading-loaded">
+        <div class="view-header">
+          <h1 id="plans-heading-loaded"><i data-lucide="layers" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Plans & Tarifs</h1>
+          <p class="text-secondary">Choisissez le plan adapté à votre restaurant</p>
+        </div>
 
-      ${highlightPlan && highlightPlan !== currentPlan ? `
-        <div class="plans-upgrade-notice">
-          <i data-lucide="lock" style="width:16px;height:16px"></i>
-          Cette fonctionnalité nécessite le plan <strong>${escapeHtml(highlightPlan)}</strong> ou supérieur.
-          Votre plan actuel : <strong>${escapeHtml(currentPlan)}</strong>.
-        </div>` : ''}
+        ${highlightPlan && highlightPlan !== currentPlan ? `
+          <div class="plans-upgrade-notice" role="alert">
+            <i data-lucide="lock" style="width:16px;height:16px" aria-hidden="true"></i>
+            Cette fonctionnalité nécessite le plan <strong>${escapeHtml(highlightPlan)}</strong> ou supérieur.
+            Votre plan actuel : <strong>${escapeHtml(currentPlan)}</strong>.
+          </div>` : ''}
 
-      <div class="plans-grid">
-        ${cardsHtml}
-      </div>
+        <div class="plans-grid" role="list" aria-label="Plans disponibles">
+          ${cardsHtml}
+        </div>
 
-      <p class="plans-note text-secondary" style="text-align:center;margin-top:24px;font-size:0.85rem">
-        Les changements de plan sont instantanés. Pas de paiement requis en phase bêta.
-      </p>`;
+        <p class="plans-note text-secondary" style="text-align:center;margin-top:24px;font-size:0.85rem">
+          Les changements de plan sont instantanés. Pas de paiement requis en phase bêta.
+        </p>
+      </section>`;
 
     if (window.lucide) lucide.createIcons();
 
@@ -127,10 +131,10 @@ async function renderPlans(highlightPlan) {
     });
   } catch (e) {
     app.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon"><i data-lucide="wifi-off"></i></div>
+      <div class="empty-state" role="alert">
+        <div class="empty-icon" aria-hidden="true"><i data-lucide="wifi-off"></i></div>
         <p>Impossible de charger les plans</p>
-        <button class="btn btn-primary" onclick="renderPlans()">Réessayer</button>
+        <button class="btn btn-primary" onclick="renderPlans()" aria-label="Réessayer de charger les plans">Réessayer</button>
       </div>`;
     if (window.lucide) lucide.createIcons();
   }

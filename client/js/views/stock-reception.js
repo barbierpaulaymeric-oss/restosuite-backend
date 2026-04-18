@@ -21,42 +21,44 @@ async function renderStockReception() {
   }
 
   app.innerHTML = `
+    <section role="region" aria-label="Réception marchandise">
     <nav aria-label="Breadcrumb" class="breadcrumb">
       <a href="#/stock">Stock</a>
-      <span class="breadcrumb-sep">›</span>
+      <span class="breadcrumb-sep" aria-hidden="true">›</span>
       <span class="breadcrumb-current">Réception</span>
     </nav>
     <div class="view-header">
       <div style="display:flex;align-items:center;gap:var(--space-3)">
-        <a href="#/stock" style="color:var(--text-secondary);text-decoration:none;font-size:1.5rem">←</a>
+        <a href="#/stock" aria-label="Retour au stock" style="color:var(--text-secondary);text-decoration:none;font-size:1.5rem">←</a>
         <div>
-          <h1><i data-lucide="download" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Réception marchandise</h1>
+          <h1><i data-lucide="download" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Réception marchandise</h1>
           <p class="text-secondary">Enregistrez la réception d'une commande</p>
         </div>
       </div>
     </div>
 
-    <div class="reception-form" style="margin-bottom:var(--space-5)">
+    <form class="reception-form" style="margin-bottom:var(--space-5)" onsubmit="return false;">
       <div class="form-group" style="margin-bottom:var(--space-4)">
-        <label class="form-label">Fournisseur</label>
-        <select id="rec-supplier" class="input">
+        <label class="form-label" for="rec-supplier">Fournisseur</label>
+        <select id="rec-supplier" class="input" aria-label="Sélectionner le fournisseur">
           <option value="">— Sélectionner un fournisseur —</option>
           ${suppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
         </select>
       </div>
 
-      <div id="reception-lines">
+      <div id="reception-lines" role="list" aria-label="Lignes de réception" aria-live="polite">
         <!-- Lines will be added here -->
       </div>
 
-      <button class="btn btn-secondary" id="add-line-btn" style="width:100%;margin-bottom:var(--space-5)">
+      <button type="button" class="btn btn-secondary" id="add-line-btn" style="width:100%;margin-bottom:var(--space-5)" aria-label="Ajouter un produit à la réception">
         + Ajouter un produit
       </button>
 
-      <button class="btn btn-accent btn-lg" id="validate-reception-btn" style="width:100%" disabled>
+      <button type="button" class="btn btn-accent btn-lg" id="validate-reception-btn" style="width:100%" disabled aria-label="Valider la réception marchandise">
         ✅ Valider la réception
       </button>
-    </div>
+    </form>
+    </section>
   `;
 
   const linesContainer = document.getElementById('reception-lines');
@@ -69,8 +71,9 @@ async function renderStockReception() {
     lineEl.dataset.lineId = lineCount;
     lineEl.style.cssText = 'background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-3);position:relative';
 
+    lineEl.setAttribute('role', 'listitem');
     lineEl.innerHTML = `
-      <button class="remove-line-btn" style="position:absolute;top:var(--space-2);right:var(--space-2);background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:1.2rem;padding:var(--space-1)" title="Supprimer">✕</button>
+      <button type="button" class="remove-line-btn" aria-label="Supprimer le produit ${lineCount}" style="position:absolute;top:var(--space-2);right:var(--space-2);background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:1.2rem;padding:var(--space-1)" title="Supprimer">✕</button>
       <div style="font-weight:600;margin-bottom:var(--space-3);color:var(--text-secondary);font-size:var(--text-sm)">Produit #${lineCount}</div>
       <div class="form-group" style="margin-bottom:var(--space-3)">
         <label class="form-label">Ingrédient *</label>

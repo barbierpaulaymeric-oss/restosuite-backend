@@ -13,19 +13,19 @@ async function renderHACCPTraceability() {
     ]);
 
     app.innerHTML = `
-      <div class="haccp-page">
+      <section class="haccp-page" role="region" aria-label="Traçabilité HACCP">
         <div class="page-header">
-          <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Traçabilité</h1>
-          <button class="btn btn-primary" id="btn-new-reception">
-            <i data-lucide="plus" style="width:18px;height:18px"></i> Réception
+          <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Traçabilité</h1>
+          <button class="btn btn-primary" id="btn-new-reception" aria-label="Nouvelle réception de marchandise">
+            <i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Réception
           </button>
         </div>
 
         ${HACCP_SUBNAV_FULL}
 
         ${dlcAlerts.length > 0 ? `
-        <div class="haccp-dlc-alert-banner">
-          <i data-lucide="alert-triangle" style="width:20px;height:20px"></i>
+        <div class="haccp-dlc-alert-banner" role="alert" aria-live="polite">
+          <i data-lucide="alert-triangle" style="width:20px;height:20px" aria-hidden="true"></i>
           <div>
             <strong>${dlcAlerts.length} produit(s) proche(s) de la DLC</strong>
             <div class="haccp-dlc-alert-list">
@@ -39,51 +39,55 @@ async function renderHACCPTraceability() {
         ` : ''}
 
         <!-- Filters -->
-        <div class="haccp-filters">
+        <div class="haccp-filters" role="search" aria-label="Filtres de traçabilité">
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
-            <input type="date" class="form-control" id="filter-date" lang="fr" style="min-height:40px" placeholder="Date">
+            <label for="filter-date" class="visually-hidden">Filtrer par date</label>
+            <input type="date" class="form-control" id="filter-date" lang="fr" style="min-height:40px" placeholder="Date" aria-label="Filtrer par date">
           </div>
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
-            <input type="text" class="form-control" id="filter-supplier" style="min-height:40px" placeholder="Fournisseur">
+            <label for="filter-supplier" class="visually-hidden">Filtrer par fournisseur</label>
+            <input type="text" class="form-control" id="filter-supplier" style="min-height:40px" placeholder="Fournisseur" aria-label="Filtrer par fournisseur">
           </div>
-          <button class="btn btn-secondary btn-sm" id="btn-filter">Filtrer</button>
+          <button class="btn btn-secondary btn-sm" id="btn-filter" aria-label="Appliquer les filtres">Filtrer</button>
         </div>
 
         <!-- Export -->
-        <div class="haccp-export-bar">
-          <label class="text-secondary text-sm">Export PDF :</label>
-          <input type="date" class="form-control" id="export-from" lang="fr" style="min-height:36px;width:auto">
-          <span class="text-secondary">→</span>
-          <input type="date" class="form-control" id="export-to" lang="fr" style="min-height:36px;width:auto">
-          <button class="btn btn-secondary btn-sm" id="btn-export-trace">📄 Exporter</button>
+        <div class="haccp-export-bar" role="group" aria-label="Export PDF de traçabilité">
+          <label for="export-from" class="text-secondary text-sm">Export PDF :</label>
+          <input type="date" class="form-control" id="export-from" lang="fr" style="min-height:36px;width:auto" aria-label="Date de début export">
+          <span class="text-secondary" aria-hidden="true">→</span>
+          <label for="export-to" class="visually-hidden">Date de fin export</label>
+          <input type="date" class="form-control" id="export-to" lang="fr" style="min-height:36px;width:auto" aria-label="Date de fin export">
+          <button class="btn btn-secondary btn-sm" id="btn-export-trace" aria-label="Exporter en PDF">📄 Exporter</button>
         </div>
 
         <!-- Table -->
-        <div class="table-container">
+        <div class="table-container" role="region" aria-label="Liste des réceptions" tabindex="0">
           <table>
+            <caption class="visually-hidden">Journal de traçabilité des réceptions</caption>
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Produit</th>
-                <th>N° BL</th>
-                <th>Fournisseur</th>
-                <th>N° Lot</th>
-                <th>DLC</th>
-                <th>DDM</th>
-                <th>T° Réc.</th>
-                <th>Emballage</th>
-                <th>Aspect organo.</th>
-                <th>Quantité</th>
-                <th>Reçu par</th>
+                <th scope="col">Date</th>
+                <th scope="col">Produit</th>
+                <th scope="col">N° BL</th>
+                <th scope="col">Fournisseur</th>
+                <th scope="col">N° Lot</th>
+                <th scope="col">DLC</th>
+                <th scope="col">DDM</th>
+                <th scope="col">T° Réc.</th>
+                <th scope="col">Emballage</th>
+                <th scope="col">Aspect organo.</th>
+                <th scope="col">Quantité</th>
+                <th scope="col">Reçu par</th>
               </tr>
             </thead>
-            <tbody id="trace-table-body">
+            <tbody id="trace-table-body" aria-live="polite">
               ${renderTraceRows(logs)}
             </tbody>
           </table>
         </div>
-        ${logs.length === 0 ? '<div class="empty-state"><p>Aucune réception enregistrée</p></div>' : ''}
-      </div>
+        ${logs.length === 0 ? '<div class="empty-state" role="status"><p>Aucune réception enregistrée</p></div>' : ''}
+      </section>
     `;
 
     if (window.lucide) lucide.createIcons();
@@ -163,48 +167,48 @@ function showReceptionModal() {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal" style="max-width:560px">
-      <h2><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Réception marchandise</h2>
+      <h2 id="modal-reception-title"><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Réception marchandise</h2>
       <div class="form-group">
-        <label>Produit *</label>
-        <input type="text" class="form-control" id="rec-product" placeholder="ex: Filet de bœuf" autofocus>
+        <label for="rec-product">Produit *</label>
+        <input type="text" class="form-control" id="rec-product" placeholder="ex: Filet de bœuf" autofocus required aria-required="true">
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Fournisseur</label>
+          <label for="rec-supplier">Fournisseur</label>
           <input type="text" class="form-control" id="rec-supplier" placeholder="ex: Metro">
         </div>
         <div class="form-group">
-          <label>N° de lot</label>
+          <label for="rec-batch">N° de lot</label>
           <input type="text" class="form-control" id="rec-batch" placeholder="ex: LOT2024-001">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>N° Bon de livraison</label>
+          <label for="rec-numero-bl">N° Bon de livraison</label>
           <input type="text" class="form-control" id="rec-numero-bl" placeholder="ex: BL-2026-04512">
         </div>
         <div class="form-group">
-          <label>T° à réception (°C)</label>
+          <label for="rec-temp">T° à réception (°C)</label>
           <input type="number" step="0.1" class="form-control" id="rec-temp" placeholder="ex: 3.5" inputmode="decimal">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>DLC</label>
+          <label for="rec-dlc">DLC</label>
           <input type="date" class="form-control" id="rec-dlc" lang="fr">
         </div>
         <div class="form-group">
-          <label>DDM (Date de Durabilité Minimale)</label>
+          <label for="rec-ddm">DDM (Date de Durabilité Minimale)</label>
           <input type="date" class="form-control" id="rec-ddm" lang="fr">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Quantité</label>
+          <label for="rec-qty">Quantité</label>
           <input type="number" step="0.01" class="form-control" id="rec-qty" placeholder="ex: 5" inputmode="decimal">
         </div>
         <div class="form-group">
-          <label>Unité</label>
+          <label for="rec-unit">Unité</label>
           <select class="form-control" id="rec-unit">
             <option value="kg">kg</option>
             <option value="g">g</option>
@@ -216,7 +220,7 @@ function showReceptionModal() {
         </div>
       </div>
       <div class="form-group">
-        <label>État de l'emballage</label>
+        <label for="rec-emballage">État de l'emballage</label>
         <select class="form-control" id="rec-emballage">
           <option value="">— Sélectionner —</option>
           <option value="Conforme">Conforme</option>
@@ -227,7 +231,7 @@ function showReceptionModal() {
         </select>
       </div>
       <div class="form-group">
-        <label>Conformité organoleptique (aspect, odeur, couleur)</label>
+        <label for="rec-organo">Conformité organoleptique (aspect, odeur, couleur)</label>
         <select class="form-control" id="rec-organo">
           <option value="">— Sélectionner —</option>
           <option value="Conforme">Conforme</option>
@@ -238,13 +242,13 @@ function showReceptionModal() {
         </select>
       </div>
       <div class="form-group">
-        <label>Notes</label>
+        <label for="rec-notes">Notes</label>
         <input type="text" class="form-control" id="rec-notes" placeholder="ex: Remarque complémentaire">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
-        <button class="btn btn-secondary" id="rec-cancel">Annuler</button>
-        <button class="btn btn-primary" id="rec-save" style="min-width:160px">
-          <i data-lucide="check" style="width:18px;height:18px"></i> Enregistrer
+        <button class="btn btn-secondary" id="rec-cancel" aria-label="Annuler la saisie">Annuler</button>
+        <button class="btn btn-primary" id="rec-save" style="min-width:160px" aria-label="Enregistrer la réception">
+          <i data-lucide="check" style="width:18px;height:18px" aria-hidden="true"></i> Enregistrer
         </button>
       </div>
     </div>

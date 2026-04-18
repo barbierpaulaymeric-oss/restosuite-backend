@@ -7,20 +7,22 @@ async function renderSuppliers() {
   const isGerant = getRole() === 'gerant';
 
   app.innerHTML = `
+    <section role="region" aria-label="Gestion des fournisseurs">
     <div class="page-header">
       <h1>Fournisseurs</h1>
       <div style="display:flex;gap:var(--space-2)">
-        <a href="#/orders" class="btn btn-secondary">
-          <i data-lucide="clipboard-pen" style="width:18px;height:18px"></i> <span class="btn-label-desktop">Commandes</span>
+        <a href="#/orders" class="btn btn-secondary" aria-label="Voir les commandes fournisseur">
+          <i data-lucide="clipboard-pen" style="width:18px;height:18px" aria-hidden="true"></i> <span class="btn-label-desktop">Commandes</span>
         </a>
-        ${isGerant ? `<button class="btn btn-secondary" onclick="location.hash='#/supplier-portal'" id="btn-portal">
-          <i data-lucide="link" style="width:18px;height:18px"></i> <span class="btn-label-desktop">Portail</span>
-          <span class="portal-badge" id="portal-badge" style="display:none"></span>
+        ${isGerant ? `<button class="btn btn-secondary" onclick="location.hash='#/supplier-portal'" id="btn-portal" aria-label="Ouvrir le portail fournisseur">
+          <i data-lucide="link" style="width:18px;height:18px" aria-hidden="true"></i> <span class="btn-label-desktop">Portail</span>
+          <span class="portal-badge" id="portal-badge" style="display:none" aria-label="Notifications non lues"></span>
         </button>` : ''}
-        <button class="btn btn-primary" onclick="showSupplierModal()"><i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter</button>
+        <button class="btn btn-primary" onclick="showSupplierModal()" aria-label="Ajouter un nouveau fournisseur"><i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Ajouter</button>
       </div>
     </div>
-    <div id="supplier-list"><div class="loading"><div class="spinner"></div></div></div>
+    <div id="supplier-list" aria-live="polite" aria-busy="true"><div class="loading"><div class="spinner"></div></div></div>
+    </section>
   `;
   lucide.createIcons();
 
@@ -51,8 +53,9 @@ async function renderSuppliers() {
     }).catch(() => {});
   }
 
+  listEl.setAttribute('aria-busy', 'false');
   listEl.innerHTML = suppliers.map(s => `
-    <div class="card" onclick="showSupplierDetail(${s.id})">
+    <div class="card" role="button" tabindex="0" aria-label="Détails du fournisseur ${escapeHtml(s.name)}" onclick="showSupplierDetail(${s.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showSupplierDetail(${s.id});}">
       <div class="card-header">
         <span class="card-title">${escapeHtml(s.name)}</span>
         <span>${renderStars(s.quality_rating)}</span>

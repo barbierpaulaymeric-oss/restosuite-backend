@@ -57,12 +57,15 @@ class OnboardingWizard {
 
     this.overlay = document.createElement('div');
     this.overlay.className = 'onboarding-overlay';
+    this.overlay.setAttribute('role', 'dialog');
+    this.overlay.setAttribute('aria-modal', 'true');
+    this.overlay.setAttribute('aria-labelledby', 'ob-dialog-title');
     this.overlay.innerHTML = `
       <div class="onboarding-card">
-        <div class="onboarding-progress">
+        <div class="onboarding-progress" role="progressbar" aria-label="Progression de la configuration" aria-valuemin="0" aria-valuemax="7" aria-valuenow="${this.step}">
           <div class="onboarding-progress-bar" id="ob-progress"></div>
         </div>
-        <div class="onboarding-body" id="ob-body"></div>
+        <div class="onboarding-body" id="ob-body" aria-live="polite"></div>
         <div class="onboarding-footer" id="ob-footer"></div>
       </div>
     `;
@@ -79,6 +82,8 @@ class OnboardingWizard {
     if (!body || !footer || !progress) return;
 
     progress.style.width = `${(this.step / this.totalSteps) * 100}%`;
+    const progressWrap = progress.parentElement;
+    if (progressWrap) progressWrap.setAttribute('aria-valuenow', String(this.step));
     body.classList.remove('slide-in-left', 'slide-in-right');
     body.classList.add(this.direction === 'next' ? 'slide-in-right' : 'slide-in-left');
 
@@ -98,21 +103,21 @@ class OnboardingWizard {
     const acc = this.data.account || {};
     body.innerHTML = `
       <div class="ob-step">
-        <div class="ob-icon">👤</div>
-        <h2 class="ob-title">Mon profil</h2>
+        <div class="ob-icon" aria-hidden="true">👤</div>
+        <h2 class="ob-title" id="ob-dialog-title">Mon profil</h2>
         <p class="ob-desc">Vos informations personnelles</p>
         <div class="ob-form">
           <div class="form-group">
-            <label>Prénom</label>
-            <input type="text" class="form-control" id="ob-firstname" value="${escapeHtml(acc.first_name || '')}" placeholder="Prénom">
+            <label for="ob-firstname">Prénom</label>
+            <input type="text" class="form-control" id="ob-firstname" value="${escapeHtml(acc.first_name || '')}" placeholder="Prénom" autocomplete="given-name">
           </div>
           <div class="form-group">
-            <label>Nom</label>
-            <input type="text" class="form-control" id="ob-lastname" value="${escapeHtml(acc.last_name || '')}" placeholder="Nom">
+            <label for="ob-lastname">Nom</label>
+            <input type="text" class="form-control" id="ob-lastname" value="${escapeHtml(acc.last_name || '')}" placeholder="Nom" autocomplete="family-name">
           </div>
           <div class="form-group">
-            <label>Téléphone</label>
-            <input type="tel" class="form-control" id="ob-phone" value="${escapeHtml(acc.phone || '')}" placeholder="06 12 34 56 78">
+            <label for="ob-phone">Téléphone</label>
+            <input type="tel" class="form-control" id="ob-phone" value="${escapeHtml(acc.phone || '')}" placeholder="06 12 34 56 78" autocomplete="tel">
           </div>
         </div>
       </div>
@@ -125,16 +130,16 @@ class OnboardingWizard {
     const r = this.data.restaurant || {};
     body.innerHTML = `
       <div class="ob-step">
-        <div class="ob-icon">🏪</div>
-        <h2 class="ob-title">Mon restaurant</h2>
+        <div class="ob-icon" aria-hidden="true">🏪</div>
+        <h2 class="ob-title" id="ob-dialog-title">Mon restaurant</h2>
         <p class="ob-desc">Les informations de votre établissement</p>
         <div class="ob-form">
           <div class="form-group">
-            <label>Nom du restaurant</label>
+            <label for="ob-rname">Nom du restaurant</label>
             <input type="text" class="form-control" id="ob-rname" value="${escapeHtml(r.name || '')}" placeholder="Chez Marcel">
           </div>
           <div class="form-group">
-            <label>Type d'établissement</label>
+            <label for="ob-rtype">Type d'établissement</label>
             <select class="form-control" id="ob-rtype">
               <option value="">— Choisir —</option>
               ${['brasserie', 'gastro', 'fast-food', 'pizzeria', 'bar', 'traiteur', 'boulangerie', 'autre']
@@ -142,27 +147,27 @@ class OnboardingWizard {
             </select>
           </div>
           <div class="form-group">
-            <label>Adresse</label>
-            <input type="text" class="form-control" id="ob-raddress" value="${escapeHtml(r.address || '')}" placeholder="12 rue de la Paix">
+            <label for="ob-raddress">Adresse</label>
+            <input type="text" class="form-control" id="ob-raddress" value="${escapeHtml(r.address || '')}" placeholder="12 rue de la Paix" autocomplete="street-address">
           </div>
           <div style="display:flex;gap:var(--space-3)">
             <div class="form-group" style="flex:2">
-              <label>Ville</label>
-              <input type="text" class="form-control" id="ob-rcity" value="${escapeHtml(r.city || '')}" placeholder="Lyon">
+              <label for="ob-rcity">Ville</label>
+              <input type="text" class="form-control" id="ob-rcity" value="${escapeHtml(r.city || '')}" placeholder="Lyon" autocomplete="address-level2">
             </div>
             <div class="form-group" style="flex:1">
-              <label>Code postal</label>
-              <input type="text" class="form-control" id="ob-rpostal" value="${escapeHtml(r.postal_code || '')}" placeholder="69001" maxlength="5">
+              <label for="ob-rpostal">Code postal</label>
+              <input type="text" class="form-control" id="ob-rpostal" value="${escapeHtml(r.postal_code || '')}" placeholder="69001" maxlength="5" inputmode="numeric" autocomplete="postal-code">
             </div>
           </div>
           <div style="display:flex;gap:var(--space-3)">
             <div class="form-group" style="flex:1">
-              <label>Téléphone</label>
+              <label for="ob-rphone">Téléphone</label>
               <input type="tel" class="form-control" id="ob-rphone" value="${escapeHtml(r.phone || '')}" placeholder="04 78 00 00 00">
             </div>
             <div class="form-group" style="flex:1">
-              <label>Nombre de couverts</label>
-              <input type="number" class="form-control" id="ob-rcovers" value="${r.covers || 30}" placeholder="30" min="1">
+              <label for="ob-rcovers">Nombre de couverts</label>
+              <input type="number" class="form-control" id="ob-rcovers" value="${r.covers || 30}" placeholder="30" min="1" inputmode="numeric">
             </div>
           </div>
         </div>
@@ -175,15 +180,15 @@ class OnboardingWizard {
   renderStep3(body, footer) {
     body.innerHTML = `
       <div class="ob-step">
-        <div class="ob-icon">🪑</div>
-        <h2 class="ob-title">Ma salle</h2>
+        <div class="ob-icon" aria-hidden="true">🪑</div>
+        <h2 class="ob-title" id="ob-dialog-title">Ma salle</h2>
         <p class="ob-desc">Configurez vos tables par zone</p>
         <div class="ob-form">
-          <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-4)">
-            <button class="btn ${this.tableMode === 'quick' ? 'btn-primary' : 'btn-secondary'} btn-sm" id="ob-mode-quick">Rapide</button>
-            <button class="btn ${this.tableMode === 'advanced' ? 'btn-primary' : 'btn-secondary'} btn-sm" id="ob-mode-advanced">Avancé</button>
+          <div role="tablist" aria-label="Mode de configuration des tables" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-4)">
+            <button class="btn ${this.tableMode === 'quick' ? 'btn-primary' : 'btn-secondary'} btn-sm" id="ob-mode-quick" role="tab" aria-selected="${this.tableMode === 'quick'}">Rapide</button>
+            <button class="btn ${this.tableMode === 'advanced' ? 'btn-primary' : 'btn-secondary'} btn-sm" id="ob-mode-advanced" role="tab" aria-selected="${this.tableMode === 'advanced'}">Avancé</button>
           </div>
-          <div id="ob-tables-content"></div>
+          <div id="ob-tables-content" role="region" aria-label="Configuration des tables"></div>
         </div>
       </div>
     `;
@@ -208,28 +213,28 @@ class OnboardingWizard {
     if (this.tableMode === 'quick') {
       container.innerHTML = `
         <div class="form-group">
-          <label>Salle — nombre de tables</label>
-          <input type="number" class="form-control" id="ob-salle-count" value="${this._countZone('Salle')}" min="0" placeholder="0">
+          <label for="ob-salle-count">Salle — nombre de tables</label>
+          <input type="number" class="form-control" id="ob-salle-count" value="${this._countZone('Salle')}" min="0" placeholder="0" inputmode="numeric">
         </div>
         <div class="form-group">
-          <label>Terrasse — nombre de tables</label>
-          <input type="number" class="form-control" id="ob-terrasse-count" value="${this._countZone('Terrasse')}" min="0" placeholder="0">
+          <label for="ob-terrasse-count">Terrasse — nombre de tables</label>
+          <input type="number" class="form-control" id="ob-terrasse-count" value="${this._countZone('Terrasse')}" min="0" placeholder="0" inputmode="numeric">
         </div>
         <div class="form-group">
-          <label>Bar — nombre de tables</label>
-          <input type="number" class="form-control" id="ob-bar-count" value="${this._countZone('Bar')}" min="0" placeholder="0">
+          <label for="ob-bar-count">Bar — nombre de tables</label>
+          <input type="number" class="form-control" id="ob-bar-count" value="${this._countZone('Bar')}" min="0" placeholder="0" inputmode="numeric">
         </div>
         <div class="form-group">
-          <label>Couverts par table (par défaut)</label>
-          <input type="number" class="form-control" id="ob-seats-default" value="4" min="1">
+          <label for="ob-seats-default">Couverts par table (par défaut)</label>
+          <input type="number" class="form-control" id="ob-seats-default" value="4" min="1" inputmode="numeric">
         </div>
       `;
     } else {
       container.innerHTML = `
-        <div id="ob-adv-tables">
+        <div id="ob-adv-tables" role="list" aria-label="Tables configurées">
           ${this.tables.map((t, i) => this._renderTableRow(t, i)).join('')}
         </div>
-        <button class="btn btn-ghost" id="ob-add-table" style="margin-top:var(--space-3)">+ Ajouter une table</button>
+        <button class="btn btn-ghost" id="ob-add-table" style="margin-top:var(--space-3)" aria-label="Ajouter une nouvelle table">+ Ajouter une table</button>
       `;
 
       document.getElementById('ob-add-table').addEventListener('click', () => {
@@ -253,13 +258,13 @@ class OnboardingWizard {
 
   _renderTableRow(t, i) {
     return `
-      <div style="display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-2)">
-        <input type="number" class="form-control" style="width:60px" value="${t.table_number}" data-index="${i}" data-field="table_number" min="1">
-        <select class="form-control" style="flex:1" data-index="${i}" data-field="zone">
+      <div role="listitem" style="display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-2)">
+        <input type="number" class="form-control" style="width:60px" value="${t.table_number}" data-index="${i}" data-field="table_number" min="1" aria-label="Numéro de table" inputmode="numeric">
+        <select class="form-control" style="flex:1" data-index="${i}" data-field="zone" aria-label="Zone">
           ${['Salle', 'Terrasse', 'Bar', 'Privé'].map(z => `<option value="${z}" ${t.zone === z ? 'selected' : ''}>${z}</option>`).join('')}
         </select>
-        <input type="number" class="form-control" style="width:60px" value="${t.seats}" data-index="${i}" data-field="seats" min="1" placeholder="4">
-        <button class="ob-table-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:18px">✕</button>
+        <input type="number" class="form-control" style="width:60px" value="${t.seats}" data-index="${i}" data-field="seats" min="1" placeholder="4" aria-label="Couverts" inputmode="numeric">
+        <button class="ob-table-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:18px" aria-label="Supprimer la table ${t.table_number}">✕</button>
       </div>
     `;
   }
@@ -296,24 +301,24 @@ class OnboardingWizard {
   renderStep4(body, footer) {
     body.innerHTML = `
       <div class="ob-step">
-        <div class="ob-icon">👥</div>
-        <h2 class="ob-title">Mon équipe</h2>
+        <div class="ob-icon" aria-hidden="true">👥</div>
+        <h2 class="ob-title" id="ob-dialog-title">Mon équipe</h2>
         <p class="ob-desc">Ajoutez les membres de votre staff</p>
 
-        <div style="padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md);margin-bottom:var(--space-4);text-align:left">
+        <aside role="note" style="padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md);margin-bottom:var(--space-4);text-align:left">
           <div style="display:flex;align-items:flex-start;gap:var(--space-3)">
-            <span style="font-size:1.3rem;line-height:1">💡</span>
+            <span style="font-size:1.3rem;line-height:1" aria-hidden="true">💡</span>
             <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
               <strong style="color:var(--text-primary)">Comment ça marche ?</strong><br>
               Votre staff se connecte avec le <strong>mot de passe équipe</strong> défini à l'inscription, puis sélectionne son nom et crée son <strong>code PIN personnel</strong> à sa première connexion.
             </div>
           </div>
-        </div>
+        </aside>
 
-        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-2)">Membres de l'équipe</h3>
+        <h3 id="ob-members-heading" style="font-size:var(--text-base);margin-bottom:var(--space-2)">Membres de l'équipe</h3>
         <p style="font-size:var(--text-sm);color:var(--text-tertiary);margin-bottom:var(--space-3)">Ajoutez vos membres avec leur nom et rôle. Vous pourrez en ajouter d'autres plus tard.</p>
-        <div id="ob-members-list"></div>
-        <button class="btn btn-ghost" id="ob-add-member" style="margin-top:var(--space-3)">+ Ajouter un membre</button>
+        <div id="ob-members-list" role="list" aria-labelledby="ob-members-heading"></div>
+        <button class="btn btn-ghost" id="ob-add-member" style="margin-top:var(--space-3)" aria-label="Ajouter un nouveau membre à l'équipe">+ Ajouter un membre</button>
       </div>
     `;
 
@@ -337,21 +342,23 @@ class OnboardingWizard {
     }
 
     container.innerHTML = this.members.map((m, i) => `
-      <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-3)">
+      <div role="listitem" style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-3)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2)">
-          <strong style="font-size:var(--text-sm)">Membre ${i + 1}</strong>
-          <button class="ob-member-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px">✕</button>
+          <strong style="font-size:var(--text-sm)" id="ob-member-label-${i}">Membre ${i + 1}</strong>
+          <button class="ob-member-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px" aria-label="Supprimer le membre ${i + 1}">✕</button>
         </div>
         <div class="form-group" style="margin-bottom:var(--space-2)">
-          <input type="text" class="form-control" placeholder="Nom / surnom" value="${escapeHtml(m.name)}" data-index="${i}" data-field="name">
+          <label for="ob-member-name-${i}" class="visually-hidden">Nom du membre ${i + 1}</label>
+          <input type="text" id="ob-member-name-${i}" class="form-control" placeholder="Nom / surnom" value="${escapeHtml(m.name)}" data-index="${i}" data-field="name">
         </div>
         <div style="display:flex;gap:var(--space-2)">
-          <select class="form-control ob-role-select" data-index="${i}" data-field="role" style="flex:1">
+          <label for="ob-member-role-${i}" class="visually-hidden">Rôle du membre ${i + 1}</label>
+          <select id="ob-member-role-${i}" class="form-control ob-role-select" data-index="${i}" data-field="role" style="flex:1">
             <option value="cuisinier" ${m.role === 'cuisinier' ? 'selected' : ''}>👨‍🍳 Cuisinier</option>
             <option value="serveur" ${m.role === 'serveur' ? 'selected' : ''}>🍽️ Serveur</option>
             <option value="__custom__" ${!['cuisinier','serveur'].includes(m.role) && m.role ? 'selected' : ''}>✏️ Personnalisé…</option>
           </select>
-          <input type="text" class="form-control ob-custom-role" data-index="${i}" data-field="custom_role" placeholder="Ex: Pâtissier"
+          <input type="text" class="form-control ob-custom-role" data-index="${i}" data-field="custom_role" placeholder="Ex: Pâtissier" aria-label="Rôle personnalisé"
                  value="${escapeHtml(!['cuisinier','serveur','equipier',''].includes(m.role) ? m.role : '')}"
                  style="flex:1;${['cuisinier','serveur','equipier',''].includes(m.role) ? 'display:none' : ''}">
         </div>
@@ -402,11 +409,11 @@ class OnboardingWizard {
   renderStep5(body, footer) {
     body.innerHTML = `
       <div class="ob-step">
-        <div class="ob-icon">🌡️</div>
-        <h2 class="ob-title">Mes zones froides</h2>
+        <div class="ob-icon" aria-hidden="true">🌡️</div>
+        <h2 class="ob-title" id="ob-dialog-title">Mes zones froides</h2>
         <p class="ob-desc">Configurez vos zones de température pour le HACCP</p>
-        <div class="ob-zones" id="ob-zones-list"></div>
-        <button class="btn btn-ghost" id="ob-add-zone" style="margin-top:var(--space-3)">+ Ajouter une zone</button>
+        <div class="ob-zones" id="ob-zones-list" role="list" aria-label="Zones de température"></div>
+        <button class="btn btn-ghost" id="ob-add-zone" style="margin-top:var(--space-3)" aria-label="Ajouter une nouvelle zone de température">+ Ajouter une zone</button>
       </div>
     `;
 
@@ -425,15 +432,15 @@ class OnboardingWizard {
     if (!container) return;
 
     container.innerHTML = this.zones.map((z, i) => `
-      <div class="ob-zone-row" data-index="${i}">
-        <input type="text" class="ob-zone-name" value="${escapeHtml(z.name)}" data-field="name" data-index="${i}">
+      <div class="ob-zone-row" data-index="${i}" role="listitem">
+        <input type="text" class="ob-zone-name" value="${escapeHtml(z.name)}" data-field="name" data-index="${i}" aria-label="Nom de la zone ${i + 1}">
         <div class="ob-zone-range">
-          <input type="number" class="ob-zone-input" value="${z.min_temp}" data-field="min_temp" data-index="${i}" step="1">
-          <span class="ob-zone-sep">°C —</span>
-          <input type="number" class="ob-zone-input" value="${z.max_temp}" data-field="max_temp" data-index="${i}" step="1">
-          <span class="ob-zone-unit">°C</span>
+          <input type="number" class="ob-zone-input" value="${z.min_temp}" data-field="min_temp" data-index="${i}" step="1" aria-label="Température minimum" inputmode="numeric">
+          <span class="ob-zone-sep" aria-hidden="true">°C —</span>
+          <input type="number" class="ob-zone-input" value="${z.max_temp}" data-field="max_temp" data-index="${i}" step="1" aria-label="Température maximum" inputmode="numeric">
+          <span class="ob-zone-unit" aria-hidden="true">°C</span>
         </div>
-        <button class="ob-zone-delete" data-index="${i}" title="Supprimer">✕</button>
+        <button class="ob-zone-delete" data-index="${i}" title="Supprimer" aria-label="Supprimer la zone ${escapeHtml(z.name)}">✕</button>
       </div>
     `).join('');
 
@@ -459,11 +466,11 @@ class OnboardingWizard {
   renderStep6(body, footer) {
     body.innerHTML = `
       <div class="ob-step">
-        <div class="ob-icon">🚚</div>
-        <h2 class="ob-title">Mes fournisseurs</h2>
+        <div class="ob-icon" aria-hidden="true">🚚</div>
+        <h2 class="ob-title" id="ob-dialog-title">Mes fournisseurs</h2>
         <p class="ob-desc">Ajoutez vos fournisseurs habituels (optionnel)</p>
-        <div id="ob-suppliers-list"></div>
-        <button class="btn btn-ghost" id="ob-add-supplier" style="margin-top:var(--space-3)">+ Ajouter un fournisseur</button>
+        <div id="ob-suppliers-list" role="list" aria-label="Fournisseurs"></div>
+        <button class="btn btn-ghost" id="ob-add-supplier" style="margin-top:var(--space-3)" aria-label="Ajouter un nouveau fournisseur">+ Ajouter un fournisseur</button>
       </div>
     `;
 
@@ -487,20 +494,21 @@ class OnboardingWizard {
     }
 
     container.innerHTML = this.suppliers.map((s, i) => `
-      <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-3)">
+      <div role="listitem" style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-3)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2)">
-          <strong style="font-size:var(--text-sm)">Fournisseur ${i + 1}</strong>
-          <button class="ob-supplier-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px">✕</button>
+          <strong style="font-size:var(--text-sm)" id="ob-supplier-label-${i}">Fournisseur ${i + 1}</strong>
+          <button class="ob-supplier-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px" aria-label="Supprimer le fournisseur ${i + 1}">✕</button>
         </div>
         <div class="form-group" style="margin-bottom:var(--space-2)">
-          <input type="text" class="form-control" placeholder="Nom de l'entreprise" value="${escapeHtml(s.name)}" data-index="${i}" data-field="name">
+          <label for="ob-supplier-name-${i}" class="visually-hidden">Nom du fournisseur ${i + 1}</label>
+          <input type="text" id="ob-supplier-name-${i}" class="form-control" placeholder="Nom de l'entreprise" value="${escapeHtml(s.name)}" data-index="${i}" data-field="name">
         </div>
         <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-2)">
-          <input type="text" class="form-control" placeholder="Contact" value="${escapeHtml(s.contact)}" data-index="${i}" data-field="contact" style="flex:1">
-          <input type="tel" class="form-control" placeholder="Téléphone" value="${escapeHtml(s.phone)}" data-index="${i}" data-field="phone" style="flex:1">
+          <input type="text" class="form-control" placeholder="Contact" value="${escapeHtml(s.contact)}" data-index="${i}" data-field="contact" style="flex:1" aria-label="Personne de contact">
+          <input type="tel" class="form-control" placeholder="Téléphone" value="${escapeHtml(s.phone)}" data-index="${i}" data-field="phone" style="flex:1" aria-label="Téléphone">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <input type="email" class="form-control" placeholder="Email" value="${escapeHtml(s.email)}" data-index="${i}" data-field="email">
+          <input type="email" class="form-control" placeholder="Email" value="${escapeHtml(s.email)}" data-index="${i}" data-field="email" aria-label="Email">
         </div>
       </div>
     `).join('');
@@ -529,13 +537,13 @@ class OnboardingWizard {
     const r = this.data.restaurant || {};
 
     body.innerHTML = `
-      <div class="ob-step ob-finish">
-        <div class="ob-icon" style="font-size:4rem">🎉</div>
-        <h2 class="ob-title">Votre restaurant est configuré !</h2>
+      <div class="ob-step ob-finish" role="status" aria-live="polite">
+        <div class="ob-icon" style="font-size:4rem" aria-hidden="true">🎉</div>
+        <h2 class="ob-title" id="ob-dialog-title">Votre restaurant est configuré !</h2>
         <p class="ob-desc">Tout est prêt. Commencez à utiliser RestoSuite.</p>
 
         <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-4);margin-top:var(--space-4);text-align:left;width:100%">
-          <h3 style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-3)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Récapitulatif</h3>
+          <h3 style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-3)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Récapitulatif</h3>
           ${r.name ? `<p style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Restaurant :</strong> ${escapeHtml(r.name)}</p>` : ''}
           ${r.city ? `<p style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Ville :</strong> ${escapeHtml(r.city)}</p>` : ''}
           ${this.tables.length ? `<p style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Tables :</strong> ${this.tables.length}</p>` : ''}
@@ -547,8 +555,8 @@ class OnboardingWizard {
 
     footer.innerHTML = `
       <div class="ob-buttons ob-buttons--finish">
-        <button class="btn btn-primary ob-btn-next" id="ob-finish" style="min-width:250px;padding:14px">
-          🚀 Accéder à RestoSuite
+        <button class="btn btn-primary ob-btn-next" id="ob-finish" style="min-width:250px;padding:14px" aria-label="Terminer et accéder à l'application">
+          <span aria-hidden="true">🚀</span> Accéder à RestoSuite
         </button>
       </div>
     `;
@@ -564,13 +572,13 @@ class OnboardingWizard {
   // ─── Navigation buttons ───
   renderNavButtons(footer, showBack) {
     footer.innerHTML = `
-      <div class="ob-buttons">
-        ${showBack ? '<button class="btn btn-ghost ob-btn-prev" id="ob-prev">← Retour</button>' : '<div></div>'}
+      <nav class="ob-buttons" aria-label="Navigation de la configuration">
+        ${showBack ? '<button class="btn btn-ghost ob-btn-prev" id="ob-prev" aria-label="Retour à l\'étape précédente">← Retour</button>' : '<div></div>'}
         <div style="display:flex;gap:var(--space-2)">
-          <button class="btn btn-ghost" id="ob-skip">Passer</button>
-          <button class="btn btn-primary ob-btn-next" id="ob-next">Suivant →</button>
+          <button class="btn btn-ghost" id="ob-skip" aria-label="Passer cette étape">Passer</button>
+          <button class="btn btn-primary ob-btn-next" id="ob-next" aria-label="Enregistrer et passer à l'étape suivante">Suivant →</button>
         </div>
-      </div>
+      </nav>
     `;
 
     if (showBack) {

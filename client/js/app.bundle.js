@@ -1054,29 +1054,31 @@ async function renderOnboardingChecklist() {
     }
     const pct = Math.round(data.progress * 100);
     container.innerHTML = `
-      <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
+      <section role="region" aria-labelledby="onboarding-checklist-heading" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-          <h3 style="margin:0;font-size:var(--text-base)">Premiers pas avec RestoSuite</h3>
+          <h3 id="onboarding-checklist-heading" style="margin:0;font-size:var(--text-base)">Premiers pas avec RestoSuite</h3>
           <div style="display:flex;align-items:center;gap:var(--space-3)">
-            <span style="font-size:var(--text-sm);font-weight:600;color:var(--color-accent)">${pct}%</span>
-            <button id="hide-onboarding-btn" style="background:none;border:none;cursor:pointer;color:var(--text-tertiary);font-size:var(--text-sm);padding:2px 6px;border-radius:var(--radius-sm)" title="Masquer">Masquer</button>
+            <span style="font-size:var(--text-sm);font-weight:600;color:var(--color-accent)" aria-label="Progression : ${pct} pour cent">${pct}%</span>
+            <button id="hide-onboarding-btn" style="background:none;border:none;cursor:pointer;color:var(--text-tertiary);font-size:var(--text-sm);padding:2px 6px;border-radius:var(--radius-sm)" title="Masquer" aria-label="Masquer la checklist d'int\xE9gration">Masquer</button>
           </div>
         </div>
-        <div style="height:6px;background:var(--bg-sunken);border-radius:var(--radius-full);margin-bottom:var(--space-3);overflow:hidden">
+        <div role="progressbar" aria-label="Progression d'int\xE9gration" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" style="height:6px;background:var(--bg-sunken);border-radius:var(--radius-full);margin-bottom:var(--space-3);overflow:hidden">
           <div style="height:100%;width:${pct}%;background:var(--color-accent);border-radius:var(--radius-full);transition:width 0.6s ease"></div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+        <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--space-2)">
           ${data.steps.map((step) => `
-            <a ${step.done ? "" : `href="${step.link}"`} class="onboarding-step${step.done ? " done" : ""}" style="${step.done ? "pointer-events:none" : ""}">
-              <span class="onboarding-step__check">
-                ${step.done ? '<i data-lucide="check-circle-2" style="color:var(--color-success);width:20px;height:20px;flex-shrink:0"></i>' : '<i data-lucide="circle" style="color:var(--text-tertiary);width:20px;height:20px;flex-shrink:0"></i>'}
-              </span>
-              <span class="onboarding-step__label">${escapeHtml(step.label)}</span>
-              ${!step.done ? '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text-tertiary);margin-left:auto;flex-shrink:0"></i>' : ""}
-            </a>
+            <li role="listitem">
+              <a ${step.done ? "" : `href="${step.link}"`} class="onboarding-step${step.done ? " done" : ""}" style="${step.done ? "pointer-events:none" : ""}" ${step.done ? 'aria-label="\xC9tape compl\xE9t\xE9e : ' + escapeHtml(step.label) + '" aria-disabled="true"' : 'aria-label="\xC9tape \xE0 compl\xE9ter : ' + escapeHtml(step.label) + '"'}>
+                <span class="onboarding-step__check" aria-hidden="true">
+                  ${step.done ? '<i data-lucide="check-circle-2" style="color:var(--color-success);width:20px;height:20px;flex-shrink:0"></i>' : '<i data-lucide="circle" style="color:var(--text-tertiary);width:20px;height:20px;flex-shrink:0"></i>'}
+                </span>
+                <span class="onboarding-step__label">${escapeHtml(step.label)}</span>
+                ${!step.done ? '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text-tertiary);margin-left:auto;flex-shrink:0" aria-hidden="true"></i>' : ""}
+              </a>
+            </li>
           `).join("")}
-        </div>
-      </div>
+        </ul>
+      </section>
     `;
     if (window.lucide) lucide.createIcons({ nodes: [container] });
     document.getElementById("hide-onboarding-btn").addEventListener("click", () => {
@@ -1094,15 +1096,15 @@ async function renderDashboard() {
   const greeting = getGreeting(account ? account.name : "Chef");
   const todayDate = formatFrenchDate(/* @__PURE__ */ new Date());
   app.innerHTML = `
-    <div id="dashboard-greeting" style="margin-bottom:var(--space-4)">
+    <header id="dashboard-greeting" role="banner" style="margin-bottom:var(--space-4)">
       <div style="padding:var(--space-4);background:var(--color-accent-light);border-radius:var(--radius-lg);border-left:4px solid var(--color-accent)">
         <h2 style="margin:0 0 2px 0;color:var(--text-primary);font-size:var(--text-xl)">${greeting}</h2>
-        <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)">${todayDate}</p>
+        <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)"><time datetime="${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}">${todayDate}</time></p>
       </div>
-    </div>
+    </header>
 
     <div id="dashboard-onboarding"></div>
-    <div id="dashboard-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
+    <div id="dashboard-summary" role="region" aria-label="R\xE9sum\xE9 du jour" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
 
     <div id="dashboard-alerts" role="region" aria-live="polite" aria-label="Alertes du jour"></div>
     <div id="ai-suggestions-container" role="region" aria-label="Suggestions IA"></div>
@@ -1154,16 +1156,16 @@ async function renderDashboard() {
     }
     if (filtered2.length === 0) {
       listEl.innerHTML = filter || typeFilter ? `
-        <div class="empty-state">
-          <div class="empty-icon"><i data-lucide="clipboard-list"></i></div>
+        <div class="empty-state" role="status">
+          <div class="empty-icon" aria-hidden="true"><i data-lucide="clipboard-list"></i></div>
           <p>Aucun r\xE9sultat</p>
         </div>
       ` : `
-        <div class="empty-state">
-          <div class="empty-icon"><i data-lucide="mic"></i></div>
+        <div class="empty-state" role="status">
+          <div class="empty-icon" aria-hidden="true"><i data-lucide="mic"></i></div>
           <h3>Cr\xE9ez votre premi\xE8re fiche technique</h3>
           <p>Dictez votre recette, l'IA fait le reste \u2014 co\xFBts, portions, proc\xE9dure.</p>
-          ${perms.edit_recipes ? '<a href="#/new" class="btn btn-primary">Nouvelle fiche</a>' : ""}
+          ${perms.edit_recipes ? '<a href="#/new" class="btn btn-primary" aria-label="Cr\xE9er une nouvelle fiche technique">Nouvelle fiche</a>' : ""}
         </div>
       `;
       lucide.createIcons();
@@ -1176,7 +1178,7 @@ async function renderDashboard() {
       const recipeType = r.recipe_type || "plat";
       const typeBadge = recipeType === "sous_recette" ? '<span class="recipe-type-badge recipe-type--sub">\u{1F4CB}</span>' : recipeType === "base" ? '<span class="recipe-type-badge recipe-type--base">\u{1FAD5}</span>' : '<span class="recipe-type-badge recipe-type--plat">\u{1F37D}\uFE0F</span>';
       return `
-        <div class="card ${costBorderClass}" onclick="location.hash='#/recipe/${r.id}'">
+        <div class="card ${costBorderClass}" role="button" tabindex="0" aria-label="Ouvrir la fiche ${escapeHtml(r.name)}" onclick="location.hash='#/recipe/${r.id}'" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();location.hash='#/recipe/${r.id}';}">
           <div class="card-header">
             <span class="card-title">${typeBadge} ${escapeHtml(r.name)}</span>
             ${r.category ? `<span class="card-category">${escapeHtml(r.category)}</span>` : ""}
@@ -1234,9 +1236,9 @@ async function renderDashboard() {
         details.push(`${alertData.dlc_alerts.filter((a) => a.days_remaining <= 0).length} DLC expir\xE9e(s)`);
       if (alertData.temp_alerts.length > 0)
         details.push(`${alertData.temp_alerts.length} alerte(s) temp\xE9rature`);
-      html += `<a href="#/haccp" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
+      html += `<a href="#/haccp" role="alert" aria-label="${alertData.summary.critical} alertes critiques : ${details.join(", ")}" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
         <div style="background:var(--color-danger);color:white;padding:var(--space-3);border-radius:var(--radius-lg);cursor:pointer">
-          \u{1F6A8} <strong>${alertData.summary.critical} alerte(s) critique(s)</strong> \u2014 ${details.join(", ")}
+          <span aria-hidden="true">\u{1F6A8}</span> <strong>${alertData.summary.critical} alerte(s) critique(s)</strong> \u2014 ${details.join(", ")}
         </div></a>`;
     }
     if (alertData.summary.warnings > 0) {
@@ -1245,15 +1247,15 @@ async function renderDashboard() {
         details.push(`${alertData.dlc_alerts.filter((a) => a.days_remaining > 0).length} DLC proche(s)`);
       if (alertData.low_stock.length > 0)
         details.push(`${alertData.low_stock.length} stock(s) bas`);
-      html += `<a href="#/stock" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
+      html += `<a href="#/stock" aria-label="${alertData.summary.warnings} avertissements : ${details.join(", ")}" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
         <div style="background:var(--color-warning);color:#000;padding:var(--space-3);border-radius:var(--radius-lg);cursor:pointer">
-          \u26A0\uFE0F <strong>${alertData.summary.warnings} avertissement(s)</strong> \u2014 ${details.join(", ")}
+          <span aria-hidden="true">\u26A0\uFE0F</span> <strong>${alertData.summary.warnings} avertissement(s)</strong> \u2014 ${details.join(", ")}
         </div></a>`;
     }
     if (alertData.summary.pending > 0) {
-      html += `<a href="#/deliveries" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
+      html += `<a href="#/deliveries" aria-label="${alertData.summary.pending} livraisons en attente" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
         <div style="background:var(--color-info);color:white;padding:var(--space-3);border-radius:var(--radius-lg);cursor:pointer">
-          \u{1F4E6} <strong>${alertData.summary.pending} livraison(s) en attente</strong>
+          <span aria-hidden="true">\u{1F4E6}</span> <strong>${alertData.summary.pending} livraison(s) en attente</strong>
         </div></a>`;
     }
     if (html) alertsDiv.innerHTML = html;
@@ -1278,9 +1280,9 @@ async function loadAISuggestions() {
   container.innerHTML = `
     <div style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-        <h3 style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Suggestions IA</h3>
+        <h3 style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Suggestions IA</h3>
       </div>
-      <p class="text-secondary text-sm" style="text-align:center;padding:var(--space-4)">Analyse en cours\u2026</p>
+      <p class="text-secondary text-sm" role="status" aria-live="polite" style="text-align:center;padding:var(--space-4)">Analyse en cours\u2026</p>
     </div>
   `;
   try {
@@ -1304,12 +1306,12 @@ function renderAISuggestions(container, data) {
   if (topItems.length > 0) {
     topHtml = `
       <div style="margin-bottom:var(--space-3)">
-        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-success)">\u{1F7E2} Plats les plus rentables</h4>
+        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-success)"><span aria-hidden="true">\u{1F7E2}</span> Plats les plus rentables</h4>
         ${topItems.map((item) => `
           <div style="padding:6px 0;border-bottom:1px solid var(--color-border)">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(item.name)}</span>
-              <span class="badge badge--success" style="font-size:11px">${item.food_cost_pct != null ? item.food_cost_pct : item.food_cost_percent != null ? item.food_cost_percent : "?"}%</span>
+              <span class="badge badge--success" style="font-size:11px" aria-label="Food cost ${item.food_cost_pct != null ? item.food_cost_pct : item.food_cost_percent != null ? item.food_cost_percent : "inconnu"}%">${item.food_cost_pct != null ? item.food_cost_pct : item.food_cost_percent != null ? item.food_cost_percent : "?"}%</span>
             </div>
             <p class="text-secondary" style="font-size:12px;margin-top:2px">${escapeHtml(item.reason || "")}</p>
           </div>
@@ -1321,12 +1323,12 @@ function renderAISuggestions(container, data) {
   if (improveItems.length > 0) {
     improveHtml = `
       <div style="margin-bottom:var(--space-3)">
-        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-danger)">\u{1F534} \xC0 am\xE9liorer</h4>
+        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-danger)"><span aria-hidden="true">\u{1F534}</span> \xC0 am\xE9liorer</h4>
         ${improveItems.map((item) => `
           <div style="padding:6px 0;border-bottom:1px solid var(--color-border)">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(item.name)}</span>
-              <span class="badge badge--danger" style="font-size:11px">${item.food_cost_pct != null ? item.food_cost_pct : item.food_cost_percent != null ? item.food_cost_percent : "?"}%</span>
+              <span class="badge badge--danger" style="font-size:11px" aria-label="Food cost ${item.food_cost_pct != null ? item.food_cost_pct : item.food_cost_percent != null ? item.food_cost_percent : "inconnu"}%">${item.food_cost_pct != null ? item.food_cost_pct : item.food_cost_percent != null ? item.food_cost_percent : "?"}%</span>
             </div>
             <p class="text-secondary" style="font-size:12px;margin-top:2px">${escapeHtml(item.suggestion || "")}</p>
           </div>
@@ -1338,7 +1340,7 @@ function renderAISuggestions(container, data) {
   if (daily && daily.name) {
     dailyHtml = `
       <div>
-        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-accent)">\u2B50 Suggestion plat du jour</h4>
+        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-accent)"><span aria-hidden="true">\u2B50</span> Suggestion plat du jour</h4>
         <div style="background:rgba(232,114,42,0.1);border-radius:var(--radius-md);padding:var(--space-3)">
           <strong>${escapeHtml(daily.name)}</strong>
           <p class="text-secondary" style="font-size:12px;margin-top:4px">${escapeHtml(daily.description || daily.reason || "")}</p>
@@ -1347,13 +1349,13 @@ function renderAISuggestions(container, data) {
     `;
   }
   container.innerHTML = `
-    <div style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
+    <section role="region" aria-labelledby="ai-suggestions-heading" style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-        <h3 style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Suggestions IA</h3>
-        <button class="btn btn-secondary btn-sm" onclick="refreshAISuggestions()" title="Rafra\xEEchir" style="padding:4px 8px">\u{1F504}</button>
+        <h3 id="ai-suggestions-heading" style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Suggestions IA</h3>
+        <button class="btn btn-secondary btn-sm" onclick="refreshAISuggestions()" title="Rafra\xEEchir" aria-label="Rafra\xEEchir les suggestions IA" style="padding:4px 8px"><span aria-hidden="true">\u{1F504}</span></button>
       </div>
       ${topHtml}${improveHtml}${dailyHtml}
-    </div>
+    </section>
   `;
 }
 async function refreshAISuggestions() {
@@ -1379,7 +1381,7 @@ function renderDailySummary(recipes, perms) {
   const summaryEl = document.getElementById("dashboard-summary");
   if (!summaryEl) return;
   let html = `
-    <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
+    <div role="group" aria-label="Nombre de fiches techniques" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
       <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recipes.length}</div>
       <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Fiches techniques</div>
     </div>
@@ -1387,7 +1389,7 @@ function renderDailySummary(recipes, perms) {
   if (perms.view_costs && recipes.length > 0) {
     const totalCost = recipes.reduce((sum, r) => sum + (r.total_cost || 0), 0);
     html += `
-      <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
+      <div role="group" aria-label="Co\xFBt total mati\xE8re" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
         <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-success)">${formatCurrency(totalCost)}</div>
         <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Co\xFBt total mati\xE8re</div>
       </div>
@@ -1397,15 +1399,15 @@ function renderDailySummary(recipes, perms) {
   const tipEl = document.getElementById("daily-tip-container");
   if (tipEl) {
     tipEl.innerHTML = `
-      <div style="background:linear-gradient(135deg, var(--color-accent-light), var(--bg-elevated));border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
+      <aside role="complementary" aria-labelledby="daily-tip-heading" style="background:linear-gradient(135deg, var(--color-accent-light), var(--bg-elevated));border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
         <div style="display:flex;gap:var(--space-3);align-items:flex-start">
-          <span style="font-size:24px">\u{1F4A1}</span>
+          <span style="font-size:24px" aria-hidden="true">\u{1F4A1}</span>
           <div>
-            <h3 style="margin:0 0 4px 0;font-size:var(--text-sm);font-weight:600;color:var(--text-primary)">Conseil du jour</h3>
+            <h3 id="daily-tip-heading" style="margin:0 0 4px 0;font-size:var(--text-sm);font-weight:600;color:var(--text-primary)">Conseil du jour</h3>
             <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)">${dailyTip}</p>
           </div>
         </div>
-      </div>
+      </aside>
     `;
   }
   summaryEl.innerHTML = html;
@@ -3194,42 +3196,44 @@ async function renderStockReception() {
     return;
   }
   app.innerHTML = `
+    <section role="region" aria-label="R\xE9ception marchandise">
     <nav aria-label="Breadcrumb" class="breadcrumb">
       <a href="#/stock">Stock</a>
-      <span class="breadcrumb-sep">\u203A</span>
+      <span class="breadcrumb-sep" aria-hidden="true">\u203A</span>
       <span class="breadcrumb-current">R\xE9ception</span>
     </nav>
     <div class="view-header">
       <div style="display:flex;align-items:center;gap:var(--space-3)">
-        <a href="#/stock" style="color:var(--text-secondary);text-decoration:none;font-size:1.5rem">\u2190</a>
+        <a href="#/stock" aria-label="Retour au stock" style="color:var(--text-secondary);text-decoration:none;font-size:1.5rem">\u2190</a>
         <div>
-          <h1><i data-lucide="download" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>R\xE9ception marchandise</h1>
+          <h1><i data-lucide="download" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>R\xE9ception marchandise</h1>
           <p class="text-secondary">Enregistrez la r\xE9ception d'une commande</p>
         </div>
       </div>
     </div>
 
-    <div class="reception-form" style="margin-bottom:var(--space-5)">
+    <form class="reception-form" style="margin-bottom:var(--space-5)" onsubmit="return false;">
       <div class="form-group" style="margin-bottom:var(--space-4)">
-        <label class="form-label">Fournisseur</label>
-        <select id="rec-supplier" class="input">
+        <label class="form-label" for="rec-supplier">Fournisseur</label>
+        <select id="rec-supplier" class="input" aria-label="S\xE9lectionner le fournisseur">
           <option value="">\u2014 S\xE9lectionner un fournisseur \u2014</option>
           ${suppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("")}
         </select>
       </div>
 
-      <div id="reception-lines">
+      <div id="reception-lines" role="list" aria-label="Lignes de r\xE9ception" aria-live="polite">
         <!-- Lines will be added here -->
       </div>
 
-      <button class="btn btn-secondary" id="add-line-btn" style="width:100%;margin-bottom:var(--space-5)">
+      <button type="button" class="btn btn-secondary" id="add-line-btn" style="width:100%;margin-bottom:var(--space-5)" aria-label="Ajouter un produit \xE0 la r\xE9ception">
         + Ajouter un produit
       </button>
 
-      <button class="btn btn-accent btn-lg" id="validate-reception-btn" style="width:100%" disabled>
+      <button type="button" class="btn btn-accent btn-lg" id="validate-reception-btn" style="width:100%" disabled aria-label="Valider la r\xE9ception marchandise">
         \u2705 Valider la r\xE9ception
       </button>
-    </div>
+    </form>
+    </section>
   `;
   const linesContainer = document.getElementById("reception-lines");
   let lineCount = 0;
@@ -3239,8 +3243,9 @@ async function renderStockReception() {
     lineEl.className = "reception-line";
     lineEl.dataset.lineId = lineCount;
     lineEl.style.cssText = "background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-3);position:relative";
+    lineEl.setAttribute("role", "listitem");
     lineEl.innerHTML = `
-      <button class="remove-line-btn" style="position:absolute;top:var(--space-2);right:var(--space-2);background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:1.2rem;padding:var(--space-1)" title="Supprimer">\u2715</button>
+      <button type="button" class="remove-line-btn" aria-label="Supprimer le produit ${lineCount}" style="position:absolute;top:var(--space-2);right:var(--space-2);background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:1.2rem;padding:var(--space-1)" title="Supprimer">\u2715</button>
       <div style="font-weight:600;margin-bottom:var(--space-3);color:var(--text-secondary);font-size:var(--text-sm)">Produit #${lineCount}</div>
       <div class="form-group" style="margin-bottom:var(--space-3)">
         <label class="form-label">Ingr\xE9dient *</label>
@@ -3651,20 +3656,22 @@ async function renderSuppliers() {
   const app = document.getElementById("app");
   const isGerant = getRole() === "gerant";
   app.innerHTML = `
+    <section role="region" aria-label="Gestion des fournisseurs">
     <div class="page-header">
       <h1>Fournisseurs</h1>
       <div style="display:flex;gap:var(--space-2)">
-        <a href="#/orders" class="btn btn-secondary">
-          <i data-lucide="clipboard-pen" style="width:18px;height:18px"></i> <span class="btn-label-desktop">Commandes</span>
+        <a href="#/orders" class="btn btn-secondary" aria-label="Voir les commandes fournisseur">
+          <i data-lucide="clipboard-pen" style="width:18px;height:18px" aria-hidden="true"></i> <span class="btn-label-desktop">Commandes</span>
         </a>
-        ${isGerant ? `<button class="btn btn-secondary" onclick="location.hash='#/supplier-portal'" id="btn-portal">
-          <i data-lucide="link" style="width:18px;height:18px"></i> <span class="btn-label-desktop">Portail</span>
-          <span class="portal-badge" id="portal-badge" style="display:none"></span>
+        ${isGerant ? `<button class="btn btn-secondary" onclick="location.hash='#/supplier-portal'" id="btn-portal" aria-label="Ouvrir le portail fournisseur">
+          <i data-lucide="link" style="width:18px;height:18px" aria-hidden="true"></i> <span class="btn-label-desktop">Portail</span>
+          <span class="portal-badge" id="portal-badge" style="display:none" aria-label="Notifications non lues"></span>
         </button>` : ""}
-        <button class="btn btn-primary" onclick="showSupplierModal()"><i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter</button>
+        <button class="btn btn-primary" onclick="showSupplierModal()" aria-label="Ajouter un nouveau fournisseur"><i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Ajouter</button>
       </div>
     </div>
-    <div id="supplier-list"><div class="loading"><div class="spinner"></div></div></div>
+    <div id="supplier-list" aria-live="polite" aria-busy="true"><div class="loading"><div class="spinner"></div></div></div>
+    </section>
   `;
   lucide.createIcons();
   let suppliers = [];
@@ -3694,8 +3701,9 @@ async function renderSuppliers() {
     }).catch(() => {
     });
   }
+  listEl.setAttribute("aria-busy", "false");
   listEl.innerHTML = suppliers.map((s) => `
-    <div class="card" onclick="showSupplierDetail(${s.id})">
+    <div class="card" role="button" tabindex="0" aria-label="D\xE9tails du fournisseur ${escapeHtml(s.name)}" onclick="showSupplierDetail(${s.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showSupplierDetail(${s.id});}">
       <div class="card-header">
         <span class="card-title">${escapeHtml(s.name)}</span>
         <span>${renderStars(s.quality_rating)}</span>
@@ -4853,12 +4861,13 @@ async function renderHACCPCleaning() {
     const isGerant = account && account.role === "gerant";
     const freqLabels = { daily: "Quotidien", weekly: "Hebdomadaire", monthly: "Mensuel" };
     app.innerHTML = `
+      <section role="region" aria-label="Plan de nettoyage HACCP">
       <div class="haccp-page">
         <div class="page-header">
-          <h1><i data-lucide="sparkles" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Plan de nettoyage</h1>
+          <h1><i data-lucide="sparkles" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Plan de nettoyage</h1>
           ${isGerant ? `
-          <button class="btn btn-primary" id="btn-add-task">
-            <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter
+          <button class="btn btn-primary" id="btn-add-task" aria-label="Ajouter une t\xE2che de nettoyage">
+            <i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Ajouter
           </button>
           ` : ""}
         </div>
@@ -4866,17 +4875,19 @@ async function renderHACCPCleaning() {
         ${HACCP_SUBNAV_FULL}
 
         <!-- Today's status -->
-        <div class="haccp-cleaning-today-box">
+        <div class="haccp-cleaning-today-box" role="region" aria-label="\xC9tat des t\xE2ches du jour">
           <h3>Aujourd'hui \u2014 ${todayData.done}/${todayData.total} effectu\xE9es</h3>
-          <div class="haccp-cleaning-progress">
+          <div class="haccp-cleaning-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${todayData.total}" aria-valuenow="${todayData.done}" aria-label="Progression des t\xE2ches de nettoyage">
             <div class="haccp-cleaning-progress__bar">
               <div class="haccp-cleaning-progress__fill" style="width:${todayData.total > 0 ? todayData.done / todayData.total * 100 : 0}%"></div>
             </div>
           </div>
-          <div class="haccp-cleaning-list" style="margin-top:var(--space-3)">
+          <div class="haccp-cleaning-list" role="list" aria-live="polite" style="margin-top:var(--space-3)">
             ${todayData.tasks.map((task) => `
-              <div class="haccp-cleaning-item ${task.done_today ? "haccp-cleaning-item--done" : ""}">
-                <button class="haccp-cleaning-check ${task.done_today ? "checked" : ""}" 
+              <div class="haccp-cleaning-item ${task.done_today ? "haccp-cleaning-item--done" : ""}" role="listitem">
+                <button class="haccp-cleaning-check ${task.done_today ? "checked" : ""}"
+                        aria-label="${task.done_today ? "T\xE2che termin\xE9e : " : "Marquer comme effectu\xE9e : "}${escapeHtml(task.name)}"
+                        aria-pressed="${task.done_today ? "true" : "false"}"
                         data-task-id="${task.id}" ${task.done_today ? "disabled" : ""}>
                   ${task.done_today ? "\u2713" : ""}
                 </button>
@@ -4891,12 +4902,13 @@ async function renderHACCPCleaning() {
         </div>
 
         <!-- Export -->
-        <div class="haccp-export-bar">
-          <label class="text-secondary text-sm">Export PDF :</label>
-          <input type="date" class="form-control" id="export-from" lang="fr" style="min-height:36px;width:auto">
-          <span class="text-secondary">\u2192</span>
-          <input type="date" class="form-control" id="export-to" lang="fr" style="min-height:36px;width:auto">
-          <button class="btn btn-secondary btn-sm" id="btn-export-cleaning">\u{1F4C4} Exporter</button>
+        <div class="haccp-export-bar" role="group" aria-label="Export PDF des relev\xE9s">
+          <label class="text-secondary text-sm" for="export-from">Export PDF :</label>
+          <input type="date" class="form-control" id="export-from" lang="fr" aria-label="Date de d\xE9but de l'export" style="min-height:36px;width:auto">
+          <span class="text-secondary" aria-hidden="true">\u2192</span>
+          <label class="visually-hidden" for="export-to">Date de fin de l'export</label>
+          <input type="date" class="form-control" id="export-to" lang="fr" aria-label="Date de fin de l'export" style="min-height:36px;width:auto">
+          <button class="btn btn-secondary btn-sm" id="btn-export-cleaning" aria-label="Exporter les relev\xE9s en PDF">\u{1F4C4} Exporter</button>
         </div>
 
         <!-- All tasks -->
@@ -5095,19 +5107,19 @@ async function renderHACCPTraceability() {
       API.getDLCAlerts()
     ]);
     app.innerHTML = `
-      <div class="haccp-page">
+      <section class="haccp-page" role="region" aria-label="Tra\xE7abilit\xE9 HACCP">
         <div class="page-header">
-          <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Tra\xE7abilit\xE9</h1>
-          <button class="btn btn-primary" id="btn-new-reception">
-            <i data-lucide="plus" style="width:18px;height:18px"></i> R\xE9ception
+          <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Tra\xE7abilit\xE9</h1>
+          <button class="btn btn-primary" id="btn-new-reception" aria-label="Nouvelle r\xE9ception de marchandise">
+            <i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> R\xE9ception
           </button>
         </div>
 
         ${HACCP_SUBNAV_FULL}
 
         ${dlcAlerts.length > 0 ? `
-        <div class="haccp-dlc-alert-banner">
-          <i data-lucide="alert-triangle" style="width:20px;height:20px"></i>
+        <div class="haccp-dlc-alert-banner" role="alert" aria-live="polite">
+          <i data-lucide="alert-triangle" style="width:20px;height:20px" aria-hidden="true"></i>
           <div>
             <strong>${dlcAlerts.length} produit(s) proche(s) de la DLC</strong>
             <div class="haccp-dlc-alert-list">
@@ -5121,51 +5133,55 @@ async function renderHACCPTraceability() {
         ` : ""}
 
         <!-- Filters -->
-        <div class="haccp-filters">
+        <div class="haccp-filters" role="search" aria-label="Filtres de tra\xE7abilit\xE9">
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
-            <input type="date" class="form-control" id="filter-date" lang="fr" style="min-height:40px" placeholder="Date">
+            <label for="filter-date" class="visually-hidden">Filtrer par date</label>
+            <input type="date" class="form-control" id="filter-date" lang="fr" style="min-height:40px" placeholder="Date" aria-label="Filtrer par date">
           </div>
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
-            <input type="text" class="form-control" id="filter-supplier" style="min-height:40px" placeholder="Fournisseur">
+            <label for="filter-supplier" class="visually-hidden">Filtrer par fournisseur</label>
+            <input type="text" class="form-control" id="filter-supplier" style="min-height:40px" placeholder="Fournisseur" aria-label="Filtrer par fournisseur">
           </div>
-          <button class="btn btn-secondary btn-sm" id="btn-filter">Filtrer</button>
+          <button class="btn btn-secondary btn-sm" id="btn-filter" aria-label="Appliquer les filtres">Filtrer</button>
         </div>
 
         <!-- Export -->
-        <div class="haccp-export-bar">
-          <label class="text-secondary text-sm">Export PDF :</label>
-          <input type="date" class="form-control" id="export-from" lang="fr" style="min-height:36px;width:auto">
-          <span class="text-secondary">\u2192</span>
-          <input type="date" class="form-control" id="export-to" lang="fr" style="min-height:36px;width:auto">
-          <button class="btn btn-secondary btn-sm" id="btn-export-trace">\u{1F4C4} Exporter</button>
+        <div class="haccp-export-bar" role="group" aria-label="Export PDF de tra\xE7abilit\xE9">
+          <label for="export-from" class="text-secondary text-sm">Export PDF :</label>
+          <input type="date" class="form-control" id="export-from" lang="fr" style="min-height:36px;width:auto" aria-label="Date de d\xE9but export">
+          <span class="text-secondary" aria-hidden="true">\u2192</span>
+          <label for="export-to" class="visually-hidden">Date de fin export</label>
+          <input type="date" class="form-control" id="export-to" lang="fr" style="min-height:36px;width:auto" aria-label="Date de fin export">
+          <button class="btn btn-secondary btn-sm" id="btn-export-trace" aria-label="Exporter en PDF">\u{1F4C4} Exporter</button>
         </div>
 
         <!-- Table -->
-        <div class="table-container">
+        <div class="table-container" role="region" aria-label="Liste des r\xE9ceptions" tabindex="0">
           <table>
+            <caption class="visually-hidden">Journal de tra\xE7abilit\xE9 des r\xE9ceptions</caption>
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Produit</th>
-                <th>N\xB0 BL</th>
-                <th>Fournisseur</th>
-                <th>N\xB0 Lot</th>
-                <th>DLC</th>
-                <th>DDM</th>
-                <th>T\xB0 R\xE9c.</th>
-                <th>Emballage</th>
-                <th>Aspect organo.</th>
-                <th>Quantit\xE9</th>
-                <th>Re\xE7u par</th>
+                <th scope="col">Date</th>
+                <th scope="col">Produit</th>
+                <th scope="col">N\xB0 BL</th>
+                <th scope="col">Fournisseur</th>
+                <th scope="col">N\xB0 Lot</th>
+                <th scope="col">DLC</th>
+                <th scope="col">DDM</th>
+                <th scope="col">T\xB0 R\xE9c.</th>
+                <th scope="col">Emballage</th>
+                <th scope="col">Aspect organo.</th>
+                <th scope="col">Quantit\xE9</th>
+                <th scope="col">Re\xE7u par</th>
               </tr>
             </thead>
-            <tbody id="trace-table-body">
+            <tbody id="trace-table-body" aria-live="polite">
               ${renderTraceRows(logs)}
             </tbody>
           </table>
         </div>
-        ${logs.length === 0 ? '<div class="empty-state"><p>Aucune r\xE9ception enregistr\xE9e</p></div>' : ""}
-      </div>
+        ${logs.length === 0 ? '<div class="empty-state" role="status"><p>Aucune r\xE9ception enregistr\xE9e</p></div>' : ""}
+      </section>
     `;
     if (window.lucide) lucide.createIcons();
     setupTraceEvents();
@@ -5236,48 +5252,48 @@ function showReceptionModal() {
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal" style="max-width:560px">
-      <h2><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>R\xE9ception marchandise</h2>
+      <h2 id="modal-reception-title"><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>R\xE9ception marchandise</h2>
       <div class="form-group">
-        <label>Produit *</label>
-        <input type="text" class="form-control" id="rec-product" placeholder="ex: Filet de b\u0153uf" autofocus>
+        <label for="rec-product">Produit *</label>
+        <input type="text" class="form-control" id="rec-product" placeholder="ex: Filet de b\u0153uf" autofocus required aria-required="true">
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Fournisseur</label>
+          <label for="rec-supplier">Fournisseur</label>
           <input type="text" class="form-control" id="rec-supplier" placeholder="ex: Metro">
         </div>
         <div class="form-group">
-          <label>N\xB0 de lot</label>
+          <label for="rec-batch">N\xB0 de lot</label>
           <input type="text" class="form-control" id="rec-batch" placeholder="ex: LOT2024-001">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>N\xB0 Bon de livraison</label>
+          <label for="rec-numero-bl">N\xB0 Bon de livraison</label>
           <input type="text" class="form-control" id="rec-numero-bl" placeholder="ex: BL-2026-04512">
         </div>
         <div class="form-group">
-          <label>T\xB0 \xE0 r\xE9ception (\xB0C)</label>
+          <label for="rec-temp">T\xB0 \xE0 r\xE9ception (\xB0C)</label>
           <input type="number" step="0.1" class="form-control" id="rec-temp" placeholder="ex: 3.5" inputmode="decimal">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>DLC</label>
+          <label for="rec-dlc">DLC</label>
           <input type="date" class="form-control" id="rec-dlc" lang="fr">
         </div>
         <div class="form-group">
-          <label>DDM (Date de Durabilit\xE9 Minimale)</label>
+          <label for="rec-ddm">DDM (Date de Durabilit\xE9 Minimale)</label>
           <input type="date" class="form-control" id="rec-ddm" lang="fr">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Quantit\xE9</label>
+          <label for="rec-qty">Quantit\xE9</label>
           <input type="number" step="0.01" class="form-control" id="rec-qty" placeholder="ex: 5" inputmode="decimal">
         </div>
         <div class="form-group">
-          <label>Unit\xE9</label>
+          <label for="rec-unit">Unit\xE9</label>
           <select class="form-control" id="rec-unit">
             <option value="kg">kg</option>
             <option value="g">g</option>
@@ -5289,7 +5305,7 @@ function showReceptionModal() {
         </div>
       </div>
       <div class="form-group">
-        <label>\xC9tat de l'emballage</label>
+        <label for="rec-emballage">\xC9tat de l'emballage</label>
         <select class="form-control" id="rec-emballage">
           <option value="">\u2014 S\xE9lectionner \u2014</option>
           <option value="Conforme">Conforme</option>
@@ -5300,7 +5316,7 @@ function showReceptionModal() {
         </select>
       </div>
       <div class="form-group">
-        <label>Conformit\xE9 organoleptique (aspect, odeur, couleur)</label>
+        <label for="rec-organo">Conformit\xE9 organoleptique (aspect, odeur, couleur)</label>
         <select class="form-control" id="rec-organo">
           <option value="">\u2014 S\xE9lectionner \u2014</option>
           <option value="Conforme">Conforme</option>
@@ -5311,13 +5327,13 @@ function showReceptionModal() {
         </select>
       </div>
       <div class="form-group">
-        <label>Notes</label>
+        <label for="rec-notes">Notes</label>
         <input type="text" class="form-control" id="rec-notes" placeholder="ex: Remarque compl\xE9mentaire">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
-        <button class="btn btn-secondary" id="rec-cancel">Annuler</button>
-        <button class="btn btn-primary" id="rec-save" style="min-width:160px">
-          <i data-lucide="check" style="width:18px;height:18px"></i> Enregistrer
+        <button class="btn btn-secondary" id="rec-cancel" aria-label="Annuler la saisie">Annuler</button>
+        <button class="btn btn-primary" id="rec-save" style="min-width:160px" aria-label="Enregistrer la r\xE9ception">
+          <i data-lucide="check" style="width:18px;height:18px" aria-hidden="true"></i> Enregistrer
         </button>
       </div>
     </div>
@@ -13018,24 +13034,26 @@ const PMS_PRINT_CSS = `
 async function renderOrdersDashboard() {
   const app = document.getElementById("app");
   app.innerHTML = `
+    <section role="region" aria-label="Commandes fournisseurs">
     <div class="page-header">
       <h1>Commandes fournisseurs</h1>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-secondary" id="btn-po-analytics"><i data-lucide="bar-chart-3" style="width:16px;height:16px"></i> Statistiques</button>
-        <button class="btn btn-secondary" id="btn-suggest-orders"><i data-lucide="lightbulb" style="width:16px;height:16px"></i> Suggestions</button>
-        <a href="#/orders/new" class="btn btn-primary"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle commande</a>
+        <button class="btn btn-secondary" id="btn-po-analytics" aria-label="Afficher les statistiques d'achat"><i data-lucide="bar-chart-3" style="width:16px;height:16px" aria-hidden="true"></i> Statistiques</button>
+        <button class="btn btn-secondary" id="btn-suggest-orders" aria-label="Voir les suggestions de r\xE9approvisionnement"><i data-lucide="lightbulb" style="width:16px;height:16px" aria-hidden="true"></i> Suggestions</button>
+        <a href="#/orders/new" class="btn btn-primary" aria-label="Cr\xE9er une nouvelle commande"><i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouvelle commande</a>
       </div>
     </div>
-    <div class="orders-subnav" style="display:flex;gap:8px;margin-bottom:20px;overflow-x:auto">
-      <button class="haccp-subnav__link active" data-filter="">Toutes</button>
-      <button class="haccp-subnav__link" data-filter="brouillon">Brouillon</button>
-      <button class="haccp-subnav__link" data-filter="envoy\xE9e">Envoy\xE9es</button>
-      <button class="haccp-subnav__link" data-filter="confirm\xE9e">Confirm\xE9es</button>
-      <button class="haccp-subnav__link" data-filter="r\xE9ceptionn\xE9e">R\xE9ceptionn\xE9es</button>
-      <button class="haccp-subnav__link" data-filter="annul\xE9e">Annul\xE9es</button>
-    </div>
-    <div id="orders-grid"><div class="loading"><div class="spinner"></div></div></div>
+    <nav class="orders-subnav" role="tablist" aria-label="Filtrer les commandes par statut" style="display:flex;gap:8px;margin-bottom:20px;overflow-x:auto">
+      <button class="haccp-subnav__link active" data-filter="" role="tab" aria-selected="true">Toutes</button>
+      <button class="haccp-subnav__link" data-filter="brouillon" role="tab" aria-selected="false">Brouillon</button>
+      <button class="haccp-subnav__link" data-filter="envoy\xE9e" role="tab" aria-selected="false">Envoy\xE9es</button>
+      <button class="haccp-subnav__link" data-filter="confirm\xE9e" role="tab" aria-selected="false">Confirm\xE9es</button>
+      <button class="haccp-subnav__link" data-filter="r\xE9ceptionn\xE9e" role="tab" aria-selected="false">R\xE9ceptionn\xE9es</button>
+      <button class="haccp-subnav__link" data-filter="annul\xE9e" role="tab" aria-selected="false">Annul\xE9es</button>
+    </nav>
+    <div id="orders-grid" role="region" aria-label="Liste des commandes" aria-live="polite" aria-busy="true"><div class="loading"><div class="spinner"></div></div></div>
     <div id="suggest-modal" class="hidden"></div>
+    </section>
   `;
   lucide.createIcons();
   let allOrders = [];
@@ -13047,13 +13065,14 @@ async function renderOrdersDashboard() {
   const gridEl = document.getElementById("orders-grid");
   function renderOrders(filterStatus) {
     const orders = filterStatus ? allOrders.filter((o) => o.status === filterStatus) : allOrders;
+    gridEl.setAttribute("aria-busy", "false");
     if (orders.length === 0) {
       gridEl.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon"><i data-lucide="package"></i></div>
+        <div class="empty-state" role="status">
+          <div class="empty-icon" aria-hidden="true"><i data-lucide="package"></i></div>
           <h3>Aucune commande</h3>
           <p>Cr\xE9ez une nouvelle commande fournisseur pour commencer.</p>
-          <a href="#/orders/new" class="btn btn-primary">Nouvelle commande</a>
+          <a href="#/orders/new" class="btn btn-primary" aria-label="Cr\xE9er une nouvelle commande">Nouvelle commande</a>
         </div>
       `;
       return;
@@ -13067,25 +13086,25 @@ async function renderOrdersDashboard() {
       let actionButtons = "";
       if (order.status === "brouillon") {
         actionButtons = `
-          <button class="btn btn-sm btn-primary" onclick="sendPurchaseOrder(${order.id})">Envoyer</button>
-          <button class="btn btn-sm btn-secondary" onclick="editPurchaseOrder(${order.id})"><i data-lucide="edit" style="width:14px;height:14px"></i></button>
-          <button class="btn btn-sm btn-danger" aria-label="Supprimer" onclick="deletePurchaseOrderFromDash(${order.id})"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
+          <button class="btn btn-sm btn-primary" onclick="sendPurchaseOrder(${order.id})" aria-label="Envoyer la commande au fournisseur">Envoyer</button>
+          <button class="btn btn-sm btn-secondary" aria-label="Modifier la commande" onclick="editPurchaseOrder(${order.id})"><i data-lucide="edit" style="width:14px;height:14px" aria-hidden="true"></i></button>
+          <button class="btn btn-sm btn-danger" aria-label="Supprimer la commande" onclick="deletePurchaseOrderFromDash(${order.id})"><i data-lucide="trash-2" style="width:14px;height:14px" aria-hidden="true"></i></button>
         `;
       } else if (order.status === "envoy\xE9e") {
         actionButtons = `
-          <button class="btn btn-sm btn-primary" onclick="confirmPurchaseOrder(${order.id})">Confirmer</button>
-          <button class="btn btn-sm btn-danger" aria-label="Annuler" onclick="cancelPurchaseOrderFromDash(${order.id})"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+          <button class="btn btn-sm btn-primary" onclick="confirmPurchaseOrder(${order.id})" aria-label="Confirmer la r\xE9ception">Confirmer</button>
+          <button class="btn btn-sm btn-danger" aria-label="Annuler la commande" onclick="cancelPurchaseOrderFromDash(${order.id})"><i data-lucide="x" style="width:14px;height:14px" aria-hidden="true"></i></button>
         `;
       } else if (order.status === "confirm\xE9e") {
         actionButtons = `
-          <button class="btn btn-sm btn-primary" onclick="receivePurchaseOrderFromDash(${order.id})">R\xE9ceptionner</button>
+          <button class="btn btn-sm btn-primary" onclick="receivePurchaseOrderFromDash(${order.id})" aria-label="R\xE9ceptionner la commande">R\xE9ceptionner</button>
         `;
       }
       return `
-        <div class="order-card" style="cursor:pointer" onclick="location.hash='#/orders/${order.id}'">
+        <div class="order-card" role="button" tabindex="0" aria-label="Ouvrir le d\xE9tail de la commande ${escapeHtml(order.reference)}" style="cursor:pointer" onclick="location.hash='#/orders/${order.id}'" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();location.hash='#/orders/${order.id}';}">
           <div class="order-card__header">
             <span class="order-card__table" style="font-weight:600">${escapeHtml(order.reference)}</span>
-            <span class="order-card__timer">${elapsed}</span>
+            <span class="order-card__timer" aria-label="Cr\xE9\xE9e il y a ${elapsed}">${elapsed}</span>
           </div>
           <div style="margin-bottom:8px">
             <span class="badge badge--info" style="background:#6366f1;color:white">${escapeHtml(order.supplier_name)}</span>
@@ -13107,8 +13126,12 @@ async function renderOrdersDashboard() {
   renderOrders("");
   document.querySelectorAll(".orders-subnav button").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".orders-subnav button").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".orders-subnav button").forEach((b) => {
+        b.classList.remove("active");
+        b.setAttribute("aria-selected", "false");
+      });
       btn.classList.add("active");
+      btn.setAttribute("aria-selected", "true");
       renderOrders(btn.dataset.filter);
     });
   });
@@ -13196,28 +13219,29 @@ async function renderNewOrder() {
 
     <div style="max-width:800px">
       <div class="form-group">
-        <label>Fournisseur *</label>
-        <select class="form-control" id="po-supplier" required>
+        <label for="po-supplier">Fournisseur *</label>
+        <select class="form-control" id="po-supplier" required aria-required="true">
           <option value="">\u2014 S\xE9lectionner un fournisseur \u2014</option>
           ${suppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("")}
         </select>
       </div>
 
-      <div class="section-title">Ingr\xE9dients</div>
-      <div id="ingredients-list">
-        <input type="text" class="form-control" id="ingredient-search" placeholder="Rechercher un ingr\xE9dient..." style="margin-bottom:12px">
-        <div id="ingredients-filtered" style="max-height:300px;overflow-y:auto;border:1px solid var(--border-color);border-radius:4px">
+      <div class="section-title" id="section-ingredients">Ingr\xE9dients</div>
+      <div id="ingredients-list" role="region" aria-labelledby="section-ingredients">
+        <label for="ingredient-search" class="visually-hidden">Rechercher un ingr\xE9dient</label>
+        <input type="search" class="form-control" id="ingredient-search" placeholder="Rechercher un ingr\xE9dient..." style="margin-bottom:12px" aria-label="Rechercher un ingr\xE9dient">
+        <div id="ingredients-filtered" role="list" aria-label="Ingr\xE9dients disponibles" style="max-height:300px;overflow-y:auto;border:1px solid var(--border-color);border-radius:4px">
           ${ingredients.map((ing) => `
-            <div class="ingredient-item" data-id="${ing.id}" style="padding:8px 12px;border-bottom:1px solid var(--border-color);cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+            <div class="ingredient-item" data-id="${ing.id}" role="listitem" style="padding:8px 12px;border-bottom:1px solid var(--border-color);cursor:pointer;display:flex;justify-content:space-between;align-items:center">
               <span>${escapeHtml(ing.name)}</span>
-              <button type="button" class="btn btn-sm btn-primary">+</button>
+              <button type="button" class="btn btn-sm btn-primary" aria-label="Ajouter ${escapeHtml(ing.name)} \xE0 la commande">+</button>
             </div>
           `).join("")}
         </div>
       </div>
 
-      <div class="section-title" style="margin-top:20px">Articles de la commande</div>
-      <div id="po-items-table" style="overflow-x:auto">
+      <div class="section-title" id="section-po-items" style="margin-top:20px">Articles de la commande</div>
+      <div id="po-items-table" role="region" aria-labelledby="section-po-items" aria-live="polite" style="overflow-x:auto">
         <p class="text-muted">Aucun article pour le moment. Ajoutez des ingr\xE9dients ci-dessus.</p>
       </div>
 
@@ -13227,13 +13251,13 @@ async function renderNewOrder() {
       </div>
 
       <div class="actions-row">
-        <button class="btn btn-primary" id="btn-send-po" disabled>
-          <i data-lucide="send" style="width:18px;height:18px"></i> Envoyer
+        <button class="btn btn-primary" id="btn-send-po" disabled aria-label="Envoyer la commande au fournisseur">
+          <i data-lucide="send" style="width:18px;height:18px" aria-hidden="true"></i> Envoyer
         </button>
-        <button class="btn btn-secondary" id="btn-save-po" disabled>
-          <i data-lucide="save" style="width:18px;height:18px"></i> Sauvegarder en brouillon
+        <button class="btn btn-secondary" id="btn-save-po" disabled aria-label="Sauvegarder la commande en brouillon">
+          <i data-lucide="save" style="width:18px;height:18px" aria-hidden="true"></i> Sauvegarder en brouillon
         </button>
-        <a href="#/orders" class="btn btn-secondary">Annuler</a>
+        <a href="#/orders" class="btn btn-secondary" aria-label="Annuler et retourner \xE0 la liste">Annuler</a>
       </div>
     </div>
   `;
@@ -15690,12 +15714,15 @@ class OnboardingWizard {
     }
     this.overlay = document.createElement("div");
     this.overlay.className = "onboarding-overlay";
+    this.overlay.setAttribute("role", "dialog");
+    this.overlay.setAttribute("aria-modal", "true");
+    this.overlay.setAttribute("aria-labelledby", "ob-dialog-title");
     this.overlay.innerHTML = `
       <div class="onboarding-card">
-        <div class="onboarding-progress">
+        <div class="onboarding-progress" role="progressbar" aria-label="Progression de la configuration" aria-valuemin="0" aria-valuemax="7" aria-valuenow="${this.step}">
           <div class="onboarding-progress-bar" id="ob-progress"></div>
         </div>
-        <div class="onboarding-body" id="ob-body"></div>
+        <div class="onboarding-body" id="ob-body" aria-live="polite"></div>
         <div class="onboarding-footer" id="ob-footer"></div>
       </div>
     `;
@@ -15709,6 +15736,8 @@ class OnboardingWizard {
     const progress = document.getElementById("ob-progress");
     if (!body || !footer || !progress) return;
     progress.style.width = `${this.step / this.totalSteps * 100}%`;
+    const progressWrap = progress.parentElement;
+    if (progressWrap) progressWrap.setAttribute("aria-valuenow", String(this.step));
     body.classList.remove("slide-in-left", "slide-in-right");
     body.classList.add(this.direction === "next" ? "slide-in-right" : "slide-in-left");
     switch (this.step) {
@@ -15740,21 +15769,21 @@ class OnboardingWizard {
     const acc = this.data.account || {};
     body.innerHTML = `
       <div class="ob-step">
-        <div class="ob-icon">\u{1F464}</div>
-        <h2 class="ob-title">Mon profil</h2>
+        <div class="ob-icon" aria-hidden="true">\u{1F464}</div>
+        <h2 class="ob-title" id="ob-dialog-title">Mon profil</h2>
         <p class="ob-desc">Vos informations personnelles</p>
         <div class="ob-form">
           <div class="form-group">
-            <label>Pr\xE9nom</label>
-            <input type="text" class="form-control" id="ob-firstname" value="${escapeHtml(acc.first_name || "")}" placeholder="Pr\xE9nom">
+            <label for="ob-firstname">Pr\xE9nom</label>
+            <input type="text" class="form-control" id="ob-firstname" value="${escapeHtml(acc.first_name || "")}" placeholder="Pr\xE9nom" autocomplete="given-name">
           </div>
           <div class="form-group">
-            <label>Nom</label>
-            <input type="text" class="form-control" id="ob-lastname" value="${escapeHtml(acc.last_name || "")}" placeholder="Nom">
+            <label for="ob-lastname">Nom</label>
+            <input type="text" class="form-control" id="ob-lastname" value="${escapeHtml(acc.last_name || "")}" placeholder="Nom" autocomplete="family-name">
           </div>
           <div class="form-group">
-            <label>T\xE9l\xE9phone</label>
-            <input type="tel" class="form-control" id="ob-phone" value="${escapeHtml(acc.phone || "")}" placeholder="06 12 34 56 78">
+            <label for="ob-phone">T\xE9l\xE9phone</label>
+            <input type="tel" class="form-control" id="ob-phone" value="${escapeHtml(acc.phone || "")}" placeholder="06 12 34 56 78" autocomplete="tel">
           </div>
         </div>
       </div>
@@ -15766,43 +15795,43 @@ class OnboardingWizard {
     const r = this.data.restaurant || {};
     body.innerHTML = `
       <div class="ob-step">
-        <div class="ob-icon">\u{1F3EA}</div>
-        <h2 class="ob-title">Mon restaurant</h2>
+        <div class="ob-icon" aria-hidden="true">\u{1F3EA}</div>
+        <h2 class="ob-title" id="ob-dialog-title">Mon restaurant</h2>
         <p class="ob-desc">Les informations de votre \xE9tablissement</p>
         <div class="ob-form">
           <div class="form-group">
-            <label>Nom du restaurant</label>
+            <label for="ob-rname">Nom du restaurant</label>
             <input type="text" class="form-control" id="ob-rname" value="${escapeHtml(r.name || "")}" placeholder="Chez Marcel">
           </div>
           <div class="form-group">
-            <label>Type d'\xE9tablissement</label>
+            <label for="ob-rtype">Type d'\xE9tablissement</label>
             <select class="form-control" id="ob-rtype">
               <option value="">\u2014 Choisir \u2014</option>
               ${["brasserie", "gastro", "fast-food", "pizzeria", "bar", "traiteur", "boulangerie", "autre"].map((t) => `<option value="${t}" ${r.type === t ? "selected" : ""}>${t.charAt(0).toUpperCase() + t.slice(1)}</option>`).join("")}
             </select>
           </div>
           <div class="form-group">
-            <label>Adresse</label>
-            <input type="text" class="form-control" id="ob-raddress" value="${escapeHtml(r.address || "")}" placeholder="12 rue de la Paix">
+            <label for="ob-raddress">Adresse</label>
+            <input type="text" class="form-control" id="ob-raddress" value="${escapeHtml(r.address || "")}" placeholder="12 rue de la Paix" autocomplete="street-address">
           </div>
           <div style="display:flex;gap:var(--space-3)">
             <div class="form-group" style="flex:2">
-              <label>Ville</label>
-              <input type="text" class="form-control" id="ob-rcity" value="${escapeHtml(r.city || "")}" placeholder="Lyon">
+              <label for="ob-rcity">Ville</label>
+              <input type="text" class="form-control" id="ob-rcity" value="${escapeHtml(r.city || "")}" placeholder="Lyon" autocomplete="address-level2">
             </div>
             <div class="form-group" style="flex:1">
-              <label>Code postal</label>
-              <input type="text" class="form-control" id="ob-rpostal" value="${escapeHtml(r.postal_code || "")}" placeholder="69001" maxlength="5">
+              <label for="ob-rpostal">Code postal</label>
+              <input type="text" class="form-control" id="ob-rpostal" value="${escapeHtml(r.postal_code || "")}" placeholder="69001" maxlength="5" inputmode="numeric" autocomplete="postal-code">
             </div>
           </div>
           <div style="display:flex;gap:var(--space-3)">
             <div class="form-group" style="flex:1">
-              <label>T\xE9l\xE9phone</label>
+              <label for="ob-rphone">T\xE9l\xE9phone</label>
               <input type="tel" class="form-control" id="ob-rphone" value="${escapeHtml(r.phone || "")}" placeholder="04 78 00 00 00">
             </div>
             <div class="form-group" style="flex:1">
-              <label>Nombre de couverts</label>
-              <input type="number" class="form-control" id="ob-rcovers" value="${r.covers || 30}" placeholder="30" min="1">
+              <label for="ob-rcovers">Nombre de couverts</label>
+              <input type="number" class="form-control" id="ob-rcovers" value="${r.covers || 30}" placeholder="30" min="1" inputmode="numeric">
             </div>
           </div>
         </div>
@@ -15814,15 +15843,15 @@ class OnboardingWizard {
   renderStep3(body, footer) {
     body.innerHTML = `
       <div class="ob-step">
-        <div class="ob-icon">\u{1FA91}</div>
-        <h2 class="ob-title">Ma salle</h2>
+        <div class="ob-icon" aria-hidden="true">\u{1FA91}</div>
+        <h2 class="ob-title" id="ob-dialog-title">Ma salle</h2>
         <p class="ob-desc">Configurez vos tables par zone</p>
         <div class="ob-form">
-          <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-4)">
-            <button class="btn ${this.tableMode === "quick" ? "btn-primary" : "btn-secondary"} btn-sm" id="ob-mode-quick">Rapide</button>
-            <button class="btn ${this.tableMode === "advanced" ? "btn-primary" : "btn-secondary"} btn-sm" id="ob-mode-advanced">Avanc\xE9</button>
+          <div role="tablist" aria-label="Mode de configuration des tables" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-4)">
+            <button class="btn ${this.tableMode === "quick" ? "btn-primary" : "btn-secondary"} btn-sm" id="ob-mode-quick" role="tab" aria-selected="${this.tableMode === "quick"}">Rapide</button>
+            <button class="btn ${this.tableMode === "advanced" ? "btn-primary" : "btn-secondary"} btn-sm" id="ob-mode-advanced" role="tab" aria-selected="${this.tableMode === "advanced"}">Avanc\xE9</button>
           </div>
-          <div id="ob-tables-content"></div>
+          <div id="ob-tables-content" role="region" aria-label="Configuration des tables"></div>
         </div>
       </div>
     `;
@@ -15843,28 +15872,28 @@ class OnboardingWizard {
     if (this.tableMode === "quick") {
       container.innerHTML = `
         <div class="form-group">
-          <label>Salle \u2014 nombre de tables</label>
-          <input type="number" class="form-control" id="ob-salle-count" value="${this._countZone("Salle")}" min="0" placeholder="0">
+          <label for="ob-salle-count">Salle \u2014 nombre de tables</label>
+          <input type="number" class="form-control" id="ob-salle-count" value="${this._countZone("Salle")}" min="0" placeholder="0" inputmode="numeric">
         </div>
         <div class="form-group">
-          <label>Terrasse \u2014 nombre de tables</label>
-          <input type="number" class="form-control" id="ob-terrasse-count" value="${this._countZone("Terrasse")}" min="0" placeholder="0">
+          <label for="ob-terrasse-count">Terrasse \u2014 nombre de tables</label>
+          <input type="number" class="form-control" id="ob-terrasse-count" value="${this._countZone("Terrasse")}" min="0" placeholder="0" inputmode="numeric">
         </div>
         <div class="form-group">
-          <label>Bar \u2014 nombre de tables</label>
-          <input type="number" class="form-control" id="ob-bar-count" value="${this._countZone("Bar")}" min="0" placeholder="0">
+          <label for="ob-bar-count">Bar \u2014 nombre de tables</label>
+          <input type="number" class="form-control" id="ob-bar-count" value="${this._countZone("Bar")}" min="0" placeholder="0" inputmode="numeric">
         </div>
         <div class="form-group">
-          <label>Couverts par table (par d\xE9faut)</label>
-          <input type="number" class="form-control" id="ob-seats-default" value="4" min="1">
+          <label for="ob-seats-default">Couverts par table (par d\xE9faut)</label>
+          <input type="number" class="form-control" id="ob-seats-default" value="4" min="1" inputmode="numeric">
         </div>
       `;
     } else {
       container.innerHTML = `
-        <div id="ob-adv-tables">
+        <div id="ob-adv-tables" role="list" aria-label="Tables configur\xE9es">
           ${this.tables.map((t, i) => this._renderTableRow(t, i)).join("")}
         </div>
-        <button class="btn btn-ghost" id="ob-add-table" style="margin-top:var(--space-3)">+ Ajouter une table</button>
+        <button class="btn btn-ghost" id="ob-add-table" style="margin-top:var(--space-3)" aria-label="Ajouter une nouvelle table">+ Ajouter une table</button>
       `;
       document.getElementById("ob-add-table").addEventListener("click", () => {
         const nextNum = this.tables.length > 0 ? Math.max(...this.tables.map((t) => t.table_number)) + 1 : 1;
@@ -15884,13 +15913,13 @@ class OnboardingWizard {
   }
   _renderTableRow(t, i) {
     return `
-      <div style="display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-2)">
-        <input type="number" class="form-control" style="width:60px" value="${t.table_number}" data-index="${i}" data-field="table_number" min="1">
-        <select class="form-control" style="flex:1" data-index="${i}" data-field="zone">
+      <div role="listitem" style="display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-2)">
+        <input type="number" class="form-control" style="width:60px" value="${t.table_number}" data-index="${i}" data-field="table_number" min="1" aria-label="Num\xE9ro de table" inputmode="numeric">
+        <select class="form-control" style="flex:1" data-index="${i}" data-field="zone" aria-label="Zone">
           ${["Salle", "Terrasse", "Bar", "Priv\xE9"].map((z) => `<option value="${z}" ${t.zone === z ? "selected" : ""}>${z}</option>`).join("")}
         </select>
-        <input type="number" class="form-control" style="width:60px" value="${t.seats}" data-index="${i}" data-field="seats" min="1" placeholder="4">
-        <button class="ob-table-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:18px">\u2715</button>
+        <input type="number" class="form-control" style="width:60px" value="${t.seats}" data-index="${i}" data-field="seats" min="1" placeholder="4" aria-label="Couverts" inputmode="numeric">
+        <button class="ob-table-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:18px" aria-label="Supprimer la table ${t.table_number}">\u2715</button>
       </div>
     `;
   }
@@ -15923,24 +15952,24 @@ class OnboardingWizard {
   renderStep4(body, footer) {
     body.innerHTML = `
       <div class="ob-step">
-        <div class="ob-icon">\u{1F465}</div>
-        <h2 class="ob-title">Mon \xE9quipe</h2>
+        <div class="ob-icon" aria-hidden="true">\u{1F465}</div>
+        <h2 class="ob-title" id="ob-dialog-title">Mon \xE9quipe</h2>
         <p class="ob-desc">Ajoutez les membres de votre staff</p>
 
-        <div style="padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md);margin-bottom:var(--space-4);text-align:left">
+        <aside role="note" style="padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md);margin-bottom:var(--space-4);text-align:left">
           <div style="display:flex;align-items:flex-start;gap:var(--space-3)">
-            <span style="font-size:1.3rem;line-height:1">\u{1F4A1}</span>
+            <span style="font-size:1.3rem;line-height:1" aria-hidden="true">\u{1F4A1}</span>
             <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
               <strong style="color:var(--text-primary)">Comment \xE7a marche ?</strong><br>
               Votre staff se connecte avec le <strong>mot de passe \xE9quipe</strong> d\xE9fini \xE0 l'inscription, puis s\xE9lectionne son nom et cr\xE9e son <strong>code PIN personnel</strong> \xE0 sa premi\xE8re connexion.
             </div>
           </div>
-        </div>
+        </aside>
 
-        <h3 style="font-size:var(--text-base);margin-bottom:var(--space-2)">Membres de l'\xE9quipe</h3>
+        <h3 id="ob-members-heading" style="font-size:var(--text-base);margin-bottom:var(--space-2)">Membres de l'\xE9quipe</h3>
         <p style="font-size:var(--text-sm);color:var(--text-tertiary);margin-bottom:var(--space-3)">Ajoutez vos membres avec leur nom et r\xF4le. Vous pourrez en ajouter d'autres plus tard.</p>
-        <div id="ob-members-list"></div>
-        <button class="btn btn-ghost" id="ob-add-member" style="margin-top:var(--space-3)">+ Ajouter un membre</button>
+        <div id="ob-members-list" role="list" aria-labelledby="ob-members-heading"></div>
+        <button class="btn btn-ghost" id="ob-add-member" style="margin-top:var(--space-3)" aria-label="Ajouter un nouveau membre \xE0 l'\xE9quipe">+ Ajouter un membre</button>
       </div>
     `;
     this.renderMembersList();
@@ -15958,21 +15987,23 @@ class OnboardingWizard {
       return;
     }
     container.innerHTML = this.members.map((m, i) => `
-      <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-3)">
+      <div role="listitem" style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-3)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2)">
-          <strong style="font-size:var(--text-sm)">Membre ${i + 1}</strong>
-          <button class="ob-member-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px">\u2715</button>
+          <strong style="font-size:var(--text-sm)" id="ob-member-label-${i}">Membre ${i + 1}</strong>
+          <button class="ob-member-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px" aria-label="Supprimer le membre ${i + 1}">\u2715</button>
         </div>
         <div class="form-group" style="margin-bottom:var(--space-2)">
-          <input type="text" class="form-control" placeholder="Nom / surnom" value="${escapeHtml(m.name)}" data-index="${i}" data-field="name">
+          <label for="ob-member-name-${i}" class="visually-hidden">Nom du membre ${i + 1}</label>
+          <input type="text" id="ob-member-name-${i}" class="form-control" placeholder="Nom / surnom" value="${escapeHtml(m.name)}" data-index="${i}" data-field="name">
         </div>
         <div style="display:flex;gap:var(--space-2)">
-          <select class="form-control ob-role-select" data-index="${i}" data-field="role" style="flex:1">
+          <label for="ob-member-role-${i}" class="visually-hidden">R\xF4le du membre ${i + 1}</label>
+          <select id="ob-member-role-${i}" class="form-control ob-role-select" data-index="${i}" data-field="role" style="flex:1">
             <option value="cuisinier" ${m.role === "cuisinier" ? "selected" : ""}>\u{1F468}\u200D\u{1F373} Cuisinier</option>
             <option value="serveur" ${m.role === "serveur" ? "selected" : ""}>\u{1F37D}\uFE0F Serveur</option>
             <option value="__custom__" ${!["cuisinier", "serveur"].includes(m.role) && m.role ? "selected" : ""}>\u270F\uFE0F Personnalis\xE9\u2026</option>
           </select>
-          <input type="text" class="form-control ob-custom-role" data-index="${i}" data-field="custom_role" placeholder="Ex: P\xE2tissier"
+          <input type="text" class="form-control ob-custom-role" data-index="${i}" data-field="custom_role" placeholder="Ex: P\xE2tissier" aria-label="R\xF4le personnalis\xE9"
                  value="${escapeHtml(!["cuisinier", "serveur", "equipier", ""].includes(m.role) ? m.role : "")}"
                  style="flex:1;${["cuisinier", "serveur", "equipier", ""].includes(m.role) ? "display:none" : ""}">
         </div>
@@ -16019,11 +16050,11 @@ class OnboardingWizard {
   renderStep5(body, footer) {
     body.innerHTML = `
       <div class="ob-step">
-        <div class="ob-icon">\u{1F321}\uFE0F</div>
-        <h2 class="ob-title">Mes zones froides</h2>
+        <div class="ob-icon" aria-hidden="true">\u{1F321}\uFE0F</div>
+        <h2 class="ob-title" id="ob-dialog-title">Mes zones froides</h2>
         <p class="ob-desc">Configurez vos zones de temp\xE9rature pour le HACCP</p>
-        <div class="ob-zones" id="ob-zones-list"></div>
-        <button class="btn btn-ghost" id="ob-add-zone" style="margin-top:var(--space-3)">+ Ajouter une zone</button>
+        <div class="ob-zones" id="ob-zones-list" role="list" aria-label="Zones de temp\xE9rature"></div>
+        <button class="btn btn-ghost" id="ob-add-zone" style="margin-top:var(--space-3)" aria-label="Ajouter une nouvelle zone de temp\xE9rature">+ Ajouter une zone</button>
       </div>
     `;
     this.renderZonesList();
@@ -16037,15 +16068,15 @@ class OnboardingWizard {
     const container = document.getElementById("ob-zones-list");
     if (!container) return;
     container.innerHTML = this.zones.map((z, i) => `
-      <div class="ob-zone-row" data-index="${i}">
-        <input type="text" class="ob-zone-name" value="${escapeHtml(z.name)}" data-field="name" data-index="${i}">
+      <div class="ob-zone-row" data-index="${i}" role="listitem">
+        <input type="text" class="ob-zone-name" value="${escapeHtml(z.name)}" data-field="name" data-index="${i}" aria-label="Nom de la zone ${i + 1}">
         <div class="ob-zone-range">
-          <input type="number" class="ob-zone-input" value="${z.min_temp}" data-field="min_temp" data-index="${i}" step="1">
-          <span class="ob-zone-sep">\xB0C \u2014</span>
-          <input type="number" class="ob-zone-input" value="${z.max_temp}" data-field="max_temp" data-index="${i}" step="1">
-          <span class="ob-zone-unit">\xB0C</span>
+          <input type="number" class="ob-zone-input" value="${z.min_temp}" data-field="min_temp" data-index="${i}" step="1" aria-label="Temp\xE9rature minimum" inputmode="numeric">
+          <span class="ob-zone-sep" aria-hidden="true">\xB0C \u2014</span>
+          <input type="number" class="ob-zone-input" value="${z.max_temp}" data-field="max_temp" data-index="${i}" step="1" aria-label="Temp\xE9rature maximum" inputmode="numeric">
+          <span class="ob-zone-unit" aria-hidden="true">\xB0C</span>
         </div>
-        <button class="ob-zone-delete" data-index="${i}" title="Supprimer">\u2715</button>
+        <button class="ob-zone-delete" data-index="${i}" title="Supprimer" aria-label="Supprimer la zone ${escapeHtml(z.name)}">\u2715</button>
       </div>
     `).join("");
     container.querySelectorAll("input").forEach((input) => {
@@ -16068,11 +16099,11 @@ class OnboardingWizard {
   renderStep6(body, footer) {
     body.innerHTML = `
       <div class="ob-step">
-        <div class="ob-icon">\u{1F69A}</div>
-        <h2 class="ob-title">Mes fournisseurs</h2>
+        <div class="ob-icon" aria-hidden="true">\u{1F69A}</div>
+        <h2 class="ob-title" id="ob-dialog-title">Mes fournisseurs</h2>
         <p class="ob-desc">Ajoutez vos fournisseurs habituels (optionnel)</p>
-        <div id="ob-suppliers-list"></div>
-        <button class="btn btn-ghost" id="ob-add-supplier" style="margin-top:var(--space-3)">+ Ajouter un fournisseur</button>
+        <div id="ob-suppliers-list" role="list" aria-label="Fournisseurs"></div>
+        <button class="btn btn-ghost" id="ob-add-supplier" style="margin-top:var(--space-3)" aria-label="Ajouter un nouveau fournisseur">+ Ajouter un fournisseur</button>
       </div>
     `;
     this.renderSuppliersList();
@@ -16090,20 +16121,21 @@ class OnboardingWizard {
       return;
     }
     container.innerHTML = this.suppliers.map((s, i) => `
-      <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-3)">
+      <div role="listitem" style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-3)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2)">
-          <strong style="font-size:var(--text-sm)">Fournisseur ${i + 1}</strong>
-          <button class="ob-supplier-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px">\u2715</button>
+          <strong style="font-size:var(--text-sm)" id="ob-supplier-label-${i}">Fournisseur ${i + 1}</strong>
+          <button class="ob-supplier-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px" aria-label="Supprimer le fournisseur ${i + 1}">\u2715</button>
         </div>
         <div class="form-group" style="margin-bottom:var(--space-2)">
-          <input type="text" class="form-control" placeholder="Nom de l'entreprise" value="${escapeHtml(s.name)}" data-index="${i}" data-field="name">
+          <label for="ob-supplier-name-${i}" class="visually-hidden">Nom du fournisseur ${i + 1}</label>
+          <input type="text" id="ob-supplier-name-${i}" class="form-control" placeholder="Nom de l'entreprise" value="${escapeHtml(s.name)}" data-index="${i}" data-field="name">
         </div>
         <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-2)">
-          <input type="text" class="form-control" placeholder="Contact" value="${escapeHtml(s.contact)}" data-index="${i}" data-field="contact" style="flex:1">
-          <input type="tel" class="form-control" placeholder="T\xE9l\xE9phone" value="${escapeHtml(s.phone)}" data-index="${i}" data-field="phone" style="flex:1">
+          <input type="text" class="form-control" placeholder="Contact" value="${escapeHtml(s.contact)}" data-index="${i}" data-field="contact" style="flex:1" aria-label="Personne de contact">
+          <input type="tel" class="form-control" placeholder="T\xE9l\xE9phone" value="${escapeHtml(s.phone)}" data-index="${i}" data-field="phone" style="flex:1" aria-label="T\xE9l\xE9phone">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <input type="email" class="form-control" placeholder="Email" value="${escapeHtml(s.email)}" data-index="${i}" data-field="email">
+          <input type="email" class="form-control" placeholder="Email" value="${escapeHtml(s.email)}" data-index="${i}" data-field="email" aria-label="Email">
         </div>
       </div>
     `).join("");
@@ -16128,13 +16160,13 @@ class OnboardingWizard {
     const acc = this.data.account || {};
     const r = this.data.restaurant || {};
     body.innerHTML = `
-      <div class="ob-step ob-finish">
-        <div class="ob-icon" style="font-size:4rem">\u{1F389}</div>
-        <h2 class="ob-title">Votre restaurant est configur\xE9 !</h2>
+      <div class="ob-step ob-finish" role="status" aria-live="polite">
+        <div class="ob-icon" style="font-size:4rem" aria-hidden="true">\u{1F389}</div>
+        <h2 class="ob-title" id="ob-dialog-title">Votre restaurant est configur\xE9 !</h2>
         <p class="ob-desc">Tout est pr\xEAt. Commencez \xE0 utiliser RestoSuite.</p>
 
         <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-4);margin-top:var(--space-4);text-align:left;width:100%">
-          <h3 style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-3)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>R\xE9capitulatif</h3>
+          <h3 style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-3)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>R\xE9capitulatif</h3>
           ${r.name ? `<p style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Restaurant :</strong> ${escapeHtml(r.name)}</p>` : ""}
           ${r.city ? `<p style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Ville :</strong> ${escapeHtml(r.city)}</p>` : ""}
           ${this.tables.length ? `<p style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Tables :</strong> ${this.tables.length}</p>` : ""}
@@ -16145,8 +16177,8 @@ class OnboardingWizard {
     `;
     footer.innerHTML = `
       <div class="ob-buttons ob-buttons--finish">
-        <button class="btn btn-primary ob-btn-next" id="ob-finish" style="min-width:250px;padding:14px">
-          \u{1F680} Acc\xE9der \xE0 RestoSuite
+        <button class="btn btn-primary ob-btn-next" id="ob-finish" style="min-width:250px;padding:14px" aria-label="Terminer et acc\xE9der \xE0 l'application">
+          <span aria-hidden="true">\u{1F680}</span> Acc\xE9der \xE0 RestoSuite
         </button>
       </div>
     `;
@@ -16161,13 +16193,13 @@ class OnboardingWizard {
   // ─── Navigation buttons ───
   renderNavButtons(footer, showBack) {
     footer.innerHTML = `
-      <div class="ob-buttons">
-        ${showBack ? '<button class="btn btn-ghost ob-btn-prev" id="ob-prev">\u2190 Retour</button>' : "<div></div>"}
+      <nav class="ob-buttons" aria-label="Navigation de la configuration">
+        ${showBack ? `<button class="btn btn-ghost ob-btn-prev" id="ob-prev" aria-label="Retour \xE0 l'\xE9tape pr\xE9c\xE9dente">\u2190 Retour</button>` : "<div></div>"}
         <div style="display:flex;gap:var(--space-2)">
-          <button class="btn btn-ghost" id="ob-skip">Passer</button>
-          <button class="btn btn-primary ob-btn-next" id="ob-next">Suivant \u2192</button>
+          <button class="btn btn-ghost" id="ob-skip" aria-label="Passer cette \xE9tape">Passer</button>
+          <button class="btn btn-primary ob-btn-next" id="ob-next" aria-label="Enregistrer et passer \xE0 l'\xE9tape suivante">Suivant \u2192</button>
         </div>
-      </div>
+      </nav>
     `;
     if (showBack) {
       document.getElementById("ob-prev").addEventListener("click", () => this.prev());
@@ -21401,34 +21433,38 @@ function renderPredictionsContent(data) {
 async function renderCRM() {
   const app = document.getElementById("app");
   app.innerHTML = `
+    <section role="region" aria-label="CRM et programme de fid\xE9lit\xE9">
     <div class="view-header">
-      <a href="#/more" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-1);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)">
-        <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Plus
+      <a href="#/more" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-1);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)" aria-label="Retour \xE0 la page Plus">
+        <i data-lucide="arrow-left" style="width:16px;height:16px" aria-hidden="true"></i> Plus
       </a>
       <h1 style="display:flex;align-items:center;gap:8px">
-        <i data-lucide="heart" style="width:28px;height:28px;color:#EC4899"></i>
+        <i data-lucide="heart" style="width:28px;height:28px;color:#EC4899" aria-hidden="true"></i>
         CRM & Fid\xE9lit\xE9
       </h1>
       <p class="text-secondary" style="font-size:var(--text-sm)">G\xE9rez vos clients, points de fid\xE9lit\xE9 et r\xE9compenses</p>
     </div>
 
-    <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-4);flex-wrap:wrap">
-      <button class="btn btn-primary crm-tab active" data-tab="customers" onclick="switchCrmTab('customers')">Clients</button>
-      <button class="btn btn-secondary crm-tab" data-tab="rewards" onclick="switchCrmTab('rewards')">R\xE9compenses</button>
-      <button class="btn btn-secondary crm-tab" data-tab="stats" onclick="switchCrmTab('stats')">Statistiques</button>
+    <div role="tablist" aria-label="Onglets CRM" style="display:flex;gap:var(--space-2);margin-bottom:var(--space-4);flex-wrap:wrap">
+      <button role="tab" aria-selected="true" class="btn btn-primary crm-tab active" data-tab="customers" onclick="switchCrmTab('customers')">Clients</button>
+      <button role="tab" aria-selected="false" class="btn btn-secondary crm-tab" data-tab="rewards" onclick="switchCrmTab('rewards')">R\xE9compenses</button>
+      <button role="tab" aria-selected="false" class="btn btn-secondary crm-tab" data-tab="stats" onclick="switchCrmTab('stats')">Statistiques</button>
     </div>
 
-    <div id="crm-content">
+    <div id="crm-content" role="tabpanel" aria-live="polite" aria-busy="true">
       <div style="text-align:center;padding:var(--space-6)"><div class="loading-spinner"></div></div>
     </div>
+    </section>
   `;
   if (window.lucide) lucide.createIcons();
   await loadCrmCustomers();
 }
 function switchCrmTab(tab) {
   document.querySelectorAll(".crm-tab").forEach((b) => {
-    b.classList.toggle("active", b.dataset.tab === tab);
-    b.className = b.classList.contains("active") ? "btn btn-primary crm-tab active" : "btn btn-secondary crm-tab";
+    const active = b.dataset.tab === tab;
+    b.classList.toggle("active", active);
+    b.className = active ? "btn btn-primary crm-tab active" : "btn btn-secondary crm-tab";
+    b.setAttribute("aria-selected", active ? "true" : "false");
   });
   if (tab === "customers") loadCrmCustomers();
   else if (tab === "rewards") loadCrmRewards();
@@ -21447,9 +21483,10 @@ function renderCrmCustomers(customers) {
   const content = document.getElementById("crm-content");
   content.innerHTML = `
     <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-3);align-items:center">
-      <input type="text" class="input" id="crm-search" placeholder="Rechercher un client\u2026" style="flex:1" oninput="searchCrmCustomers()">
-      <button class="btn btn-primary btn-sm" onclick="showAddCustomer()">
-        <i data-lucide="user-plus" style="width:16px;height:16px"></i> Ajouter
+      <label for="crm-search" class="visually-hidden">Rechercher un client</label>
+      <input type="search" class="input" id="crm-search" placeholder="Rechercher un client\u2026" aria-label="Rechercher un client" style="flex:1" oninput="searchCrmCustomers()">
+      <button class="btn btn-primary btn-sm" onclick="showAddCustomer()" aria-label="Ajouter un nouveau client">
+        <i data-lucide="user-plus" style="width:16px;height:16px" aria-hidden="true"></i> Ajouter
       </button>
     </div>
 
@@ -21469,7 +21506,7 @@ function renderCrmCustomers(customers) {
 }
 function renderCustomerCard(c) {
   return `
-    <div class="card" style="padding:var(--space-3);cursor:pointer" onclick="showCustomerDetail(${c.id})">
+    <div class="card" role="button" tabindex="0" aria-label="D\xE9tails du client ${escapeHtml(c.name)}" style="padding:var(--space-3);cursor:pointer" onclick="showCustomerDetail(${c.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showCustomerDetail(${c.id});}">
       <div style="display:flex;align-items:center;gap:var(--space-3)">
         ${renderAvatar(c.name, 40)}
         <div style="flex:1;min-width:0">
@@ -22109,22 +22146,24 @@ async function renderPlans(highlightPlan) {
   const account = getAccount();
   if (!account || account.role !== "gerant") {
     app.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon"><i data-lucide="lock"></i></div>
+      <div class="empty-state" role="alert">
+        <div class="empty-icon" aria-hidden="true"><i data-lucide="lock"></i></div>
         <p>Acc\xE8s r\xE9serv\xE9 au g\xE9rant</p>
-        <a href="#/" class="btn btn-primary">Retour</a>
+        <a href="#/" class="btn btn-primary" aria-label="Retour \xE0 l'accueil">Retour</a>
       </div>`;
     if (window.lucide) lucide.createIcons();
     return;
   }
   app.innerHTML = `
-    <div class="view-header">
-      <h1><i data-lucide="layers" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Plans & Tarifs</h1>
-      <p class="text-secondary">Choisissez le plan adapt\xE9 \xE0 votre restaurant</p>
-    </div>
-    <div class="plans-loading">
-      <div class="spinner"></div>
-    </div>`;
+    <section role="region" aria-labelledby="plans-heading">
+      <div class="view-header">
+        <h1 id="plans-heading"><i data-lucide="layers" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Plans & Tarifs</h1>
+        <p class="text-secondary">Choisissez le plan adapt\xE9 \xE0 votre restaurant</p>
+      </div>
+      <div class="plans-loading" role="status" aria-live="polite" aria-label="Chargement des plans">
+        <div class="spinner"></div>
+      </div>
+    </section>`;
   if (window.lucide) lucide.createIcons();
   try {
     let planRank2 = function(p) {
@@ -22132,7 +22171,7 @@ async function renderPlans(highlightPlan) {
     }, renderFeature2 = function(f) {
       const isSectionTitle = f.startsWith("Tout ");
       return `<li class="plan-feature${isSectionTitle ? " plan-feature--section" : ""}">
-        ${isSectionTitle ? "" : '<i data-lucide="check" style="width:14px;height:14px;flex-shrink:0;color:var(--color-success)"></i>'}
+        ${isSectionTitle ? "" : '<i data-lucide="check" style="width:14px;height:14px;flex-shrink:0;color:var(--color-success)" aria-hidden="true"></i>'}
         <span>${escapeHtml(f)}</span>
       </li>`;
     };
@@ -22150,51 +22189,53 @@ async function renderPlans(highlightPlan) {
       const isEnterprise = plan.id === "enterprise";
       let btnHtml;
       if (isCurrent) {
-        btnHtml = `<button class="btn btn-secondary btn-sm" disabled>Plan actuel</button>`;
+        btnHtml = `<button class="btn btn-secondary btn-sm" disabled aria-label="${escapeHtml(plan.name)} \u2014 votre plan actuel">Plan actuel</button>`;
       } else if (isEnterprise) {
-        btnHtml = `<a href="mailto:contact@restosuite.fr?subject=Plan Enterprise" class="btn btn-outline btn-sm">Nous contacter</a>`;
+        btnHtml = `<a href="mailto:contact@restosuite.fr?subject=Plan Enterprise" class="btn btn-outline btn-sm" aria-label="Contacter le service commercial pour le plan Enterprise">Nous contacter</a>`;
       } else {
         const btnClass = isDowngrade ? "btn-outline" : "btn-primary";
         const label = isDowngrade ? "Passer \xE0 ce plan" : `Choisir ${escapeHtml(plan.name)}`;
-        btnHtml = `<button class="btn ${btnClass} btn-sm plan-upgrade-btn" data-plan="${escapeHtml(plan.id)}">${label}</button>`;
+        btnHtml = `<button class="btn ${btnClass} btn-sm plan-upgrade-btn" data-plan="${escapeHtml(plan.id)}" aria-label="${isDowngrade ? "Passer au plan" : "Choisir le plan"} ${escapeHtml(plan.name)}">${label}</button>`;
       }
       return `
-        <div class="plan-card${isCurrent ? " plan-card--current" : ""}${isHighlighted && !isCurrent ? " plan-card--highlighted" : ""}">
-          ${isCurrent ? '<div class="plan-card__current-badge">Plan actuel</div>' : ""}
+        <article class="plan-card${isCurrent ? " plan-card--current" : ""}${isHighlighted && !isCurrent ? " plan-card--highlighted" : ""}" aria-label="Plan ${escapeHtml(plan.name)}"${isCurrent ? ' aria-current="true"' : ""}>
+          ${isCurrent ? '<div class="plan-card__current-badge" aria-hidden="true">Plan actuel</div>' : ""}
           ${plan.badge && !isCurrent ? `<div class="plan-card__badge">${escapeHtml(plan.badge)}</div>` : ""}
           <div class="plan-card__header">
             <h2 class="plan-card__name">${escapeHtml(plan.name)}</h2>
-            <div class="plan-card__price">${escapeHtml(plan.label)}</div>
+            <div class="plan-card__price" aria-label="Prix : ${escapeHtml(plan.label)}">${escapeHtml(plan.label)}</div>
             <p class="plan-card__desc">${escapeHtml(plan.description)}</p>
           </div>
-          <ul class="plan-features">
+          <ul class="plan-features" aria-label="Fonctionnalit\xE9s incluses dans ${escapeHtml(plan.name)}">
             ${plan.features.map(renderFeature2).join("")}
           </ul>
           <div class="plan-card__footer">
             ${btnHtml}
           </div>
-        </div>`;
+        </article>`;
     }).join("");
     app.innerHTML = `
-      <div class="view-header">
-        <h1><i data-lucide="layers" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Plans & Tarifs</h1>
-        <p class="text-secondary">Choisissez le plan adapt\xE9 \xE0 votre restaurant</p>
-      </div>
+      <section role="region" aria-labelledby="plans-heading-loaded">
+        <div class="view-header">
+          <h1 id="plans-heading-loaded"><i data-lucide="layers" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Plans & Tarifs</h1>
+          <p class="text-secondary">Choisissez le plan adapt\xE9 \xE0 votre restaurant</p>
+        </div>
 
-      ${highlightPlan && highlightPlan !== currentPlan ? `
-        <div class="plans-upgrade-notice">
-          <i data-lucide="lock" style="width:16px;height:16px"></i>
-          Cette fonctionnalit\xE9 n\xE9cessite le plan <strong>${escapeHtml(highlightPlan)}</strong> ou sup\xE9rieur.
-          Votre plan actuel : <strong>${escapeHtml(currentPlan)}</strong>.
-        </div>` : ""}
+        ${highlightPlan && highlightPlan !== currentPlan ? `
+          <div class="plans-upgrade-notice" role="alert">
+            <i data-lucide="lock" style="width:16px;height:16px" aria-hidden="true"></i>
+            Cette fonctionnalit\xE9 n\xE9cessite le plan <strong>${escapeHtml(highlightPlan)}</strong> ou sup\xE9rieur.
+            Votre plan actuel : <strong>${escapeHtml(currentPlan)}</strong>.
+          </div>` : ""}
 
-      <div class="plans-grid">
-        ${cardsHtml}
-      </div>
+        <div class="plans-grid" role="list" aria-label="Plans disponibles">
+          ${cardsHtml}
+        </div>
 
-      <p class="plans-note text-secondary" style="text-align:center;margin-top:24px;font-size:0.85rem">
-        Les changements de plan sont instantan\xE9s. Pas de paiement requis en phase b\xEAta.
-      </p>`;
+        <p class="plans-note text-secondary" style="text-align:center;margin-top:24px;font-size:0.85rem">
+          Les changements de plan sont instantan\xE9s. Pas de paiement requis en phase b\xEAta.
+        </p>
+      </section>`;
     if (window.lucide) lucide.createIcons();
     app.querySelectorAll(".plan-upgrade-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -22215,10 +22256,10 @@ async function renderPlans(highlightPlan) {
     });
   } catch (e) {
     app.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon"><i data-lucide="wifi-off"></i></div>
+      <div class="empty-state" role="alert">
+        <div class="empty-icon" aria-hidden="true"><i data-lucide="wifi-off"></i></div>
         <p>Impossible de charger les plans</p>
-        <button class="btn btn-primary" onclick="renderPlans()">R\xE9essayer</button>
+        <button class="btn btn-primary" onclick="renderPlans()" aria-label="R\xE9essayer de charger les plans">R\xE9essayer</button>
       </div>`;
     if (window.lucide) lucide.createIcons();
   }

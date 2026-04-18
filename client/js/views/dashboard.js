@@ -12,32 +12,34 @@ async function renderOnboardingChecklist() {
 
     const pct = Math.round(data.progress * 100);
     container.innerHTML = `
-      <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
+      <section role="region" aria-labelledby="onboarding-checklist-heading" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-          <h3 style="margin:0;font-size:var(--text-base)">Premiers pas avec RestoSuite</h3>
+          <h3 id="onboarding-checklist-heading" style="margin:0;font-size:var(--text-base)">Premiers pas avec RestoSuite</h3>
           <div style="display:flex;align-items:center;gap:var(--space-3)">
-            <span style="font-size:var(--text-sm);font-weight:600;color:var(--color-accent)">${pct}%</span>
-            <button id="hide-onboarding-btn" style="background:none;border:none;cursor:pointer;color:var(--text-tertiary);font-size:var(--text-sm);padding:2px 6px;border-radius:var(--radius-sm)" title="Masquer">Masquer</button>
+            <span style="font-size:var(--text-sm);font-weight:600;color:var(--color-accent)" aria-label="Progression : ${pct} pour cent">${pct}%</span>
+            <button id="hide-onboarding-btn" style="background:none;border:none;cursor:pointer;color:var(--text-tertiary);font-size:var(--text-sm);padding:2px 6px;border-radius:var(--radius-sm)" title="Masquer" aria-label="Masquer la checklist d'intégration">Masquer</button>
           </div>
         </div>
-        <div style="height:6px;background:var(--bg-sunken);border-radius:var(--radius-full);margin-bottom:var(--space-3);overflow:hidden">
+        <div role="progressbar" aria-label="Progression d'intégration" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" style="height:6px;background:var(--bg-sunken);border-radius:var(--radius-full);margin-bottom:var(--space-3);overflow:hidden">
           <div style="height:100%;width:${pct}%;background:var(--color-accent);border-radius:var(--radius-full);transition:width 0.6s ease"></div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+        <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--space-2)">
           ${data.steps.map(step => `
-            <a ${step.done ? '' : `href="${step.link}"`} class="onboarding-step${step.done ? ' done' : ''}" style="${step.done ? 'pointer-events:none' : ''}">
-              <span class="onboarding-step__check">
-                ${step.done
-                  ? '<i data-lucide="check-circle-2" style="color:var(--color-success);width:20px;height:20px;flex-shrink:0"></i>'
-                  : '<i data-lucide="circle" style="color:var(--text-tertiary);width:20px;height:20px;flex-shrink:0"></i>'
-                }
-              </span>
-              <span class="onboarding-step__label">${escapeHtml(step.label)}</span>
-              ${!step.done ? '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text-tertiary);margin-left:auto;flex-shrink:0"></i>' : ''}
-            </a>
+            <li role="listitem">
+              <a ${step.done ? '' : `href="${step.link}"`} class="onboarding-step${step.done ? ' done' : ''}" style="${step.done ? 'pointer-events:none' : ''}" ${step.done ? 'aria-label="Étape complétée : ' + escapeHtml(step.label) + '" aria-disabled="true"' : 'aria-label="Étape à compléter : ' + escapeHtml(step.label) + '"'}>
+                <span class="onboarding-step__check" aria-hidden="true">
+                  ${step.done
+                    ? '<i data-lucide="check-circle-2" style="color:var(--color-success);width:20px;height:20px;flex-shrink:0"></i>'
+                    : '<i data-lucide="circle" style="color:var(--text-tertiary);width:20px;height:20px;flex-shrink:0"></i>'
+                  }
+                </span>
+                <span class="onboarding-step__label">${escapeHtml(step.label)}</span>
+                ${!step.done ? '<i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text-tertiary);margin-left:auto;flex-shrink:0" aria-hidden="true"></i>' : ''}
+              </a>
+            </li>
           `).join('')}
-        </div>
-      </div>
+        </ul>
+      </section>
     `;
     if (window.lucide) lucide.createIcons({ nodes: [container] });
     document.getElementById('hide-onboarding-btn').addEventListener('click', () => {
@@ -57,15 +59,15 @@ async function renderDashboard() {
   const todayDate = formatFrenchDate(new Date());
 
   app.innerHTML = `
-    <div id="dashboard-greeting" style="margin-bottom:var(--space-4)">
+    <header id="dashboard-greeting" role="banner" style="margin-bottom:var(--space-4)">
       <div style="padding:var(--space-4);background:var(--color-accent-light);border-radius:var(--radius-lg);border-left:4px solid var(--color-accent)">
         <h2 style="margin:0 0 2px 0;color:var(--text-primary);font-size:var(--text-xl)">${greeting}</h2>
-        <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)">${todayDate}</p>
+        <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)"><time datetime="${new Date().toISOString().slice(0, 10)}">${todayDate}</time></p>
       </div>
-    </div>
+    </header>
 
     <div id="dashboard-onboarding"></div>
-    <div id="dashboard-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
+    <div id="dashboard-summary" role="region" aria-label="Résumé du jour" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
 
     <div id="dashboard-alerts" role="region" aria-live="polite" aria-label="Alertes du jour"></div>
     <div id="ai-suggestions-container" role="region" aria-label="Suggestions IA"></div>
@@ -126,16 +128,16 @@ async function renderDashboard() {
 
     if (filtered.length === 0) {
       listEl.innerHTML = filter || typeFilter ? `
-        <div class="empty-state">
-          <div class="empty-icon"><i data-lucide="clipboard-list"></i></div>
+        <div class="empty-state" role="status">
+          <div class="empty-icon" aria-hidden="true"><i data-lucide="clipboard-list"></i></div>
           <p>Aucun résultat</p>
         </div>
       ` : `
-        <div class="empty-state">
-          <div class="empty-icon"><i data-lucide="mic"></i></div>
+        <div class="empty-state" role="status">
+          <div class="empty-icon" aria-hidden="true"><i data-lucide="mic"></i></div>
           <h3>Créez votre première fiche technique</h3>
           <p>Dictez votre recette, l'IA fait le reste — coûts, portions, procédure.</p>
-          ${perms.edit_recipes ? '<a href="#/new" class="btn btn-primary">Nouvelle fiche</a>' : ''}
+          ${perms.edit_recipes ? '<a href="#/new" class="btn btn-primary" aria-label="Créer une nouvelle fiche technique">Nouvelle fiche</a>' : ''}
         </div>
       `;
       lucide.createIcons();
@@ -155,7 +157,7 @@ async function renderDashboard() {
         '<span class="recipe-type-badge recipe-type--plat">🍽️</span>';
 
       return `
-        <div class="card ${costBorderClass}" onclick="location.hash='#/recipe/${r.id}'">
+        <div class="card ${costBorderClass}" role="button" tabindex="0" aria-label="Ouvrir la fiche ${escapeHtml(r.name)}" onclick="location.hash='#/recipe/${r.id}'" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();location.hash='#/recipe/${r.id}';}">
           <div class="card-header">
             <span class="card-title">${typeBadge} ${escapeHtml(r.name)}</span>
             ${r.category ? `<span class="card-category">${escapeHtml(r.category)}</span>` : ''}
@@ -223,9 +225,9 @@ async function renderDashboard() {
         details.push(`${alertData.dlc_alerts.filter(a => a.days_remaining <= 0).length} DLC expirée(s)`);
       if (alertData.temp_alerts.length > 0)
         details.push(`${alertData.temp_alerts.length} alerte(s) température`);
-      html += `<a href="#/haccp" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
+      html += `<a href="#/haccp" role="alert" aria-label="${alertData.summary.critical} alertes critiques : ${details.join(', ')}" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
         <div style="background:var(--color-danger);color:white;padding:var(--space-3);border-radius:var(--radius-lg);cursor:pointer">
-          🚨 <strong>${alertData.summary.critical} alerte(s) critique(s)</strong> — ${details.join(', ')}
+          <span aria-hidden="true">🚨</span> <strong>${alertData.summary.critical} alerte(s) critique(s)</strong> — ${details.join(', ')}
         </div></a>`;
     }
     if (alertData.summary.warnings > 0) {
@@ -234,15 +236,15 @@ async function renderDashboard() {
         details.push(`${alertData.dlc_alerts.filter(a => a.days_remaining > 0).length} DLC proche(s)`);
       if (alertData.low_stock.length > 0)
         details.push(`${alertData.low_stock.length} stock(s) bas`);
-      html += `<a href="#/stock" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
+      html += `<a href="#/stock" aria-label="${alertData.summary.warnings} avertissements : ${details.join(', ')}" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
         <div style="background:var(--color-warning);color:#000;padding:var(--space-3);border-radius:var(--radius-lg);cursor:pointer">
-          ⚠️ <strong>${alertData.summary.warnings} avertissement(s)</strong> — ${details.join(', ')}
+          <span aria-hidden="true">⚠️</span> <strong>${alertData.summary.warnings} avertissement(s)</strong> — ${details.join(', ')}
         </div></a>`;
     }
     if (alertData.summary.pending > 0) {
-      html += `<a href="#/deliveries" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
+      html += `<a href="#/deliveries" aria-label="${alertData.summary.pending} livraisons en attente" style="text-decoration:none;display:block;margin-bottom:var(--space-2)">
         <div style="background:var(--color-info);color:white;padding:var(--space-3);border-radius:var(--radius-lg);cursor:pointer">
-          📦 <strong>${alertData.summary.pending} livraison(s) en attente</strong>
+          <span aria-hidden="true">📦</span> <strong>${alertData.summary.pending} livraison(s) en attente</strong>
         </div></a>`;
     }
     if (html) alertsDiv.innerHTML = html;
@@ -275,9 +277,9 @@ async function loadAISuggestions() {
   container.innerHTML = `
     <div style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-        <h3 style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Suggestions IA</h3>
+        <h3 style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Suggestions IA</h3>
       </div>
-      <p class="text-secondary text-sm" style="text-align:center;padding:var(--space-4)">Analyse en cours…</p>
+      <p class="text-secondary text-sm" role="status" aria-live="polite" style="text-align:center;padding:var(--space-4)">Analyse en cours…</p>
     </div>
   `;
 
@@ -305,12 +307,12 @@ function renderAISuggestions(container, data) {
   if (topItems.length > 0) {
     topHtml = `
       <div style="margin-bottom:var(--space-3)">
-        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-success)">🟢 Plats les plus rentables</h4>
+        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-success)"><span aria-hidden="true">🟢</span> Plats les plus rentables</h4>
         ${topItems.map(item => `
           <div style="padding:6px 0;border-bottom:1px solid var(--color-border)">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(item.name)}</span>
-              <span class="badge badge--success" style="font-size:11px">${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : '?')}%</span>
+              <span class="badge badge--success" style="font-size:11px" aria-label="Food cost ${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : 'inconnu')}%">${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : '?')}%</span>
             </div>
             <p class="text-secondary" style="font-size:12px;margin-top:2px">${escapeHtml(item.reason || '')}</p>
           </div>
@@ -323,12 +325,12 @@ function renderAISuggestions(container, data) {
   if (improveItems.length > 0) {
     improveHtml = `
       <div style="margin-bottom:var(--space-3)">
-        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-danger)">🔴 À améliorer</h4>
+        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-danger)"><span aria-hidden="true">🔴</span> À améliorer</h4>
         ${improveItems.map(item => `
           <div style="padding:6px 0;border-bottom:1px solid var(--color-border)">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(item.name)}</span>
-              <span class="badge badge--danger" style="font-size:11px">${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : '?')}%</span>
+              <span class="badge badge--danger" style="font-size:11px" aria-label="Food cost ${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : 'inconnu')}%">${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : '?')}%</span>
             </div>
             <p class="text-secondary" style="font-size:12px;margin-top:2px">${escapeHtml(item.suggestion || '')}</p>
           </div>
@@ -341,7 +343,7 @@ function renderAISuggestions(container, data) {
   if (daily && daily.name) {
     dailyHtml = `
       <div>
-        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-accent)">⭐ Suggestion plat du jour</h4>
+        <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-accent)"><span aria-hidden="true">⭐</span> Suggestion plat du jour</h4>
         <div style="background:rgba(232,114,42,0.1);border-radius:var(--radius-md);padding:var(--space-3)">
           <strong>${escapeHtml(daily.name)}</strong>
           <p class="text-secondary" style="font-size:12px;margin-top:4px">${escapeHtml(daily.description || daily.reason || '')}</p>
@@ -351,13 +353,13 @@ function renderAISuggestions(container, data) {
   }
 
   container.innerHTML = `
-    <div style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
+    <section role="region" aria-labelledby="ai-suggestions-heading" style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-        <h3 style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Suggestions IA</h3>
-        <button class="btn btn-secondary btn-sm" onclick="refreshAISuggestions()" title="Rafraîchir" style="padding:4px 8px">🔄</button>
+        <h3 id="ai-suggestions-heading" style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Suggestions IA</h3>
+        <button class="btn btn-secondary btn-sm" onclick="refreshAISuggestions()" title="Rafraîchir" aria-label="Rafraîchir les suggestions IA" style="padding:4px 8px"><span aria-hidden="true">🔄</span></button>
       </div>
       ${topHtml}${improveHtml}${dailyHtml}
-    </div>
+    </section>
   `;
 }
 
@@ -394,7 +396,7 @@ function renderDailySummary(recipes, perms) {
   if (!summaryEl) return;
 
   let html = `
-    <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
+    <div role="group" aria-label="Nombre de fiches techniques" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
       <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recipes.length}</div>
       <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Fiches techniques</div>
     </div>
@@ -403,7 +405,7 @@ function renderDailySummary(recipes, perms) {
   if (perms.view_costs && recipes.length > 0) {
     const totalCost = recipes.reduce((sum, r) => sum + (r.total_cost || 0), 0);
     html += `
-      <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
+      <div role="group" aria-label="Coût total matière" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
         <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-success)">${formatCurrency(totalCost)}</div>
         <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Coût total matière</div>
       </div>
@@ -415,15 +417,15 @@ function renderDailySummary(recipes, perms) {
   const tipEl = document.getElementById('daily-tip-container');
   if (tipEl) {
     tipEl.innerHTML = `
-      <div style="background:linear-gradient(135deg, var(--color-accent-light), var(--bg-elevated));border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
+      <aside role="complementary" aria-labelledby="daily-tip-heading" style="background:linear-gradient(135deg, var(--color-accent-light), var(--bg-elevated));border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
         <div style="display:flex;gap:var(--space-3);align-items:flex-start">
-          <span style="font-size:24px">💡</span>
+          <span style="font-size:24px" aria-hidden="true">💡</span>
           <div>
-            <h3 style="margin:0 0 4px 0;font-size:var(--text-sm);font-weight:600;color:var(--text-primary)">Conseil du jour</h3>
+            <h3 id="daily-tip-heading" style="margin:0 0 4px 0;font-size:var(--text-sm);font-weight:600;color:var(--text-primary)">Conseil du jour</h3>
             <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)">${dailyTip}</p>
           </div>
         </div>
-      </div>
+      </aside>
     `;
   }
 

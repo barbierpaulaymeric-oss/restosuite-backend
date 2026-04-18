@@ -6,24 +6,26 @@
 async function renderOrdersDashboard() {
   const app = document.getElementById('app');
   app.innerHTML = `
+    <section role="region" aria-label="Commandes fournisseurs">
     <div class="page-header">
       <h1>Commandes fournisseurs</h1>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-secondary" id="btn-po-analytics"><i data-lucide="bar-chart-3" style="width:16px;height:16px"></i> Statistiques</button>
-        <button class="btn btn-secondary" id="btn-suggest-orders"><i data-lucide="lightbulb" style="width:16px;height:16px"></i> Suggestions</button>
-        <a href="#/orders/new" class="btn btn-primary"><i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle commande</a>
+        <button class="btn btn-secondary" id="btn-po-analytics" aria-label="Afficher les statistiques d'achat"><i data-lucide="bar-chart-3" style="width:16px;height:16px" aria-hidden="true"></i> Statistiques</button>
+        <button class="btn btn-secondary" id="btn-suggest-orders" aria-label="Voir les suggestions de réapprovisionnement"><i data-lucide="lightbulb" style="width:16px;height:16px" aria-hidden="true"></i> Suggestions</button>
+        <a href="#/orders/new" class="btn btn-primary" aria-label="Créer une nouvelle commande"><i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouvelle commande</a>
       </div>
     </div>
-    <div class="orders-subnav" style="display:flex;gap:8px;margin-bottom:20px;overflow-x:auto">
-      <button class="haccp-subnav__link active" data-filter="">Toutes</button>
-      <button class="haccp-subnav__link" data-filter="brouillon">Brouillon</button>
-      <button class="haccp-subnav__link" data-filter="envoyée">Envoyées</button>
-      <button class="haccp-subnav__link" data-filter="confirmée">Confirmées</button>
-      <button class="haccp-subnav__link" data-filter="réceptionnée">Réceptionnées</button>
-      <button class="haccp-subnav__link" data-filter="annulée">Annulées</button>
-    </div>
-    <div id="orders-grid"><div class="loading"><div class="spinner"></div></div></div>
+    <nav class="orders-subnav" role="tablist" aria-label="Filtrer les commandes par statut" style="display:flex;gap:8px;margin-bottom:20px;overflow-x:auto">
+      <button class="haccp-subnav__link active" data-filter="" role="tab" aria-selected="true">Toutes</button>
+      <button class="haccp-subnav__link" data-filter="brouillon" role="tab" aria-selected="false">Brouillon</button>
+      <button class="haccp-subnav__link" data-filter="envoyée" role="tab" aria-selected="false">Envoyées</button>
+      <button class="haccp-subnav__link" data-filter="confirmée" role="tab" aria-selected="false">Confirmées</button>
+      <button class="haccp-subnav__link" data-filter="réceptionnée" role="tab" aria-selected="false">Réceptionnées</button>
+      <button class="haccp-subnav__link" data-filter="annulée" role="tab" aria-selected="false">Annulées</button>
+    </nav>
+    <div id="orders-grid" role="region" aria-label="Liste des commandes" aria-live="polite" aria-busy="true"><div class="loading"><div class="spinner"></div></div></div>
     <div id="suggest-modal" class="hidden"></div>
+    </section>
   `;
   lucide.createIcons();
 
@@ -41,13 +43,14 @@ async function renderOrdersDashboard() {
       ? allOrders.filter(o => o.status === filterStatus)
       : allOrders;
 
+    gridEl.setAttribute('aria-busy', 'false');
     if (orders.length === 0) {
       gridEl.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon"><i data-lucide="package"></i></div>
+        <div class="empty-state" role="status">
+          <div class="empty-icon" aria-hidden="true"><i data-lucide="package"></i></div>
           <h3>Aucune commande</h3>
           <p>Créez une nouvelle commande fournisseur pour commencer.</p>
-          <a href="#/orders/new" class="btn btn-primary">Nouvelle commande</a>
+          <a href="#/orders/new" class="btn btn-primary" aria-label="Créer une nouvelle commande">Nouvelle commande</a>
         </div>
       `;
       return;
@@ -63,26 +66,26 @@ async function renderOrdersDashboard() {
       let actionButtons = '';
       if (order.status === 'brouillon') {
         actionButtons = `
-          <button class="btn btn-sm btn-primary" onclick="sendPurchaseOrder(${order.id})">Envoyer</button>
-          <button class="btn btn-sm btn-secondary" onclick="editPurchaseOrder(${order.id})"><i data-lucide="edit" style="width:14px;height:14px"></i></button>
-          <button class="btn btn-sm btn-danger" aria-label="Supprimer" onclick="deletePurchaseOrderFromDash(${order.id})"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
+          <button class="btn btn-sm btn-primary" onclick="sendPurchaseOrder(${order.id})" aria-label="Envoyer la commande au fournisseur">Envoyer</button>
+          <button class="btn btn-sm btn-secondary" aria-label="Modifier la commande" onclick="editPurchaseOrder(${order.id})"><i data-lucide="edit" style="width:14px;height:14px" aria-hidden="true"></i></button>
+          <button class="btn btn-sm btn-danger" aria-label="Supprimer la commande" onclick="deletePurchaseOrderFromDash(${order.id})"><i data-lucide="trash-2" style="width:14px;height:14px" aria-hidden="true"></i></button>
         `;
       } else if (order.status === 'envoyée') {
         actionButtons = `
-          <button class="btn btn-sm btn-primary" onclick="confirmPurchaseOrder(${order.id})">Confirmer</button>
-          <button class="btn btn-sm btn-danger" aria-label="Annuler" onclick="cancelPurchaseOrderFromDash(${order.id})"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+          <button class="btn btn-sm btn-primary" onclick="confirmPurchaseOrder(${order.id})" aria-label="Confirmer la réception">Confirmer</button>
+          <button class="btn btn-sm btn-danger" aria-label="Annuler la commande" onclick="cancelPurchaseOrderFromDash(${order.id})"><i data-lucide="x" style="width:14px;height:14px" aria-hidden="true"></i></button>
         `;
       } else if (order.status === 'confirmée') {
         actionButtons = `
-          <button class="btn btn-sm btn-primary" onclick="receivePurchaseOrderFromDash(${order.id})">Réceptionner</button>
+          <button class="btn btn-sm btn-primary" onclick="receivePurchaseOrderFromDash(${order.id})" aria-label="Réceptionner la commande">Réceptionner</button>
         `;
       }
 
       return `
-        <div class="order-card" style="cursor:pointer" onclick="location.hash='#/orders/${order.id}'">
+        <div class="order-card" role="button" tabindex="0" aria-label="Ouvrir le détail de la commande ${escapeHtml(order.reference)}" style="cursor:pointer" onclick="location.hash='#/orders/${order.id}'" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();location.hash='#/orders/${order.id}';}">
           <div class="order-card__header">
             <span class="order-card__table" style="font-weight:600">${escapeHtml(order.reference)}</span>
-            <span class="order-card__timer">${elapsed}</span>
+            <span class="order-card__timer" aria-label="Créée il y a ${elapsed}">${elapsed}</span>
           </div>
           <div style="margin-bottom:8px">
             <span class="badge badge--info" style="background:#6366f1;color:white">${escapeHtml(order.supplier_name)}</span>
@@ -107,8 +110,12 @@ async function renderOrdersDashboard() {
   // Filter buttons
   document.querySelectorAll('.orders-subnav button').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.orders-subnav button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.orders-subnav button').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+      });
       btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
       renderOrders(btn.dataset.filter);
     });
   });
@@ -211,28 +218,29 @@ async function renderNewOrder() {
 
     <div style="max-width:800px">
       <div class="form-group">
-        <label>Fournisseur *</label>
-        <select class="form-control" id="po-supplier" required>
+        <label for="po-supplier">Fournisseur *</label>
+        <select class="form-control" id="po-supplier" required aria-required="true">
           <option value="">— Sélectionner un fournisseur —</option>
           ${suppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
         </select>
       </div>
 
-      <div class="section-title">Ingrédients</div>
-      <div id="ingredients-list">
-        <input type="text" class="form-control" id="ingredient-search" placeholder="Rechercher un ingrédient..." style="margin-bottom:12px">
-        <div id="ingredients-filtered" style="max-height:300px;overflow-y:auto;border:1px solid var(--border-color);border-radius:4px">
+      <div class="section-title" id="section-ingredients">Ingrédients</div>
+      <div id="ingredients-list" role="region" aria-labelledby="section-ingredients">
+        <label for="ingredient-search" class="visually-hidden">Rechercher un ingrédient</label>
+        <input type="search" class="form-control" id="ingredient-search" placeholder="Rechercher un ingrédient..." style="margin-bottom:12px" aria-label="Rechercher un ingrédient">
+        <div id="ingredients-filtered" role="list" aria-label="Ingrédients disponibles" style="max-height:300px;overflow-y:auto;border:1px solid var(--border-color);border-radius:4px">
           ${ingredients.map(ing => `
-            <div class="ingredient-item" data-id="${ing.id}" style="padding:8px 12px;border-bottom:1px solid var(--border-color);cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+            <div class="ingredient-item" data-id="${ing.id}" role="listitem" style="padding:8px 12px;border-bottom:1px solid var(--border-color);cursor:pointer;display:flex;justify-content:space-between;align-items:center">
               <span>${escapeHtml(ing.name)}</span>
-              <button type="button" class="btn btn-sm btn-primary">+</button>
+              <button type="button" class="btn btn-sm btn-primary" aria-label="Ajouter ${escapeHtml(ing.name)} à la commande">+</button>
             </div>
           `).join('')}
         </div>
       </div>
 
-      <div class="section-title" style="margin-top:20px">Articles de la commande</div>
-      <div id="po-items-table" style="overflow-x:auto">
+      <div class="section-title" id="section-po-items" style="margin-top:20px">Articles de la commande</div>
+      <div id="po-items-table" role="region" aria-labelledby="section-po-items" aria-live="polite" style="overflow-x:auto">
         <p class="text-muted">Aucun article pour le moment. Ajoutez des ingrédients ci-dessus.</p>
       </div>
 
@@ -242,13 +250,13 @@ async function renderNewOrder() {
       </div>
 
       <div class="actions-row">
-        <button class="btn btn-primary" id="btn-send-po" disabled>
-          <i data-lucide="send" style="width:18px;height:18px"></i> Envoyer
+        <button class="btn btn-primary" id="btn-send-po" disabled aria-label="Envoyer la commande au fournisseur">
+          <i data-lucide="send" style="width:18px;height:18px" aria-hidden="true"></i> Envoyer
         </button>
-        <button class="btn btn-secondary" id="btn-save-po" disabled>
-          <i data-lucide="save" style="width:18px;height:18px"></i> Sauvegarder en brouillon
+        <button class="btn btn-secondary" id="btn-save-po" disabled aria-label="Sauvegarder la commande en brouillon">
+          <i data-lucide="save" style="width:18px;height:18px" aria-hidden="true"></i> Sauvegarder en brouillon
         </button>
-        <a href="#/orders" class="btn btn-secondary">Annuler</a>
+        <a href="#/orders" class="btn btn-secondary" aria-label="Annuler et retourner à la liste">Annuler</a>
       </div>
     </div>
   `;

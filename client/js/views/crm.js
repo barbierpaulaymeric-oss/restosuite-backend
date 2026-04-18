@@ -5,26 +5,28 @@
 async function renderCRM() {
   const app = document.getElementById('app');
   app.innerHTML = `
+    <section role="region" aria-label="CRM et programme de fidélité">
     <div class="view-header">
-      <a href="#/more" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-1);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)">
-        <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Plus
+      <a href="#/more" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-1);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)" aria-label="Retour à la page Plus">
+        <i data-lucide="arrow-left" style="width:16px;height:16px" aria-hidden="true"></i> Plus
       </a>
       <h1 style="display:flex;align-items:center;gap:8px">
-        <i data-lucide="heart" style="width:28px;height:28px;color:#EC4899"></i>
+        <i data-lucide="heart" style="width:28px;height:28px;color:#EC4899" aria-hidden="true"></i>
         CRM & Fidélité
       </h1>
       <p class="text-secondary" style="font-size:var(--text-sm)">Gérez vos clients, points de fidélité et récompenses</p>
     </div>
 
-    <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-4);flex-wrap:wrap">
-      <button class="btn btn-primary crm-tab active" data-tab="customers" onclick="switchCrmTab('customers')">Clients</button>
-      <button class="btn btn-secondary crm-tab" data-tab="rewards" onclick="switchCrmTab('rewards')">Récompenses</button>
-      <button class="btn btn-secondary crm-tab" data-tab="stats" onclick="switchCrmTab('stats')">Statistiques</button>
+    <div role="tablist" aria-label="Onglets CRM" style="display:flex;gap:var(--space-2);margin-bottom:var(--space-4);flex-wrap:wrap">
+      <button role="tab" aria-selected="true" class="btn btn-primary crm-tab active" data-tab="customers" onclick="switchCrmTab('customers')">Clients</button>
+      <button role="tab" aria-selected="false" class="btn btn-secondary crm-tab" data-tab="rewards" onclick="switchCrmTab('rewards')">Récompenses</button>
+      <button role="tab" aria-selected="false" class="btn btn-secondary crm-tab" data-tab="stats" onclick="switchCrmTab('stats')">Statistiques</button>
     </div>
 
-    <div id="crm-content">
+    <div id="crm-content" role="tabpanel" aria-live="polite" aria-busy="true">
       <div style="text-align:center;padding:var(--space-6)"><div class="loading-spinner"></div></div>
     </div>
+    </section>
   `;
   if (window.lucide) lucide.createIcons();
   await loadCrmCustomers();
@@ -32,8 +34,10 @@ async function renderCRM() {
 
 function switchCrmTab(tab) {
   document.querySelectorAll('.crm-tab').forEach(b => {
-    b.classList.toggle('active', b.dataset.tab === tab);
-    b.className = b.classList.contains('active') ? 'btn btn-primary crm-tab active' : 'btn btn-secondary crm-tab';
+    const active = b.dataset.tab === tab;
+    b.classList.toggle('active', active);
+    b.className = active ? 'btn btn-primary crm-tab active' : 'btn btn-secondary crm-tab';
+    b.setAttribute('aria-selected', active ? 'true' : 'false');
   });
   if (tab === 'customers') loadCrmCustomers();
   else if (tab === 'rewards') loadCrmRewards();
@@ -55,9 +59,10 @@ function renderCrmCustomers(customers) {
 
   content.innerHTML = `
     <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-3);align-items:center">
-      <input type="text" class="input" id="crm-search" placeholder="Rechercher un client…" style="flex:1" oninput="searchCrmCustomers()">
-      <button class="btn btn-primary btn-sm" onclick="showAddCustomer()">
-        <i data-lucide="user-plus" style="width:16px;height:16px"></i> Ajouter
+      <label for="crm-search" class="visually-hidden">Rechercher un client</label>
+      <input type="search" class="input" id="crm-search" placeholder="Rechercher un client…" aria-label="Rechercher un client" style="flex:1" oninput="searchCrmCustomers()">
+      <button class="btn btn-primary btn-sm" onclick="showAddCustomer()" aria-label="Ajouter un nouveau client">
+        <i data-lucide="user-plus" style="width:16px;height:16px" aria-hidden="true"></i> Ajouter
       </button>
     </div>
 
@@ -78,7 +83,7 @@ function renderCrmCustomers(customers) {
 
 function renderCustomerCard(c) {
   return `
-    <div class="card" style="padding:var(--space-3);cursor:pointer" onclick="showCustomerDetail(${c.id})">
+    <div class="card" role="button" tabindex="0" aria-label="Détails du client ${escapeHtml(c.name)}" style="padding:var(--space-3);cursor:pointer" onclick="showCustomerDetail(${c.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showCustomerDetail(${c.id});}">
       <div style="display:flex;align-items:center;gap:var(--space-3)">
         ${renderAvatar(c.name, 40)}
         <div style="flex:1;min-width:0">

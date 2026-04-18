@@ -17,12 +17,13 @@ async function renderHACCPCleaning() {
     const freqLabels = { daily: 'Quotidien', weekly: 'Hebdomadaire', monthly: 'Mensuel' };
 
     app.innerHTML = `
+      <section role="region" aria-label="Plan de nettoyage HACCP">
       <div class="haccp-page">
         <div class="page-header">
-          <h1><i data-lucide="sparkles" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Plan de nettoyage</h1>
+          <h1><i data-lucide="sparkles" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Plan de nettoyage</h1>
           ${isGerant ? `
-          <button class="btn btn-primary" id="btn-add-task">
-            <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter
+          <button class="btn btn-primary" id="btn-add-task" aria-label="Ajouter une tâche de nettoyage">
+            <i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Ajouter
           </button>
           ` : ''}
         </div>
@@ -30,17 +31,19 @@ async function renderHACCPCleaning() {
         ${HACCP_SUBNAV_FULL}
 
         <!-- Today's status -->
-        <div class="haccp-cleaning-today-box">
+        <div class="haccp-cleaning-today-box" role="region" aria-label="État des tâches du jour">
           <h3>Aujourd'hui — ${todayData.done}/${todayData.total} effectuées</h3>
-          <div class="haccp-cleaning-progress">
+          <div class="haccp-cleaning-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${todayData.total}" aria-valuenow="${todayData.done}" aria-label="Progression des tâches de nettoyage">
             <div class="haccp-cleaning-progress__bar">
               <div class="haccp-cleaning-progress__fill" style="width:${todayData.total > 0 ? (todayData.done / todayData.total * 100) : 0}%"></div>
             </div>
           </div>
-          <div class="haccp-cleaning-list" style="margin-top:var(--space-3)">
+          <div class="haccp-cleaning-list" role="list" aria-live="polite" style="margin-top:var(--space-3)">
             ${todayData.tasks.map(task => `
-              <div class="haccp-cleaning-item ${task.done_today ? 'haccp-cleaning-item--done' : ''}">
-                <button class="haccp-cleaning-check ${task.done_today ? 'checked' : ''}" 
+              <div class="haccp-cleaning-item ${task.done_today ? 'haccp-cleaning-item--done' : ''}" role="listitem">
+                <button class="haccp-cleaning-check ${task.done_today ? 'checked' : ''}"
+                        aria-label="${task.done_today ? 'Tâche terminée : ' : 'Marquer comme effectuée : '}${escapeHtml(task.name)}"
+                        aria-pressed="${task.done_today ? 'true' : 'false'}"
                         data-task-id="${task.id}" ${task.done_today ? 'disabled' : ''}>
                   ${task.done_today ? '✓' : ''}
                 </button>
@@ -55,12 +58,13 @@ async function renderHACCPCleaning() {
         </div>
 
         <!-- Export -->
-        <div class="haccp-export-bar">
-          <label class="text-secondary text-sm">Export PDF :</label>
-          <input type="date" class="form-control" id="export-from" lang="fr" style="min-height:36px;width:auto">
-          <span class="text-secondary">→</span>
-          <input type="date" class="form-control" id="export-to" lang="fr" style="min-height:36px;width:auto">
-          <button class="btn btn-secondary btn-sm" id="btn-export-cleaning">📄 Exporter</button>
+        <div class="haccp-export-bar" role="group" aria-label="Export PDF des relevés">
+          <label class="text-secondary text-sm" for="export-from">Export PDF :</label>
+          <input type="date" class="form-control" id="export-from" lang="fr" aria-label="Date de début de l'export" style="min-height:36px;width:auto">
+          <span class="text-secondary" aria-hidden="true">→</span>
+          <label class="visually-hidden" for="export-to">Date de fin de l'export</label>
+          <input type="date" class="form-control" id="export-to" lang="fr" aria-label="Date de fin de l'export" style="min-height:36px;width:auto">
+          <button class="btn btn-secondary btn-sm" id="btn-export-cleaning" aria-label="Exporter les relevés en PDF">📄 Exporter</button>
         </div>
 
         <!-- All tasks -->
