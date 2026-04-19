@@ -5327,12 +5327,13 @@ button.nav-link {
   background: rgba(0,0,0,0.45);
   pointer-events: auto;
 }
-/* Desktop: dropdown behavior — no dim, sheet's shadow/border carries the visual.
-   Avoids visual asymmetry where the 300px white sheet on the left of the
-   viewport made only the right half look "dimmed". */
+/* Desktop: dim the page below the nav bar when a dropdown is open */
 @media (min-width: 768px) {
+  .nav-panel-backdrop {
+    top: var(--nav-height, 56px);
+  }
   .nav-panel.open .nav-panel-backdrop {
-    background: rgba(0,0,0,0);
+    background: rgba(0,0,0,0.4);
   }
 }
 
