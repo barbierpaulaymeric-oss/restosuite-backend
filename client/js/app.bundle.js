@@ -23899,7 +23899,12 @@ function bootApp(role, account, opts = {}) {
   console.log("%c RestoSuite ", "background:#E8722A;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600", `loaded (${displayName})`);
   fetchTrialStatus().then(() => renderTrialBanner());
   API.getCurrentPlan().then((data) => {
-    _currentPlan = data.plan || "discovery";
+    if (data.trial_active || data.status === "trial") {
+      _currentPlan = "enterprise";
+    } else {
+      _currentPlan = data.plan || "discovery";
+    }
+    if (typeof renderNav === "function") renderNav();
   }).catch(() => {
   });
   clearTrialStatusInterval();

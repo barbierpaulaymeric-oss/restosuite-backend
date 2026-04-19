@@ -9,6 +9,7 @@ const express = require('express');
 const { get, run } = require('../db');
 const { requireAuth } = require('./auth');
 const { PLAN_ORDER } = require('../middleware/plan-gate');
+const { getAccountStatusById } = require('../middleware/trial');
 
 const router = express.Router();
 
@@ -89,7 +90,10 @@ router.get('/current', requireAuth, (req, res) => {
     : null;
   const currentPlan = restaurant ? (restaurant.plan || 'discovery') : 'discovery';
   const planDetails = PLANS.find(p => p.id === currentPlan) || PLANS[0];
-  res.json({ plan: currentPlan, details: planDetails, restaurant: restaurant || null });
+  // Include trial status so the client can bypass plan-gate UI during trial
+  const trialStatus = getAccountStatusById ? getAccountStatusById(Number(req.user.id)) : null;
+  const trialActive = trialStatus && trialStatus.status === 'trial';
+  res.json({ plan: currentPlan, details: planDetails, restaurant: restaurant || null, trial_active: trialActive, status: trialStatus ? trialStatus.status : null });
 });
 
 // POST /api/plans/upgrade — changer de plan (simulation sans paiement)

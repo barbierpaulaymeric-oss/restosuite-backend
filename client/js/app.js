@@ -420,7 +420,17 @@ function bootApp(role, account, opts = {}) {
 
   // Fetch trial status and plan in parallel
   fetchTrialStatus().then(() => renderTrialBanner());
-  API.getCurrentPlan().then(data => { _currentPlan = data.plan || 'discovery'; }).catch(() => {});
+  API.getCurrentPlan().then(data => {
+    // If user is in active trial, give them full access (enterprise-level)
+    // so no plan-gate badges/locks appear in the UI during trial.
+    if (data.trial_active || data.status === 'trial') {
+      _currentPlan = 'enterprise';
+    } else {
+      _currentPlan = data.plan || 'discovery';
+    }
+    // Re-render nav to remove any stale lock badges
+    if (typeof renderNav === 'function') renderNav();
+  }).catch(() => {});
 
   // Refresh trial status every 5 minutes (store interval ID for cleanup on logout)
   clearTrialStatusInterval();
