@@ -168,6 +168,14 @@ async function showCookingModal(editId = null) {
     `<option value="${p.target}">${p.label} (≥${p.target}°C)</option>`
   ).join('');
 
+  // Autocomplete: recipe names from the user's fiches techniques
+  let recipeOptions = '';
+  try {
+    const recipes = await API.getRecipes();
+    const plats = (recipes || []).filter(r => r.recipe_type === 'plat' || !r.recipe_type);
+    recipeOptions = plats.map(r => `<option value="${escapeHtml(r.name)}">`).join('');
+  } catch (_) { /* non-blocking: autocomplete is a convenience */ }
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
@@ -191,8 +199,10 @@ async function showCookingModal(editId = null) {
       <div class="form-group">
         <label>Nom du produit *</label>
         <input type="text" class="form-control" id="cook-product"
-               placeholder="ex: Poulet rôti" autofocus
+               list="cook-product-list"
+               placeholder="ex: Poulet rôti — tapez pour voir vos fiches" autofocus
                value="${existingRecord ? escapeHtml(existingRecord.product_name) : ''}">
+        <datalist id="cook-product-list">${recipeOptions}</datalist>
       </div>
 
       <div class="form-row">

@@ -48,8 +48,7 @@ const NAV_GROUPS = {
   operations: {
     label: 'Opérations',
     items: [
-      { label: 'Commandes fournisseurs', route: '/orders',    icon: 'clipboard-pen',  roles: ['gerant'],              minPlan: 'essential' },
-      { label: 'Fournisseurs',           route: '/suppliers', icon: 'truck',          roles: ['gerant'],              minPlan: 'essential' },
+      { label: 'Fournisseurs & Commandes', route: '/suppliers', icon: 'truck',        roles: ['gerant'],              minPlan: 'essential' },
       { label: 'Livraisons',             route: '/deliveries',icon: 'package-check',  roles: ['gerant','cuisinier'], minPlan: 'essential' },
       { label: 'Service (Salle)',        route: '/service',   icon: 'concierge-bell', roles: ['gerant','salle'] },
       { label: 'Cuisine (écran)',        route: '/kitchen',   icon: 'chef-hat',       roles: ['gerant','cuisinier'] },
