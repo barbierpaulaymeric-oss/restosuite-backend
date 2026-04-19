@@ -64,10 +64,21 @@ describe('Plans — Upgrade (requires auth + gerant role)', () => {
     const res = await request(app)
       .post('/api/plans/upgrade')
       .set(AUTH)
-      .send({ plan: 'essential' });
+      .send({ plan: 'professional' });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('ok', true);
-    expect(res.body.plan).toBe('essential');
+    expect(res.body.plan).toBe('professional');
+  });
+
+  it('POST /api/plans/upgrade → 200 with legacy plan, persists as professional', async () => {
+    // Legacy tier names (essential, premium) collapse to 'professional'
+    // since the public catalog only exposes 3 tiers.
+    const res = await request(app)
+      .post('/api/plans/upgrade')
+      .set(AUTH)
+      .send({ plan: 'essential' });
+    expect(res.status).toBe(200);
+    expect(res.body.plan).toBe('professional');
   });
 
   it('POST /api/plans/upgrade → 403 for non-gerant', async () => {

@@ -35,9 +35,14 @@ async function renderPlans(highlightPlan) {
       API.getCurrentPlan(),
     ]);
 
-    const target = highlightPlan || currentPlan;
-
+    // 3 public tiers. Legacy 'essential'/'premium' still appear as synonyms
+    // so restaurants migrated from old plans still render correctly.
     const PLAN_ORDER = ['discovery', 'essential', 'professional', 'premium', 'enterprise'];
+    // Treat legacy paid tiers as 'professional' for current-plan highlighting.
+    const normalizePlan = (p) => (p === 'essential' || p === 'premium') ? 'professional' : p;
+
+    const normalizedCurrent = normalizePlan(currentPlan);
+    const target = normalizePlan(highlightPlan || currentPlan);
 
     function planRank(p) { return PLAN_ORDER.indexOf(p); }
 
@@ -50,9 +55,9 @@ async function renderPlans(highlightPlan) {
     }
 
     const cardsHtml = plans.map(plan => {
-      const isCurrent = plan.id === currentPlan;
+      const isCurrent = plan.id === normalizedCurrent;
       const isHighlighted = plan.id === target;
-      const isDowngrade = planRank(plan.id) < planRank(currentPlan);
+      const isDowngrade = planRank(plan.id) < planRank(normalizedCurrent);
       const isEnterprise = plan.id === 'enterprise';
 
       let btnHtml;

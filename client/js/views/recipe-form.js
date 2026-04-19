@@ -37,13 +37,21 @@ async function renderRecipeForm(editId) {
     const response = await API.getIngredients();
     allIngredients = response.ingredients || [];
   } catch(e) { allIngredients = []; }
-  // Load sub-recipes
+  // Load sub-recipes. API.getRecipes() returns {recipes, total, limit, offset},
+  // NOT a bare array — assigning the object to a var named `allRecipes` and
+  // calling `.filter` used to throw silently, leaving sub-recipes empty.
+  // A recipe is eligible as a sub-recipe if its recipe_type is explicit
+  // (sous_recette / base) OR its category signals it's a component rather
+  // than a plated dish (sauce / base / accompagnement).
   try {
-    const allRecipes = await API.getRecipes();
-    allRecipesForSub = allRecipes.filter(r =>
-      (r.recipe_type === 'sous_recette' || r.recipe_type === 'base') &&
-      (!editId || r.id !== editId)
-    );
+    const response = await API.getRecipes();
+    const recipeList = Array.isArray(response) ? response : (response.recipes || []);
+    allRecipesForSub = recipeList.filter(r => {
+      if (editId && r.id === editId) return false;
+      if (r.recipe_type === 'sous_recette' || r.recipe_type === 'base') return true;
+      if (r.category === 'sauce' || r.category === 'base' || r.category === 'accompagnement') return true;
+      return false;
+    });
   } catch(e) { allRecipesForSub = []; }
 
   // Separate regular ingredients and sub-recipe ingredients
@@ -434,17 +442,53 @@ function setupIngredientAutocomplete() {
     const q = input.value.trim().toLowerCase();
     if (q.length < 1) { list.classList.add('hidden'); return; }
 
-    const matches = allIngredients.filter(i => i.name.includes(q)).slice(0, 8);
+    // Search ingredients AND eligible sub-recipes together so the cook doesn't
+    // have to know which bucket a thing lives in (requested UX fix 2026-04-19).
+    const ingMatches = allIngredients
+      .filter(i => i.name.includes(q))
+      .slice(0, 6)
+      .map(m => ({ kind: 'ingredient', name: m.name, waste: m.waste_percent, unit: m.default_unit }));
+    const subMatches = allRecipesForSub
+      .filter(r => r.name && r.name.toLowerCase().includes(q))
+      .slice(0, 4)
+      .map(r => ({ kind: 'sub', id: r.id, name: r.name, recipe_type: r.recipe_type, category: r.category }));
+    const matches = [...subMatches, ...ingMatches];
     if (matches.length === 0) { list.classList.add('hidden'); return; }
 
     highlighted = -1;
-    list.innerHTML = matches.map((m, i) =>
-      `<div class="autocomplete-item" data-index="${i}" data-name="${escapeHtml(m.name)}" data-waste="${m.waste_percent}" data-unit="${m.default_unit}">${escapeHtml(m.name)}</div>`
-    ).join('');
+    list.innerHTML = matches.map((m, i) => {
+      if (m.kind === 'sub') {
+        const icon = m.recipe_type === 'base' ? '🫕' : '📋';
+        return `<div class="autocomplete-item autocomplete-item--sub" data-index="${i}" data-kind="sub" data-id="${m.id}" data-name="${escapeHtml(m.name)}">${icon} ${escapeHtml(m.name)} <span class="text-muted" style="font-size:var(--text-xs);margin-left:6px">sous-recette</span></div>`;
+      }
+      return `<div class="autocomplete-item" data-index="${i}" data-kind="ingredient" data-name="${escapeHtml(m.name)}" data-waste="${m.waste || 0}" data-unit="${m.unit || 'g'}">${escapeHtml(m.name)}</div>`;
+    }).join('');
     list.classList.remove('hidden');
 
     list.querySelectorAll('.autocomplete-item').forEach(item => {
       item.addEventListener('click', () => {
+        if (item.dataset.kind === 'sub') {
+          // Pick this sub-recipe immediately — clear the ingredient-entry row
+          // and add a sub-recipe line with qty 1 (user can edit in the list).
+          const id = parseInt(item.dataset.id, 10);
+          if (formSubRecipes.some(sr => sr.sub_recipe_id === id)) {
+            showToast('Cette sous-recette est déjà ajoutée', 'error');
+          } else {
+            const recipe = allRecipesForSub.find(r => r.id === id);
+            formSubRecipes.push({
+              sub_recipe_id: id,
+              name: recipe ? recipe.name : `#${id}`,
+              quantity: 1,
+              cost: recipe ? (recipe.cost_per_portion || 0) : 0,
+            });
+            renderSubRecipeLines();
+            showToast('Sous-recette ajoutée', 'success');
+          }
+          input.value = '';
+          list.classList.add('hidden');
+          input.focus();
+          return;
+        }
         input.value = item.dataset.name;
         document.getElementById('add-ing-waste').value = item.dataset.waste || '';
         document.getElementById('add-ing-unit').value = item.dataset.unit || 'g';

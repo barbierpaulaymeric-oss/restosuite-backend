@@ -157,6 +157,14 @@ const API = {
     if (r && r.csrf_token) setCsrfToken(r.csrf_token);
     return r;
   },
+  // Unified Restaurant login (2026-04-19 UX fix). Returns either
+  //   { mode: 'owner',  token, csrf_token, account, restaurant } — direct gerant login
+  //   { mode: 'staff',  restaurant_id, restaurant_name, members } — continue to PIN picker
+  async smartLogin(email, password) {
+    const r = await this.request("/auth/smart-login", { method: "POST", body: { email, password } });
+    if (r && r.csrf_token) setCsrfToken(r.csrf_token);
+    return r;
+  },
   async pinLogin(data) {
     const r = await this.request("/auth/pin-login", { method: "POST", body: data });
     if (r && r.csrf_token) setCsrfToken(r.csrf_token);
@@ -1936,10 +1944,14 @@ async function renderRecipeForm(editId) {
     allIngredients = [];
   }
   try {
-    const allRecipes = await API.getRecipes();
-    allRecipesForSub = allRecipes.filter(
-      (r) => (r.recipe_type === "sous_recette" || r.recipe_type === "base") && (!editId || r.id !== editId)
-    );
+    const response = await API.getRecipes();
+    const recipeList = Array.isArray(response) ? response : response.recipes || [];
+    allRecipesForSub = recipeList.filter((r) => {
+      if (editId && r.id === editId) return false;
+      if (r.recipe_type === "sous_recette" || r.recipe_type === "base") return true;
+      if (r.category === "sauce" || r.category === "base" || r.category === "accompagnement") return true;
+      return false;
+    });
   } catch (e) {
     allRecipesForSub = [];
   }
@@ -2306,18 +2318,44 @@ function setupIngredientAutocomplete() {
       list.classList.add("hidden");
       return;
     }
-    const matches = allIngredients.filter((i) => i.name.includes(q)).slice(0, 8);
+    const ingMatches = allIngredients.filter((i) => i.name.includes(q)).slice(0, 6).map((m) => ({ kind: "ingredient", name: m.name, waste: m.waste_percent, unit: m.default_unit }));
+    const subMatches = allRecipesForSub.filter((r) => r.name && r.name.toLowerCase().includes(q)).slice(0, 4).map((r) => ({ kind: "sub", id: r.id, name: r.name, recipe_type: r.recipe_type, category: r.category }));
+    const matches = [...subMatches, ...ingMatches];
     if (matches.length === 0) {
       list.classList.add("hidden");
       return;
     }
     highlighted = -1;
-    list.innerHTML = matches.map(
-      (m, i) => `<div class="autocomplete-item" data-index="${i}" data-name="${escapeHtml(m.name)}" data-waste="${m.waste_percent}" data-unit="${m.default_unit}">${escapeHtml(m.name)}</div>`
-    ).join("");
+    list.innerHTML = matches.map((m, i) => {
+      if (m.kind === "sub") {
+        const icon = m.recipe_type === "base" ? "\u{1FAD5}" : "\u{1F4CB}";
+        return `<div class="autocomplete-item autocomplete-item--sub" data-index="${i}" data-kind="sub" data-id="${m.id}" data-name="${escapeHtml(m.name)}">${icon} ${escapeHtml(m.name)} <span class="text-muted" style="font-size:var(--text-xs);margin-left:6px">sous-recette</span></div>`;
+      }
+      return `<div class="autocomplete-item" data-index="${i}" data-kind="ingredient" data-name="${escapeHtml(m.name)}" data-waste="${m.waste || 0}" data-unit="${m.unit || "g"}">${escapeHtml(m.name)}</div>`;
+    }).join("");
     list.classList.remove("hidden");
     list.querySelectorAll(".autocomplete-item").forEach((item) => {
       item.addEventListener("click", () => {
+        if (item.dataset.kind === "sub") {
+          const id = parseInt(item.dataset.id, 10);
+          if (formSubRecipes.some((sr) => sr.sub_recipe_id === id)) {
+            showToast("Cette sous-recette est d\xE9j\xE0 ajout\xE9e", "error");
+          } else {
+            const recipe = allRecipesForSub.find((r) => r.id === id);
+            formSubRecipes.push({
+              sub_recipe_id: id,
+              name: recipe ? recipe.name : `#${id}`,
+              quantity: 1,
+              cost: recipe ? recipe.cost_per_portion || 0 : 0
+            });
+            renderSubRecipeLines();
+            showToast("Sous-recette ajout\xE9e", "success");
+          }
+          input.value = "";
+          list.classList.add("hidden");
+          input.focus();
+          return;
+        }
         input.value = item.dataset.name;
         document.getElementById("add-ing-waste").value = item.dataset.waste || "";
         document.getElementById("add-ing-unit").value = item.dataset.unit || "g";
@@ -16374,7 +16412,9 @@ class LoginView {
     this.staffMembers = [];
     this.selectedMember = null;
     this.restaurantName = "";
+    this.restaurantId = null;
     this.pinDigits = [];
+    this.prefillEmail = "";
   }
   async render() {
     const app = document.getElementById("app");
@@ -16384,14 +16424,11 @@ class LoginView {
       case "choice":
         this.renderChoice(app);
         break;
-      case "gerant":
-        this.renderGerant(app);
+      case "restaurant":
+        this.renderRestaurant(app);
         break;
       case "register":
         this.renderRegister(app);
-        break;
-      case "staff-password":
-        this.renderStaffPassword(app);
         break;
       case "team-picker":
         this.renderTeamPicker(app);
@@ -16404,7 +16441,7 @@ class LoginView {
         break;
     }
   }
-  // ─── Choice Screen ───
+  // ─── Choice Screen — Restaurant vs Fournisseur ───
   renderChoice(app) {
     app.innerHTML = `
       <div class="login-screen">
@@ -16416,11 +16453,11 @@ class LoginView {
           <p class="login-tagline">Votre cuisine tourne. Vos chiffres suivent.</p>
 
           <div style="display:flex;flex-direction:column;gap:16px;margin-top:var(--space-6);width:100%">
-            <button class="btn btn-primary" id="btn-gerant" style="padding:16px;font-size:var(--text-base);display:flex;align-items:center;justify-content:center;gap:10px">
-              <span style="font-size:1.4rem">\u{1F451}</span> G\xE9rant
+            <button class="btn btn-primary" id="btn-restaurant" style="padding:16px;font-size:var(--text-base);display:flex;align-items:center;justify-content:center;gap:10px">
+              <span style="font-size:1.4rem">\u{1F37D}\uFE0F</span> Restaurant
             </button>
-            <button class="btn btn-secondary" id="btn-staff" style="padding:16px;font-size:var(--text-base);display:flex;align-items:center;justify-content:center;gap:10px">
-              <span style="font-size:1.4rem">\u{1F465}</span> \xC9quipe
+            <button class="btn btn-secondary" id="btn-fournisseur" style="padding:16px;font-size:var(--text-base);display:flex;align-items:center;justify-content:center;gap:10px">
+              <span style="font-size:1.4rem">\u{1F69A}</span> Fournisseur
             </button>
           </div>
 
@@ -16432,13 +16469,16 @@ class LoginView {
         </div>
       </div>
     `;
-    document.getElementById("btn-gerant").addEventListener("click", () => {
-      this.mode = "gerant";
+    document.getElementById("btn-restaurant").addEventListener("click", () => {
+      this.mode = "restaurant";
       this.render();
     });
-    document.getElementById("btn-staff").addEventListener("click", () => {
-      this.mode = "staff-password";
-      this.render();
+    document.getElementById("btn-fournisseur").addEventListener("click", () => {
+      if (typeof renderSupplierLogin === "function") {
+        renderSupplierLogin();
+      } else {
+        location.hash = "#/supplier/login";
+      }
     });
     document.getElementById("link-register").addEventListener("click", (e) => {
       e.preventDefault();
@@ -16446,8 +16486,10 @@ class LoginView {
       this.render();
     });
   }
-  // ─── Gérant Login ───
-  renderGerant(app) {
+  // ─── Restaurant Login (unified — owner pwd OR staff pwd via /smart-login) ───
+  renderRestaurant(app) {
+    const stored = typeof getAccount === "function" ? getAccount() : null;
+    const prefill = this.prefillEmail || stored && stored.email || localStorage.getItem("restosuite_last_email") || "";
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">
@@ -16457,12 +16499,14 @@ class LoginView {
           <div class="login-logo">
             <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 60px; width: auto;">
           </div>
-          <h2 class="login-subtitle">Connexion g\xE9rant</h2>
+          <h2 class="login-subtitle">Connexion restaurant</h2>
+          <p class="login-tagline" style="margin-bottom:var(--space-2)">G\xE9rant ou \xE9quipe \u2014 un seul formulaire.</p>
+          <p class="login-hint" style="font-size:var(--text-xs);color:var(--text-tertiary);margin:0 0 var(--space-4)">Utilisez votre mot de passe personnel (g\xE9rant) ou celui de l'\xE9quipe \u2014 c'est le mot de passe qui d\xE9termine votre acc\xE8s.</p>
 
           <div style="text-align:left;width:100%;margin-top:var(--space-4)">
             <div class="form-group">
-              <label for="login-email">Email</label>
-              <input type="email" class="form-control" id="login-email" placeholder="votre@email.com" autocomplete="email" required>
+              <label for="login-email">Email du restaurant</label>
+              <input type="email" class="form-control" id="login-email" value="${escapeHtml(prefill)}" placeholder="votre@email.com" autocomplete="email" required>
             </div>
             <div class="form-group">
               <label for="login-password">Mot de passe</label>
@@ -16483,12 +16527,18 @@ class LoginView {
       this.mode = "choice";
       this.render();
     });
-    document.getElementById("login-submit").addEventListener("click", () => this.handleGerantLogin());
+    document.getElementById("login-submit").addEventListener("click", () => this.handleRestaurantLogin());
     document.getElementById("login-password").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") this.handleGerantLogin();
+      if (e.key === "Enter") this.handleRestaurantLogin();
     });
+    const emailField = document.getElementById("login-email");
+    if (emailField.value) {
+      document.getElementById("login-password").focus();
+    } else {
+      emailField.focus();
+    }
   }
-  async handleGerantLogin() {
+  async handleRestaurantLogin() {
     const email = document.getElementById("login-email").value.trim();
     const password = document.getElementById("login-password").value;
     const errorEl = document.getElementById("login-error");
@@ -16505,19 +16555,43 @@ class LoginView {
     submitBtn.disabled = true;
     submitBtn.textContent = "Connexion...";
     try {
-      const result = await API.login({ email, password });
-      localStorage.setItem("restosuite_token", result.token);
-      localStorage.setItem("restosuite_account", JSON.stringify(result.account));
-      const nav = document.getElementById("nav");
-      if (nav) nav.style.display = "";
-      if (result.account.onboarding_step < 7 && result.account.is_owner) {
-        const wizard = new OnboardingWizard(() => {
-          bootApp(result.account.role, result.account);
-        });
-        wizard.show();
-      } else {
-        bootApp(result.account.role, result.account);
+      const result = await API.smartLogin(email, password);
+      try {
+        localStorage.setItem("restosuite_last_email", email);
+      } catch (e) {
       }
+      if (result.mode === "owner") {
+        localStorage.setItem("restosuite_token", result.token);
+        localStorage.setItem("restosuite_account", JSON.stringify(result.account));
+        const nav = document.getElementById("nav");
+        if (nav) nav.style.display = "";
+        if (result.account.onboarding_step < 7 && result.account.is_owner) {
+          const wizard = new OnboardingWizard(() => {
+            bootApp(result.account.role, result.account);
+          });
+          wizard.show();
+        } else {
+          bootApp(result.account.role, result.account);
+        }
+        return;
+      }
+      if (result.mode === "staff") {
+        this.staffMembers = result.members || [];
+        this.restaurantName = result.restaurant_name || "Mon restaurant";
+        this.restaurantId = result.restaurant_id;
+        if (this.staffMembers.length === 0) {
+          errorEl.textContent = "Aucun membre d'\xE9quipe trouv\xE9. Le g\xE9rant doit d'abord cr\xE9er des comptes.";
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Se connecter";
+          return;
+        }
+        this.mode = "team-picker";
+        this.render();
+        return;
+      }
+      errorEl.textContent = "Erreur de connexion";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Se connecter";
     } catch (e) {
       errorEl.textContent = e.message || "Erreur de connexion";
       submitBtn.disabled = false;
@@ -16638,75 +16712,6 @@ class LoginView {
       submitBtn.textContent = "Cr\xE9er mon compte";
     }
   }
-  // ─── Staff Password ───
-  renderStaffPassword(app) {
-    app.innerHTML = `
-      <div class="login-screen">
-        <div class="login-content" style="max-width:400px">
-          <button class="login-back" id="back-btn" aria-label="Revenir \xE0 l'\xE9cran pr\xE9c\xE9dent">
-            <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
-          </button>
-          <div style="margin-bottom:var(--space-4)">
-            <span style="font-size:2.5rem">\u{1F465}</span>
-          </div>
-          <h2 class="login-subtitle">Acc\xE8s \xE9quipe</h2>
-          <p class="login-tagline">Entrez le mot de passe du restaurant</p>
-
-          <div style="text-align:left;width:100%;margin-top:var(--space-4)">
-            <div class="form-group">
-              <label for="staff-password">Mot de passe restaurant</label>
-              <input type="password" class="form-control" id="staff-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="off" style="text-align:center;font-size:1.2rem;letter-spacing:4px" required>
-            </div>
-          </div>
-
-          <div id="staff-error" role="alert" aria-live="assertive" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
-
-          <button class="btn btn-primary" id="staff-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
-            Continuer
-          </button>
-        </div>
-      </div>
-    `;
-    if (window.lucide) lucide.createIcons();
-    document.getElementById("back-btn").addEventListener("click", () => {
-      this.mode = "choice";
-      this.render();
-    });
-    document.getElementById("staff-submit").addEventListener("click", () => this.handleStaffPassword());
-    document.getElementById("staff-password").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") this.handleStaffPassword();
-    });
-    document.getElementById("staff-password").focus();
-  }
-  async handleStaffPassword() {
-    const password = document.getElementById("staff-password").value;
-    const errorEl = document.getElementById("staff-error");
-    const submitBtn = document.getElementById("staff-submit");
-    errorEl.textContent = "";
-    if (!password) {
-      errorEl.textContent = "Le mot de passe est requis";
-      return;
-    }
-    submitBtn.disabled = true;
-    submitBtn.textContent = "V\xE9rification...";
-    try {
-      const result = await API.staffLogin(password);
-      this.staffMembers = result.members;
-      this.restaurantName = result.restaurant_name;
-      if (this.staffMembers.length === 0) {
-        errorEl.textContent = "Aucun membre d'\xE9quipe trouv\xE9. Le g\xE9rant doit d'abord cr\xE9er des comptes.";
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Continuer";
-        return;
-      }
-      this.mode = "team-picker";
-      this.render();
-    } catch (e) {
-      errorEl.textContent = e.message || "Mot de passe incorrect";
-      submitBtn.disabled = false;
-      submitBtn.textContent = "Continuer";
-    }
-  }
   // ─── Team Picker ───
   renderTeamPicker(app) {
     app.innerHTML = `
@@ -16736,7 +16741,7 @@ class LoginView {
     `;
     if (window.lucide) lucide.createIcons();
     document.getElementById("back-btn").addEventListener("click", () => {
-      this.mode = "staff-password";
+      this.mode = "restaurant";
       this.render();
     });
     document.querySelectorAll(".team-picker-card").forEach((card) => {
@@ -22180,12 +22185,14 @@ async function renderPlans(highlightPlan) {
       API.getPlans(),
       API.getCurrentPlan()
     ]);
-    const target = highlightPlan || currentPlan;
     const PLAN_ORDER = ["discovery", "essential", "professional", "premium", "enterprise"];
+    const normalizePlan = (p) => p === "essential" || p === "premium" ? "professional" : p;
+    const normalizedCurrent = normalizePlan(currentPlan);
+    const target = normalizePlan(highlightPlan || currentPlan);
     const cardsHtml = plans.map((plan) => {
-      const isCurrent = plan.id === currentPlan;
+      const isCurrent = plan.id === normalizedCurrent;
       const isHighlighted = plan.id === target;
-      const isDowngrade = planRank2(plan.id) < planRank2(currentPlan);
+      const isDowngrade = planRank2(plan.id) < planRank2(normalizedCurrent);
       const isEnterprise = plan.id === "enterprise";
       let btnHtml;
       if (isCurrent) {

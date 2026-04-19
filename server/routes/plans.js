@@ -12,89 +12,70 @@ const { PLAN_ORDER } = require('../middleware/plan-gate');
 
 const router = express.Router();
 
+// Public pricing catalog — 3 plans only.
+// - discovery = free 60-day trial (full access, no card, no plan selection)
+// - professional = Pro at 39€/mois (all features)
+// - enterprise = Entreprise sur devis (multi-site + API + SLA)
+// Internal planGate() keeps the 5-rank PLAN_ORDER for back-compat with existing
+// `planGate('essential')` / `planGate('premium')` calls in index.js — those
+// are still satisfied by planRank('professional') ≥ planRank('essential').
 const PLANS = [
   {
     id: 'discovery',
-    name: 'Discovery',
+    name: 'Essai gratuit',
     price: 0,
     label: 'Gratuit',
     badge: null,
-    description: 'Pour démarrer et tester la solution',
+    description: '60 jours d\'accès complet, sans carte bancaire',
     features: [
+      'Accès à toutes les fonctionnalités',
       'Fiches techniques illimitées',
-      'Gestion des ingrédients',
-      'Stock & réception',
-      'Tableau de bord basique',
-    ],
-  },
-  {
-    id: 'essential',
-    name: 'Essential',
-    price: 29,
-    label: '29€/mois',
-    badge: 'ESSENTIAL',
-    description: 'Pour les restaurants qui s\'installent',
-    features: [
-      'Tout Discovery, plus :',
-      'HACCP températures & nettoyage',
-      'Gestion fournisseurs',
-      'Commandes fournisseurs',
-      'Bons de livraison',
-      'CRM & fidélité',
-      'QR Codes menu',
+      'Saisie vocale IA',
+      'HACCP complet',
+      'Multi-comptes',
+      'Aucune carte bancaire requise',
     ],
   },
   {
     id: 'professional',
-    name: 'Professional',
-    price: 59,
-    label: '59€/mois',
+    name: 'Pro',
+    price: 39,
+    label: '39€/mois',
     badge: 'PRO',
-    description: 'Pour les restaurants en croissance',
+    description: 'Tout ce qu\'il faut pour piloter votre restaurant',
     features: [
-      'Tout Essential, plus :',
-      'Plan HACCP formalisé',
-      'BPH complet (formation, nuisibles, maintenance, déchets)',
-      'Pilotage & analytics avancés',
-      'Menu engineering',
-      'Prédictions IA',
-      'Assistant IA culinaire',
-      'Bilan carbone',
-      'Intégrations TPV',
-    ],
-  },
-  {
-    id: 'premium',
-    name: 'Premium',
-    price: 99,
-    label: '99€/mois',
-    badge: 'PREMIUM',
-    description: 'Pour les restaurants exigeants',
-    features: [
-      'Tout Professional, plus :',
-      'Traçabilité complète',
-      'Procédures retrait & rappel',
-      'Exports PDF & données',
-      'Multi-sites',
+      'Fiches techniques illimitées',
+      'Saisie vocale IA',
+      'HACCP complet + plan formalisé',
+      'Gestion fournisseurs & commandes',
+      'CRM, fidélité, QR Codes',
+      'Pilotage, analytics, menu engineering',
+      'Prédictions IA & bilan carbone',
+      'Exports PDF & support prioritaire',
     ],
   },
   {
     id: 'enterprise',
-    name: 'Enterprise',
+    name: 'Entreprise',
     price: null,
     label: 'Sur devis',
     badge: 'ENTERPRISE',
-    description: 'Pour les groupes de restauration',
+    description: 'Pour les groupes et chaînes de restauration',
     features: [
-      'Tout Premium, plus :',
+      'Tout le plan Pro, plus :',
+      'Multi-établissements',
       'API publique',
       'SSO & authentification centralisée',
-      'Support dédié',
-      'SLA garanti',
+      'Support dédié + SLA garanti',
       'Intégrations sur mesure',
     ],
   },
 ];
+
+// Allowed upgrade targets (public-facing). Legacy tier names
+// ('essential', 'premium') are still recognised by planGate for back-compat,
+// but cannot be chosen as a target via the UI — any paid plan is 'professional'.
+const UPGRADE_TARGETS = ['discovery', 'professional', 'enterprise'];
 
 // GET /api/plans — liste publique des plans
 router.get('/', (req, res) => {
@@ -112,20 +93,25 @@ router.get('/current', requireAuth, (req, res) => {
 });
 
 // POST /api/plans/upgrade — changer de plan (simulation sans paiement)
+// Accepts any recognised tier (including legacy 'essential'/'premium') so the
+// internal planGate compat layer stays intact, but legacy names are rewritten
+// to 'professional' before being persisted — we only store the 3 public tiers.
 router.post('/upgrade', requireAuth, (req, res) => {
   if (req.user.role !== 'gerant') {
     return res.status(403).json({ error: 'Réservé au gérant' });
   }
   const { plan } = req.body;
   if (!plan || !PLAN_ORDER.includes(plan)) {
-    return res.status(400).json({ error: 'Plan invalide', valid: PLAN_ORDER });
+    return res.status(400).json({ error: 'Plan invalide', valid: UPGRADE_TARGETS });
   }
   if (!req.user.restaurant_id) {
     return res.status(400).json({ error: 'Aucun restaurant associé à ce compte' });
   }
-  run('UPDATE restaurants SET plan = ? WHERE id = ?', [plan, req.user.restaurant_id]);
-  const planDetails = PLANS.find(p => p.id === plan) || PLANS[0];
-  res.json({ ok: true, plan, details: planDetails });
+  // Collapse legacy tiers into the single 'professional' plan.
+  const storedPlan = (plan === 'essential' || plan === 'premium') ? 'professional' : plan;
+  run('UPDATE restaurants SET plan = ? WHERE id = ?', [storedPlan, req.user.restaurant_id]);
+  const planDetails = PLANS.find(p => p.id === storedPlan) || PLANS[0];
+  res.json({ ok: true, plan: storedPlan, details: planDetails });
 });
 
 module.exports = router;

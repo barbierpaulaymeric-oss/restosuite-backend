@@ -256,9 +256,19 @@ router.post('/register', async (req, res) => {
     const restaurantResult = run('INSERT INTO restaurants (name) VALUES (?)', ['Mon restaurant']);
     const restaurantId = restaurantResult.lastInsertRowid;
 
-    // Set staff password if provided during registration
+    // Set staff password if provided during registration. Same security floor
+    // as the gérant password — 8+ chars, one uppercase, one digit — because it
+    // now grants the same Restaurant-login entry point (UX change 2026-04-19).
     if (req.body.staff_password && req.body.staff_password.trim()) {
-      const staffHash = await bcrypt.hash(req.body.staff_password.trim(), 10);
+      const sp = req.body.staff_password.trim();
+      if (sp.length < 8 || !/[A-Z]/.test(sp) || !/[0-9]/.test(sp)) {
+        // We already created the restaurant + account; roll back the implicit
+        // half-state before returning so a retry won't tell the user the
+        // email is already taken.
+        try { run('DELETE FROM restaurants WHERE id = ?', [restaurantId]); } catch {}
+        return res.status(400).json({ error: "Le mot de passe équipe doit faire 8 caractères avec une majuscule et un chiffre" });
+      }
+      const staffHash = await bcrypt.hash(sp, 10);
       run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [staffHash, restaurantId]);
     }
 
@@ -468,6 +478,92 @@ router.get('/me', requireAuth, (req, res) => {
   });
 });
 
+// ─── POST /api/auth/smart-login ───
+// Unified Restaurant login: the caller sends email + password. We try the
+// owner's password first (→ gerant session); if that fails, we try the
+// restaurant's shared staff_password (→ team-picker flow). This avoids the
+// "Gérant vs Équipe" button choice that confused real users (UX testing
+// 2026-04-19). The email is the restaurant owner's email; the password
+// decides the role.
+router.post('/smart-login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email et mot de passe requis' });
+  }
+  const normEmail = email.trim().toLowerCase();
+
+  // Per-IP+email lockout on this combined endpoint
+  const lockoutKey = `smart_login:${req.ip}:${normEmail}`;
+  const lock = checkPinLockout(lockoutKey);
+  if (lock.locked) {
+    const minutesRemaining = Math.ceil(lock.remainingMs / 60000);
+    return res.status(429).json({ error: `Trop de tentatives. Réessayez dans ${minutesRemaining} minutes.` });
+  }
+
+  const ownerAccount = get('SELECT * FROM accounts WHERE email = ?', [normEmail]);
+  if (!ownerAccount) {
+    recordPinAttempt(lockoutKey, false);
+    return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+  }
+
+  // Branch 1 — owner password (full gérant session, skip team picker entirely).
+  if (ownerAccount.password_hash && await bcrypt.compare(password, ownerAccount.password_hash)) {
+    recordPinAttempt(lockoutKey, true);
+    run('UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [ownerAccount.id]);
+    const { token, csrf } = generateToken(ownerAccount);
+    issueAuthCookie(res, token);
+    const restaurant = ownerAccount.restaurant_id
+      ? get('SELECT * FROM restaurants WHERE id = ?', [ownerAccount.restaurant_id])
+      : null;
+    return res.json({
+      mode: 'owner',
+      token,
+      csrf_token: csrf,
+      account: {
+        id: ownerAccount.id,
+        name: ownerAccount.name,
+        email: ownerAccount.email,
+        role: ownerAccount.role,
+        first_name: ownerAccount.first_name,
+        last_name: ownerAccount.last_name,
+        onboarding_step: ownerAccount.onboarding_step,
+        is_owner: ownerAccount.is_owner,
+        permissions: JSON.parse(ownerAccount.permissions),
+      },
+      restaurant,
+    });
+  }
+
+  // Branch 2 — restaurant's shared staff_password → returns team members for
+  // the PIN picker. We never return 403/mode-specific hints; a wrong password
+  // looks the same whether we tried branch 1 or 2.
+  const restaurant = ownerAccount.restaurant_id
+    ? get('SELECT * FROM restaurants WHERE id = ?', [ownerAccount.restaurant_id])
+    : null;
+
+  if (restaurant && restaurant.staff_password
+      && await bcrypt.compare(password, restaurant.staff_password)) {
+    recordPinAttempt(lockoutKey, true);
+    const members = all(
+      `SELECT id, name, role, CASE WHEN pin IS NOT NULL AND pin != '' THEN 1 ELSE 0 END as has_pin
+       FROM accounts
+       WHERE restaurant_id = ? AND role NOT IN ('gerant', 'fournisseur')
+       ORDER BY name ASC`,
+      [restaurant.id]
+    );
+    return res.json({
+      mode: 'staff',
+      restaurant_id: restaurant.id,
+      restaurant_name: restaurant.name || 'Mon restaurant',
+      members,
+    });
+  }
+
+  recordPinAttempt(lockoutKey, false);
+  return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+});
+
 // ─── POST /api/auth/staff-login ───
 // Staff enters the restaurant's name + shared password → gets list of team members.
 // restaurant_name is required to avoid the O(N-tenants × bcrypt) event-loop DoS
@@ -641,8 +737,16 @@ router.post('/staff-pin/create', requireAuth, async (req, res) => {
 router.put('/staff-password', requireAuth, async (req, res) => {
   const { password } = req.body;
 
-  if (!password || password.length < 4) {
-    return res.status(400).json({ error: 'Le mot de passe doit faire au moins 4 caractères' });
+  // Same security floor as the gérant password — this now logs into the same
+  // Restaurant entry point (UX change 2026-04-19).
+  if (!password || password.length < 8) {
+    return res.status(400).json({ error: 'Le mot de passe doit faire au moins 8 caractères' });
+  }
+  if (!/[A-Z]/.test(password)) {
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins une majuscule' });
+  }
+  if (!/[0-9]/.test(password)) {
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins un chiffre' });
   }
 
   // Get the user's restaurant

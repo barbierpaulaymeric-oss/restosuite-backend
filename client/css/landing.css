@@ -226,21 +226,24 @@
       color: var(--text-primary);
       border: 1.5px solid var(--border-default);
     }
+    /* Hover: text stays at full contrast + bolder. Orange on orange-tint was
+       washing out — keep text-primary, tint bg, thicken weight. */
     .btn--secondary:hover {
       border-color: var(--color-accent);
-      color: var(--color-accent);
+      color: var(--text-primary);
       background: var(--color-accent-light);
+      font-weight: 700;
       transform: translateY(-2px);
     }
     .btn--secondary:active { transform: translateY(0) scale(0.98); }
-    
+
     .btn--ghost {
       background: transparent;
       color: var(--text-secondary);
       padding: 10px 16px;
       font-weight: 500;
     }
-    .btn--ghost:hover { color: var(--color-accent); }
+    .btn--ghost:hover { color: var(--text-primary); font-weight: 700; }
     
     .btn--large {
       padding: 16px 36px;
@@ -1597,8 +1600,10 @@
       border-color: var(--border-paper);
     }
     .section--paper .btn--secondary:hover {
-      color: var(--color-accent);
+      color: var(--text-on-paper);
       border-color: var(--color-accent);
+      background: var(--color-accent-light);
+      font-weight: 700;
     }
 
     /* ============================================

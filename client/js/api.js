@@ -164,6 +164,14 @@ const API = {
     if (r && r.csrf_token) setCsrfToken(r.csrf_token);
     return r;
   },
+  // Unified Restaurant login (2026-04-19 UX fix). Returns either
+  //   { mode: 'owner',  token, csrf_token, account, restaurant } — direct gerant login
+  //   { mode: 'staff',  restaurant_id, restaurant_name, members } — continue to PIN picker
+  async smartLogin(email, password) {
+    const r = await this.request('/auth/smart-login', { method: 'POST', body: { email, password } });
+    if (r && r.csrf_token) setCsrfToken(r.csrf_token);
+    return r;
+  },
   async pinLogin(data) {
     const r = await this.request('/auth/pin-login', { method: 'POST', body: data });
     if (r && r.csrf_token) setCsrfToken(r.csrf_token);
