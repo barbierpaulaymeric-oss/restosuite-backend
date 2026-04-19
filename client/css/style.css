@@ -5322,9 +5322,18 @@ button.nav-link {
   transition: background 0.2s ease;
   pointer-events: none;
 }
+/* Mobile: dim everything like a bottom-sheet modal */
 .nav-panel.open .nav-panel-backdrop {
   background: rgba(0,0,0,0.45);
   pointer-events: auto;
+}
+/* Desktop: dropdown behavior — no dim, sheet's shadow/border carries the visual.
+   Avoids visual asymmetry where the 300px white sheet on the left of the
+   viewport made only the right half look "dimmed". */
+@media (min-width: 768px) {
+  .nav-panel.open .nav-panel-backdrop {
+    background: rgba(0,0,0,0);
+  }
 }
 
 .nav-panel-sheet {
@@ -5339,7 +5348,7 @@ button.nav-link {
   transform: translateY(100%);
   transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
   display: grid;
-  grid-template-columns: repeat(2,1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
 }
 .nav-panel.open .nav-panel-sheet { transform: translateY(0); }
@@ -5369,6 +5378,8 @@ button.nav-link {
   background: var(--bg-sunken);
   transition: background 0.15s, color 0.15s;
   -webkit-tap-highlight-color: transparent;
+  min-width: 0;
+  overflow: hidden;
 }
 .nav-panel-item svg { width:18px; height:18px; flex-shrink:0; stroke:currentColor; }
 .nav-panel-item__label {
