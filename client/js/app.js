@@ -78,6 +78,7 @@ const NAV_GROUPS = {
         label: 'Traçabilité',
         items: [
           { label: 'Réception (CCP1)',       route: '/stock/reception',           icon: 'package-plus',   roles: ['gerant','cuisinier'] },
+          { label: 'Scan étiquettes',        route: '/haccp/label-scan',          icon: 'scan-line',      roles: ['gerant','cuisinier'] },
           { label: 'Traçabilité aval',       route: '/traceability/downstream',   icon: 'package-check',  roles: ['gerant','cuisinier'] },
           { label: 'Allergènes (INCO)',      route: '/haccp/allergens',           icon: 'wheat-off',      roles: ['gerant','cuisinier'] },
         ]
@@ -396,6 +397,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/corrective-actions$/, renderCorrectiveActions);
   Router.add(/^\/haccp\/allergens-plan$/, renderHACCPAllergensplan);
   Router.add(/^\/haccp\/water$/, renderHACCPWater);
+  Router.add(/^\/haccp\/label-scan$/, renderHACCPLabelScan);
   Router.add(/^\/haccp\/pms-audit$/, renderHACCPPmsAudit);
   Router.add(/^\/haccp\/tiac$/, renderHACCPTIAC);
   Router.add(/^\/haccp\/witness-meals$/, renderHACCPWitnessMeals);

@@ -269,6 +269,18 @@ const API = {
   createTraceability(data) { return this.request('/haccp/traceability', { method: 'POST', body: data }); },
   getDLCAlerts() { return this.request('/haccp/traceability/dlc-alerts'); },
 
+  // Label Scans (CCP1 réception)
+  getLabelScans(params) {
+    const qs = params ? new URLSearchParams(params).toString() : '';
+    return this.request(`/haccp/label-scans${qs ? '?' + qs : ''}`);
+  },
+  getLabelScan(id) { return this.request(`/haccp/label-scans/${id}`); },
+  saveLabelScan(data) { return this.request('/haccp/label-scans', { method: 'POST', body: data }); },
+  deleteLabelScan(id) { return this.request(`/haccp/label-scans/${id}`, { method: 'DELETE' }); },
+  extractLabelScan(image_base64) {
+    return this.request('/haccp/label-scans/extract', { method: 'POST', body: { image_base64 } });
+  },
+
   // Cooling
   getCoolingLogs(params) {
     const qs = params ? new URLSearchParams(params).toString() : '';

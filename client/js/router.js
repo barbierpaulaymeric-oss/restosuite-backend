@@ -18,6 +18,7 @@ const ROUTE_ROLES = {
   '/haccp': ['gerant', 'cuisinier'],
   '/haccp/': ['gerant', 'cuisinier'],
   '/haccp/calibrations': ['gerant', 'cuisinier'],
+  '/haccp/label-scan': ['gerant', 'cuisinier'],
   '/suppliers': ['gerant'],
   '/ia': ['gerant', 'cuisinier', 'equipier'],
   '/analytics': ['gerant'],

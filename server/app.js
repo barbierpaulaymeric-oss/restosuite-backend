@@ -284,6 +284,7 @@ app.use('/api/ai', require('./routes/ai'));
 app.use('/api/ai-preferences', require('./routes/ai-preferences'));
 app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/haccp/witness-meals', require('./routes/witness-meals'));
+app.use('/api/haccp/label-scans', require('./routes/haccp-label-scans'));
 app.use('/api/haccp', require('./routes/haccp'));
 app.use('/api/haccp', require('./routes/haccp-calibrations'));
 app.use('/api/haccp-plan', require('./routes/haccp-plan'));

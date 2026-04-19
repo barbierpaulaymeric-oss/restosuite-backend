@@ -1805,6 +1805,29 @@ try {
   console.warn('⚠️ audit_log migration error:', e.message);
 }
 
+// ─── HACCP label scans — CCP1 réception viande/poisson ───
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS label_scans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      product_name TEXT NOT NULL,
+      supplier TEXT,
+      batch_number TEXT,
+      expiry_date TEXT,
+      temperature REAL,
+      category TEXT,
+      photo_data TEXT,
+      scanned_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_by INTEGER
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_label_scans_restaurant ON label_scans(restaurant_id, scanned_at DESC)`);
+  console.log('✅ Migration: label_scans table ready');
+} catch (e) {
+  if (!e.message.includes('already exists')) console.error('Migration label_scans error:', e.message);
+}
+
 }
 
 module.exports = { runMigrations };

@@ -281,6 +281,23 @@ const API = {
   getDLCAlerts() {
     return this.request("/haccp/traceability/dlc-alerts");
   },
+  // Label Scans (CCP1 réception)
+  getLabelScans(params) {
+    const qs = params ? new URLSearchParams(params).toString() : "";
+    return this.request(`/haccp/label-scans${qs ? "?" + qs : ""}`);
+  },
+  getLabelScan(id) {
+    return this.request(`/haccp/label-scans/${id}`);
+  },
+  saveLabelScan(data) {
+    return this.request("/haccp/label-scans", { method: "POST", body: data });
+  },
+  deleteLabelScan(id) {
+    return this.request(`/haccp/label-scans/${id}`, { method: "DELETE" });
+  },
+  extractLabelScan(image_base64) {
+    return this.request("/haccp/label-scans/extract", { method: "POST", body: { image_base64 } });
+  },
   // Cooling
   getCoolingLogs(params) {
     const qs = params ? new URLSearchParams(params).toString() : "";
@@ -5427,6 +5444,404 @@ function showReceptionModal() {
       showToast("Erreur : " + err.message, "error");
     }
   });
+}
+async function renderHACCPLabelScan() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const { items, total } = await API.getLabelScans();
+    app.innerHTML = buildLabelScanPage(items, total);
+    lucide.createIcons();
+    attachLabelScanEvents();
+  } catch (e) {
+    console.error("renderHACCPLabelScan error:", e);
+    app.innerHTML = `<div class="error-state"><p>Erreur chargement des scans</p></div>`;
+  }
+}
+function buildLabelScanPage(items, total) {
+  const CATEGORY_LABELS = {
+    viande: "Viande",
+    volaille: "Volaille",
+    poisson: "Poisson",
+    charcuterie: "Charcuterie",
+    fromage: "Fromage",
+    produit_laitier: "Produit laitier",
+    autre: "Autre"
+  };
+  return `
+    <section class="haccp-page" role="region" aria-label="Scan \xE9tiquettes HACCP">
+      <div class="page-header">
+        <h1>
+          <i data-lucide="scan-line" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>
+          Scan \xE9tiquettes
+        </h1>
+        <button class="btn btn-primary" id="btn-open-scan" aria-label="Scanner une nouvelle \xE9tiquette">
+          <i data-lucide="camera" style="width:18px;height:18px" aria-hidden="true"></i> Scanner
+        </button>
+      </div>
+
+      <p class="text-secondary text-sm" style="margin-bottom:1.5rem">
+        CCP1 \u2014 R\xE9ception viande, volaille, poisson. Photographiez l'\xE9tiquette pour extraction automatique (Alto) des donn\xE9es de tra\xE7abilit\xE9.
+      </p>
+
+      ${total === 0 ? `
+        <div class="empty-state">
+          <div class="empty-icon"><i data-lucide="scan-line" style="width:48px;height:48px;color:var(--text-tertiary)"></i></div>
+          <p>Aucun scan enregistr\xE9</p>
+          <p class="text-secondary text-sm">Utilisez le bouton <strong>Scanner</strong> pour photographier une \xE9tiquette produit.</p>
+        </div>
+      ` : `
+        <div class="table-container" role="region" aria-label="Liste des scans \xE9tiquettes">
+          <table class="data-table" aria-label="Scans \xE9tiquettes HACCP">
+            <thead>
+              <tr>
+                <th scope="col">Photo</th>
+                <th scope="col">Produit</th>
+                <th scope="col">Fournisseur</th>
+                <th scope="col">N\xB0 Lot</th>
+                <th scope="col">DLC/DDM</th>
+                <th scope="col">Temp.</th>
+                <th scope="col">Cat\xE9gorie</th>
+                <th scope="col">Scann\xE9 le</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((scan) => buildScanRow(scan, CATEGORY_LABELS)).join("")}
+            </tbody>
+          </table>
+        </div>
+      `}
+
+      <!-- Scan modal -->
+      <div id="label-scan-modal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="label-scan-modal-title">
+        <div class="modal" style="max-width:560px;width:100%">
+          <div class="modal-header">
+            <h2 id="label-scan-modal-title" class="modal-title">Scanner une \xE9tiquette</h2>
+            <button class="modal-close" id="btn-close-scan-modal" aria-label="Fermer">&times;</button>
+          </div>
+          <div class="modal-body">
+            <!-- Step 1: Capture -->
+            <div id="step-capture">
+              <div id="photo-preview-container" style="display:none;margin-bottom:1rem;text-align:center">
+                <img id="photo-preview" src="" alt="Aper\xE7u de l'\xE9tiquette" style="max-width:100%;max-height:280px;border-radius:var(--radius-md);border:1px solid var(--border-color)">
+              </div>
+              <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.5rem">
+                <button class="btn btn-primary" id="btn-take-photo" type="button">
+                  <i data-lucide="camera" style="width:16px;height:16px" aria-hidden="true"></i>
+                  <span id="btn-take-photo-label">Prendre une photo</span>
+                </button>
+                <!-- File input fallback (shown in browser, hidden in native Capacitor) -->
+                <label class="btn btn-secondary" id="btn-file-fallback" style="cursor:pointer;display:none">
+                  <i data-lucide="upload" style="width:16px;height:16px" aria-hidden="true"></i>
+                  Choisir une image
+                  <input type="file" id="file-input-fallback" accept="image/*" capture="environment" style="display:none" aria-label="Choisir une image depuis l'appareil">
+                </label>
+              </div>
+              <div id="extract-spinner" style="display:none;text-align:center;padding:1rem">
+                <div class="spinner" style="margin:0 auto .75rem"></div>
+                <p class="text-secondary text-sm">Extraction Alto en cours\u2026</p>
+              </div>
+            </div>
+
+            <!-- Step 2: Form (pre-filled by Gemini OCR, user reviews/corrects) -->
+            <div id="step-form" style="display:none">
+              <p class="text-secondary text-sm" style="margin-bottom:1rem">
+                <i data-lucide="sparkles" style="width:14px;height:14px;vertical-align:middle;color:var(--accent)" aria-hidden="true"></i>
+                Champs pr\xE9-remplis par Alto \u2014 v\xE9rifiez et corrigez si n\xE9cessaire.
+              </p>
+              <form id="label-scan-form" novalidate>
+                <div class="form-group">
+                  <label for="ls-product-name">Produit <span aria-hidden="true" style="color:var(--danger)">*</span></label>
+                  <input type="text" class="form-control" id="ls-product-name" required
+                    placeholder="Ex : Poulet fermier Label Rouge" autocomplete="off">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+                  <div class="form-group" style="margin-bottom:0">
+                    <label for="ls-supplier">Fournisseur</label>
+                    <input type="text" class="form-control" id="ls-supplier" placeholder="Nom du fournisseur" autocomplete="off">
+                  </div>
+                  <div class="form-group" style="margin-bottom:0">
+                    <label for="ls-batch">N\xB0 de lot</label>
+                    <input type="text" class="form-control" id="ls-batch" placeholder="LOT-XXXX" autocomplete="off">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:.75rem">
+                  <div class="form-group" style="margin-bottom:0">
+                    <label for="ls-expiry">DLC / DDM</label>
+                    <input type="date" class="form-control" id="ls-expiry" lang="fr">
+                  </div>
+                  <div class="form-group" style="margin-bottom:0">
+                    <label for="ls-temp">Temp\xE9rature r\xE9ception (\xB0C)</label>
+                    <input type="number" class="form-control" id="ls-temp" step="0.1" min="-30" max="30" placeholder="Ex : 3.5">
+                  </div>
+                </div>
+                <div class="form-group" style="margin-top:.75rem">
+                  <label for="ls-category">Cat\xE9gorie</label>
+                  <select class="form-control" id="ls-category">
+                    <option value="">\u2014 Choisir \u2014</option>
+                    <option value="viande">Viande</option>
+                    <option value="volaille">Volaille</option>
+                    <option value="poisson">Poisson</option>
+                    <option value="charcuterie">Charcuterie</option>
+                    <option value="fromage">Fromage</option>
+                    <option value="produit_laitier">Produit laitier</option>
+                    <option value="autre">Autre</option>
+                  </select>
+                </div>
+              </form>
+            </div>
+          </div>
+          <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end">
+            <button class="btn btn-secondary" id="btn-cancel-scan" type="button">Annuler</button>
+            <button class="btn btn-primary" id="btn-save-scan" style="display:none" type="button">
+              <i data-lucide="save" style="width:16px;height:16px" aria-hidden="true"></i> Enregistrer
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+function buildScanRow(scan, CATEGORY_LABELS) {
+  const dlc = scan.expiry_date ? /* @__PURE__ */ new Date(scan.expiry_date + "T00:00:00") : null;
+  const today = /* @__PURE__ */ new Date();
+  today.setHours(0, 0, 0, 0);
+  let dlcBadge = "";
+  if (dlc) {
+    const diffDays = Math.ceil((dlc - today) / 864e5);
+    if (diffDays < 0) dlcBadge = `<span class="badge badge-danger" title="DLC d\xE9pass\xE9e" aria-label="DLC d\xE9pass\xE9e">DLC !</span>`;
+    else if (diffDays <= 2) dlcBadge = `<span class="badge badge-warning" title="DLC dans ${diffDays} jour(s)">J-${diffDays}</span>`;
+  }
+  const catLabel = CATEGORY_LABELS[scan.category] || escapeHtml(scan.category || "\u2014");
+  const scannedAt = scan.scanned_at ? new Date(scan.scanned_at.replace(" ", "T")).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "\u2014";
+  return `
+    <tr>
+      <td>
+        <button class="btn btn-sm btn-secondary" onclick="showScanPhoto(${scan.id})"
+          aria-label="Voir la photo de ${escapeHtml(scan.product_name)}" title="Voir la photo">
+          <i data-lucide="image" style="width:14px;height:14px" aria-hidden="true"></i>
+        </button>
+      </td>
+      <td>${escapeHtml(scan.product_name)}</td>
+      <td>${escapeHtml(scan.supplier || "\u2014")}</td>
+      <td><code style="font-size:.8em">${escapeHtml(scan.batch_number || "\u2014")}</code></td>
+      <td>${scan.expiry_date ? escapeHtml(scan.expiry_date) : "\u2014"} ${dlcBadge}</td>
+      <td>${scan.temperature !== null && scan.temperature !== void 0 ? `${Number(scan.temperature).toFixed(1)} \xB0C` : "\u2014"}</td>
+      <td>${escapeHtml(catLabel)}</td>
+      <td>${scannedAt}</td>
+      <td>
+        <button class="btn btn-sm btn-danger" onclick="deleteLabelScan(${scan.id})"
+          aria-label="Supprimer le scan ${escapeHtml(scan.product_name)}">
+          <i data-lucide="trash-2" style="width:14px;height:14px" aria-hidden="true"></i>
+        </button>
+      </td>
+    </tr>
+  `;
+}
+function compressImage(dataUrl, maxWidth, quality) {
+  maxWidth = maxWidth || 800;
+  quality = quality || 0.75;
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = function() {
+      var scale = img.width > maxWidth ? maxWidth / img.width : 1;
+      var canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      var ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = function() {
+      resolve(dataUrl);
+    };
+    img.src = dataUrl;
+  });
+}
+function isCapacitorAvailable() {
+  return !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera);
+}
+var _capturedPhotoData = null;
+async function captureWithCapacitor() {
+  var Camera = window.Capacitor.Plugins.Camera;
+  try {
+    var photo = await Camera.getPhoto({
+      quality: 90,
+      allowEditing: false,
+      resultType: "base64",
+      // returns photo.base64String
+      source: "CAMERA"
+    });
+    var dataUrl = "data:image/jpeg;base64," + photo.base64String;
+    return dataUrl;
+  } catch (e) {
+    if (e && e.message && (e.message.includes("cancelled") || e.message.includes("canceled"))) return null;
+    throw e;
+  }
+}
+function attachLabelScanEvents() {
+  var _a, _b, _c, _d, _e, _f;
+  (_a = document.getElementById("btn-open-scan")) == null ? void 0 : _a.addEventListener("click", openScanModal);
+  (_b = document.getElementById("btn-close-scan-modal")) == null ? void 0 : _b.addEventListener("click", closeScanModal);
+  (_c = document.getElementById("btn-cancel-scan")) == null ? void 0 : _c.addEventListener("click", closeScanModal);
+  if (!isCapacitorAvailable()) {
+    var fallback = document.getElementById("btn-file-fallback");
+    if (fallback) fallback.style.display = "";
+  }
+  (_d = document.getElementById("btn-take-photo")) == null ? void 0 : _d.addEventListener("click", async function() {
+    var _a2;
+    if (isCapacitorAvailable()) {
+      try {
+        var dataUrl = await captureWithCapacitor();
+        if (dataUrl) await handleCapturedPhoto(dataUrl);
+      } catch (e) {
+        console.error("Capacitor camera error:", e);
+        showToast("Erreur appareil photo", "error");
+      }
+    } else {
+      (_a2 = document.getElementById("file-input-fallback")) == null ? void 0 : _a2.click();
+    }
+  });
+  (_e = document.getElementById("file-input-fallback")) == null ? void 0 : _e.addEventListener("change", async function(e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = async function(ev) {
+      var compressed = await compressImage(ev.target.result, 800, 0.75);
+      await handleCapturedPhoto(compressed);
+    };
+    reader.readAsDataURL(file);
+  });
+  (_f = document.getElementById("btn-save-scan")) == null ? void 0 : _f.addEventListener("click", saveLabelScan);
+}
+function openScanModal() {
+  _capturedPhotoData = null;
+  var modal = document.getElementById("label-scan-modal");
+  if (!modal) return;
+  modal.style.display = "flex";
+  document.getElementById("step-form").style.display = "none";
+  document.getElementById("step-capture").style.display = "";
+  document.getElementById("photo-preview-container").style.display = "none";
+  document.getElementById("extract-spinner").style.display = "none";
+  document.getElementById("btn-save-scan").style.display = "none";
+  var form = document.getElementById("label-scan-form");
+  if (form) form.reset();
+}
+function closeScanModal() {
+  var modal = document.getElementById("label-scan-modal");
+  if (modal) modal.style.display = "none";
+  _capturedPhotoData = null;
+}
+async function handleCapturedPhoto(dataUrl) {
+  var compressed = await compressImage(dataUrl, 800, 0.75);
+  var preview = document.getElementById("photo-preview");
+  var previewContainer = document.getElementById("photo-preview-container");
+  if (preview) preview.src = compressed;
+  if (previewContainer) previewContainer.style.display = "";
+  _capturedPhotoData = compressed.replace(/^data:image\/\w+;base64,/, "");
+  document.getElementById("extract-spinner").style.display = "";
+  document.getElementById("step-form").style.display = "none";
+  document.getElementById("btn-save-scan").style.display = "none";
+  try {
+    var extracted = await API.extractLabelScan(_capturedPhotoData);
+    if (extracted.product_name) document.getElementById("ls-product-name").value = extracted.product_name;
+    if (extracted.supplier) document.getElementById("ls-supplier").value = extracted.supplier;
+    if (extracted.batch_number) document.getElementById("ls-batch").value = extracted.batch_number;
+    if (extracted.expiry_date) document.getElementById("ls-expiry").value = extracted.expiry_date;
+    if (extracted.category) {
+      var sel = document.getElementById("ls-category");
+      if (sel) sel.value = extracted.category;
+    }
+  } catch (e) {
+    console.warn("Extraction IA \xE9chou\xE9e, formulaire vide:", e);
+  }
+  document.getElementById("extract-spinner").style.display = "none";
+  document.getElementById("step-form").style.display = "";
+  document.getElementById("btn-save-scan").style.display = "";
+  lucide.createIcons();
+}
+async function saveLabelScan() {
+  var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+  var productName = (_b = (_a = document.getElementById("ls-product-name")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim();
+  if (!productName) {
+    showToast("Le nom du produit est requis", "error");
+    (_c = document.getElementById("ls-product-name")) == null ? void 0 : _c.focus();
+    return;
+  }
+  var tempRaw = (_d = document.getElementById("ls-temp")) == null ? void 0 : _d.value;
+  var temperature = tempRaw !== void 0 && tempRaw !== null && tempRaw !== "" ? parseFloat(tempRaw) : null;
+  var payload = {
+    product_name: productName,
+    supplier: ((_f = (_e = document.getElementById("ls-supplier")) == null ? void 0 : _e.value) == null ? void 0 : _f.trim()) || null,
+    batch_number: ((_h = (_g = document.getElementById("ls-batch")) == null ? void 0 : _g.value) == null ? void 0 : _h.trim()) || null,
+    expiry_date: ((_i = document.getElementById("ls-expiry")) == null ? void 0 : _i.value) || null,
+    temperature,
+    category: ((_j = document.getElementById("ls-category")) == null ? void 0 : _j.value) || null,
+    photo_data: _capturedPhotoData || null
+  };
+  var btn = document.getElementById("btn-save-scan");
+  if (btn) btn.disabled = true;
+  try {
+    await API.saveLabelScan(payload);
+    showToast("Scan enregistr\xE9 avec succ\xE8s", "success");
+    closeScanModal();
+    renderHACCPLabelScan();
+  } catch (e) {
+    console.error("saveLabelScan error:", e);
+    showToast("Erreur lors de l'enregistrement", "error");
+    if (btn) btn.disabled = false;
+  }
+}
+async function showScanPhoto(id) {
+  try {
+    var scan = await API.getLabelScan(id);
+    if (!scan.photo_data) {
+      showToast("Aucune photo pour ce scan", "warning");
+      return;
+    }
+    var overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.style.cssText = "display:flex;align-items:center;justify-content:center;padding:1rem";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "Photo \xE9tiquette");
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:620px;width:100%">
+        <div class="modal-header">
+          <h2 class="modal-title" id="photo-modal-title">${escapeHtml(scan.product_name)}</h2>
+          <button class="modal-close" aria-label="Fermer la photo">&times;</button>
+        </div>
+        <div class="modal-body" style="text-align:center;padding:1rem">
+          <img src="data:image/jpeg;base64,${scan.photo_data}"
+            alt="\xC9tiquette ${escapeHtml(scan.product_name)}"
+            style="max-width:100%;border-radius:var(--radius-md)">
+        </div>
+      </div>
+    `;
+    overlay.querySelector(".modal-close").addEventListener("click", function() {
+      overlay.remove();
+    });
+    overlay.addEventListener("click", function(e) {
+      if (e.target === overlay) overlay.remove();
+    });
+    document.body.appendChild(overlay);
+    lucide.createIcons();
+  } catch (e) {
+    console.error("showScanPhoto error:", e);
+    showToast("Erreur chargement photo", "error");
+  }
+}
+async function deleteLabelScan(id) {
+  if (!confirm("Supprimer ce scan d'\xE9tiquette ?")) return;
+  try {
+    await API.deleteLabelScan(id);
+    showToast("Scan supprim\xE9", "success");
+    renderHACCPLabelScan();
+  } catch (e) {
+    console.error("deleteLabelScan error:", e);
+    showToast("Erreur lors de la suppression", "error");
+  }
 }
 async function renderHACCPCooling() {
   const app = document.getElementById("app");
@@ -23600,6 +24015,7 @@ const ROUTE_ROLES = {
   "/haccp": ["gerant", "cuisinier"],
   "/haccp/": ["gerant", "cuisinier"],
   "/haccp/calibrations": ["gerant", "cuisinier"],
+  "/haccp/label-scan": ["gerant", "cuisinier"],
   "/suppliers": ["gerant"],
   "/ia": ["gerant", "cuisinier", "equipier"],
   "/analytics": ["gerant"],
@@ -23761,6 +24177,7 @@ const NAV_GROUPS = {
         label: "Tra\xE7abilit\xE9",
         items: [
           { label: "R\xE9ception (CCP1)", route: "/stock/reception", icon: "package-plus", roles: ["gerant", "cuisinier"] },
+          { label: "Scan \xE9tiquettes", route: "/haccp/label-scan", icon: "scan-line", roles: ["gerant", "cuisinier"] },
           { label: "Tra\xE7abilit\xE9 aval", route: "/traceability/downstream", icon: "package-check", roles: ["gerant", "cuisinier"] },
           { label: "Allerg\xE8nes (INCO)", route: "/haccp/allergens", icon: "wheat-off", roles: ["gerant", "cuisinier"] }
         ]
@@ -24064,6 +24481,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/corrective-actions$/, renderCorrectiveActions);
   Router.add(/^\/haccp\/allergens-plan$/, renderHACCPAllergensplan);
   Router.add(/^\/haccp\/water$/, renderHACCPWater);
+  Router.add(/^\/haccp\/label-scan$/, renderHACCPLabelScan);
   Router.add(/^\/haccp\/pms-audit$/, renderHACCPPmsAudit);
   Router.add(/^\/haccp\/tiac$/, renderHACCPTIAC);
   Router.add(/^\/haccp\/witness-meals$/, renderHACCPWitnessMeals);
