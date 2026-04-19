@@ -70,7 +70,7 @@ router.get('/menu-suggestions', async (req, res) => {
                 WHEN sp.unit = 'kg' THEN 1000
                 WHEN sp.unit = 'L' THEN 1000
                 ELSE 1
-              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id ORDER BY sp.last_updated DESC LIMIT 1),
+              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
               0
             )
           )
@@ -78,10 +78,10 @@ router.get('/menu-suggestions', async (req, res) => {
         ), 0) as total_cost
       FROM recipes r
       WHERE (r.recipe_type = 'plat' OR r.recipe_type IS NULL) AND r.restaurant_id = ?
-    `, [rid]);
+    `, [rid, rid]);
 
     const recipesData = recipes
-      .filter(r => r.selling_price > 0)
+      .filter(r => r.selling_price > 0 && r.total_cost > 0)
       .map(r => ({
         id: r.id,
         name: r.name,
@@ -90,7 +90,9 @@ router.get('/menu-suggestions', async (req, res) => {
         total_cost: Math.round(r.total_cost * 100) / 100,
         food_cost_pct: r.selling_price > 0 ? Math.round((r.total_cost / r.selling_price) * 1000) / 10 : null,
         margin: Math.round((r.selling_price - r.total_cost) * 100) / 100
-      }));
+      }))
+      // Filter out absurd food costs (missing supplier prices produce 0% or >200%)
+      .filter(r => r.food_cost_pct !== null && r.food_cost_pct > 0 && r.food_cost_pct < 200);
 
     // Get ingredients in stock — scoped to this tenant
     const stockIngredients = all(`
@@ -100,7 +102,9 @@ router.get('/menu-suggestions', async (req, res) => {
       ORDER BY s.quantity DESC LIMIT 30
     `, [rid]);
 
-    const prompt = `Voici les fiches techniques d'un restaurant avec leur food cost :
+    const prompt = `Tu es un expert en gestion de restaurant français. Réponds UNIQUEMENT en français, jamais en anglais.
+
+Voici les fiches techniques d'un restaurant avec leur food cost :
 ${JSON.stringify(recipesData, null, 2)}
 
 Ingrédients actuellement en stock :
@@ -111,7 +115,9 @@ Analyse et donne :
 2) Les 3 plats avec le food cost trop élevé et des suggestions pour les améliorer (substitution d'ingrédients)
 3) Une suggestion de plat du jour basée sur les ingrédients en stock
 
-Réponds en JSON avec cette structure :
+IMPORTANT : Tous les textes (name, reason, suggestion, description, key_ingredients) doivent être en français.
+
+Réponds en JSON avec cette structure exacte :
 {
   "top_profitable": [{"name": "...", "food_cost_pct": ..., "reason": "..."}],
   "to_improve": [{"name": "...", "food_cost_pct": ..., "suggestion": "..."}],

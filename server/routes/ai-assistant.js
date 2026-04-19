@@ -94,7 +94,8 @@ DOMAINES D'EXPERTISE :
       parts: [{ text: message }]
     });
 
-    const response = await fetch(buildGeminiUrl(selectModel('chef', req.user?.restaurant_id)), {
+    const chefModel = selectModel('chef', req.user?.restaurant_id);
+    const response = await fetch(buildGeminiUrl(chefModel), {
       signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: geminiHeaders(),
@@ -106,18 +107,22 @@ DOMAINES D'EXPERTISE :
 
     if (!response.ok) {
       const err = await response.text();
-      console.error('Gemini Chef error:', err);
-      return res.status(502).json({ error: 'Erreur service IA' });
+      console.error(`[Alto/chef] Gemini ${response.status} (model=${chefModel}):`, err.slice(0, 500));
+      return res.status(502).json({ error: 'Erreur service IA', status: response.status });
     }
 
     const data = await response.json();
     const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!reply) return res.status(502).json({ error: 'Réponse IA vide' });
+    if (!reply) {
+      console.error('[Alto/chef] Empty reply. Raw:', JSON.stringify(data).slice(0, 500));
+      return res.status(502).json({ error: 'Réponse IA vide' });
+    }
 
     res.json({ reply });
   } catch (e) {
-    console.error('Chef AI error:', e);
-    res.status(500).json({ error: 'Erreur assistant' });
+    console.error('[Alto/chef] Exception:', e && e.name, e && e.message, e && e.stack);
+    const hint = e && e.name === 'TimeoutError' ? 'Timeout IA (30s)' : 'Erreur assistant';
+    res.status(500).json({ error: hint });
   }
 });
 
@@ -308,7 +313,8 @@ DOMAINES D'EXPERTISE :
     });
 
     // First call: get text response and action detection
-    const response = await fetch(buildGeminiUrl(selectModel('assistant', user.restaurant_id)), {
+    const assistantModel = selectModel('assistant', user.restaurant_id);
+    const response = await fetch(buildGeminiUrl(assistantModel), {
       signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: geminiHeaders(),
@@ -358,8 +364,8 @@ DOMAINES D'EXPERTISE :
 
     if (!response.ok) {
       const err = await response.text();
-      console.error('Gemini Assistant error:', err);
-      return res.status(502).json({ error: 'Erreur service IA' });
+      console.error(`[Alto/assistant] Gemini ${response.status} (model=${assistantModel}):`, err.slice(0, 500));
+      return res.status(502).json({ error: 'Erreur service IA', status: response.status });
     }
 
     const data = await response.json();
@@ -380,7 +386,10 @@ DOMAINES D'EXPERTISE :
       }
     }
 
-    if (!result.reply) return res.status(502).json({ error: 'Réponse IA vide' });
+    if (!result.reply) {
+      console.error('[Alto/assistant] Empty reply. Raw:', JSON.stringify(data).slice(0, 500));
+      return res.status(502).json({ error: 'Réponse IA vide' });
+    }
 
     // Filter actions based on user role
     if (result.actions && result.actions.length > 0) {
@@ -389,8 +398,9 @@ DOMAINES D'EXPERTISE :
 
     res.json(result);
   } catch (e) {
-    console.error('Chef AI error:', e);
-    res.status(500).json({ error: 'Erreur assistant' });
+    console.error('[Alto/assistant] Exception:', e && e.name, e && e.message, e && e.stack);
+    const hint = e && e.name === 'TimeoutError' ? 'Timeout IA (30s)' : 'Erreur assistant';
+    res.status(500).json({ error: hint });
   }
 });
 

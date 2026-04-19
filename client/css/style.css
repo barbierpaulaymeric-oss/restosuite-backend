@@ -5305,19 +5305,26 @@ button.nav-link {
 .nav-panel {
   position: fixed;
   inset: 0;
-  z-index: calc(var(--z-nav) - 1);
+  /* Must sit above floating UI (bubble/install-prompt at z 100/200) so the
+     backdrop dims the entire viewport — previously left side of the screen
+     was partially covered by elements at z-index 100 that poked through. */
+  z-index: 9000;
   pointer-events: none;
 }
 .nav-panel.open { pointer-events: auto; }
 
 .nav-panel-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
   background: rgba(0,0,0,0);
   transition: background 0.2s ease;
+  pointer-events: none;
 }
 .nav-panel.open .nav-panel-backdrop {
   background: rgba(0,0,0,0.45);
+  pointer-events: auto;
 }
 
 .nav-panel-sheet {
@@ -5364,6 +5371,13 @@ button.nav-link {
   -webkit-tap-highlight-color: transparent;
 }
 .nav-panel-item svg { width:18px; height:18px; flex-shrink:0; stroke:currentColor; }
+.nav-panel-item__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .nav-panel-item:active,
 .nav-panel-item:hover { background: var(--color-accent-light); color: var(--color-accent); }
 .nav-panel-item.active { background: var(--color-accent-light); color: var(--color-accent); }

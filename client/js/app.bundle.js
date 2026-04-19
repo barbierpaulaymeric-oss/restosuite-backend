@@ -20293,7 +20293,7 @@ function toggleAIVoice() {
     btn.style.background = "";
     btn.style.color = "";
     btn.setAttribute("aria-pressed", "false");
-    if (event.error !== "no-speech") {
+    if (event.error !== "no-speech" && event.error !== "aborted") {
       showToast("Erreur vocale: " + event.error, "error");
     }
     _aiVoiceRecognition = null;
@@ -23248,6 +23248,7 @@ function toggleVoiceRecording() {
   const btn = document.getElementById("bubble-voice-btn");
   btn.classList.add("recording");
   _bubbleState.listening = true;
+  _bubbleState.recognition = rec;
   rec.onresult = (event) => {
     let interim = "";
     for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -23266,7 +23267,7 @@ function toggleVoiceRecording() {
   };
   rec.onerror = (event) => {
     console.error("Speech recognition error:", event.error);
-    if (event.error !== "no-speech") {
+    if (event.error !== "no-speech" && event.error !== "aborted") {
       showBubbleMessage("Erreur reconnaissance vocale: " + event.error, "ai");
     }
     stopVoiceRecording();
@@ -23285,6 +23286,13 @@ function stopVoiceRecording() {
   const btn = document.getElementById("bubble-voice-btn");
   btn.classList.remove("recording");
   _bubbleState.listening = false;
+  if (_bubbleState.recognition) {
+    try {
+      _bubbleState.recognition.stop();
+    } catch (_) {
+    }
+    _bubbleState.recognition = null;
+  }
 }
 async function sendBubbleMessage(msg) {
   var _a, _b;
@@ -23958,7 +23966,7 @@ function initNavGroups(role) {
       if (item.action === "logout") {
         return `<button class="nav-panel-item nav-panel-item--danger" onclick="logout()">
             <i data-lucide="${item.icon}"></i>
-            ${escapeHtml(item.label)}
+            <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
           </button>`;
       }
       const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
@@ -23968,13 +23976,13 @@ function initNavGroups(role) {
         const badge = PLAN_LABELS[item.minPlan] || item.minPlan;
         return `<button class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}" data-action="plan-gate">
             <i data-lucide="${item.icon}"></i>
-            ${escapeHtml(item.label)}
+            <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
             <span class="nav-plan-badge">${escapeHtml(badge)}</span>
           </button>`;
       }
       return `<a href="#${item.route}" class="nav-panel-item${isActive ? " active" : ""}">
           <i data-lucide="${item.icon}"></i>
-          ${escapeHtml(item.label)}
+          <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
         </a>`;
     }).join("")}
     `;

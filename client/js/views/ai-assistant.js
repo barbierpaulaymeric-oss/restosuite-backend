@@ -192,7 +192,7 @@ function toggleAIVoice() {
     btn.style.background = '';
     btn.style.color = '';
     btn.setAttribute('aria-pressed', 'false');
-    if (event.error !== 'no-speech') {
+    if (event.error !== 'no-speech' && event.error !== 'aborted') {
       showToast('Erreur vocale: ' + event.error, 'error');
     }
     _aiVoiceRecognition = null;

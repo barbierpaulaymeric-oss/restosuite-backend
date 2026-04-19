@@ -503,7 +503,7 @@ function initNavGroups(role) {
         if (item.action === 'logout') {
           return `<button class="nav-panel-item nav-panel-item--danger" onclick="logout()">
             <i data-lucide="${item.icon}"></i>
-            ${escapeHtml(item.label)}
+            <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
           </button>`;
         }
         const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
@@ -513,13 +513,13 @@ function initNavGroups(role) {
           const badge = PLAN_LABELS[item.minPlan] || item.minPlan;
           return `<button class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}" data-action="plan-gate">
             <i data-lucide="${item.icon}"></i>
-            ${escapeHtml(item.label)}
+            <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
             <span class="nav-plan-badge">${escapeHtml(badge)}</span>
           </button>`;
         }
         return `<a href="#${item.route}" class="nav-panel-item${isActive ? ' active' : ''}">
           <i data-lucide="${item.icon}"></i>
-          ${escapeHtml(item.label)}
+          <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
         </a>`;
       }).join('')}
     `;

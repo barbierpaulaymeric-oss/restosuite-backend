@@ -338,6 +338,7 @@ function toggleVoiceRecording() {
   const btn = document.getElementById('bubble-voice-btn');
   btn.classList.add('recording');
   _bubbleState.listening = true;
+  _bubbleState.recognition = rec;
 
   rec.onresult = (event) => {
     let interim = '';
@@ -358,7 +359,7 @@ function toggleVoiceRecording() {
 
   rec.onerror = (event) => {
     console.error('Speech recognition error:', event.error);
-    if (event.error !== 'no-speech') {
+    if (event.error !== 'no-speech' && event.error !== 'aborted') {
       showBubbleMessage('Erreur reconnaissance vocale: ' + event.error, 'ai');
     }
     stopVoiceRecording();
@@ -380,6 +381,10 @@ function stopVoiceRecording() {
   const btn = document.getElementById('bubble-voice-btn');
   btn.classList.remove('recording');
   _bubbleState.listening = false;
+  if (_bubbleState.recognition) {
+    try { _bubbleState.recognition.stop(); } catch (_) {}
+    _bubbleState.recognition = null;
+  }
 }
 
 async function sendBubbleMessage(msg) {
