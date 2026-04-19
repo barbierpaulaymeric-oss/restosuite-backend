@@ -57,11 +57,11 @@ const PLANS = [
   },
   {
     id: 'enterprise',
-    name: 'Entreprise',
+    name: 'Groupe',
     price: null,
     label: 'Sur devis',
-    badge: 'ENTERPRISE',
-    description: 'Pour les groupes et chaînes de restauration',
+    badge: 'GROUPE',
+    description: 'Pour les groupes et chaînes de restauration multi-sites',
     features: [
       'Tout le plan Pro, plus :',
       'Multi-établissements',

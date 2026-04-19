@@ -3,3 +3,11 @@ server/data/
 data/backups/
 .env
 *.db
+.claude/
+.git_backup/
+.DS_Store
+.opencode/
+.claude/
+.git_backup/
+.DS_Store
+.opencode/

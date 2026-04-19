@@ -509,7 +509,7 @@ function initNavGroups(role) {
         const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
         const isActive = !locked && (currentPath === item.route || (item.route !== '/' && currentPath.startsWith(item.route)));
         if (locked) {
-          const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Enterprise' };
+          const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Groupe' };
           const badge = PLAN_LABELS[item.minPlan] || item.minPlan;
           return `<button class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}" data-action="plan-gate">
             <i data-lucide="${item.icon}"></i>
@@ -546,7 +546,7 @@ function initNavGroups(role) {
       btn.addEventListener('click', (e) => {
         e.stopImmediatePropagation();
         const plan = btn.dataset.requiredPlan;
-        const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Enterprise' };
+        const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Groupe' };
         const label = PLAN_LABELS[plan] || plan;
         showPlanGateModal(label);
       });
