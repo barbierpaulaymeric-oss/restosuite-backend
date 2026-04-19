@@ -4504,9 +4504,12 @@ async function renderHACCPCalibrations() {
       API.getThermometerAlerts(),
       API.getCalibrations({ limit: 50 })
     ]);
-    const thermometers = thermosResp.items || [];
-    const alerts = alertsResp || { overdue: [], due_soon: [] };
-    const calibrations = calibrationsResp.items || [];
+    const thermometers = thermosResp && thermosResp.items ? thermosResp.items : Array.isArray(thermosResp) ? thermosResp : [];
+    const alerts = {
+      overdue: alertsResp && Array.isArray(alertsResp.overdue) ? alertsResp.overdue : [],
+      due_soon: alertsResp && Array.isArray(alertsResp.due_soon) ? alertsResp.due_soon : []
+    };
+    const calibrations = calibrationsResp && calibrationsResp.items ? calibrationsResp.items : Array.isArray(calibrationsResp) ? calibrationsResp : [];
     const alertBanner = alerts.overdue.length > 0 || alerts.due_soon.length > 0 ? `
       <div style="background:rgba(217,48,37,0.12);border:1px solid rgba(217,48,37,0.45);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;color:var(--text-primary)">
         <i data-lucide="alert-triangle" style="width:18px;height:18px;color:var(--color-danger);flex-shrink:0;margin-top:1px"></i>

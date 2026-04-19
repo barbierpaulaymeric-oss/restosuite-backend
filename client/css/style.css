@@ -5686,7 +5686,6 @@ body.tour-active { overflow: hidden; }
   position: absolute;
   inset: 0;
   background: rgba(15, 25, 35, 0.55);
-  backdrop-filter: blur(2px);
   pointer-events: auto;
   animation: tour-fade-in 0.25s ease;
 }
