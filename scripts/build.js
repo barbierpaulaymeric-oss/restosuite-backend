@@ -59,6 +59,7 @@ const JS_FILES = [
   'js/views/health-dashboard.js',
   'js/views/more.js',
   'js/views/onboarding.js',
+  'js/views/onboarding-tour.js',
   'js/views/login.js',
   'js/views/supplier-login.js',
   'js/views/supplier-catalog.js',

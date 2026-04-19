@@ -425,6 +425,12 @@ function bootApp(role, account, opts = {}) {
   // Refresh trial status every 5 minutes (store interval ID for cleanup on logout)
   clearTrialStatusInterval();
   _trialStatusIntervalId = setInterval(() => fetchTrialStatus().then(() => renderTrialBanner()), 5 * 60 * 1000);
+
+  // First-login onboarding tour (gérant only, runs once, skips if role-
+  // redirected to /kitchen or /service since the nav is hidden there).
+  if (role === 'gerant' && typeof maybeStartOnboardingTour === 'function') {
+    maybeStartOnboardingTour(account);
+  }
 }
 
 function updateNavUser(account) {

@@ -5678,3 +5678,119 @@ button.nav-link {
   white-space: nowrap;
   min-width: 0;
 }
+
+/* ─── Onboarding tour (first-login walkthrough) ─── */
+body.tour-active { overflow: hidden; }
+#onboarding-tour-root {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;
+}
+.tour-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 25, 35, 0.55);
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
+  animation: tour-fade-in 0.25s ease;
+}
+.tour-spotlight {
+  position: absolute;
+  border-radius: var(--radius-md, 12px);
+  box-shadow: 0 0 0 9999px rgba(15, 25, 35, 0.65);
+  border: 2px solid var(--color-accent, #E8722A);
+  pointer-events: none;
+  transition: all 0.35s cubic-bezier(0.22, 0.8, 0.3, 1);
+  background: transparent;
+}
+.tour-popover {
+  position: absolute;
+  max-width: 340px;
+  width: calc(100vw - 32px);
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #1a1a1a);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  padding: 20px 22px;
+  pointer-events: auto;
+  transition: top 0.3s cubic-bezier(0.22, 0.8, 0.3, 1), left 0.3s cubic-bezier(0.22, 0.8, 0.3, 1);
+  animation: tour-pop-in 0.35s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+.tour-popover__step {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary, #888);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.tour-popover__title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--text-primary, #1a1a1a);
+}
+.tour-popover__body {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #555);
+  margin: 0 0 16px;
+}
+.tour-popover__dots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.tour-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-default, #ddd);
+  transition: all 0.2s;
+}
+.tour-dot--active {
+  background: var(--color-accent, #E8722A);
+  width: 20px;
+  border-radius: 3px;
+}
+.tour-popover__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.tour-btn {
+  border: 0;
+  border-radius: var(--radius-md, 10px);
+  padding: 9px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.tour-btn--ghost {
+  background: transparent;
+  color: var(--text-tertiary, #888);
+}
+.tour-btn--ghost:hover {
+  background: var(--bg-secondary, #f5f5f5);
+  color: var(--text-primary, #1a1a1a);
+}
+.tour-btn--primary {
+  background: var(--color-accent, #E8722A);
+  color: #fff;
+}
+.tour-btn--primary:hover {
+  background: var(--color-accent-dark, #C45A18);
+  transform: translateY(-1px);
+}
+@keyframes tour-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes tour-pop-in {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
