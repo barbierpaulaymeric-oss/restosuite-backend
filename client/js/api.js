@@ -476,6 +476,14 @@ const API = {
     return this.supplierRequest(`/delivery-notes/${id}`);
   },
 
+  // ─── Supplier Purchase Orders (supplier side — read-only) ───
+  getSupplierOrders() {
+    return this.supplierRequest('/orders');
+  },
+  getSupplierOrder(id) {
+    return this.supplierRequest(`/orders/${id}`);
+  },
+
   // ─── Deliveries (restaurant side) ───
   getDeliveries(status) {
     const qs = status ? `?status=${encodeURIComponent(status)}` : '';

@@ -54,6 +54,59 @@ const NAV_GROUPS = {
       { label: 'Cuisine (écran)',        route: '/kitchen',   icon: 'chef-hat',       roles: ['gerant','cuisinier'] },
     ]
   },
+  haccp: {
+    label: 'HACCP',
+    subcategories: [
+      {
+        label: 'Températures (quotidien)',
+        items: [
+          { label: 'Relevés de température', route: '/haccp/temperatures', icon: 'thermometer',    roles: ['gerant','cuisinier'] },
+          { label: 'Cuisson (CCP2)',         route: '/haccp/cooking',       icon: 'flame',          roles: ['gerant','cuisinier'] },
+          { label: 'Refroidissement',        route: '/haccp/cooling',       icon: 'snowflake',      roles: ['gerant','cuisinier'] },
+          { label: 'Remise en température',  route: '/haccp/reheating',     icon: 'microwave',      roles: ['gerant','cuisinier'] },
+        ]
+      },
+      {
+        label: 'Hygiène (quotidien / hebdo)',
+        items: [
+          { label: 'Plan de nettoyage',      route: '/haccp/cleaning',            icon: 'spray-can',     roles: ['gerant','cuisinier'] },
+          { label: 'Non-conformités',        route: '/haccp/non-conformities',    icon: 'alert-triangle',roles: ['gerant','cuisinier'] },
+          { label: 'Actions correctives',    route: '/haccp/corrective-actions',  icon: 'wrench',        roles: ['gerant','cuisinier'] },
+        ]
+      },
+      {
+        label: 'Traçabilité',
+        items: [
+          { label: 'Réception (CCP1)',       route: '/stock/reception',           icon: 'package-plus',   roles: ['gerant','cuisinier'] },
+          { label: 'Traçabilité aval',       route: '/traceability/downstream',   icon: 'package-check',  roles: ['gerant','cuisinier'] },
+          { label: 'Allergènes (INCO)',      route: '/haccp/allergens',           icon: 'wheat-off',      roles: ['gerant','cuisinier'] },
+        ]
+      },
+      {
+        label: 'Plan HACCP (mensuel)',
+        items: [
+          { label: 'Plan formalisé',         route: '/haccp/plan',                icon: 'file-check',     roles: ['gerant'] },
+          { label: 'Étalonnage',             route: '/haccp/calibrations',        icon: 'ruler',          roles: ['gerant','cuisinier'] },
+          { label: 'Formation personnel',    route: '/haccp/training',            icon: 'graduation-cap', roles: ['gerant'] },
+          { label: 'Santé personnel',        route: '/haccp/staff-health',        icon: 'heart-pulse',    roles: ['gerant'] },
+        ]
+      },
+      {
+        label: 'Autre (ponctuel)',
+        items: [
+          { label: 'Plats témoins',          route: '/haccp/witness-meals',       icon: 'archive',        roles: ['gerant','cuisinier'] },
+          { label: 'Huile de friture',       route: '/haccp/fryers',              icon: 'droplet',        roles: ['gerant','cuisinier'] },
+          { label: 'Lutte nuisibles',        route: '/haccp/pest-control',        icon: 'bug',            roles: ['gerant'] },
+          { label: 'Maintenance équipement', route: '/haccp/maintenance',         icon: 'wrench',         roles: ['gerant'] },
+          { label: 'Gestion des déchets',    route: '/haccp/waste',               icon: 'trash-2',        roles: ['gerant','cuisinier'] },
+          { label: 'Analyse d\'eau',         route: '/haccp/water',               icon: 'droplets',       roles: ['gerant'] },
+          { label: 'Audit PMS',              route: '/haccp/pms-audit',           icon: 'clipboard-check',roles: ['gerant'] },
+          { label: 'TIAC',                   route: '/haccp/tiac',                icon: 'siren',          roles: ['gerant'] },
+          { label: 'Retrait / rappel',       route: '/haccp/recall',              icon: 'rotate-ccw',     roles: ['gerant'] },
+        ]
+      },
+    ]
+  },
   config: {
     label: 'Paramètres',
     items: [
@@ -110,9 +163,33 @@ const ROUTE_TO_GROUP = {
   '/crm': 'config', '/subscribe': 'config', '/settings/plans': 'config',
   '/settings': 'config',
   '/settings/sanitary-approval': 'config',
-  '/traceability/downstream': 'traceability',
+  '/traceability/downstream': 'haccp',
   '/fabrication-diagrams': 'documents',
   '/pms/export': 'documents',
+  '/haccp': 'haccp',
+  '/haccp/temperatures': 'haccp',
+  '/haccp/cooking': 'haccp',
+  '/haccp/cooling': 'haccp',
+  '/haccp/reheating': 'haccp',
+  '/haccp/cleaning': 'haccp',
+  '/haccp/non-conformities': 'haccp',
+  '/haccp/corrective-actions': 'haccp',
+  '/haccp/allergens': 'haccp',
+  '/haccp/allergens-plan': 'haccp',
+  '/haccp/plan': 'haccp',
+  '/haccp/calibrations': 'haccp',
+  '/haccp/training': 'haccp',
+  '/haccp/staff-health': 'haccp',
+  '/haccp/witness-meals': 'haccp',
+  '/haccp/fryers': 'haccp',
+  '/haccp/pest-control': 'haccp',
+  '/haccp/maintenance': 'haccp',
+  '/haccp/waste': 'haccp',
+  '/haccp/water': 'haccp',
+  '/haccp/pms-audit': 'haccp',
+  '/haccp/tiac': 'haccp',
+  '/haccp/recall': 'haccp',
+  '/stock/reception': 'haccp',
 };
 
 // ─── Command Palette shortcut ───
@@ -484,43 +561,68 @@ function initNavGroups(role) {
     const group = NAV_GROUPS[groupKey];
     if (!group) return;
 
-    const accessible = group.items.filter(item => item.roles.includes(role));
-    if (accessible.length === 0) return;
+    const currentPath = location.hash.replace('#', '') || '/';
+
+    function renderItem(item) {
+      if (item.action === 'logout') {
+        return `<button class="nav-panel-item nav-panel-item--danger" onclick="logout()">
+          <i data-lucide="${item.icon}"></i>
+          <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
+        </button>`;
+      }
+      const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
+      const isActive = !locked && (currentPath === item.route || (item.route !== '/' && currentPath.startsWith(item.route)));
+      if (locked) {
+        const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Groupe' };
+        const badge = PLAN_LABELS[item.minPlan] || item.minPlan;
+        return `<button class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}" data-action="plan-gate">
+          <i data-lucide="${item.icon}"></i>
+          <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
+          <span class="nav-plan-badge">${escapeHtml(badge)}</span>
+        </button>`;
+      }
+      return `<a href="#${item.route}" class="nav-panel-item${isActive ? ' active' : ''}">
+        <i data-lucide="${item.icon}"></i>
+        <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
+      </a>`;
+    }
+
+    let body = '';
+    let accessibleCount = 0;
+    let onlyItem = null;
+
+    if (Array.isArray(group.subcategories)) {
+      const sections = [];
+      for (const sub of group.subcategories) {
+        const subAccessible = sub.items.filter(item => item.roles.includes(role));
+        if (subAccessible.length === 0) continue;
+        accessibleCount += subAccessible.length;
+        if (subAccessible.length === 1 && !onlyItem) onlyItem = subAccessible[0];
+        sections.push(
+          `<div class="nav-panel-subtitle">${escapeHtml(sub.label)}</div>` +
+          subAccessible.map(renderItem).join('')
+        );
+      }
+      body = sections.join('');
+    } else {
+      const accessible = group.items.filter(item => item.roles.includes(role));
+      accessibleCount = accessible.length;
+      if (accessible.length === 1) onlyItem = accessible[0];
+      body = accessible.map(renderItem).join('');
+    }
+
+    if (accessibleCount === 0) return;
 
     // Single accessible item → navigate directly, no panel
-    if (accessible.length === 1) {
+    if (accessibleCount === 1 && onlyItem) {
       closePanel();
-      location.hash = '#' + accessible[0].route;
+      location.hash = '#' + onlyItem.route;
       return;
     }
 
-    const currentPath = location.hash.replace('#', '') || '/';
-
     panelContent.innerHTML = `
       <div class="nav-panel-title">${escapeHtml(group.label)}</div>
-      ${accessible.map(item => {
-        if (item.action === 'logout') {
-          return `<button class="nav-panel-item nav-panel-item--danger" onclick="logout()">
-            <i data-lucide="${item.icon}"></i>
-            <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
-          </button>`;
-        }
-        const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
-        const isActive = !locked && (currentPath === item.route || (item.route !== '/' && currentPath.startsWith(item.route)));
-        if (locked) {
-          const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Groupe' };
-          const badge = PLAN_LABELS[item.minPlan] || item.minPlan;
-          return `<button class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}" data-action="plan-gate">
-            <i data-lucide="${item.icon}"></i>
-            <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
-            <span class="nav-plan-badge">${escapeHtml(badge)}</span>
-          </button>`;
-        }
-        return `<a href="#${item.route}" class="nav-panel-item${isActive ? ' active' : ''}">
-          <i data-lucide="${item.icon}"></i>
-          <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
-        </a>`;
-      }).join('')}
+      ${body}
     `;
 
     if (window.lucide) lucide.createIcons({ nodes: [panelContent] });

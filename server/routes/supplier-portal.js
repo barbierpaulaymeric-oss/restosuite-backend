@@ -600,4 +600,42 @@ router.get('/delivery-notes/:id', requireSupplierAuth, (req, res) => {
   res.json({ ...note, items });
 });
 
+// ═════════════════════════════════════════
+// PURCHASE ORDERS (supplier side — read-only)
+// ═════════════════════════════════════════
+
+// GET /orders — List purchase orders the restaurant has placed with this supplier
+router.get('/orders', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const orders = all(
+    `SELECT id, reference, status, total_amount, expected_delivery, notes, created_at
+       FROM purchase_orders
+      WHERE supplier_id = ? AND restaurant_id = ?
+      ORDER BY created_at DESC
+      LIMIT 100`,
+    [supplierId, rid]
+  );
+  res.json(orders);
+});
+
+// GET /orders/:id — Order detail with items
+router.get('/orders/:id', requireSupplierAuth, (req, res) => {
+  const id = Number(req.params.id);
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+
+  const order = get(
+    'SELECT * FROM purchase_orders WHERE id = ? AND supplier_id = ? AND restaurant_id = ?',
+    [id, supplierId, rid]
+  );
+  if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+
+  const items = all(
+    'SELECT id, product_name, quantity, unit, unit_price, total_price, notes FROM purchase_order_items WHERE purchase_order_id = ? AND restaurant_id = ?',
+    [id, rid]
+  );
+  res.json({ ...order, items });
+});
+
 module.exports = router;

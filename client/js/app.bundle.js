@@ -563,6 +563,13 @@ const API = {
   getSupplierDeliveryNote(id) {
     return this.supplierRequest(`/delivery-notes/${id}`);
   },
+  // ─── Supplier Purchase Orders (supplier side — read-only) ───
+  getSupplierOrders() {
+    return this.supplierRequest("/orders");
+  },
+  getSupplierOrder(id) {
+    return this.supplierRequest(`/orders/${id}`);
+  },
   // ─── Deliveries (restaurant side) ───
   getDeliveries(status) {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
@@ -17503,6 +17510,9 @@ function bootSupplierApp(session) {
         <button class="supplier-nav__tab active" data-tab="catalog">
           <i data-lucide="package" style="width:18px;height:18px"></i> Catalogue
         </button>
+        <button class="supplier-nav__tab" data-tab="orders">
+          <i data-lucide="clipboard-list" style="width:18px;height:18px"></i> Commandes
+        </button>
         <button class="supplier-nav__tab" data-tab="deliveries">
           <i data-lucide="truck" style="width:18px;height:18px"></i> Livraisons
         </button>
@@ -17524,6 +17534,7 @@ function bootSupplierApp(session) {
       document.querySelectorAll(".supplier-nav__tab").forEach((t) => t.classList.remove("active"));
       tab.classList.add("active");
       if (tab.dataset.tab === "catalog") renderSupplierCatalogTab();
+      else if (tab.dataset.tab === "orders") renderSupplierOrdersTab();
       else if (tab.dataset.tab === "deliveries") renderSupplierDeliveriesTab();
       else renderSupplierHistoryTab();
     });
@@ -18070,6 +18081,119 @@ function showNewDeliveryForm() {
       showToast("Erreur : " + e.message, "error");
     }
   });
+}
+const SUPPLIER_ORDER_STATUS = {
+  brouillon: { label: "Brouillon", color: "#94a3b8" },
+  envoy\u00E9e: { label: "\xC0 confirmer", color: "#E8722A" },
+  confirm\u00E9e: { label: "Confirm\xE9e", color: "#4A90D9" },
+  r\u00E9ceptionn\u00E9e: { label: "R\xE9ceptionn\xE9e", color: "#22c55e" },
+  annul\u00E9e: { label: "Annul\xE9e", color: "#ef4444" }
+};
+async function renderSupplierOrdersTab() {
+  const content = document.getElementById("supplier-content");
+  if (!content) return;
+  content.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-4)">
+      <h2 style="margin:0;font-size:var(--text-xl)">Commandes re\xE7ues</h2>
+    </div>
+    <div id="supplier-orders-list">
+      <div class="skeleton skeleton-row"></div>
+      <div class="skeleton skeleton-row"></div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+  try {
+    const orders = await API.getSupplierOrders();
+    const list = document.getElementById("supplier-orders-list");
+    if (!list) return;
+    if (!orders || orders.length === 0) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon"><i data-lucide="inbox"></i></div>
+          <p>Aucune commande</p>
+          <p class="text-secondary text-sm">Les commandes du restaurant appara\xEEtront ici.</p>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+    list.innerHTML = orders.map((o) => {
+      const s = SUPPLIER_ORDER_STATUS[o.status] || { label: o.status, color: "#666" };
+      const created = o.created_at ? new Date(o.created_at).toLocaleDateString("fr-FR") : "";
+      const expected = o.expected_delivery ? new Date(o.expected_delivery).toLocaleDateString("fr-FR") : null;
+      return `
+        <div class="card supplier-order-card" data-id="${o.id}" style="padding:var(--space-4);margin-bottom:var(--space-3);border-left:4px solid ${s.color};border-radius:var(--radius-lg);background:var(--bg-elevated);cursor:pointer">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <strong>${escapeHtml(o.reference || `Commande #${o.id}`)}</strong>
+              <span class="text-secondary text-sm" style="margin-left:var(--space-2)">${escapeHtml(created)}</span>
+            </div>
+            <span class="badge" style="background:${s.color};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md)">
+              ${escapeHtml(s.label)}
+            </span>
+          </div>
+          <div class="text-secondary text-sm" style="margin-top:var(--space-2)">
+            ${o.total_amount ? `${formatCurrency(o.total_amount)}` : "\u2014"}
+            ${expected ? ` \xB7 Livraison pr\xE9vue : ${escapeHtml(expected)}` : ""}
+          </div>
+        </div>
+      `;
+    }).join("");
+    list.querySelectorAll(".supplier-order-card").forEach((card) => {
+      card.addEventListener("click", () => showSupplierOrderDetail(Number(card.dataset.id)));
+    });
+  } catch (e) {
+    const list = document.getElementById("supplier-orders-list");
+    if (list) list.innerHTML = `<p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>`;
+  }
+}
+async function showSupplierOrderDetail(id) {
+  const content = document.getElementById("supplier-content");
+  if (!content) return;
+  try {
+    const order = await API.getSupplierOrder(id);
+    const s = SUPPLIER_ORDER_STATUS[order.status] || { label: order.status, color: "#666" };
+    content.innerHTML = `
+      <div style="margin-bottom:var(--space-4)">
+        <button class="btn btn-secondary btn-sm" id="back-supplier-orders">
+          <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Retour
+        </button>
+      </div>
+      <div class="card" style="padding:var(--space-4);margin-bottom:var(--space-4);border-left:4px solid ${s.color};border-radius:var(--radius-lg);background:var(--bg-elevated)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h2 style="margin:0;font-size:var(--text-xl)">${escapeHtml(order.reference || `Commande #${order.id}`)}</h2>
+          <span class="badge" style="background:${s.color};color:white;padding:4px 10px;border-radius:var(--radius-md)">${escapeHtml(s.label)}</span>
+        </div>
+        <div class="text-secondary text-sm" style="margin-top:var(--space-2)">
+          Cr\xE9\xE9e le ${order.created_at ? escapeHtml(new Date(order.created_at).toLocaleDateString("fr-FR")) : "\u2014"}
+          ${order.expected_delivery ? ` \xB7 Livraison pr\xE9vue : ${escapeHtml(new Date(order.expected_delivery).toLocaleDateString("fr-FR"))}` : ""}
+        </div>
+        ${order.notes ? `<p style="margin-top:var(--space-3);white-space:pre-wrap">${escapeHtml(order.notes)}</p>` : ""}
+      </div>
+      <h3 style="font-size:var(--text-lg);margin-bottom:var(--space-3)">Produits</h3>
+      <div style="display:grid;gap:var(--space-2)">
+        ${(order.items || []).map((it) => `
+          <div class="card" style="padding:var(--space-3);display:flex;justify-content:space-between;align-items:center;border-radius:var(--radius-md);background:var(--bg-elevated)">
+            <div>
+              <strong>${escapeHtml(it.product_name)}</strong>
+              <div class="text-secondary text-sm">${it.quantity} ${escapeHtml(it.unit || "")}</div>
+            </div>
+            <div style="text-align:right;font-family:var(--font-mono)">
+              ${it.unit_price != null ? formatCurrency(it.unit_price) + "/" + escapeHtml(it.unit || "") : "\u2014"}
+              <div class="text-secondary text-sm">${it.total_price != null ? formatCurrency(it.total_price) : ""}</div>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+      <div style="margin-top:var(--space-4);text-align:right;font-size:var(--text-lg)">
+        <strong>Total : ${order.total_amount != null ? formatCurrency(order.total_amount) : "\u2014"}</strong>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    document.getElementById("back-supplier-orders").addEventListener("click", renderSupplierOrdersTab);
+  } catch (e) {
+    content.innerHTML = `<p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>`;
+  }
 }
 async function renderDeliveries() {
   const app = document.getElementById("app");
@@ -23613,6 +23737,59 @@ const NAV_GROUPS = {
       { label: "Cuisine (\xE9cran)", route: "/kitchen", icon: "chef-hat", roles: ["gerant", "cuisinier"] }
     ]
   },
+  haccp: {
+    label: "HACCP",
+    subcategories: [
+      {
+        label: "Temp\xE9ratures (quotidien)",
+        items: [
+          { label: "Relev\xE9s de temp\xE9rature", route: "/haccp/temperatures", icon: "thermometer", roles: ["gerant", "cuisinier"] },
+          { label: "Cuisson (CCP2)", route: "/haccp/cooking", icon: "flame", roles: ["gerant", "cuisinier"] },
+          { label: "Refroidissement", route: "/haccp/cooling", icon: "snowflake", roles: ["gerant", "cuisinier"] },
+          { label: "Remise en temp\xE9rature", route: "/haccp/reheating", icon: "microwave", roles: ["gerant", "cuisinier"] }
+        ]
+      },
+      {
+        label: "Hygi\xE8ne (quotidien / hebdo)",
+        items: [
+          { label: "Plan de nettoyage", route: "/haccp/cleaning", icon: "spray-can", roles: ["gerant", "cuisinier"] },
+          { label: "Non-conformit\xE9s", route: "/haccp/non-conformities", icon: "alert-triangle", roles: ["gerant", "cuisinier"] },
+          { label: "Actions correctives", route: "/haccp/corrective-actions", icon: "wrench", roles: ["gerant", "cuisinier"] }
+        ]
+      },
+      {
+        label: "Tra\xE7abilit\xE9",
+        items: [
+          { label: "R\xE9ception (CCP1)", route: "/stock/reception", icon: "package-plus", roles: ["gerant", "cuisinier"] },
+          { label: "Tra\xE7abilit\xE9 aval", route: "/traceability/downstream", icon: "package-check", roles: ["gerant", "cuisinier"] },
+          { label: "Allerg\xE8nes (INCO)", route: "/haccp/allergens", icon: "wheat-off", roles: ["gerant", "cuisinier"] }
+        ]
+      },
+      {
+        label: "Plan HACCP (mensuel)",
+        items: [
+          { label: "Plan formalis\xE9", route: "/haccp/plan", icon: "file-check", roles: ["gerant"] },
+          { label: "\xC9talonnage", route: "/haccp/calibrations", icon: "ruler", roles: ["gerant", "cuisinier"] },
+          { label: "Formation personnel", route: "/haccp/training", icon: "graduation-cap", roles: ["gerant"] },
+          { label: "Sant\xE9 personnel", route: "/haccp/staff-health", icon: "heart-pulse", roles: ["gerant"] }
+        ]
+      },
+      {
+        label: "Autre (ponctuel)",
+        items: [
+          { label: "Plats t\xE9moins", route: "/haccp/witness-meals", icon: "archive", roles: ["gerant", "cuisinier"] },
+          { label: "Huile de friture", route: "/haccp/fryers", icon: "droplet", roles: ["gerant", "cuisinier"] },
+          { label: "Lutte nuisibles", route: "/haccp/pest-control", icon: "bug", roles: ["gerant"] },
+          { label: "Maintenance \xE9quipement", route: "/haccp/maintenance", icon: "wrench", roles: ["gerant"] },
+          { label: "Gestion des d\xE9chets", route: "/haccp/waste", icon: "trash-2", roles: ["gerant", "cuisinier"] },
+          { label: "Analyse d'eau", route: "/haccp/water", icon: "droplets", roles: ["gerant"] },
+          { label: "Audit PMS", route: "/haccp/pms-audit", icon: "clipboard-check", roles: ["gerant"] },
+          { label: "TIAC", route: "/haccp/tiac", icon: "siren", roles: ["gerant"] },
+          { label: "Retrait / rappel", route: "/haccp/recall", icon: "rotate-ccw", roles: ["gerant"] }
+        ]
+      }
+    ]
+  },
   config: {
     label: "Param\xE8tres",
     items: [
@@ -23685,9 +23862,33 @@ const ROUTE_TO_GROUP = {
   "/settings/plans": "config",
   "/settings": "config",
   "/settings/sanitary-approval": "config",
-  "/traceability/downstream": "traceability",
+  "/traceability/downstream": "haccp",
   "/fabrication-diagrams": "documents",
-  "/pms/export": "documents"
+  "/pms/export": "documents",
+  "/haccp": "haccp",
+  "/haccp/temperatures": "haccp",
+  "/haccp/cooking": "haccp",
+  "/haccp/cooling": "haccp",
+  "/haccp/reheating": "haccp",
+  "/haccp/cleaning": "haccp",
+  "/haccp/non-conformities": "haccp",
+  "/haccp/corrective-actions": "haccp",
+  "/haccp/allergens": "haccp",
+  "/haccp/allergens-plan": "haccp",
+  "/haccp/plan": "haccp",
+  "/haccp/calibrations": "haccp",
+  "/haccp/training": "haccp",
+  "/haccp/staff-health": "haccp",
+  "/haccp/witness-meals": "haccp",
+  "/haccp/fryers": "haccp",
+  "/haccp/pest-control": "haccp",
+  "/haccp/maintenance": "haccp",
+  "/haccp/waste": "haccp",
+  "/haccp/water": "haccp",
+  "/haccp/pms-audit": "haccp",
+  "/haccp/tiac": "haccp",
+  "/haccp/recall": "haccp",
+  "/stock/reception": "haccp"
 };
 document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -24007,22 +24208,13 @@ function initNavGroups(role) {
   function openPanel(btn, groupKey) {
     const group = NAV_GROUPS[groupKey];
     if (!group) return;
-    const accessible = group.items.filter((item) => item.roles.includes(role));
-    if (accessible.length === 0) return;
-    if (accessible.length === 1) {
-      closePanel();
-      location.hash = "#" + accessible[0].route;
-      return;
-    }
     const currentPath = location.hash.replace("#", "") || "/";
-    panelContent.innerHTML = `
-      <div class="nav-panel-title">${escapeHtml(group.label)}</div>
-      ${accessible.map((item) => {
+    function renderItem(item) {
       if (item.action === "logout") {
         return `<button class="nav-panel-item nav-panel-item--danger" onclick="logout()">
-            <i data-lucide="${item.icon}"></i>
-            <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
-          </button>`;
+          <i data-lucide="${item.icon}"></i>
+          <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
+        </button>`;
       }
       const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
       const isActive = !locked && (currentPath === item.route || item.route !== "/" && currentPath.startsWith(item.route));
@@ -24030,16 +24222,46 @@ function initNavGroups(role) {
         const PLAN_LABELS = { essential: "Essential", professional: "Pro", premium: "Premium", enterprise: "Groupe" };
         const badge = PLAN_LABELS[item.minPlan] || item.minPlan;
         return `<button class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}" data-action="plan-gate">
-            <i data-lucide="${item.icon}"></i>
-            <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
-            <span class="nav-plan-badge">${escapeHtml(badge)}</span>
-          </button>`;
-      }
-      return `<a href="#${item.route}" class="nav-panel-item${isActive ? " active" : ""}">
           <i data-lucide="${item.icon}"></i>
           <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
-        </a>`;
-    }).join("")}
+          <span class="nav-plan-badge">${escapeHtml(badge)}</span>
+        </button>`;
+      }
+      return `<a href="#${item.route}" class="nav-panel-item${isActive ? " active" : ""}">
+        <i data-lucide="${item.icon}"></i>
+        <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
+      </a>`;
+    }
+    let body = "";
+    let accessibleCount = 0;
+    let onlyItem = null;
+    if (Array.isArray(group.subcategories)) {
+      const sections = [];
+      for (const sub of group.subcategories) {
+        const subAccessible = sub.items.filter((item) => item.roles.includes(role));
+        if (subAccessible.length === 0) continue;
+        accessibleCount += subAccessible.length;
+        if (subAccessible.length === 1 && !onlyItem) onlyItem = subAccessible[0];
+        sections.push(
+          `<div class="nav-panel-subtitle">${escapeHtml(sub.label)}</div>` + subAccessible.map(renderItem).join("")
+        );
+      }
+      body = sections.join("");
+    } else {
+      const accessible = group.items.filter((item) => item.roles.includes(role));
+      accessibleCount = accessible.length;
+      if (accessible.length === 1) onlyItem = accessible[0];
+      body = accessible.map(renderItem).join("");
+    }
+    if (accessibleCount === 0) return;
+    if (accessibleCount === 1 && onlyItem) {
+      closePanel();
+      location.hash = "#" + onlyItem.route;
+      return;
+    }
+    panelContent.innerHTML = `
+      <div class="nav-panel-title">${escapeHtml(group.label)}</div>
+      ${body}
     `;
     if (window.lucide) lucide.createIcons({ nodes: [panelContent] });
     if (window.innerWidth >= 768) {

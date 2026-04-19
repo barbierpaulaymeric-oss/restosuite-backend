@@ -64,6 +64,7 @@ const JS_FILES = [
   'js/views/supplier-login.js',
   'js/views/supplier-catalog.js',
   'js/views/supplier-delivery.js',
+  'js/views/supplier-orders.js',
   'js/views/deliveries.js',
   'js/views/supplier-portal-manage.js',
   'js/views/team.js',
