@@ -3,6 +3,7 @@ const { db, all, get, run } = require('../db');
 const PDFDocument = require('pdfkit');
 const { requireAuth } = require('./auth');
 const { writeAudit } = require('../lib/audit-log');
+const { validateReceptionTemp, validateCookingTarget, minCookingTempFor } = require('../lib/haccp-thresholds');
 const router = Router();
 
 router.use(requireAuth);
@@ -378,14 +379,18 @@ router.get('/traceability', (req, res) => {
 
 router.post('/traceability', (req, res) => {
   const rid = req.user.restaurant_id;
-  const { product_name, supplier, batch_number, dlc, ddm, temperature_at_reception, quantity, unit, received_by, notes, etat_emballage, conformite_organoleptique, numero_bl } = req.body;
+  const { product_name, supplier, batch_number, dlc, ddm, temperature_at_reception, quantity, unit, received_by, notes, etat_emballage, conformite_organoleptique, numero_bl, product_category } = req.body;
   if (!product_name) return res.status(400).json({ error: 'Le nom du produit est requis' });
+  // CCP1 reception: validate temperature against product-category legal thresholds
+  //  (Arrêté 21/12/2009 Annexe IV — viande ≤4°C, surgelés ≤-18°C, mer ≤2°C, etc.)
+  const tempCheck = validateReceptionTemp(product_category || null, temperature_at_reception);
+  if (!tempCheck.ok) return res.status(400).json({ error: tempCheck.error });
   const info = run(
-    `INSERT INTO traceability_logs (restaurant_id, product_name, supplier, batch_number, dlc, ddm, temperature_at_reception, quantity, unit, received_by, notes, etat_emballage, conformite_organoleptique, numero_bl)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO traceability_logs (restaurant_id, product_name, supplier, batch_number, dlc, ddm, temperature_at_reception, quantity, unit, received_by, notes, etat_emballage, conformite_organoleptique, numero_bl, product_category)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [rid, product_name, supplier || null, batch_number || null, dlc || null, ddm || null,
      temperature_at_reception ?? null, quantity ?? null, unit || 'kg', received_by || null, notes || null,
-     etat_emballage || null, conformite_organoleptique || null, numero_bl || null]
+     etat_emballage || null, conformite_organoleptique || null, numero_bl || null, product_category || null]
   );
   const log = get(`
     SELECT tl.*, a.name as received_by_name
@@ -1194,7 +1199,7 @@ router.post('/cooking', (req, res) => {
       recipe_id, product_name, batch_number, cooking_date,
       cooking_time_start, cooking_time_end, target_temperature,
       measured_temperature, thermometer_id, corrective_action,
-      operator, notes, core_temp_point,
+      operator, notes, core_temp_point, product_category,
     } = req.body;
 
     if (!product_name || cooking_date == null || target_temperature == null || measured_temperature == null) {
@@ -1204,13 +1209,9 @@ router.post('/cooking', (req, res) => {
       return res.status(400).json({ error: 'target_temperature doit être un nombre entre 0 et 300°C' });
     }
     // Legal minimum cooking temperature (Arrêté 21/12/2009, DGAL/SDSSA/N2012-8156):
-    //  - Cœur du produit doit atteindre ≥ 63°C pour la plupart des produits cuits
-    if (target_temperature < 63) {
-      return res.status(400).json({ error: 'target_temperature doit être ≥ 63°C (température légale minimale de cuisson à cœur, Arrêté 21/12/2009)' });
-    }
-    if (typeof measured_temperature !== 'number' || measured_temperature < 0 || measured_temperature > 300) {
-      return res.status(400).json({ error: 'measured_temperature doit être un nombre entre 0 et 300°C' });
-    }
+    //  - 63°C baseline ; volaille 65°C ; viande hachée 70°C ; remise en T° 75°C
+    const targetCheck = validateCookingTarget(product_category || null, target_temperature);
+    if (!targetCheck.ok) return res.status(400).json({ error: targetCheck.error });
     if (typeof measured_temperature !== 'number' || measured_temperature < -50 || measured_temperature > 300) {
       return res.status(400).json({ error: 'measured_temperature doit être un nombre entre -50 et 300°C' });
     }
@@ -1221,14 +1222,14 @@ router.post('/cooking', (req, res) => {
       `INSERT INTO cooking_records (
         restaurant_id, recipe_id, product_name, batch_number, cooking_date,
         cooking_time_start, cooking_time_end, target_temperature, measured_temperature,
-        is_compliant, thermometer_id, corrective_action, operator, notes, core_temp_point
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        is_compliant, thermometer_id, corrective_action, operator, notes, core_temp_point, product_category
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         rid, recipe_id ?? null, product_name, batch_number ?? null, cooking_date,
         cooking_time_start ?? null, cooking_time_end ?? null,
         target_temperature, measured_temperature,
         is_compliant, thermometer_id ?? null, corrective_action ?? null,
-        operator ?? null, notes ?? null, core_temp_point ?? null,
+        operator ?? null, notes ?? null, core_temp_point ?? null, product_category ?? null,
       ]
     );
     const created = get('SELECT * FROM cooking_records WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
@@ -1252,7 +1253,7 @@ router.put('/cooking/:id', (req, res) => {
       'recipe_id', 'product_name', 'batch_number', 'cooking_date',
       'cooking_time_start', 'cooking_time_end', 'target_temperature',
       'measured_temperature', 'thermometer_id', 'corrective_action',
-      'operator', 'notes', 'core_temp_point',
+      'operator', 'notes', 'core_temp_point', 'product_category',
     ];
     const merged = { ...existing };
     for (const key of allowed) {
@@ -1262,9 +1263,9 @@ router.put('/cooking/:id', (req, res) => {
     if (typeof merged.target_temperature !== 'number' || merged.target_temperature < 0 || merged.target_temperature > 300) {
       return res.status(400).json({ error: 'target_temperature doit être un nombre entre 0 et 300°C' });
     }
-    if (merged.target_temperature < 63) {
-      return res.status(400).json({ error: 'target_temperature doit être ≥ 63°C (température légale minimale de cuisson à cœur, Arrêté 21/12/2009)' });
-    }
+    // Product-aware legal minimum (63/65/70/75°C per category)
+    const targetCheck = validateCookingTarget(merged.product_category || null, merged.target_temperature);
+    if (!targetCheck.ok) return res.status(400).json({ error: targetCheck.error });
     if (typeof merged.measured_temperature !== 'number' || merged.measured_temperature < -50 || merged.measured_temperature > 300) {
       return res.status(400).json({ error: 'measured_temperature doit être un nombre entre -50 et 300°C' });
     }
@@ -1277,6 +1278,7 @@ router.put('/cooking/:id', (req, res) => {
         cooking_time_start = ?, cooking_time_end = ?, target_temperature = ?,
         measured_temperature = ?, is_compliant = ?, thermometer_id = ?,
         corrective_action = ?, operator = ?, notes = ?, core_temp_point = ?,
+        product_category = ?,
         updated_at = datetime('now')
        WHERE id = ? AND restaurant_id = ?`,
       [
@@ -1285,6 +1287,7 @@ router.put('/cooking/:id', (req, res) => {
         merged.target_temperature, merged.measured_temperature, is_compliant,
         merged.thermometer_id ?? null, merged.corrective_action ?? null,
         merged.operator ?? null, merged.notes ?? null, merged.core_temp_point ?? null,
+        merged.product_category ?? null,
         id, rid,
       ]
     );

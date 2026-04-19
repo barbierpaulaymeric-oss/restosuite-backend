@@ -464,6 +464,12 @@ try {
     CREATE INDEX IF NOT EXISTS idx_cooking_records_cooking_date ON cooking_records(cooking_date);
     CREATE INDEX IF NOT EXISTS idx_cooking_records_is_compliant ON cooking_records(is_compliant);
   `);
+  // Product category for CCP2 legal thresholds (63/65/70/75°C)
+  const cookingCols = all('PRAGMA table_info(cooking_records)').map(c => c.name);
+  if (!cookingCols.includes('product_category')) {
+    db.exec("ALTER TABLE cooking_records ADD COLUMN product_category TEXT");
+    console.log('✅ Migration: cooking_records.product_category ajouté (CCP2 thresholds)');
+  }
   console.log('✅ Migration: cooking_records table ready');
 } catch (e) {
   if (!e.message.includes('already exists')) console.error('Migration cooking_records error:', e.message);
@@ -1401,6 +1407,10 @@ try {
   if (!traceColNames.includes('ddm')) {
     db.exec("ALTER TABLE traceability_logs ADD COLUMN ddm DATE");
     console.log('✅ Migration: traceability_logs.ddm ajouté');
+  }
+  if (!traceColNames.includes('product_category')) {
+    db.exec("ALTER TABLE traceability_logs ADD COLUMN product_category TEXT");
+    console.log('✅ Migration: traceability_logs.product_category ajouté (CCP1 thresholds)');
   }
   console.log('✅ Migration: traçabilité réception enrichie');
 } catch (e) {
