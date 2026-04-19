@@ -39,7 +39,7 @@ async function renderHACCPStaffHealth() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvel enregistrement
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb('plan')}
 
         ${unfit.length > 0 ? `
         <div style="background:#fff0f0;border:1px solid #ef4444;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center">

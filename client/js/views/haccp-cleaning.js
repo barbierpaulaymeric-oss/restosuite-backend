@@ -28,7 +28,7 @@ async function renderHACCPCleaning() {
           ` : ''}
         </div>
 
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb('hygiene')}
 
         <!-- Today's status -->
         <div class="haccp-cleaning-today-box" role="region" aria-label="État des tâches du jour">

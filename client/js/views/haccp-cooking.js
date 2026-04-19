@@ -40,7 +40,7 @@ async function renderHACCPCooking() {
             <i data-lucide="plus" style="width:20px;height:20px"></i> Nouvelle cuisson
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb('temperatures')}
 
         <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
           <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>

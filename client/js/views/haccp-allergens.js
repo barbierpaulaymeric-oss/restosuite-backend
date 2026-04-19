@@ -43,7 +43,7 @@ async function renderHACCPAllergens() {
             <i data-lucide="printer" style="width:18px;height:18px"></i> Imprimer
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb('tracabilite')}
         <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
           <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
           <span class="text-sm">Règlement INCO (UE) n°1169/2011 — Les 14 allergènes majeurs doivent être portés à la connaissance des consommateurs. Peut être affiché en salle ou remis sur demande.</span>

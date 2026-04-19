@@ -69,7 +69,7 @@ function renderHACCPPlanShell() {
         </button>
       </div>
 
-      ${HACCP_SUBNAV_FULL}
+      ${haccpBreadcrumb('plan')}
 
       <!-- Onglets -->
       <div style="display:flex;gap:4px;margin-bottom:var(--space-4);border-bottom:2px solid var(--border-light)">

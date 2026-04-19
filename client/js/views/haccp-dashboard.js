@@ -2,46 +2,6 @@
 // HACCP Dashboard — Route #/haccp
 // ═══════════════════════════════════════════
 
-// Shared subnav for all HACCP pages — actif dynamique selon la route courante
-const HACCP_SUBNAV_ITEMS = [
-  { href: '#/haccp',                       label: 'Dashboard' },
-  { href: '#/haccp/temperatures',          label: 'Températures' },
-  { href: '#/haccp/calibrations',          label: 'Étalonnage' },
-  { href: '#/haccp/cleaning',              label: 'Nettoyage' },
-  { href: '#/haccp/traceability',          label: 'Traçabilité' },
-  { href: '#/haccp/cooking',               label: 'Cuisson (CCP2)' },
-  { href: '#/haccp/cooling',               label: 'Refroidissement' },
-  { href: '#/haccp/reheating',             label: 'Remise en T°' },
-  { href: '#/haccp/fryers',                label: 'Friteuses' },
-  { href: '#/haccp/non-conformities',      label: 'Non-conf.' },
-  { href: '#/haccp/allergens',             label: 'Allergènes' },
-  { href: '#/haccp/plan',                  label: 'Plan HACCP' },
-  { href: '#/haccp/recall',                label: 'Retrait/Rappel' },
-  { href: '#/haccp/training',              label: 'Formation' },
-  { href: '#/haccp/pest-control',          label: 'Nuisibles' },
-  { href: '#/haccp/maintenance',           label: 'Maintenance' },
-  { href: '#/haccp/waste',                 label: 'Déchets' },
-  { href: '#/haccp/corrective-actions',    label: 'Actions correctives' },
-  { href: '#/haccp/allergens-plan',        label: 'Plan allergènes' },
-  { href: '#/haccp/water',                 label: 'Eau' },
-  { href: '#/haccp/pms-audit',             label: 'Audits PMS' },
-  { href: '#/haccp/tiac',                  label: 'TIAC' },
-  { href: '#/haccp/witness-meals',         label: 'Plats témoins' },
-  { href: '#/haccp/staff-health',           label: 'Santé personnel' },
-  { href: '#/pms/export',                  label: 'Export PMS', extra: ' haccp-subnav__link--export' },
-];
-
-const HACCP_SUBNAV_FULL = {
-  toString() {
-    const current = location.hash.replace('#', '') || '/';
-    const links = HACCP_SUBNAV_ITEMS.map(item => {
-      const route = item.href.replace('#', '');
-      const isActive = route === current;
-      return `<a href="${item.href}" class="haccp-subnav__link${item.extra || ''}${isActive ? ' active' : ''}">${item.label}</a>`;
-    }).join('');
-    return `<div class="haccp-subnav">${links}</div>`;
-  }
-};
 
 async function renderHACCPDashboard() {
   const app = document.getElementById('app');
@@ -64,9 +24,6 @@ async function renderHACCPDashboard() {
         <div class="page-header">
           <h1><i data-lucide="shield-check" style="width:28px;height:28px;vertical-align:middle;color:var(--color-accent)"></i> HACCP</h1>
         </div>
-
-        <!-- HACCP Sub-navigation -->
-        ${HACCP_SUBNAV_FULL}
 
         <!-- SECTION: Températures du jour -->
         <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">

@@ -29,7 +29,7 @@ async function renderHACCPTemperatures() {
           </button>
         </div>
 
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb('temperatures')}
 
         <!-- Filters -->
         <div class="haccp-filters" role="search" aria-label="Filtrer les relevés">

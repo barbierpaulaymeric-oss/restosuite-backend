@@ -80,7 +80,7 @@ async function renderCorrectiveActions() {
             </button>
           </div>
 
-          ${HACCP_SUBNAV_FULL}
+          ${haccpBreadcrumb('hygiene')}
 
           <!-- KPI bar -->
           <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:20px">

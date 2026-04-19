@@ -5827,3 +5827,84 @@ body.tour-active { overflow: hidden; }
   from { opacity: 0; transform: scale(0.95) translateY(8px); }
   to   { opacity: 1; transform: scale(1)    translateY(0); }
 }
+
+/* ─── HACCP Hub pages ─── */
+.haccp-hub { padding: 0 16px 32px; max-width: 900px; margin: 0 auto; }
+.haccp-hub__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+.haccp-hub__card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.haccp-hub__card:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+}
+.haccp-hub__card-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent-light);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  color: var(--color-accent);
+}
+.haccp-hub__card-icon i { width: 20px; height: 20px; }
+.haccp-hub__card-label { flex: 1; font-weight: 500; font-size: 0.9rem; line-height: 1.3; }
+.haccp-hub__card-arrow { width: 16px; height: 16px; color: var(--text-tertiary); flex-shrink: 0; }
+
+/* ─── HACCP module breadcrumb (replaces 22-item subnav) ─── */
+.haccp-breadcrumb {
+  padding: 8px 16px 4px;
+  margin-bottom: 4px;
+}
+.haccp-breadcrumb__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+.haccp-breadcrumb__back:hover { color: var(--color-accent-hover); }
+.haccp-breadcrumb__back i { width: 16px; height: 16px; }
+
+/* ─── page-header breadcrumb trail (used by hub pages) ─── */
+.page-header__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}
+.breadcrumb-link {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+.breadcrumb-link:hover { text-decoration: underline; }
+.page-header__subtitle {
+  font-family: var(--font-serif);
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-left: 8px;
+  vertical-align: middle;
+}

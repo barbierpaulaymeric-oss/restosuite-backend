@@ -21,7 +21,7 @@ async function renderHACCPTraceability() {
           </button>
         </div>
 
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb('tracabilite')}
 
         ${dlcAlerts.length > 0 ? `
         <div class="haccp-dlc-alert-banner" role="alert" aria-live="polite">

@@ -36,7 +36,7 @@ async function renderHACCPRecall() {
           </button>
         </div>
 
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb('autre')}
 
         <!-- KPIs -->
         <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:var(--space-5)">

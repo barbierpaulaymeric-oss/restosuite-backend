@@ -26,7 +26,7 @@ async function renderHACCPTraining() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle formation
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb('plan')}
 
         ${expiring.length > 0 ? `
         <div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center">

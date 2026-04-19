@@ -56,55 +56,12 @@ const NAV_GROUPS = {
   },
   haccp: {
     label: 'HACCP',
-    subcategories: [
-      {
-        label: 'Températures (quotidien)',
-        items: [
-          { label: 'Relevés de température', route: '/haccp/temperatures', icon: 'thermometer',    roles: ['gerant','cuisinier'] },
-          { label: 'Cuisson (CCP2)',         route: '/haccp/cooking',       icon: 'flame',          roles: ['gerant','cuisinier'] },
-          { label: 'Refroidissement',        route: '/haccp/cooling',       icon: 'snowflake',      roles: ['gerant','cuisinier'] },
-          { label: 'Remise en température',  route: '/haccp/reheating',     icon: 'microwave',      roles: ['gerant','cuisinier'] },
-        ]
-      },
-      {
-        label: 'Hygiène (quotidien / hebdo)',
-        items: [
-          { label: 'Plan de nettoyage',      route: '/haccp/cleaning',            icon: 'spray-can',     roles: ['gerant','cuisinier'] },
-          { label: 'Non-conformités',        route: '/haccp/non-conformities',    icon: 'alert-triangle',roles: ['gerant','cuisinier'] },
-          { label: 'Actions correctives',    route: '/haccp/corrective-actions',  icon: 'wrench',        roles: ['gerant','cuisinier'] },
-        ]
-      },
-      {
-        label: 'Traçabilité',
-        items: [
-          { label: 'Réception (CCP1)',       route: '/stock/reception',           icon: 'package-plus',   roles: ['gerant','cuisinier'] },
-          { label: 'Traçabilité aval',       route: '/traceability/downstream',   icon: 'package-check',  roles: ['gerant','cuisinier'] },
-          { label: 'Allergènes (INCO)',      route: '/haccp/allergens',           icon: 'wheat-off',      roles: ['gerant','cuisinier'] },
-        ]
-      },
-      {
-        label: 'Plan HACCP (mensuel)',
-        items: [
-          { label: 'Plan formalisé',         route: '/haccp/plan',                icon: 'file-check',     roles: ['gerant'] },
-          { label: 'Étalonnage',             route: '/haccp/calibrations',        icon: 'ruler',          roles: ['gerant','cuisinier'] },
-          { label: 'Formation personnel',    route: '/haccp/training',            icon: 'graduation-cap', roles: ['gerant'] },
-          { label: 'Santé personnel',        route: '/haccp/staff-health',        icon: 'heart-pulse',    roles: ['gerant'] },
-        ]
-      },
-      {
-        label: 'Autre (ponctuel)',
-        items: [
-          { label: 'Plats témoins',          route: '/haccp/witness-meals',       icon: 'archive',        roles: ['gerant','cuisinier'] },
-          { label: 'Huile de friture',       route: '/haccp/fryers',              icon: 'droplet',        roles: ['gerant','cuisinier'] },
-          { label: 'Lutte nuisibles',        route: '/haccp/pest-control',        icon: 'bug',            roles: ['gerant'] },
-          { label: 'Maintenance équipement', route: '/haccp/maintenance',         icon: 'wrench',         roles: ['gerant'] },
-          { label: 'Gestion des déchets',    route: '/haccp/waste',               icon: 'trash-2',        roles: ['gerant','cuisinier'] },
-          { label: 'Analyse d\'eau',         route: '/haccp/water',               icon: 'droplets',       roles: ['gerant'] },
-          { label: 'Audit PMS',              route: '/haccp/pms-audit',           icon: 'clipboard-check',roles: ['gerant'] },
-          { label: 'TIAC',                   route: '/haccp/tiac',                icon: 'siren',          roles: ['gerant'] },
-          { label: 'Retrait / rappel',       route: '/haccp/recall',              icon: 'rotate-ccw',     roles: ['gerant'] },
-        ]
-      },
+    items: [
+      { label: 'Températures', route: '/haccp/hub/temperatures', icon: 'thermometer',    roles: ['gerant','cuisinier'] },
+      { label: 'Hygiène',      route: '/haccp/hub/hygiene',      icon: 'spray-can',      roles: ['gerant','cuisinier'] },
+      { label: 'Traçabilité',  route: '/haccp/hub/tracabilite',  icon: 'package-check',  roles: ['gerant','cuisinier'] },
+      { label: 'Plan HACCP',   route: '/haccp/hub/plan',         icon: 'file-check',     roles: ['gerant','cuisinier'] },
+      { label: 'Autre',        route: '/haccp/hub/autre',        icon: 'more-horizontal', roles: ['gerant','cuisinier'] },
     ]
   },
   config: {
@@ -189,6 +146,11 @@ const ROUTE_TO_GROUP = {
   '/haccp/pms-audit': 'haccp',
   '/haccp/tiac': 'haccp',
   '/haccp/recall': 'haccp',
+  '/haccp/hub/temperatures': 'haccp',
+  '/haccp/hub/hygiene':      'haccp',
+  '/haccp/hub/tracabilite':  'haccp',
+  '/haccp/hub/plan':         'haccp',
+  '/haccp/hub/autre':        'haccp',
   '/stock/reception': 'haccp',
 };
 
@@ -400,6 +362,11 @@ function registerRoutes() {
   Router.add(/^\/haccp\/tiac$/, renderHACCPTIAC);
   Router.add(/^\/haccp\/witness-meals$/, renderHACCPWitnessMeals);
   Router.add(/^\/haccp\/staff-health$/, renderHACCPStaffHealth);
+  Router.add(/^\/haccp\/hub\/temperatures$/, () => renderHACCPHub('temperatures'));
+  Router.add(/^\/haccp\/hub\/hygiene$/,      () => renderHACCPHub('hygiene'));
+  Router.add(/^\/haccp\/hub\/tracabilite$/,  () => renderHACCPHub('tracabilite'));
+  Router.add(/^\/haccp\/hub\/plan$/,         () => renderHACCPHub('plan'));
+  Router.add(/^\/haccp\/hub\/autre$/,        () => renderHACCPHub('autre'));
   Router.add(/^\/settings\/sanitary-approval$/, renderSanitaryApproval);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, () => { location.hash = '#/analytics'; });

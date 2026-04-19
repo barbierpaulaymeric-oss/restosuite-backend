@@ -23,7 +23,7 @@ async function renderHACCPPestControl() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle visite
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb('autre')}
 
         ${lastVisit?.next_visit_date ? `
         <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:14px 18px;margin-bottom:16px;display:flex;gap:12px;align-items:center">

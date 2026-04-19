@@ -33,7 +33,7 @@ async function renderHACCPTIAC() {
           ` : ''}
         </div>
 
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb('autre')}
 
         <div class="haccp-info-banner" style="background:var(--color-danger-light,rgba(239,68,68,0.08));border:1px solid var(--color-danger);border-radius:8px;padding:var(--space-3) var(--space-4);margin-bottom:var(--space-4);display:flex;gap:var(--space-3);align-items:flex-start">
           <i data-lucide="info" style="width:20px;height:20px;color:var(--color-danger);flex-shrink:0;margin-top:2px"></i>

@@ -62,7 +62,7 @@ async function renderHACCPCalibrations() {
           </div>
         </div>
 
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb('plan')}
 
         ${alertBanner}
 

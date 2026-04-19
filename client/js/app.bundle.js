@@ -3885,44 +3885,6 @@ async function showSupplierDetail(id) {
   if (!sup) return;
   showSupplierModal(sup);
 }
-const HACCP_SUBNAV_ITEMS = [
-  { href: "#/haccp", label: "Dashboard" },
-  { href: "#/haccp/temperatures", label: "Temp\xE9ratures" },
-  { href: "#/haccp/calibrations", label: "\xC9talonnage" },
-  { href: "#/haccp/cleaning", label: "Nettoyage" },
-  { href: "#/haccp/traceability", label: "Tra\xE7abilit\xE9" },
-  { href: "#/haccp/cooking", label: "Cuisson (CCP2)" },
-  { href: "#/haccp/cooling", label: "Refroidissement" },
-  { href: "#/haccp/reheating", label: "Remise en T\xB0" },
-  { href: "#/haccp/fryers", label: "Friteuses" },
-  { href: "#/haccp/non-conformities", label: "Non-conf." },
-  { href: "#/haccp/allergens", label: "Allerg\xE8nes" },
-  { href: "#/haccp/plan", label: "Plan HACCP" },
-  { href: "#/haccp/recall", label: "Retrait/Rappel" },
-  { href: "#/haccp/training", label: "Formation" },
-  { href: "#/haccp/pest-control", label: "Nuisibles" },
-  { href: "#/haccp/maintenance", label: "Maintenance" },
-  { href: "#/haccp/waste", label: "D\xE9chets" },
-  { href: "#/haccp/corrective-actions", label: "Actions correctives" },
-  { href: "#/haccp/allergens-plan", label: "Plan allerg\xE8nes" },
-  { href: "#/haccp/water", label: "Eau" },
-  { href: "#/haccp/pms-audit", label: "Audits PMS" },
-  { href: "#/haccp/tiac", label: "TIAC" },
-  { href: "#/haccp/witness-meals", label: "Plats t\xE9moins" },
-  { href: "#/haccp/staff-health", label: "Sant\xE9 personnel" },
-  { href: "#/pms/export", label: "Export PMS", extra: " haccp-subnav__link--export" }
-];
-const HACCP_SUBNAV_FULL = {
-  toString() {
-    const current = location.hash.replace("#", "") || "/";
-    const links = HACCP_SUBNAV_ITEMS.map((item) => {
-      const route = item.href.replace("#", "");
-      const isActive = route === current;
-      return `<a href="${item.href}" class="haccp-subnav__link${item.extra || ""}${isActive ? " active" : ""}">${item.label}</a>`;
-    }).join("");
-    return `<div class="haccp-subnav">${links}</div>`;
-  }
-};
 async function renderHACCPDashboard() {
   const app = document.getElementById("app");
   app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
@@ -3941,9 +3903,6 @@ async function renderHACCPDashboard() {
         <div class="page-header">
           <h1><i data-lucide="shield-check" style="width:28px;height:28px;vertical-align:middle;color:var(--color-accent)"></i> HACCP</h1>
         </div>
-
-        <!-- HACCP Sub-navigation -->
-        ${HACCP_SUBNAV_FULL}
 
         <!-- SECTION: Temp\xE9ratures du jour -->
         <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
@@ -4158,6 +4117,145 @@ function showTemperatureModal(zoneId, zoneName, minTemp, maxTemp) {
     }
   });
 }
+const HACCP_HUB_CATEGORIES = {
+  temperatures: {
+    label: "Temp\xE9ratures",
+    subtitle: "Quotidien",
+    icon: "thermometer",
+    hubRoute: "/haccp/hub/temperatures",
+    items: [
+      { label: "Relev\xE9s du jour", route: "/haccp/temperatures", icon: "thermometer" },
+      { label: "Cuisson (CCP2)", route: "/haccp/cooking", icon: "flame" },
+      { label: "Refroidissement", route: "/haccp/cooling", icon: "snowflake" },
+      { label: "Remise en temp\xE9rature", route: "/haccp/reheating", icon: "microwave" }
+    ]
+  },
+  hygiene: {
+    label: "Hygi\xE8ne",
+    subtitle: "Quotidien / Hebdo",
+    icon: "spray-can",
+    hubRoute: "/haccp/hub/hygiene",
+    items: [
+      { label: "Plan de nettoyage", route: "/haccp/cleaning", icon: "spray-can" },
+      { label: "Non-conformit\xE9s", route: "/haccp/non-conformities", icon: "alert-triangle" },
+      { label: "Actions correctives", route: "/haccp/corrective-actions", icon: "wrench" }
+    ]
+  },
+  tracabilite: {
+    label: "Tra\xE7abilit\xE9",
+    subtitle: "",
+    icon: "package-check",
+    hubRoute: "/haccp/hub/tracabilite",
+    items: [
+      { label: "R\xE9ception (CCP1)", route: "/stock/reception", icon: "package-plus" },
+      { label: "Tra\xE7abilit\xE9 aval", route: "/traceability/downstream", icon: "package-check" },
+      { label: "Allerg\xE8nes (INCO)", route: "/haccp/allergens", icon: "wheat-off" }
+    ]
+  },
+  plan: {
+    label: "Plan HACCP",
+    subtitle: "Mensuel",
+    icon: "file-check",
+    hubRoute: "/haccp/hub/plan",
+    items: [
+      { label: "Plan formalis\xE9", route: "/haccp/plan", icon: "file-check" },
+      { label: "\xC9talonnage", route: "/haccp/calibrations", icon: "ruler" },
+      { label: "Formation personnel", route: "/haccp/training", icon: "graduation-cap" },
+      { label: "Sant\xE9 personnel", route: "/haccp/staff-health", icon: "heart-pulse" }
+    ]
+  },
+  autre: {
+    label: "Autre",
+    subtitle: "Ponctuel",
+    icon: "more-horizontal",
+    hubRoute: "/haccp/hub/autre",
+    items: [
+      { label: "Plats t\xE9moins", route: "/haccp/witness-meals", icon: "archive" },
+      { label: "Huile de friture", route: "/haccp/fryers", icon: "droplet" },
+      { label: "Lutte nuisibles", route: "/haccp/pest-control", icon: "bug" },
+      { label: "Maintenance \xE9quipement", route: "/haccp/maintenance", icon: "wrench" },
+      { label: "Gestion des d\xE9chets", route: "/haccp/waste", icon: "trash-2" },
+      { label: "Analyse d'eau", route: "/haccp/water", icon: "droplets" },
+      { label: "Audit PMS", route: "/haccp/pms-audit", icon: "clipboard-check" },
+      { label: "TIAC", route: "/haccp/tiac", icon: "siren" },
+      { label: "Retrait / rappel", route: "/haccp/recall", icon: "rotate-ccw" }
+    ]
+  }
+};
+const HACCP_ROUTE_TO_CATEGORY = {
+  "/haccp/temperatures": "temperatures",
+  "/haccp/cooking": "temperatures",
+  "/haccp/cooling": "temperatures",
+  "/haccp/reheating": "temperatures",
+  "/haccp/cleaning": "hygiene",
+  "/haccp/non-conformities": "hygiene",
+  "/haccp/corrective-actions": "hygiene",
+  "/stock/reception": "tracabilite",
+  "/traceability/downstream": "tracabilite",
+  "/haccp/allergens": "tracabilite",
+  "/haccp/allergens-plan": "tracabilite",
+  "/haccp/plan": "plan",
+  "/haccp/calibrations": "plan",
+  "/haccp/training": "plan",
+  "/haccp/staff-health": "plan",
+  "/haccp/witness-meals": "autre",
+  "/haccp/fryers": "autre",
+  "/haccp/pest-control": "autre",
+  "/haccp/maintenance": "autre",
+  "/haccp/waste": "autre",
+  "/haccp/water": "autre",
+  "/haccp/pms-audit": "autre",
+  "/haccp/tiac": "autre",
+  "/haccp/recall": "autre"
+};
+function haccpBreadcrumb(categoryKey) {
+  const key = categoryKey || HACCP_ROUTE_TO_CATEGORY[location.hash.replace("#", "")] || null;
+  if (!key) return "";
+  const cat = HACCP_HUB_CATEGORIES[key];
+  if (!cat) return "";
+  return `<div class="haccp-breadcrumb">
+    <a href="#${cat.hubRoute}" class="haccp-breadcrumb__back">
+      <i data-lucide="chevron-left"></i>
+      <span>${escapeHtml(cat.label)}</span>
+    </a>
+  </div>`;
+}
+async function renderHACCPHub(categoryKey) {
+  const cat = HACCP_HUB_CATEGORIES[categoryKey];
+  if (!cat) {
+    location.hash = "#/haccp";
+    return;
+  }
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="page-header">
+      <div class="page-header__content">
+        <div class="page-header__breadcrumb">
+          <a href="#/haccp" class="breadcrumb-link">HACCP</a>
+          <i data-lucide="chevron-right" style="width:14px;height:14px;color:var(--text-tertiary)"></i>
+          <span>${escapeHtml(cat.label)}</span>
+        </div>
+        <h1 class="page-header__title">
+          <i data-lucide="${cat.icon}"></i>
+          ${escapeHtml(cat.label)}${cat.subtitle ? ` <span class="page-header__subtitle">${escapeHtml(cat.subtitle)}</span>` : ""}
+        </h1>
+      </div>
+    </div>
+    <div class="haccp-hub">
+      <div class="haccp-hub__grid">
+        ${cat.items.map((item) => `
+          <a href="#${item.route}" class="haccp-hub__card">
+            <div class="haccp-hub__card-icon">
+              <i data-lucide="${item.icon}"></i>
+            </div>
+            <span class="haccp-hub__card-label">${escapeHtml(item.label)}</span>
+            <i data-lucide="chevron-right" class="haccp-hub__card-arrow"></i>
+          </a>`).join("")}
+      </div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons({ nodes: [app] });
+}
 async function renderHACCPTemperatures() {
   const app = document.getElementById("app");
   app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
@@ -4182,7 +4280,7 @@ async function renderHACCPTemperatures() {
           </button>
         </div>
 
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("temperatures")}
 
         <!-- Filters -->
         <div class="haccp-filters" role="search" aria-label="Filtrer les relev\xE9s">
@@ -4547,7 +4645,7 @@ async function renderHACCPCalibrations() {
           </div>
         </div>
 
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("plan")}
 
         ${alertBanner}
 
@@ -4925,7 +5023,7 @@ async function renderHACCPCleaning() {
           ` : ""}
         </div>
 
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("hygiene")}
 
         <!-- Today's status -->
         <div class="haccp-cleaning-today-box" role="region" aria-label="\xC9tat des t\xE2ches du jour">
@@ -5168,7 +5266,7 @@ async function renderHACCPTraceability() {
           </button>
         </div>
 
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("tracabilite")}
 
         ${dlcAlerts.length > 0 ? `
         <div class="haccp-dlc-alert-banner" role="alert" aria-live="polite">
@@ -5441,7 +5539,7 @@ async function renderHACCPCooling() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("temperatures")}
         <div style="background:rgba(59,158,222,0.12);border:1px solid rgba(59,158,222,0.45);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;color:var(--text-primary)">
           <i data-lucide="info" style="width:18px;height:18px;color:var(--color-info);flex-shrink:0;margin-top:1px"></i>
           <span class="text-sm">R\xE9glementation : passage de <strong>+63\xB0C \xE0 +10\xB0C en moins de 2h</strong>.</span>
@@ -5660,7 +5758,7 @@ async function renderHACCPCooking() {
             <i data-lucide="plus" style="width:20px;height:20px"></i> Nouvelle cuisson
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("temperatures")}
 
         <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
           <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
@@ -6010,7 +6108,7 @@ async function renderHACCPReheating() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("temperatures")}
         <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
           <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
           <span class="text-sm">R\xE9glementation : atteindre <strong>+63\xB0C en moins de 1h</strong> depuis la mise en chauffe.</span>
@@ -6206,7 +6304,7 @@ async function renderHACCPFryers() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter friteuse
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("autre")}
         <div style="background:rgba(59,158,222,0.12);border:1px solid rgba(59,158,222,0.45);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;color:var(--text-primary)">
           <i data-lucide="info" style="width:18px;height:18px;color:var(--color-info);flex-shrink:0;margin-top:1px"></i>
           <span class="text-sm">Seuil l\xE9gal : <strong>25% de compos\xE9s polaires</strong>. Au-del\xE0, changement obligatoire.</span>
@@ -6441,7 +6539,7 @@ async function renderHACCPNonConformities() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> D\xE9clarer
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("hygiene")}
 
         ${openData.items.length > 0 ? `
         <div class="section-title" style="display:flex;align-items:center;gap:8px">
@@ -6646,7 +6744,7 @@ async function renderHACCPAllergens() {
             <i data-lucide="printer" style="width:18px;height:18px"></i> Imprimer
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("tracabilite")}
         <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
           <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
           <span class="text-sm">R\xE8glement INCO (UE) n\xB01169/2011 \u2014 Les 14 allerg\xE8nes majeurs doivent \xEAtre port\xE9s \xE0 la connaissance des consommateurs. Peut \xEAtre affich\xE9 en salle ou remis sur demande.</span>
@@ -6720,7 +6818,7 @@ async function renderHACCPAllergensplan() {
             <i data-lucide="printer" style="width:18px;height:18px"></i> Imprimer
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("tracabilite")}
 
         <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
           <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
@@ -6917,7 +7015,7 @@ async function renderHACCPWater() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle analyse
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("autre")}
 
         <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
           <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
@@ -7181,7 +7279,7 @@ async function renderHACCPPmsAudit() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvel audit
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("autre")}
 
         <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
           <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
@@ -7509,7 +7607,7 @@ async function renderHACCPTIAC() {
           ` : ""}
         </div>
 
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("autre")}
 
         <div class="haccp-info-banner" style="background:var(--color-danger-light,rgba(239,68,68,0.08));border:1px solid var(--color-danger);border-radius:8px;padding:var(--space-3) var(--space-4);margin-bottom:var(--space-4);display:flex;gap:var(--space-3);align-items:flex-start">
           <i data-lucide="info" style="width:20px;height:20px;color:var(--color-danger);flex-shrink:0;margin-top:2px"></i>
@@ -7749,7 +7847,7 @@ async function renderHACCPWitnessMeals() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouveau pr\xE9l\xE8vement
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("autre")}
 
         ${overdue.total > 0 ? `
         <div style="background:#fff0f0;border:1px solid #ef4444;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center">
@@ -8138,7 +8236,7 @@ async function renderHACCPStaffHealth() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvel enregistrement
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("plan")}
 
         ${unfit.length > 0 ? `
         <div style="background:#fff0f0;border:1px solid #ef4444;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center">
@@ -8523,7 +8621,7 @@ function renderHACCPPlanShell() {
         </button>
       </div>
 
-      ${HACCP_SUBNAV_FULL}
+      ${haccpBreadcrumb("plan")}
 
       <!-- Onglets -->
       <div style="display:flex;gap:4px;margin-bottom:var(--space-4);border-bottom:2px solid var(--border-light)">
@@ -9045,7 +9143,7 @@ async function renderHACCPRecall() {
           </button>
         </div>
 
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("autre")}
 
         <!-- KPIs -->
         <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:var(--space-5)">
@@ -9512,7 +9610,7 @@ async function renderHACCPTraining() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle formation
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("plan")}
 
         ${expiring.length > 0 ? `
         <div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center">
@@ -9747,7 +9845,7 @@ async function renderHACCPPestControl() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Nouvelle visite
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("autre")}
 
         ${(lastVisit == null ? void 0 : lastVisit.next_visit_date) ? `
         <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:14px 18px;margin-bottom:16px;display:flex;gap:12px;align-items:center">
@@ -9995,7 +10093,7 @@ async function renderHACCPMaintenance() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter \xE9quipement
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("autre")}
 
         ${overdue.length > 0 ? `
         <div style="background:#fff0f0;border:1px solid #ef4444;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center">
@@ -10245,7 +10343,7 @@ async function renderHACCPWaste() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter fili\xE8re
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb("autre")}
 
         <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
           <i data-lucide="info" style="width:18px;height:18px;color:#3b9ede;flex-shrink:0;margin-top:1px"></i>
@@ -10496,7 +10594,7 @@ async function renderCorrectiveActions() {
             </button>
           </div>
 
-          ${HACCP_SUBNAV_FULL}
+          ${haccpBreadcrumb("hygiene")}
 
           <!-- KPI bar -->
           <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:20px">
@@ -23739,55 +23837,12 @@ const NAV_GROUPS = {
   },
   haccp: {
     label: "HACCP",
-    subcategories: [
-      {
-        label: "Temp\xE9ratures (quotidien)",
-        items: [
-          { label: "Relev\xE9s de temp\xE9rature", route: "/haccp/temperatures", icon: "thermometer", roles: ["gerant", "cuisinier"] },
-          { label: "Cuisson (CCP2)", route: "/haccp/cooking", icon: "flame", roles: ["gerant", "cuisinier"] },
-          { label: "Refroidissement", route: "/haccp/cooling", icon: "snowflake", roles: ["gerant", "cuisinier"] },
-          { label: "Remise en temp\xE9rature", route: "/haccp/reheating", icon: "microwave", roles: ["gerant", "cuisinier"] }
-        ]
-      },
-      {
-        label: "Hygi\xE8ne (quotidien / hebdo)",
-        items: [
-          { label: "Plan de nettoyage", route: "/haccp/cleaning", icon: "spray-can", roles: ["gerant", "cuisinier"] },
-          { label: "Non-conformit\xE9s", route: "/haccp/non-conformities", icon: "alert-triangle", roles: ["gerant", "cuisinier"] },
-          { label: "Actions correctives", route: "/haccp/corrective-actions", icon: "wrench", roles: ["gerant", "cuisinier"] }
-        ]
-      },
-      {
-        label: "Tra\xE7abilit\xE9",
-        items: [
-          { label: "R\xE9ception (CCP1)", route: "/stock/reception", icon: "package-plus", roles: ["gerant", "cuisinier"] },
-          { label: "Tra\xE7abilit\xE9 aval", route: "/traceability/downstream", icon: "package-check", roles: ["gerant", "cuisinier"] },
-          { label: "Allerg\xE8nes (INCO)", route: "/haccp/allergens", icon: "wheat-off", roles: ["gerant", "cuisinier"] }
-        ]
-      },
-      {
-        label: "Plan HACCP (mensuel)",
-        items: [
-          { label: "Plan formalis\xE9", route: "/haccp/plan", icon: "file-check", roles: ["gerant"] },
-          { label: "\xC9talonnage", route: "/haccp/calibrations", icon: "ruler", roles: ["gerant", "cuisinier"] },
-          { label: "Formation personnel", route: "/haccp/training", icon: "graduation-cap", roles: ["gerant"] },
-          { label: "Sant\xE9 personnel", route: "/haccp/staff-health", icon: "heart-pulse", roles: ["gerant"] }
-        ]
-      },
-      {
-        label: "Autre (ponctuel)",
-        items: [
-          { label: "Plats t\xE9moins", route: "/haccp/witness-meals", icon: "archive", roles: ["gerant", "cuisinier"] },
-          { label: "Huile de friture", route: "/haccp/fryers", icon: "droplet", roles: ["gerant", "cuisinier"] },
-          { label: "Lutte nuisibles", route: "/haccp/pest-control", icon: "bug", roles: ["gerant"] },
-          { label: "Maintenance \xE9quipement", route: "/haccp/maintenance", icon: "wrench", roles: ["gerant"] },
-          { label: "Gestion des d\xE9chets", route: "/haccp/waste", icon: "trash-2", roles: ["gerant", "cuisinier"] },
-          { label: "Analyse d'eau", route: "/haccp/water", icon: "droplets", roles: ["gerant"] },
-          { label: "Audit PMS", route: "/haccp/pms-audit", icon: "clipboard-check", roles: ["gerant"] },
-          { label: "TIAC", route: "/haccp/tiac", icon: "siren", roles: ["gerant"] },
-          { label: "Retrait / rappel", route: "/haccp/recall", icon: "rotate-ccw", roles: ["gerant"] }
-        ]
-      }
+    items: [
+      { label: "Temp\xE9ratures", route: "/haccp/hub/temperatures", icon: "thermometer", roles: ["gerant", "cuisinier"] },
+      { label: "Hygi\xE8ne", route: "/haccp/hub/hygiene", icon: "spray-can", roles: ["gerant", "cuisinier"] },
+      { label: "Tra\xE7abilit\xE9", route: "/haccp/hub/tracabilite", icon: "package-check", roles: ["gerant", "cuisinier"] },
+      { label: "Plan HACCP", route: "/haccp/hub/plan", icon: "file-check", roles: ["gerant", "cuisinier"] },
+      { label: "Autre", route: "/haccp/hub/autre", icon: "more-horizontal", roles: ["gerant", "cuisinier"] }
     ]
   },
   config: {
@@ -23888,6 +23943,11 @@ const ROUTE_TO_GROUP = {
   "/haccp/pms-audit": "haccp",
   "/haccp/tiac": "haccp",
   "/haccp/recall": "haccp",
+  "/haccp/hub/temperatures": "haccp",
+  "/haccp/hub/hygiene": "haccp",
+  "/haccp/hub/tracabilite": "haccp",
+  "/haccp/hub/plan": "haccp",
+  "/haccp/hub/autre": "haccp",
   "/stock/reception": "haccp"
 };
 document.addEventListener("keydown", (e) => {
@@ -24068,6 +24128,11 @@ function registerRoutes() {
   Router.add(/^\/haccp\/tiac$/, renderHACCPTIAC);
   Router.add(/^\/haccp\/witness-meals$/, renderHACCPWitnessMeals);
   Router.add(/^\/haccp\/staff-health$/, renderHACCPStaffHealth);
+  Router.add(/^\/haccp\/hub\/temperatures$/, () => renderHACCPHub("temperatures"));
+  Router.add(/^\/haccp\/hub\/hygiene$/, () => renderHACCPHub("hygiene"));
+  Router.add(/^\/haccp\/hub\/tracabilite$/, () => renderHACCPHub("tracabilite"));
+  Router.add(/^\/haccp\/hub\/plan$/, () => renderHACCPHub("plan"));
+  Router.add(/^\/haccp\/hub\/autre$/, () => renderHACCPHub("autre"));
   Router.add(/^\/settings\/sanitary-approval$/, renderSanitaryApproval);
   Router.add(/^\/analytics$/, renderAnalytics);
   Router.add(/^\/health$/, () => {

@@ -34,7 +34,7 @@ async function renderHACCPNonConformities() {
             <i data-lucide="plus" style="width:18px;height:18px"></i> Déclarer
           </button>
         </div>
-        ${HACCP_SUBNAV_FULL}
+        ${haccpBreadcrumb('hygiene')}
 
         ${openData.items.length > 0 ? `
         <div class="section-title" style="display:flex;align-items:center;gap:8px">
