@@ -52,6 +52,14 @@ const API = {
     }
     const res = await fetch(url, config);
     if (res.status === 401) {
+      // Check if this is a login attempt (smart-login, login, register) — if so,
+      // don't redirect, just throw with the server's error message so the login
+      // form can display it.
+      const isLoginAttempt = path.includes('/auth/smart-login') || path.includes('/auth/login') || path.includes('/auth/register') || path.includes('/auth/staff-login') || path.includes('/auth/pin-login') || path.includes('/auth/staff-pin');
+      if (isLoginAttempt) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Email ou mot de passe incorrect');
+      }
       // JWT expired or invalid — force re-login
       localStorage.removeItem('restosuite_token');
       localStorage.removeItem('restosuite_account');
