@@ -102,9 +102,10 @@ router.get('/menu-suggestions', async (req, res) => {
       ORDER BY s.quantity DESC LIMIT 30
     `, [rid]);
 
-    const prompt = `Tu es un expert en gestion de restaurant français. Réponds UNIQUEMENT en français, jamais en anglais.
+    // Build lookup map of verified food_cost_pct values (lowercase name → recipe)
+    const recipeMap = new Map(recipesData.map(r => [r.name.toLowerCase(), r]));
 
-Voici les fiches techniques d'un restaurant avec leur food cost :
+    const prompt = `Voici les fiches techniques d'un restaurant avec leur food cost :
 ${JSON.stringify(recipesData, null, 2)}
 
 Ingrédients actuellement en stock :
@@ -114,8 +115,6 @@ Analyse et donne :
 1) Les 3 plats les plus rentables à mettre en avant
 2) Les 3 plats avec le food cost trop élevé et des suggestions pour les améliorer (substitution d'ingrédients)
 3) Une suggestion de plat du jour basée sur les ingrédients en stock
-
-IMPORTANT : Tous les textes (name, reason, suggestion, description, key_ingredients) doivent être en français.
 
 Réponds en JSON avec cette structure exacte :
 {
@@ -129,6 +128,9 @@ Réponds en JSON avec cette structure exacte :
       method: 'POST',
       headers: geminiHeaders(),
       body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: 'Tu es un expert en gestion de restaurant. Réponds EXCLUSIVEMENT en français. Tous les champs texte (name, reason, suggestion, description, key_ingredients) DOIVENT être rédigés en français. Ne jamais utiliser l\'anglais.' }]
+        },
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: 'application/json', temperature: 0.7 }
       })
@@ -150,6 +152,20 @@ Réponds en JSON avec cette structure exacte :
     if (!content) return res.status(502).json({ error: 'Réponse IA vide' });
 
     const suggestions = JSON.parse(content);
+
+    // Replace Gemini's food_cost_pct with server-verified values to prevent
+    // hallucinated / absurd percentages from reaching the client.
+    const sanitizeItems = (items) => (items || [])
+      .map(item => {
+        const verified = recipeMap.get((item.name || '').toLowerCase());
+        if (verified) item.food_cost_pct = verified.food_cost_pct;
+        return item;
+      })
+      .filter(item => item.food_cost_pct != null && item.food_cost_pct > 0 && item.food_cost_pct < 200);
+
+    suggestions.top_profitable = sanitizeItems(suggestions.top_profitable);
+    suggestions.to_improve = sanitizeItems(suggestions.to_improve);
+
     res.json(suggestions);
   } catch (e) {
     console.error('Menu suggestions error:', e);
