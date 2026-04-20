@@ -74,25 +74,26 @@ router.get('/menu-suggestions', async (req, res) => {
               0
             )
           )
-          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id
+          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?
         ), 0) as total_cost
       FROM recipes r
       WHERE (r.recipe_type = 'plat' OR r.recipe_type IS NULL) AND r.restaurant_id = ?
-    `, [rid, rid]);
+    `, [rid, rid, rid]);
 
     const recipesData = recipes
       .filter(r => r.selling_price > 0 && r.total_cost > 0)
-      .map(r => ({
-        id: r.id,
-        name: r.name,
-        category: r.category,
-        selling_price: r.selling_price,
-        total_cost: Math.round(r.total_cost * 100) / 100,
-        food_cost_pct: r.selling_price > 0 ? Math.round((r.total_cost / r.selling_price) * 1000) / 10 : null,
-        margin: Math.round((r.selling_price - r.total_cost) * 100) / 100
-      }))
-      // Filter out absurd food costs (missing supplier prices produce 0% or >200%)
-      .filter(r => r.food_cost_pct !== null && r.food_cost_pct > 0 && r.food_cost_pct < 200);
+      .map(r => {
+        const food_cost_pct = Math.round((r.total_cost / r.selling_price) * 1000) / 10;
+        return {
+          name: r.name,
+          category: r.category,
+          selling_price: r.selling_price,
+          food_cost_pct,
+          margin_pct: Math.round(((r.selling_price - r.total_cost) / r.selling_price) * 1000) / 10
+        };
+      })
+      // Filter out absurd food costs (unit mismatch / missing supplier prices produce 0% or >100%)
+      .filter(r => r.food_cost_pct > 0 && r.food_cost_pct < 100);
 
     // Get ingredients in stock — scoped to this tenant
     const stockIngredients = all(`
@@ -102,20 +103,31 @@ router.get('/menu-suggestions', async (req, res) => {
       ORDER BY s.quantity DESC LIMIT 30
     `, [rid]);
 
-    const prompt = `Tu es un expert en gestion de restaurant français. Réponds UNIQUEMENT en français, jamais en anglais.
+    // If no recipes have valid cost data, return a data-quality error rather than
+    // calling Gemini with an empty array (which causes hallucinated English responses).
+    if (recipesData.length === 0) {
+      return res.json({
+        top_profitable: [],
+        to_improve: [],
+        daily_special: null,
+        fallback: true,
+        message: 'Aucune fiche technique avec prix de vente et coût matière disponible. Renseignez les prix fournisseurs pour activer les suggestions IA.'
+      });
+    }
 
-Voici les fiches techniques d'un restaurant avec leur food cost :
+    const prompt = `Voici les fiches techniques d'un restaurant avec leur food cost (food_cost_pct en %) :
 ${JSON.stringify(recipesData, null, 2)}
 
 Ingrédients actuellement en stock :
 ${JSON.stringify(stockIngredients, null, 2)}
 
 Analyse et donne :
-1) Les 3 plats les plus rentables à mettre en avant
-2) Les 3 plats avec le food cost trop élevé et des suggestions pour les améliorer (substitution d'ingrédients)
+1) Les 3 plats les plus rentables à mettre en avant (food_cost_pct le plus bas)
+2) Les 3 plats avec le food cost le plus élevé et des suggestions concrètes pour l'améliorer (substitution d'ingrédients, réduction des portions)
 3) Une suggestion de plat du jour basée sur les ingrédients en stock
 
-IMPORTANT : Tous les textes (name, reason, suggestion, description, key_ingredients) doivent être en français.
+IMPORTANT : Utilise UNIQUEMENT les valeurs food_cost_pct déjà calculées dans les données ci-dessus — ne recalcule pas.
+IMPORTANT : Tous les champs texte (reason, suggestion, description, key_ingredients) doivent être en français.
 
 Réponds en JSON avec cette structure exacte :
 {
@@ -129,13 +141,14 @@ Réponds en JSON avec cette structure exacte :
       method: 'POST',
       headers: geminiHeaders(),
       body: JSON.stringify({
+        systemInstruction: { parts: [{ text: 'Tu es un expert en gestion de restaurant français. Tu réponds TOUJOURS et UNIQUEMENT en français, jamais en anglais ni dans aucune autre langue.' }] },
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json', temperature: 0.7 }
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.5 }
       })
     });
 
     if (!geminiRes.ok) {
-      // Fallback: return raw data analysis
+      // Fallback: return raw data analysis without calling Gemini
       const sorted = [...recipesData].sort((a, b) => a.food_cost_pct - b.food_cost_pct);
       return res.json({
         top_profitable: sorted.slice(0, 3).map(r => ({ name: r.name, food_cost_pct: r.food_cost_pct, reason: 'Meilleur ratio coût/prix' })),
@@ -150,6 +163,17 @@ Réponds en JSON avec cette structure exacte :
     if (!content) return res.status(502).json({ error: 'Réponse IA vide' });
 
     const suggestions = JSON.parse(content);
+
+    // Clamp any food_cost_pct values Gemini may have altered back to valid range
+    const clamp = arr => (arr || []).map(item => ({
+      ...item,
+      food_cost_pct: typeof item.food_cost_pct === 'number'
+        ? Math.min(Math.max(Math.round(item.food_cost_pct * 10) / 10, 0), 100)
+        : item.food_cost_pct
+    }));
+    suggestions.top_profitable = clamp(suggestions.top_profitable);
+    suggestions.to_improve = clamp(suggestions.to_improve);
+
     res.json(suggestions);
   } catch (e) {
     console.error('Menu suggestions error:', e);
