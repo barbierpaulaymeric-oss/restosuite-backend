@@ -266,7 +266,7 @@ async function loadAISuggestions() {
   if (cached) {
     try {
       const { data, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
+      if (Date.now() - timestamp < 12 * 60 * 60 * 1000) {
         renderAISuggestions(container, data);
         return;
       }
@@ -354,18 +354,12 @@ function renderAISuggestions(container, data) {
 
   container.innerHTML = `
     <section role="region" aria-labelledby="ai-suggestions-heading" style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
+      <div style="margin-bottom:var(--space-3)">
         <h3 id="ai-suggestions-heading" style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Suggestions IA</h3>
-        <button class="btn btn-secondary btn-sm" onclick="refreshAISuggestions()" title="Rafraîchir" aria-label="Rafraîchir les suggestions IA" style="padding:4px 8px"><span aria-hidden="true">🔄</span></button>
       </div>
       ${topHtml}${improveHtml}${dailyHtml}
     </section>
   `;
-}
-
-async function refreshAISuggestions() {
-  localStorage.removeItem('restosuite_suggestions_cache');
-  await loadAISuggestions();
 }
 
 // ═══════════════════════════════════════════
