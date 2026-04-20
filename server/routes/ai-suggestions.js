@@ -67,8 +67,8 @@ router.get('/menu-suggestions', async (req, res) => {
           SELECT SUM(
             ri.gross_quantity * COALESCE(
               (SELECT sp.price / CASE
-                WHEN sp.unit = 'kg' THEN 1000
-                WHEN sp.unit = 'L' THEN 1000
+                WHEN LOWER(sp.unit) = 'kg' THEN 1000
+                WHEN LOWER(sp.unit) = 'l' THEN 1000
                 ELSE 1
               END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
               0
@@ -91,7 +91,7 @@ router.get('/menu-suggestions', async (req, res) => {
         food_cost_pct: r.selling_price > 0 ? Math.round((r.total_cost / r.selling_price) * 1000) / 10 : null,
         margin: Math.round((r.selling_price - r.total_cost) * 100) / 100
       }))
-      // Filter out absurd food costs (missing supplier prices produce 0% or >200%)
+      // Safety filter: exclude recipes with no meaningful cost data (food_cost_pct 0 or >200% indicates missing/bad data)
       .filter(r => r.food_cost_pct !== null && r.food_cost_pct > 0 && r.food_cost_pct < 200);
 
     // Get ingredients in stock — scoped to this tenant
@@ -129,6 +129,7 @@ Réponds en JSON avec cette structure exacte :
       method: 'POST',
       headers: geminiHeaders(),
       body: JSON.stringify({
+        systemInstruction: { parts: [{ text: 'Tu es un expert en gestion de restaurant français. Tu réponds TOUJOURS en français, sans exception. Ne réponds jamais en anglais.' }] },
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: 'application/json', temperature: 0.7 }
       })
