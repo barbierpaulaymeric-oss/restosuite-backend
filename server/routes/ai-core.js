@@ -404,9 +404,13 @@ function buildRestaurantContext(rid) {
       FROM recipes r
       WHERE r.restaurant_id = ?
     `, [rid, rid, rid]);
-    parts.push(`FICHES : ${recipeStats.total} fiches techniques (${recipeStats.plats} plats, ${recipeStats.sous_recettes} sous-recettes). Food cost moyen : ${recipeStats.avg_food_cost ? recipeStats.avg_food_cost.toFixed(1) + '%' : 'non calculé'}.`);
+    // Sanity-check avg_food_cost: unit mismatches can produce absurd values (>200%)
+    const avgFcDisplay = recipeStats.avg_food_cost && recipeStats.avg_food_cost > 0 && recipeStats.avg_food_cost <= 200
+      ? recipeStats.avg_food_cost.toFixed(1) + '%'
+      : 'non calculé (données fournisseurs incomplètes)';
+    parts.push(`FICHES : ${recipeStats.total} fiches techniques (${recipeStats.plats} plats, ${recipeStats.sous_recettes} sous-recettes). Food cost moyen : ${avgFcDisplay}.`);
 
-    // Top 5 recipes by food cost
+    // Top 5 recipes by food cost — filter out absurd values caused by unit mismatches
     const topRecipes = all(`
       SELECT r.name, r.selling_price, r.category,
         COALESCE((SELECT SUM(ri.gross_quantity * COALESCE(
@@ -416,9 +420,10 @@ function buildRestaurantContext(rid) {
       FROM recipes r WHERE r.selling_price > 0 AND (r.recipe_type = 'plat' OR r.recipe_type IS NULL) AND r.restaurant_id = ?
       ORDER BY (cost / r.selling_price) DESC LIMIT 5
     `, [rid, rid, rid]);
-    if (topRecipes.length > 0) {
-      parts.push('TOP 5 FOOD COST (les plus chers) : ' + topRecipes.map(r =>
-        `${r.name} (coût: ${r.cost.toFixed(2)}€, vente: ${r.selling_price}€, FC: ${r.selling_price > 0 ? (r.cost / r.selling_price * 100).toFixed(1) : 0}%)`
+    const validTopRecipes = topRecipes.filter(r => r.selling_price > 0 && r.cost / r.selling_price <= 2.0);
+    if (validTopRecipes.length > 0) {
+      parts.push('TOP 5 FOOD COST (les plus chers) : ' + validTopRecipes.map(r =>
+        `${r.name} (coût: ${r.cost.toFixed(2)}€, vente: ${r.selling_price}€, FC: ${(r.cost / r.selling_price * 100).toFixed(1)}%)`
       ).join(', '));
     }
 

@@ -102,7 +102,9 @@ router.get('/menu-suggestions', async (req, res) => {
       ORDER BY s.quantity DESC LIMIT 30
     `, [rid]);
 
-    const prompt = `Tu es un expert en gestion de restaurant français. Réponds UNIQUEMENT en français, jamais en anglais.
+    const prompt = `LANGUE : Réponds TOUJOURS et UNIQUEMENT en français. Jamais en anglais. Tous les champs texte du JSON doivent être en français.
+
+Tu es un expert en gestion de restaurant français. Réponds UNIQUEMENT en français, jamais en anglais.
 
 Voici les fiches techniques d'un restaurant avec leur food cost :
 ${JSON.stringify(recipesData, null, 2)}
