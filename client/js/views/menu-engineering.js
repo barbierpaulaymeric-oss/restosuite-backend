@@ -77,12 +77,23 @@ function renderMEContent() {
   const data = _meData;
   const items = catFilter ? data.items.filter(i => i.category === catFilter) : data.items;
 
+  const noSalesBanner = !data.summary.has_sales_data ? `
+    <div class="alert" style="background:var(--color-info-light,#EFF6FF);border:1px solid var(--color-info,#3B82F6);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-4);display:flex;align-items:flex-start;gap:var(--space-3)">
+      <i data-lucide="info" style="width:20px;height:20px;color:var(--color-info,#3B82F6);flex-shrink:0;margin-top:2px"></i>
+      <div>
+        <strong>Pas encore de données de ventes</strong>
+        <p class="text-secondary text-sm" style="margin:4px 0 0">La classification Stars / Puzzles / Plowhorses / Dogs nécessite des données de ventes. Connectez votre caisse ou utilisez le module Service pour enregistrer des commandes. Les recettes sont affichées ci-dessous triées par marge.</p>
+      </div>
+    </div>
+  ` : '';
+
   const stars = items.filter(i => i.classification === 'star');
   const puzzles = items.filter(i => i.classification === 'puzzle');
   const plowhorses = items.filter(i => i.classification === 'plowhorse');
   const dogs = items.filter(i => i.classification === 'dog');
 
   content.innerHTML = `
+    ${noSalesBanner}
     <!-- Summary Cards -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)">
       <div class="card" style="text-align:center;padding:var(--space-3);border-left:4px solid #F59E0B">

@@ -790,13 +790,18 @@ router.get('/menu-engineering', (req, res) => {
     }
 
     // 4. Calculate averages for classification
-    const avgMargin = totalQtySold > 0 ? totalMarginWeighted / totalQtySold : 0;
+    const hasSalesData = totalQtySold > 0;
+    // When no sales data, use simple average margin (not weighted by sales)
+    const avgMargin = hasSalesData
+      ? totalMarginWeighted / totalQtySold
+      : items.length > 0 ? items.reduce((s, i) => s + i.margin, 0) / items.length : 0;
     const avgQtySold = items.length > 0 ? totalQtySold / items.length : 0;
 
     // 5. Classify each item in the BCG matrix
     for (const item of items) {
       const highMargin = item.margin >= avgMargin;
-      const highPopularity = item.qty_sold >= avgQtySold * 0.7; // 70% threshold
+      // Without sales data, no item can be "popular"
+      const highPopularity = hasSalesData && item.qty_sold >= avgQtySold * 0.7; // 70% threshold
 
       if (highMargin && highPopularity) {
         item.classification = 'star';
@@ -847,7 +852,8 @@ router.get('/menu-engineering', (req, res) => {
       avg_margin: Math.round(avgMargin * 100) / 100,
       avg_qty_sold: Math.round(avgQtySold * 10) / 10,
       total_revenue: Math.round(items.reduce((s, i) => s + i.total_revenue, 0) * 100) / 100,
-      total_profit: Math.round(items.reduce((s, i) => s + i.total_profit, 0) * 100) / 100
+      total_profit: Math.round(items.reduce((s, i) => s + i.total_profit, 0) * 100) / 100,
+      has_sales_data: hasSalesData
     };
 
     // 8. AI recommendations (quick rules-based)
