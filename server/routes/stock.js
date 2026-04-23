@@ -47,7 +47,29 @@ router.get('/', (req, res) => {
   let sql = baseSql + ' ORDER BY is_alert DESC, i.category, i.name LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
-  const items = all(sql, params);
+  let items = all(sql, params);
+
+  // Auto-seed stock from recipe ingredients when empty (first visit, no search)
+  if (items.length === 0 && !q) {
+    const recipeIngredients = all(
+      `SELECT DISTINCT i.id, i.default_unit
+       FROM recipe_ingredients ri
+       JOIN recipes r ON r.id = ri.recipe_id AND r.restaurant_id = ?
+       JOIN ingredients i ON i.id = ri.ingredient_id AND i.restaurant_id = ?`,
+      [rid, rid]
+    );
+    if (recipeIngredients.length > 0) {
+      const insertStmt = db.prepare(
+        'INSERT OR IGNORE INTO stock (restaurant_id, ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, 0, ?, 0)'
+      );
+      for (const ing of recipeIngredients) {
+        insertStmt.run(rid, ing.id, ing.default_unit || 'kg');
+      }
+      // Re-query after seeding
+      items = all(sql, params);
+    }
+  }
+
   const productCount = get('SELECT COUNT(*) as count FROM stock WHERE quantity > 0 AND restaurant_id = ?', [rid]);
 
   res.json({ items, total, limit, offset, product_count: productCount ? productCount.count : 0 });
