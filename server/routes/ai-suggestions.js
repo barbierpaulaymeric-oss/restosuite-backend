@@ -62,15 +62,14 @@ router.get('/menu-suggestions', async (req, res) => {
     const rid = req.user.restaurant_id;
     // Get all recipes with cost data — scoped to this tenant
     const recipes = all(`
-      SELECT r.id, r.name, r.category, r.selling_price, r.notes,
+      SELECT r.id, r.name, r.category, r.selling_price, r.notes, COALESCE(r.portions, 1) as portions,
         COALESCE((
           SELECT SUM(
             ri.gross_quantity * COALESCE(
-              (SELECT sp.price / CASE
-                WHEN LOWER(sp.unit) = 'kg' THEN 1000
-                WHEN LOWER(sp.unit) = 'l' THEN 1000
-                ELSE 1
-              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
+              (SELECT sp.price / CASE WHEN LOWER(sp.unit) = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
+               FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.price ASC LIMIT 1),
+              (SELECT i.price_per_unit / CASE WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'kg' THEN 1000 WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'l' THEN 1000 ELSE 1 END
+               FROM ingredients i WHERE i.id = ri.ingredient_id AND i.restaurant_id = ?),
               0
             )
           )
@@ -78,18 +77,19 @@ router.get('/menu-suggestions', async (req, res) => {
         ), 0) as total_cost
       FROM recipes r
       WHERE (r.recipe_type = 'plat' OR r.recipe_type IS NULL) AND r.restaurant_id = ?
-    `, [rid, rid, rid]);
+    `, [rid, rid, rid, rid]);
 
     const recipesData = recipes
       .filter(r => r.selling_price > 0 && r.total_cost > 0)
       .map(r => {
-        const food_cost_pct = Math.round((r.total_cost / r.selling_price) * 1000) / 10;
+        const costPerPortion = r.total_cost / Math.max(r.portions, 1);
+        const food_cost_pct = Math.round((costPerPortion / r.selling_price) * 1000) / 10;
         return {
           name: r.name,
           category: r.category,
           selling_price: r.selling_price,
           food_cost_pct,
-          margin_pct: Math.round(((r.selling_price - r.total_cost) / r.selling_price) * 1000) / 10
+          margin_pct: Math.round(((r.selling_price - costPerPortion) / r.selling_price) * 1000) / 10
         };
       })
       // Safety filter: exclude recipes with no meaningful cost data (0% or >100% indicates unit-mismatch / missing data)

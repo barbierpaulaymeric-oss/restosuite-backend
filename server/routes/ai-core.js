@@ -398,8 +398,8 @@ function buildRestaurantContext(rid) {
              COUNT(CASE WHEN recipe_type = 'sous_recette' THEN 1 END) as sous_recettes,
              AVG(CASE WHEN selling_price > 0 THEN
                (SELECT SUM(ri.gross_quantity * COALESCE(
-                 (SELECT sp.price / CASE WHEN sp.unit = 'kg' THEN 1000 WHEN sp.unit = 'L' THEN 1000 ELSE 1 END
-                  FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1), 0))
+                 (SELECT sp.price / CASE WHEN LOWER(sp.unit) = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
+                  FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.price ASC LIMIT 1), 0))
                FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?) / selling_price * 100 END) as avg_food_cost
       FROM recipes r
       WHERE r.restaurant_id = ?
@@ -408,18 +408,22 @@ function buildRestaurantContext(rid) {
 
     // Top 5 recipes by food cost
     const topRecipes = all(`
-      SELECT r.name, r.selling_price, r.category,
+      SELECT r.name, r.selling_price, r.category, COALESCE(r.portions, 1) as portions,
         COALESCE((SELECT SUM(ri.gross_quantity * COALESCE(
-          (SELECT sp.price / CASE WHEN sp.unit = 'kg' THEN 1000 WHEN sp.unit = 'L' THEN 1000 ELSE 1 END
-           FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1), 0))
+          (SELECT sp.price / CASE WHEN LOWER(sp.unit) = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
+           FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.price ASC LIMIT 1),
+          (SELECT i.price_per_unit / CASE WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'kg' THEN 1000 WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'l' THEN 1000 ELSE 1 END
+           FROM ingredients i WHERE i.id = ri.ingredient_id AND i.restaurant_id = ?),
+          0))
         FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?), 0) as cost
       FROM recipes r WHERE r.selling_price > 0 AND (r.recipe_type = 'plat' OR r.recipe_type IS NULL) AND r.restaurant_id = ?
-      ORDER BY (cost / r.selling_price) DESC LIMIT 5
-    `, [rid, rid, rid]);
+      ORDER BY (cost / COALESCE(r.portions, 1) / r.selling_price) DESC LIMIT 5
+    `, [rid, rid, rid, rid]);
     if (topRecipes.length > 0) {
-      parts.push('TOP 5 FOOD COST (les plus chers) : ' + topRecipes.map(r =>
-        `${r.name} (coût: ${r.cost.toFixed(2)}€, vente: ${r.selling_price}€, FC: ${r.selling_price > 0 ? (r.cost / r.selling_price * 100).toFixed(1) : 0}%)`
-      ).join(', '));
+      parts.push('TOP 5 FOOD COST (les plus chers) : ' + topRecipes.map(r => {
+        const costPP = r.cost / Math.max(r.portions, 1);
+        return `${r.name} (coût: ${costPP.toFixed(2)}€/portion, vente: ${r.selling_price}€, FC: ${r.selling_price > 0 ? (costPP / r.selling_price * 100).toFixed(1) : 0}%)`;
+      }).join(', '));
     }
 
     // Stock summary

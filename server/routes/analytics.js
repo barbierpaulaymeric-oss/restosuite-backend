@@ -23,28 +23,28 @@ router.get('/kpis', (req, res) => {
 
     // Average food cost % across recipes with selling_price > 0
     const recipes = all(`
-      SELECT r.id, r.selling_price,
+      SELECT r.id, r.selling_price, COALESCE(r.portions, 1) as portions,
         COALESCE((
           SELECT SUM(
             ri.gross_quantity * COALESCE(
-              (SELECT sp.price / CASE
-                WHEN sp.unit = 'kg' THEN 1000
-                WHEN LOWER(sp.unit) = 'l' THEN 1000
-                ELSE 1
-              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
+              (SELECT sp.price / CASE WHEN LOWER(sp.unit) = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
+               FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.price ASC LIMIT 1),
+              (SELECT i.price_per_unit / CASE WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'kg' THEN 1000 WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'l' THEN 1000 ELSE 1 END
+               FROM ingredients i WHERE i.id = ri.ingredient_id AND i.restaurant_id = ?),
               0
             )
           )
           FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?
         ), 0) as cost
       FROM recipes r WHERE r.selling_price > 0 AND r.restaurant_id = ?
-    `, [rid, rid, rid]);
+    `, [rid, rid, rid, rid]);
 
     let totalFoodCostPct = 0;
     let countWithPrice = 0;
     for (const r of recipes) {
-      if (r.selling_price > 0 && r.cost > 0) {
-        totalFoodCostPct += (r.cost / r.selling_price) * 100;
+      const costPerPortion = r.cost / Math.max(r.portions, 1);
+      if (r.selling_price > 0 && costPerPortion > 0) {
+        totalFoodCostPct += (costPerPortion / r.selling_price) * 100;
         countWithPrice++;
       }
     }
@@ -53,16 +53,15 @@ router.get('/kpis', (req, res) => {
     // Total stock value
     const stockVal = get(`
       SELECT COALESCE(SUM(s.quantity * COALESCE(
-        (SELECT sp.price / CASE
-          WHEN sp.unit = 'kg' THEN 1000
-          WHEN LOWER(sp.unit) = 'l' THEN 1000
-          ELSE 1
-        END FROM supplier_prices sp WHERE sp.ingredient_id = s.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
+        (SELECT sp.price / CASE WHEN LOWER(sp.unit) = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
+         FROM supplier_prices sp WHERE sp.ingredient_id = s.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.price ASC LIMIT 1),
+        (SELECT i.price_per_unit / CASE WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'kg' THEN 1000 WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'l' THEN 1000 ELSE 1 END
+         FROM ingredients i WHERE i.id = s.ingredient_id AND i.restaurant_id = ?),
         0
       )), 0) as total
       FROM stock s
       WHERE s.restaurant_id = ?
-    `, [rid, rid]);
+    `, [rid, rid, rid]);
     const totalStockValue = Math.round(stockVal.total * 100) / 100;
 
     // HACCP compliance today
@@ -112,15 +111,14 @@ router.get('/food-cost', (req, res) => {
   try {
     const rid = req.user.restaurant_id;
     const recipes = all(`
-      SELECT r.id, r.name, r.selling_price, r.portions,
+      SELECT r.id, r.name, r.selling_price, COALESCE(r.portions, 1) as portions,
         COALESCE((
           SELECT SUM(
             ri.gross_quantity * COALESCE(
-              (SELECT sp.price / CASE
-                WHEN sp.unit = 'kg' THEN 1000
-                WHEN LOWER(sp.unit) = 'l' THEN 1000
-                ELSE 1
-              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
+              (SELECT sp.price / CASE WHEN LOWER(sp.unit) = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
+               FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.price ASC LIMIT 1),
+              (SELECT i.price_per_unit / CASE WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'kg' THEN 1000 WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'l' THEN 1000 ELSE 1 END
+               FROM ingredients i WHERE i.id = ri.ingredient_id AND i.restaurant_id = ?),
               0
             )
           )
@@ -129,7 +127,7 @@ router.get('/food-cost', (req, res) => {
       FROM recipes r
       WHERE r.restaurant_id = ?
       ORDER BY r.name
-    `, [rid, rid, rid]);
+    `, [rid, rid, rid, rid]);
 
     const result = [];
     let totalPct = 0;
@@ -140,7 +138,8 @@ router.get('/food-cost', (req, res) => {
 
     for (const r of recipes) {
       const sellingPrice = r.selling_price || 0;
-      const cost = r.cost || 0;
+      const costTotal = r.cost || 0;
+      const cost = costTotal / Math.max(r.portions, 1); // cost per portion
       const foodCostPct = sellingPrice > 0 ? Math.round((cost / sellingPrice) * 1000) / 10 : null;
       const margin = sellingPrice > 0 ? Math.round((sellingPrice - cost) * 100) / 100 : null;
       const marginPct = sellingPrice > 0 ? Math.round(((sellingPrice - cost) / sellingPrice) * 1000) / 10 : null;
@@ -453,15 +452,18 @@ router.get('/ai-insights', async (req, res) => {
 
     // Collect data for Gemini
     const recipesData = all(`
-      SELECT r.name, r.selling_price,
+      SELECT r.name, r.selling_price, COALESCE(r.portions, 1) as portions,
         COALESCE((
           SELECT SUM(ri.gross_quantity * COALESCE(
-            (SELECT sp.price / CASE WHEN sp.unit = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
-             FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1), 0))
+            (SELECT sp.price / CASE WHEN LOWER(sp.unit) = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
+             FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.price ASC LIMIT 1),
+            (SELECT i.price_per_unit / CASE WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'kg' THEN 1000 WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'l' THEN 1000 ELSE 1 END
+             FROM ingredients i WHERE i.id = ri.ingredient_id AND i.restaurant_id = ?),
+            0))
           FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?
         ), 0) as cost
       FROM recipes r WHERE r.selling_price > 0 AND r.restaurant_id = ?
-    `, [rid, rid, rid]);
+    `, [rid, rid, rid, rid]);
 
     const stockAlerts = all(`
       SELECT i.name, s.quantity, s.min_quantity, s.unit
@@ -481,7 +483,10 @@ router.get('/ai-insights', async (req, res) => {
 
     const topCostRecipes = recipesData
       .filter(r => r.selling_price > 0 && r.cost > 0)
-      .map(r => ({ name: r.name, food_cost_pct: Math.round((r.cost / r.selling_price) * 1000) / 10, cost: Math.round(r.cost * 100) / 100, selling_price: r.selling_price }))
+      .map(r => {
+        const costPerPortion = r.cost / Math.max(r.portions, 1);
+        return { name: r.name, food_cost_pct: Math.round((costPerPortion / r.selling_price) * 1000) / 10, cost: Math.round(costPerPortion * 100) / 100, selling_price: r.selling_price };
+      })
       .sort((a, b) => b.food_cost_pct - a.food_cost_pct);
 
     const dataContext = {
@@ -716,15 +721,14 @@ router.get('/menu-engineering', (req, res) => {
 
     // 1. Get all recipes with cost data
     const recipes = all(`
-      SELECT r.id, r.name, r.category, r.selling_price, r.recipe_type,
+      SELECT r.id, r.name, r.category, r.selling_price, r.recipe_type, COALESCE(r.portions, 1) as portions,
         COALESCE((
           SELECT SUM(
             ri.gross_quantity * COALESCE(
-              (SELECT sp.price / CASE
-                WHEN sp.unit = 'kg' THEN 1000
-                WHEN LOWER(sp.unit) = 'l' THEN 1000
-                ELSE 1
-              END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
+              (SELECT sp.price / CASE WHEN LOWER(sp.unit) = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
+               FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.price ASC LIMIT 1),
+              (SELECT i.price_per_unit / CASE WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'kg' THEN 1000 WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'l' THEN 1000 ELSE 1 END
+               FROM ingredients i WHERE i.id = ri.ingredient_id AND i.restaurant_id = ?),
               0
             )
           )
@@ -732,7 +736,7 @@ router.get('/menu-engineering', (req, res) => {
         ), 0) as cost
       FROM recipes r
       WHERE r.selling_price > 0 AND r.restaurant_id = ?
-    `, [rid, rid, rid]);
+    `, [rid, rid, rid, rid]);
 
     // 2. Get sales data per recipe
     let salesData = {};
@@ -758,7 +762,7 @@ router.get('/menu-engineering', (req, res) => {
 
     for (const r of recipes) {
       const sales = salesData[r.id] || { qty_sold: 0, order_count: 0 };
-      const cost = r.cost || 0;
+      const cost = (r.cost || 0) / Math.max(r.portions, 1); // cost per portion
       const margin = r.selling_price - cost;
       const marginPct = r.selling_price > 0 ? (margin / r.selling_price) * 100 : 0;
       const foodCostPct = r.selling_price > 0 ? (cost / r.selling_price) * 100 : 0;
