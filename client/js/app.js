@@ -339,6 +339,7 @@ function registerRoutes() {
   Router.add(/^\/suppliers$/, renderSuppliers);
   Router.add(/^\/ia$/, renderAIAssistant);
   Router.add(/^\/haccp$/, renderHACCPDashboard);
+  Router.add(/^\/haccp\/ma-journee$/, renderHACCPMaJournee);
   Router.add(/^\/haccp\/temperatures$/, renderHACCPTemperatures);
   Router.add(/^\/haccp\/calibrations$/, renderHACCPCalibrations);
   Router.add(/^\/haccp\/cleaning$/, renderHACCPCleaning);

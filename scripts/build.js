@@ -26,6 +26,7 @@ const JS_FILES = [
   'js/views/suppliers.js',
   'js/views/haccp-dashboard.js',
   'js/views/haccp-hub.js',
+  'js/views/haccp-ma-journee.js',
   'js/views/haccp-temperatures.js',
   'js/views/haccp-calibrations.js',
   'js/views/haccp-cleaning.js',

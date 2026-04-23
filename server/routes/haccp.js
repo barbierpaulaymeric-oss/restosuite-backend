@@ -1318,4 +1318,199 @@ router.delete('/cooking/:id', (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// MA JOURNÉE HACCP — Vue quotidienne agrégée
+// GET /api/haccp/ma-journee
+// ═══════════════════════════════════════════
+
+router.get('/ma-journee', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const today = new Date().toISOString().split('T')[0];
+
+    // Temperature zones + how many logged today
+    const zones = all(
+      `SELECT z.id, z.name, z.type,
+        (SELECT COUNT(*) FROM temperature_logs l
+         WHERE l.zone_id = z.id AND l.restaurant_id = ? AND date(l.recorded_at) = ?) AS logged_today
+       FROM temperature_zones z WHERE z.restaurant_id = ?`,
+      [rid, today, rid]
+    );
+    const zonesTotal = zones.length;
+    const zonesLoggedToday = zones.filter(z => z.logged_today > 0).length;
+
+    // Cleaning tasks + how many done today
+    const cleaningTasks = all('SELECT id FROM cleaning_tasks WHERE restaurant_id = ?', [rid]);
+    const cleaningDoneToday = cleaningTasks.length > 0
+      ? (get(
+          `SELECT COUNT(DISTINCT task_id) as done FROM cleaning_logs
+           WHERE restaurant_id = ? AND date(completed_at) = ?
+           AND task_id IN (${cleaningTasks.map(() => '?').join(',')})`,
+          [rid, today, ...cleaningTasks.map(t => t.id)]
+        ) || { done: 0 }).done
+      : 0;
+    const cleaningTotal = cleaningTasks.length;
+
+    // Cooking records today
+    const cookingRow = get(
+      'SELECT COUNT(*) as count FROM cooking_records WHERE restaurant_id = ? AND date(cooking_date) = ?',
+      [rid, today]
+    );
+    const cookingToday = cookingRow ? cookingRow.count : 0;
+
+    // Witness meals today
+    const witnessRow = get(
+      'SELECT COUNT(*) as count FROM witness_meals WHERE restaurant_id = ? AND meal_date = ?',
+      [rid, today]
+    );
+    const witnessToday = witnessRow ? witnessRow.count : 0;
+
+    // Active fryers + how many checked today
+    const fryers = all('SELECT id, name FROM fryers WHERE restaurant_id = ? AND is_active = 1', [rid]);
+    const fryersTotal = fryers.length;
+    const fryerChecksToday = fryersTotal > 0
+      ? (get(
+          `SELECT COUNT(DISTINCT fryer_id) as checked FROM fryer_checks
+           WHERE restaurant_id = ? AND date(action_date) = ?`,
+          [rid, today]
+        ) || { checked: 0 }).checked
+      : 0;
+
+    const makeStatus = (done, total) => {
+      if (total === 0) return 'na';
+      if (done >= total) return 'done';
+      if (done > 0) return 'partial';
+      return 'pending';
+    };
+
+    const slots = [
+      {
+        id: 'ouverture',
+        label: 'Ouverture',
+        icon: 'sunrise',
+        time: '6h – 10h',
+        tasks: [
+          {
+            type: 'temperatures',
+            label: 'Relevés températures',
+            route: '/haccp/temperatures',
+            icon: 'thermometer',
+            status: makeStatus(zonesLoggedToday, zonesTotal),
+            detail: zonesTotal > 0 ? `${zonesLoggedToday}/${zonesTotal} zones relevées` : 'Aucune zone configurée',
+          },
+          ...(fryersTotal > 0 ? [{
+            type: 'fryers',
+            label: 'Contrôle huile friteuses',
+            route: '/haccp/fryers',
+            icon: 'droplet',
+            status: makeStatus(fryerChecksToday, fryersTotal),
+            detail: `${fryerChecksToday}/${fryersTotal} contrôle(s)`,
+          }] : []),
+        ],
+      },
+      {
+        id: 'service-midi',
+        label: 'Service midi',
+        icon: 'sun',
+        time: '10h – 15h',
+        tasks: [
+          {
+            type: 'cooking',
+            label: 'Enregistrement cuissons',
+            route: '/haccp/cooking',
+            icon: 'flame',
+            status: cookingToday >= 1 ? 'done' : 'pending',
+            detail: `${cookingToday} cuisson(s) enregistrée(s) aujourd'hui`,
+          },
+          {
+            type: 'witness_meals',
+            label: 'Plat témoin service midi',
+            route: '/haccp/witness-meals',
+            icon: 'archive',
+            status: witnessToday >= 2 ? 'done' : witnessToday === 1 ? 'partial' : 'pending',
+            detail: `${witnessToday}/2 plat(s) témoin enregistré(s)`,
+          },
+        ],
+      },
+      {
+        id: 'apres-midi',
+        label: 'Après-midi',
+        icon: 'cloud-sun',
+        time: '15h – 18h',
+        tasks: [
+          {
+            type: 'temperatures',
+            label: 'Relevé T° après-midi',
+            route: '/haccp/temperatures',
+            icon: 'thermometer',
+            status: makeStatus(zonesLoggedToday, zonesTotal),
+            detail: zonesTotal > 0 ? `${zonesLoggedToday}/${zonesTotal} zones relevées` : 'Aucune zone configurée',
+          },
+          {
+            type: 'cleaning',
+            label: 'Plan de nettoyage',
+            route: '/haccp/cleaning',
+            icon: 'spray-can',
+            status: makeStatus(cleaningDoneToday, cleaningTotal),
+            detail: cleaningTotal > 0 ? `${cleaningDoneToday}/${cleaningTotal} tâche(s) effectuée(s)` : 'Aucune tâche configurée',
+          },
+        ],
+      },
+      {
+        id: 'service-soir',
+        label: 'Service soir',
+        icon: 'sunset',
+        time: '18h – 23h',
+        tasks: [
+          {
+            type: 'cooking',
+            label: 'Enregistrement cuissons soir',
+            route: '/haccp/cooking',
+            icon: 'flame',
+            status: cookingToday >= 2 ? 'done' : cookingToday === 1 ? 'partial' : 'pending',
+            detail: `${cookingToday} cuisson(s) au total aujourd'hui`,
+          },
+          {
+            type: 'witness_meals',
+            label: 'Plat témoin service soir',
+            route: '/haccp/witness-meals',
+            icon: 'archive',
+            status: witnessToday >= 2 ? 'done' : witnessToday === 1 ? 'partial' : 'pending',
+            detail: `${witnessToday}/2 plat(s) témoin au total`,
+          },
+        ],
+      },
+      {
+        id: 'fermeture',
+        label: 'Fermeture',
+        icon: 'moon',
+        time: '23h – 6h',
+        tasks: [
+          {
+            type: 'cleaning',
+            label: 'Nettoyage fin de service',
+            route: '/haccp/cleaning',
+            icon: 'sparkles',
+            status: makeStatus(cleaningDoneToday, cleaningTotal),
+            detail: cleaningTotal > 0 ? `${cleaningDoneToday}/${cleaningTotal} tâche(s) effectuée(s)` : 'Aucune tâche',
+          },
+          {
+            type: 'temperatures',
+            label: 'Relevé T° clôture',
+            route: '/haccp/temperatures',
+            icon: 'thermometer',
+            status: makeStatus(zonesLoggedToday, zonesTotal),
+            detail: zonesTotal > 0 ? `${zonesLoggedToday}/${zonesTotal} zones` : 'Aucune zone configurée',
+          },
+        ],
+      },
+    ];
+
+    res.json({ slots, date: today });
+  } catch (e) {
+    console.error('[HACCP/ma-journee]', e);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
 module.exports = router;

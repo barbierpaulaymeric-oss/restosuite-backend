@@ -238,6 +238,9 @@ const API = {
   // setStaffPassword is defined in Staff Auth section above
 
   // ─── HACCP ───
+  // Ma journée HACCP
+  getMaJourneeHACCP() { return this.request('/haccp/ma-journee'); },
+
   // Zones
   getHACCPZones() { return this.request('/haccp/zones'); },
   createHACCPZone(data) { return this.request('/haccp/zones', { method: 'POST', body: data }); },

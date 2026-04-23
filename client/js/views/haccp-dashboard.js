@@ -25,6 +25,16 @@ async function renderHACCPDashboard() {
           <h1><i data-lucide="shield-check" style="width:28px;height:28px;vertical-align:middle;color:var(--color-accent)"></i> HACCP</h1>
         </div>
 
+        <!-- Ma journée HACCP shortcut -->
+        <a href="#/haccp/ma-journee" class="card" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4);margin-bottom:var(--space-5);text-decoration:none;border:2px solid var(--color-accent);border-radius:var(--radius-lg);background:var(--color-accent-light)" aria-label="Ma journée HACCP — tâches du jour par service">
+          <i data-lucide="calendar-check" style="width:28px;height:28px;flex-shrink:0;color:var(--color-accent)" aria-hidden="true"></i>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;color:var(--color-accent)">Ma journée HACCP</div>
+            <div style="font-size:var(--text-sm);color:var(--text-secondary)">Tâches du jour par service</div>
+          </div>
+          <i data-lucide="chevron-right" style="width:20px;height:20px;flex-shrink:0;color:var(--color-accent)" aria-hidden="true"></i>
+        </a>
+
         <!-- SECTION: Températures du jour -->
         <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
           <span>🌡️ Températures du jour</span>

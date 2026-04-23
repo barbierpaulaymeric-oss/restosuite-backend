@@ -224,6 +224,10 @@ const API = {
   },
   // setStaffPassword is defined in Staff Auth section above
   // ─── HACCP ───
+  // Ma journée HACCP
+  getMaJourneeHACCP() {
+    return this.request("/haccp/ma-journee");
+  },
   // Zones
   getHACCPZones() {
     return this.request("/haccp/zones");
@@ -1991,7 +1995,11 @@ async function renderRecipeForm(editId) {
   app.innerHTML = `
     <div class="page-header">
       <div>
-        <a href="#/" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px" aria-hidden="true"></i> Retour</a>
+        <nav aria-label="Breadcrumb" class="breadcrumb">
+          <a href="#/">Recettes</a>
+          <span class="breadcrumb-sep" aria-hidden="true">\u203A</span>
+          <span class="breadcrumb-current">${isEdit ? "Modifier la fiche" : "Nouvelle fiche"}</span>
+        </nav>
         <h1 style="margin-top:4px">${isEdit ? "Modifier la fiche" : "Nouvelle fiche technique"}</h1>
       </div>
     </div>
@@ -3439,12 +3447,14 @@ async function renderStockMovements() {
   const app = document.getElementById("app");
   app.innerHTML = `
     <div class="view-header">
-      <div style="display:flex;align-items:center;gap:var(--space-3)">
-        <a href="#/stock" style="color:var(--text-secondary);text-decoration:none;font-size:1.5rem">\u2190</a>
-        <div>
-          <h1><i data-lucide="trending-up" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Mouvements de stock</h1>
-          <p class="text-secondary">Historique des entr\xE9es et sorties</p>
-        </div>
+      <div>
+        <nav aria-label="Breadcrumb" class="breadcrumb">
+          <a href="#/stock">Stock</a>
+          <span class="breadcrumb-sep" aria-hidden="true">\u203A</span>
+          <span class="breadcrumb-current">Mouvements</span>
+        </nav>
+        <h1><i data-lucide="trending-up" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Mouvements de stock</h1>
+        <p class="text-secondary">Historique des entr\xE9es et sorties</p>
       </div>
     </div>
 
@@ -3568,9 +3578,11 @@ async function renderStockVariance() {
   const app = document.getElementById("app");
   app.innerHTML = `
     <div class="view-header">
-      <a href="#/stock" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-2);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)">
-        <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Retour stock
-      </a>
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <a href="#/stock">Stock</a>
+        <span class="breadcrumb-sep" aria-hidden="true">\u203A</span>
+        <span class="breadcrumb-current">\xC9carts</span>
+      </nav>
       <h1>Analyse des \xE9carts</h1>
       <p class="text-secondary">Consommation th\xE9orique vs r\xE9elle</p>
     </div>
@@ -3898,6 +3910,16 @@ async function renderHACCPDashboard() {
         <div class="page-header">
           <h1><i data-lucide="shield-check" style="width:28px;height:28px;vertical-align:middle;color:var(--color-accent)"></i> HACCP</h1>
         </div>
+
+        <!-- Ma journ\xE9e HACCP shortcut -->
+        <a href="#/haccp/ma-journee" class="card" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4);margin-bottom:var(--space-5);text-decoration:none;border:2px solid var(--color-accent);border-radius:var(--radius-lg);background:var(--color-accent-light)" aria-label="Ma journ\xE9e HACCP \u2014 t\xE2ches du jour par service">
+          <i data-lucide="calendar-check" style="width:28px;height:28px;flex-shrink:0;color:var(--color-accent)" aria-hidden="true"></i>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;color:var(--color-accent)">Ma journ\xE9e HACCP</div>
+            <div style="font-size:var(--text-sm);color:var(--text-secondary)">T\xE2ches du jour par service</div>
+          </div>
+          <i data-lucide="chevron-right" style="width:20px;height:20px;flex-shrink:0;color:var(--color-accent)" aria-hidden="true"></i>
+        </a>
 
         <!-- SECTION: Temp\xE9ratures du jour -->
         <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
@@ -4250,6 +4272,75 @@ async function renderHACCPHub(categoryKey) {
     </div>
   `;
   if (window.lucide) lucide.createIcons({ nodes: [app] });
+}
+async function renderHACCPMaJournee() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const data = await API.getMaJourneeHACCP();
+    const dateStr = (/* @__PURE__ */ new Date(data.date + "T12:00:00")).toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long"
+    });
+    const statusIcon = (s) => s === "done" ? "\u2705" : s === "partial" ? "\u26A0\uFE0F" : s === "na" ? "\u2014" : "\u23F0";
+    const statusLabel = (s) => s === "done" ? "Effectu\xE9" : s === "partial" ? "Partiel" : s === "na" ? "N/A" : "En attente";
+    const statusBadge2 = (s) => s === "done" ? "badge--success" : s === "partial" ? "badge--warning" : s === "na" ? "" : "badge--secondary";
+    const allTasks = data.slots.flatMap((s) => s.tasks);
+    const totalTasks = allTasks.filter((t) => t.status !== "na").length;
+    const doneTasks = allTasks.filter((t) => t.status === "done").length;
+    const pct = totalTasks > 0 ? Math.round(doneTasks / totalTasks * 100) : 0;
+    const barColor = pct === 100 ? "var(--color-success)" : "var(--color-accent)";
+    app.innerHTML = `
+      <div class="haccp-page">
+        <div class="page-header">
+          <h1><i data-lucide="calendar-check" style="width:24px;height:24px;vertical-align:middle;margin-right:8px" aria-hidden="true"></i>Ma journ\xE9e HACCP</h1>
+        </div>
+
+        <div class="haccp-breadcrumb">
+          <a href="#/haccp" class="haccp-breadcrumb__back">
+            <i data-lucide="chevron-left"></i>
+            <span>HACCP</span>
+          </a>
+        </div>
+
+        <div class="card" style="margin-bottom:var(--space-5);padding:var(--space-4)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3)">
+            <span style="font-weight:600;text-transform:capitalize">${escapeHtml(dateStr)}</span>
+            <span class="badge ${pct === 100 ? "badge--success" : "badge--secondary"}">${doneTasks}/${totalTasks} t\xE2ches</span>
+          </div>
+          <div style="background:var(--border-default);border-radius:var(--radius-full);height:8px;overflow:hidden" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Progression journali\xE8re HACCP">
+            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:var(--radius-full);transition:width 0.4s ease"></div>
+          </div>
+        </div>
+
+        ${data.slots.map((slot) => `
+          <div style="margin-bottom:var(--space-5)">
+            <div class="section-title" style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+              <i data-lucide="${slot.icon}" style="width:18px;height:18px" aria-hidden="true"></i>
+              <span>${escapeHtml(slot.label)}</span>
+              <span class="text-secondary" style="font-size:var(--text-xs);font-weight:400">${escapeHtml(slot.time)}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+              ${slot.tasks.map((task) => `
+                <a href="#${task.route}" class="card" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);text-decoration:none;border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--bg-elevated);transition:box-shadow 0.15s" aria-label="${escapeHtml(task.label)} \u2014 ${escapeHtml(task.detail)}">
+                  <i data-lucide="${task.icon}" style="width:20px;height:20px;flex-shrink:0;color:var(--color-accent)" aria-hidden="true"></i>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-weight:500;font-size:var(--text-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(task.label)}</div>
+                    <div class="text-secondary" style="font-size:var(--text-xs)">${escapeHtml(task.detail)}</div>
+                  </div>
+                  <span class="badge ${statusBadge2(task.status)}" style="flex-shrink:0" aria-label="${escapeHtml(statusLabel(task.status))}">${statusIcon(task.status)} ${escapeHtml(statusLabel(task.status))}</span>
+                </a>
+              `).join("")}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+  } catch (e) {
+    app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(e.message)}</p></div>`;
+  }
 }
 async function renderHACCPTemperatures() {
   const app = document.getElementById("app");
@@ -24102,6 +24193,7 @@ function registerRoutes() {
   Router.add(/^\/suppliers$/, renderSuppliers);
   Router.add(/^\/ia$/, renderAIAssistant);
   Router.add(/^\/haccp$/, renderHACCPDashboard);
+  Router.add(/^\/haccp\/ma-journee$/, renderHACCPMaJournee);
   Router.add(/^\/haccp\/temperatures$/, renderHACCPTemperatures);
   Router.add(/^\/haccp\/calibrations$/, renderHACCPCalibrations);
   Router.add(/^\/haccp\/cleaning$/, renderHACCPCleaning);
