@@ -7,12 +7,14 @@ async function renderStockMovements() {
 
   app.innerHTML = `
     <div class="view-header">
-      <div style="display:flex;align-items:center;gap:var(--space-3)">
-        <a href="#/stock" style="color:var(--text-secondary);text-decoration:none;font-size:1.5rem">←</a>
-        <div>
-          <h1><i data-lucide="trending-up" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Mouvements de stock</h1>
-          <p class="text-secondary">Historique des entrées et sorties</p>
-        </div>
+      <div>
+        <nav aria-label="Breadcrumb" class="breadcrumb">
+          <a href="#/stock">Stock</a>
+          <span class="breadcrumb-sep" aria-hidden="true">›</span>
+          <span class="breadcrumb-current">Mouvements</span>
+        </nav>
+        <h1><i data-lucide="trending-up" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Mouvements de stock</h1>
+        <p class="text-secondary">Historique des entrées et sorties</p>
       </div>
     </div>
 

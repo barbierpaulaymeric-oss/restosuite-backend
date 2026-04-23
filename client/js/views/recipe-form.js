@@ -88,7 +88,11 @@ async function renderRecipeForm(editId) {
   app.innerHTML = `
     <div class="page-header">
       <div>
-        <a href="#/" class="back-link"><i data-lucide="arrow-left" style="width:16px;height:16px" aria-hidden="true"></i> Retour</a>
+        <nav aria-label="Breadcrumb" class="breadcrumb">
+          <a href="#/">Recettes</a>
+          <span class="breadcrumb-sep" aria-hidden="true">›</span>
+          <span class="breadcrumb-current">${isEdit ? 'Modifier la fiche' : 'Nouvelle fiche'}</span>
+        </nav>
         <h1 style="margin-top:4px">${isEdit ? 'Modifier la fiche' : 'Nouvelle fiche technique'}</h1>
       </div>
     </div>

@@ -6,9 +6,11 @@ async function renderStockVariance() {
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="view-header">
-      <a href="#/stock" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-2);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)">
-        <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Retour stock
-      </a>
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <a href="#/stock">Stock</a>
+        <span class="breadcrumb-sep" aria-hidden="true">›</span>
+        <span class="breadcrumb-current">Écarts</span>
+      </nav>
       <h1>Analyse des écarts</h1>
       <p class="text-secondary">Consommation théorique vs réelle</p>
     </div>
