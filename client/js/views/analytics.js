@@ -24,6 +24,11 @@ async function renderAnalytics() {
 
   app.innerHTML = `
     <div class="view-header">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <a href="#/">Accueil</a>
+        <span class="breadcrumb-sep" aria-hidden="true">›</span>
+        <span class="breadcrumb-current">Pilotage</span>
+      </nav>
       <h1><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Pilotage</h1>
       <p class="text-secondary">Score de santé · Food cost · Stock · HACCP · Fournisseurs · IA</p>
     </div>
@@ -137,6 +142,11 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
 
   app.innerHTML = `
     <div class="view-header">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <a href="#/">Accueil</a>
+        <span class="breadcrumb-sep" aria-hidden="true">›</span>
+        <span class="breadcrumb-current">Pilotage</span>
+      </nav>
       <h1><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Pilotage</h1>
       <p class="text-secondary">Score de santé · Food cost · Stock · HACCP · Fournisseurs · IA</p>
     </div>

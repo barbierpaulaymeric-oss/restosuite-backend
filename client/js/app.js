@@ -57,11 +57,12 @@ const NAV_GROUPS = {
   haccp: {
     label: 'HACCP',
     items: [
-      { label: 'Températures', route: '/haccp/hub/temperatures', icon: 'thermometer',    roles: ['gerant','cuisinier'] },
-      { label: 'Hygiène',      route: '/haccp/hub/hygiene',      icon: 'spray-can',      roles: ['gerant','cuisinier'] },
-      { label: 'Traçabilité',  route: '/haccp/hub/tracabilite',  icon: 'package-check',  roles: ['gerant','cuisinier'] },
-      { label: 'Plan HACCP',   route: '/haccp/hub/plan',         icon: 'file-check',     roles: ['gerant','cuisinier'] },
-      { label: 'Autre',        route: '/haccp/hub/autre',        icon: 'more-horizontal', roles: ['gerant','cuisinier'] },
+      { label: 'Ma journée HACCP', route: '/haccp/ma-journee',      icon: 'calendar-check',  roles: ['gerant','cuisinier'] },
+      { label: 'Températures',     route: '/haccp/hub/temperatures', icon: 'thermometer',     roles: ['gerant','cuisinier'] },
+      { label: 'Hygiène',          route: '/haccp/hub/hygiene',      icon: 'spray-can',       roles: ['gerant','cuisinier'] },
+      { label: 'Traçabilité',      route: '/haccp/hub/tracabilite',  icon: 'package-check',   roles: ['gerant','cuisinier'] },
+      { label: 'Plan HACCP',       route: '/haccp/hub/plan',         icon: 'file-check',      roles: ['gerant','cuisinier'] },
+      { label: 'Autre',            route: '/haccp/hub/autre',        icon: 'more-horizontal', roles: ['gerant','cuisinier'] },
     ]
   },
   config: {
@@ -124,6 +125,7 @@ const ROUTE_TO_GROUP = {
   '/fabrication-diagrams': 'documents',
   '/pms/export': 'documents',
   '/haccp': 'haccp',
+  '/haccp/ma-journee': 'haccp',
   '/haccp/temperatures': 'haccp',
   '/haccp/cooking': 'haccp',
   '/haccp/cooling': 'haccp',
@@ -394,6 +396,7 @@ function registerRoutes() {
   Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
   Router.add(/^\/fabrication-diagrams$/, renderFabricationDiagrams);
   Router.add(/^\/pms\/export$/, renderPMSExport);
+  Router.add(/^\/docs$/, () => { location.hash = '#/fabrication-diagrams'; });
   Router.add(/^\/admin$/, renderAdmin);
 }
 

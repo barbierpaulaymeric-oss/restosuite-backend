@@ -9,6 +9,11 @@ async function renderStockDashboard() {
 
   app.innerHTML = `
     <div class="view-header">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <a href="#/">Accueil</a>
+        <span class="breadcrumb-sep" aria-hidden="true">›</span>
+        <span class="breadcrumb-current">Stock</span>
+      </nav>
       <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Stock</h1>
       <p class="text-secondary">Vue d'ensemble du stock actuel</p>
     </div>

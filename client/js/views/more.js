@@ -8,6 +8,11 @@ class MoreView {
 
     app.innerHTML = `
       <div class="view-header">
+        <nav aria-label="Breadcrumb" class="breadcrumb">
+          <a href="#/">Accueil</a>
+          <span class="breadcrumb-sep" aria-hidden="true">›</span>
+          <span class="breadcrumb-current">Paramètres</span>
+        </nav>
         ${account ? `
         <div class="more-user-info">
           ${renderAvatar(account.name, 48)}

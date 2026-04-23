@@ -5348,7 +5348,7 @@ button.nav-link {
   transform: translateY(100%);
   transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--space-2);
   max-height: calc(100vh - var(--nav-height) - 16px);
   overflow-y: auto;
@@ -5401,9 +5401,6 @@ button.nav-link {
 .nav-panel-item__label {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .nav-panel-item:active,
 .nav-panel-item:hover { background: var(--color-accent-light); color: var(--color-accent); }

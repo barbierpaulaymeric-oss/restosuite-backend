@@ -172,8 +172,14 @@ function getFullRecipe(id, rid, depth = 0, visited = new Set()) {
       const cost = calcIngredientCost(ing.ingredient_id, ing.gross_quantity, ing.unit, rid);
       totalCost += cost;
       if (!priceSource.hasPrice) missingPriceCount++;
+      // Compute net_quantity when not stored: gross × (1 - waste%)
+      const wasteP = ing.custom_waste_percent ?? ing.default_waste_percent ?? 0;
+      const netQty = ing.net_quantity != null
+        ? ing.net_quantity
+        : Math.round(ing.gross_quantity * (1 - wasteP / 100) * 10) / 10;
       return {
         ...ing,
+        net_quantity: netQty,
         is_sub_recipe: false,
         cost: Math.round(cost * 100) / 100,
         missing_price: !priceSource.hasPrice,

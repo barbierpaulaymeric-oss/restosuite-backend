@@ -2964,6 +2964,11 @@ async function renderStockDashboard() {
   const isGerant = account && account.role === "gerant";
   app.innerHTML = `
     <div class="view-header">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <a href="#/">Accueil</a>
+        <span class="breadcrumb-sep" aria-hidden="true">\u203A</span>
+        <span class="breadcrumb-current">Stock</span>
+      </nav>
       <h1><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Stock</h1>
       <p class="text-secondary">Vue d'ensemble du stock actuel</p>
     </div>
@@ -15067,6 +15072,11 @@ async function renderAnalytics() {
   }
   app.innerHTML = `
     <div class="view-header">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <a href="#/">Accueil</a>
+        <span class="breadcrumb-sep" aria-hidden="true">\u203A</span>
+        <span class="breadcrumb-current">Pilotage</span>
+      </nav>
       <h1><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Pilotage</h1>
       <p class="text-secondary">Score de sant\xE9 \xB7 Food cost \xB7 Stock \xB7 HACCP \xB7 Fournisseurs \xB7 IA</p>
     </div>
@@ -15161,6 +15171,11 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
   const fcClass = kpis.avg_food_cost_pct < 30 ? "kpi--success" : kpis.avg_food_cost_pct <= 35 ? "kpi--warning" : "kpi--danger";
   app.innerHTML = `
     <div class="view-header">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <a href="#/">Accueil</a>
+        <span class="breadcrumb-sep" aria-hidden="true">\u203A</span>
+        <span class="breadcrumb-current">Pilotage</span>
+      </nav>
       <h1><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Pilotage</h1>
       <p class="text-secondary">Score de sant\xE9 \xB7 Food cost \xB7 Stock \xB7 HACCP \xB7 Fournisseurs \xB7 IA</p>
     </div>
@@ -15764,6 +15779,11 @@ class MoreView {
     const showAdvanced = localStorage.getItem("restosuite_show_advanced") === "true";
     app.innerHTML = `
       <div class="view-header">
+        <nav aria-label="Breadcrumb" class="breadcrumb">
+          <a href="#/">Accueil</a>
+          <span class="breadcrumb-sep" aria-hidden="true">\u203A</span>
+          <span class="breadcrumb-current">Param\xE8tres</span>
+        </nav>
         ${account ? `
         <div class="more-user-info">
           ${renderAvatar(account.name, 48)}
@@ -23795,6 +23815,7 @@ const ROUTE_ROLES = {
   "/orders/": ["gerant"],
   "/haccp": ["gerant", "cuisinier"],
   "/haccp/": ["gerant", "cuisinier"],
+  "/haccp/ma-journee": ["gerant", "cuisinier"],
   "/haccp/calibrations": ["gerant", "cuisinier"],
   "/suppliers": ["gerant"],
   "/ia": ["gerant", "cuisinier", "equipier"],
@@ -23936,6 +23957,7 @@ const NAV_GROUPS = {
   haccp: {
     label: "HACCP",
     items: [
+      { label: "Ma journ\xE9e HACCP", route: "/haccp/ma-journee", icon: "calendar-check", roles: ["gerant", "cuisinier"] },
       { label: "Temp\xE9ratures", route: "/haccp/hub/temperatures", icon: "thermometer", roles: ["gerant", "cuisinier"] },
       { label: "Hygi\xE8ne", route: "/haccp/hub/hygiene", icon: "spray-can", roles: ["gerant", "cuisinier"] },
       { label: "Tra\xE7abilit\xE9", route: "/haccp/hub/tracabilite", icon: "package-check", roles: ["gerant", "cuisinier"] },
@@ -24019,6 +24041,7 @@ const ROUTE_TO_GROUP = {
   "/fabrication-diagrams": "documents",
   "/pms/export": "documents",
   "/haccp": "haccp",
+  "/haccp/ma-journee": "haccp",
   "/haccp/temperatures": "haccp",
   "/haccp/cooking": "haccp",
   "/haccp/cooling": "haccp",
@@ -24264,6 +24287,9 @@ function registerRoutes() {
   Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
   Router.add(/^\/fabrication-diagrams$/, renderFabricationDiagrams);
   Router.add(/^\/pms\/export$/, renderPMSExport);
+  Router.add(/^\/docs$/, () => {
+    location.hash = "#/fabrication-diagrams";
+  });
   Router.add(/^\/admin$/, renderAdmin);
 }
 function showPlanGateModal(planLabel) {
