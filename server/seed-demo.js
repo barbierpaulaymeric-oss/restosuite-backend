@@ -533,6 +533,146 @@ const seedRecipes = db.transaction(() => {
 seedRecipes();
 log(`${recipes.length} recipes + ingredients + steps`);
 
+// ─── 5b. Stock quantities (realistic brasserie levels) ─────────────────────
+section('Stock quantities');
+const stockItems = [
+  ['entrecôte de bœuf',        5000, 'g',      1000],
+  ['suprême de volaille',      4000, 'g',      1000],
+  ['cuisse de canard confite',   20, 'pièce',     5],
+  ['bœuf haché 15% MG',        3000, 'g',       500],
+  ['lardons fumés',            2000, 'g',       500],
+  ['foie de porc',             1500, 'g',         0],
+  ['pavé de saumon',           3000, 'g',      1000],
+  ['saumon extra-frais sashimi', 1500, 'g',      500],
+  ['pomme de terre bintje',   15000, 'g',      3000],
+  ['champignons de Paris',     2000, 'g',       500],
+  ['cèpes frais',               800, 'g',         0],
+  ['oignon jaune',             5000, 'g',      1000],
+  ['échalote grise',           1500, 'g',       300],
+  ['ail rose',                 1000, 'g',       200],
+  ['cœur de romaine',            20, 'pièce',     5],
+  ['tomate cœur de bœuf',      3000, 'g',       500],
+  ['pomme golden',             5000, 'g',      1000],
+  ['beurre AOP Charentes',     3000, 'g',       500],
+  ['crème liquide 35% MG',     5000, 'ml',     1000],
+  ['parmesan reggiano',        1500, 'g',       300],
+  ['gruyère râpé',             2000, 'g',       500],
+  ['œuf fermier',                60, 'pièce',    12],
+  ['mascarpone',               1000, 'g',         0],
+  ['pain de mie brioché',      2000, 'g',       500],
+  ['farine T55',               5000, 'g',      1000],
+  ['riz arborio',              3000, 'g',       500],
+  ['bouillon de volaille',     5000, 'ml',     1000],
+  ['vin blanc de cuisson',     3000, 'ml',      500],
+  ['sucre semoule',            3000, 'g',       500],
+  ['chocolat noir 70%',        1500, 'g',       300],
+  ['gousse de vanille',          10, 'pièce',     2],
+  ['miel de Provence',         1000, 'g',         0],
+  ['thym frais',                  5, 'botte',     1],
+  ['persil plat',                 5, 'botte',     1],
+];
+const upsertStock = db.prepare(
+  `INSERT OR IGNORE INTO stock (restaurant_id, ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, ?, ?)`
+);
+const updateStock = db.prepare(
+  `UPDATE stock SET quantity = ?, unit = ?, min_quantity = ? WHERE restaurant_id = ? AND ingredient_id = ?`
+);
+let stockCount = 0;
+for (const [name, qty, unit, minQty] of stockItems) {
+  const iid = ingId(name);
+  if (!iid) continue;
+  upsertStock.run(RID, iid, qty, unit, minQty);
+  updateStock.run(qty, unit, minQty, RID, iid);
+  stockCount++;
+}
+log(`${stockCount} stock items with realistic quantities`);
+
+// ─── 5c. Sales data (orders + order_items, last 30 days) ────────────────────
+section('Sales data (orders)');
+// Lookup recipe IDs by name (inserted in section 5)
+const recipeRow = (name) => get('SELECT id FROM recipes WHERE name = ? AND restaurant_id = ?', [name, RID]);
+const popularPlats = [
+  { name: 'Burger maison bœuf fermier',          weight: 8 },
+  { name: 'Entrecôte grillée, frites maison',    weight: 7 },
+  { name: 'Confit de canard, pommes sarladaises', weight: 6 },
+  { name: 'Pavé de saumon beurre blanc',          weight: 5 },
+  { name: 'Risotto aux cèpes',                    weight: 4 },
+  { name: 'Suprême de volaille, jus au fond de veau', weight: 3 },
+].map(r => ({ ...r, row: recipeRow(r.name) })).filter(r => r.row);
+
+const popularEntrees = [
+  { name: 'Soupe à l\'oignon gratinée',  weight: 5 },
+  { name: 'Salade César',                weight: 4 },
+  { name: 'Tartare de saumon à l\'aneth', weight: 3 },
+  { name: 'Terrine de campagne maison',  weight: 2 },
+].map(r => ({ ...r, row: recipeRow(r.name) })).filter(r => r.row);
+
+const popularDesserts = [
+  { name: 'Crème brûlée à la vanille',          weight: 5 },
+  { name: 'Tiramisu au café',                   weight: 4 },
+  { name: 'Tarte Tatin, crème épaisse',         weight: 3 },
+  { name: 'Île flottante, caramel au beurre salé', weight: 2 },
+].map(r => ({ ...r, row: recipeRow(r.name) })).filter(r => r.row);
+
+function weightedPick(items) {
+  const total = items.reduce((s, i) => s + i.weight, 0);
+  let r = Math.random() * total;
+  for (const item of items) {
+    r -= item.weight;
+    if (r <= 0) return item.row.id;
+  }
+  return items[0].row.id;
+}
+
+const insertOrder = db.prepare(
+  `INSERT INTO orders (restaurant_id, table_number, status, total_cost, created_at) VALUES (?, ?, 'servi', 0, ?)`
+);
+const insertOrderItem = db.prepare(
+  `INSERT INTO order_items (order_id, recipe_id, quantity, status, restaurant_id) VALUES (?, ?, ?, 'servi', ?)`
+);
+
+const seedOrders = db.transaction(() => {
+  let orderCount = 0, itemCount = 0;
+  const now = Date.now();
+  for (let d = 29; d >= 0; d--) {
+    // ~10-18 covers per service (midi + soir) depending on day of week
+    const dayOfWeek = new Date(now - d * 86400000).getDay(); // 0=Sun
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6;
+    const ordersPerDay = isWeekend ? 14 + Math.floor(Math.random() * 6) : 8 + Math.floor(Math.random() * 6);
+
+    for (let o = 0; o < ordersPerDay; o++) {
+      const isMidi = o < ordersPerDay / 2;
+      const baseHour = isMidi ? 12 : 20;
+      const ts = new Date(now - d * 86400000);
+      ts.setHours(baseHour, Math.floor(Math.random() * 90), 0, 0);
+      const tableNum = 1 + Math.floor(Math.random() * 12);
+      const ord = insertOrder.run(RID, tableNum, ts.toISOString().replace('T', ' ').slice(0, 19));
+      const orderId = ord.lastInsertRowid;
+
+      // Entrée (40% chance)
+      if (Math.random() < 0.4 && popularEntrees.length > 0) {
+        insertOrderItem.run(orderId, weightedPick(popularEntrees), 1, RID);
+        itemCount++;
+      }
+      // Plat (always)
+      if (popularPlats.length > 0) {
+        const qty = Math.random() < 0.15 ? 2 : 1; // 15% chance of 2 same dish
+        insertOrderItem.run(orderId, weightedPick(popularPlats), qty, RID);
+        itemCount++;
+      }
+      // Dessert (35% chance)
+      if (Math.random() < 0.35 && popularDesserts.length > 0) {
+        insertOrderItem.run(orderId, weightedPick(popularDesserts), 1, RID);
+        itemCount++;
+      }
+      orderCount++;
+    }
+  }
+  return { orderCount, itemCount };
+});
+const { orderCount, itemCount } = seedOrders();
+log(`${orderCount} orders + ${itemCount} order items (30 days)`);
+
 // ─── 6. Temperature zones & logs (30 days) ─────────────────────────────────
 section('Temperature logs (30 days)');
 // Ensure we have the 7 zones (the boot seed creates 4). Upsert gracefully.
