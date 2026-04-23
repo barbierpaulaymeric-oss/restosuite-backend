@@ -65,18 +65,8 @@ DOMAINES D'EXPERTISE :
 - Réglementation restauration (allergènes INCO, traçabilité)
 - Conseils culinaires et techniques`;
 
-    // Build conversation
+    // Build conversation (systemInstruction handles language + context; no synthetic first turn needed)
     const contents = [];
-
-    // Add system context as first user message
-    contents.push({
-      role: 'user',
-      parts: [{ text: systemPrompt + '\n\nVoici ma première question : Bonjour !' }]
-    });
-    contents.push({
-      role: 'model',
-      parts: [{ text: 'Bonjour ! Je suis Alto, l\'assistant culinaire intelligent de RestoSuite. Je connais les données de votre restaurant et je suis prêt à vous aider. Que puis-je faire pour vous ?' }]
-    });
 
     // Add conversation history
     if (conversation_history && Array.isArray(conversation_history)) {
@@ -100,6 +90,7 @@ DOMAINES D'EXPERTISE :
       method: 'POST',
       headers: geminiHeaders(),
       body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
         contents,
         generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
       })
@@ -283,18 +274,8 @@ DOMAINES D'EXPERTISE :
 - Réglementation restauration (allergènes INCO, traçabilité, arrêté 21/12/2009)
 - Conseils culinaires et techniques`;
 
-    // Build conversation
+    // Build conversation (systemInstruction handles language + context; no synthetic first turn needed)
     const contents = [];
-
-    // Add system context as first user message
-    contents.push({
-      role: 'user',
-      parts: [{ text: systemPrompt + '\n\nVoici ma première question : Bonjour !' }]
-    });
-    contents.push({
-      role: 'model',
-      parts: [{ text: 'Bonjour ! Je suis Alto, l\'assistant culinaire intelligent de RestoSuite. Je connais les données de votre restaurant et je peux saisir vos relevés HACCP et effectuer des actions pour vous. Que puis-je faire ?' }]
-    });
 
     // Add conversation history
     if (conversation_history && Array.isArray(conversation_history)) {
@@ -319,6 +300,7 @@ DOMAINES D'EXPERTISE :
       method: 'POST',
       headers: geminiHeaders(),
       body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
         contents,
         generationConfig: {
           temperature: 0.7,
