@@ -29,7 +29,7 @@ router.get('/kpis', (req, res) => {
             ri.gross_quantity * COALESCE(
               (SELECT sp.price / CASE
                 WHEN sp.unit = 'kg' THEN 1000
-                WHEN sp.unit = 'L' THEN 1000
+                WHEN LOWER(sp.unit) = 'l' THEN 1000
                 ELSE 1
               END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
               0
@@ -55,7 +55,7 @@ router.get('/kpis', (req, res) => {
       SELECT COALESCE(SUM(s.quantity * COALESCE(
         (SELECT sp.price / CASE
           WHEN sp.unit = 'kg' THEN 1000
-          WHEN sp.unit = 'L' THEN 1000
+          WHEN LOWER(sp.unit) = 'l' THEN 1000
           ELSE 1
         END FROM supplier_prices sp WHERE sp.ingredient_id = s.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
         0
@@ -118,7 +118,7 @@ router.get('/food-cost', (req, res) => {
             ri.gross_quantity * COALESCE(
               (SELECT sp.price / CASE
                 WHEN sp.unit = 'kg' THEN 1000
-                WHEN sp.unit = 'L' THEN 1000
+                WHEN LOWER(sp.unit) = 'l' THEN 1000
                 ELSE 1
               END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
               0
@@ -197,7 +197,7 @@ router.get('/stock', (req, res) => {
         COALESCE(
           (SELECT sp.price / CASE
             WHEN sp.unit = 'kg' THEN 1000
-            WHEN sp.unit = 'L' THEN 1000
+            WHEN LOWER(sp.unit) = 'l' THEN 1000
             ELSE 1
           END FROM supplier_prices sp WHERE sp.ingredient_id = s.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
           0
@@ -456,7 +456,7 @@ router.get('/ai-insights', async (req, res) => {
       SELECT r.name, r.selling_price,
         COALESCE((
           SELECT SUM(ri.gross_quantity * COALESCE(
-            (SELECT sp.price / CASE WHEN sp.unit = 'kg' THEN 1000 WHEN sp.unit = 'L' THEN 1000 ELSE 1 END
+            (SELECT sp.price / CASE WHEN sp.unit = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
              FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1), 0))
           FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?
         ), 0) as cost
@@ -722,7 +722,7 @@ router.get('/menu-engineering', (req, res) => {
             ri.gross_quantity * COALESCE(
               (SELECT sp.price / CASE
                 WHEN sp.unit = 'kg' THEN 1000
-                WHEN sp.unit = 'L' THEN 1000
+                WHEN LOWER(sp.unit) = 'l' THEN 1000
                 ELSE 1
               END FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.last_updated DESC LIMIT 1),
               0

@@ -126,9 +126,11 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
   // ─── HACCP KPI for top bar ───
   const haccpTemp = kpis.haccp_compliance_today.temperatures;
   const haccpClean = kpis.haccp_compliance_today.cleaning;
-  const haccpPct = (haccpTemp.total + haccpClean.total) > 0
-    ? Math.round(((haccpTemp.done + haccpClean.done) / (haccpTemp.total + haccpClean.total)) * 100)
-    : 100;
+  // Use 7-day compliance from haccpData (more meaningful than today-only zone coverage,
+  // which shows 0% when no readings have been logged yet today).
+  const haccpPct = Math.round(
+    ((haccpData.temperature_compliance_7d || 100) + (haccpData.cleaning_compliance_7d || 100)) / 2
+  );
 
   const activeAlerts = kpis.low_stock_count + (haccpData.alerts_count_7d || 0);
   const fcClass = kpis.avg_food_cost_pct < 30 ? 'kpi--success' : kpis.avg_food_cost_pct <= 35 ? 'kpi--warning' : 'kpi--danger';

@@ -1290,7 +1290,7 @@ async function loadAISuggestions() {
   if (cached) {
     try {
       const { data, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < 24 * 60 * 60 * 1e3) {
+      if (Date.now() - timestamp < 12 * 60 * 60 * 1e3) {
         renderAISuggestions(container, data);
         return;
       }
@@ -1370,17 +1370,12 @@ function renderAISuggestions(container, data) {
   }
   container.innerHTML = `
     <section role="region" aria-labelledby="ai-suggestions-heading" style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
+      <div style="margin-bottom:var(--space-3)">
         <h3 id="ai-suggestions-heading" style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Suggestions IA</h3>
-        <button class="btn btn-secondary btn-sm" onclick="refreshAISuggestions()" title="Rafra\xEEchir" aria-label="Rafra\xEEchir les suggestions IA" style="padding:4px 8px"><span aria-hidden="true">\u{1F504}</span></button>
       </div>
       ${topHtml}${improveHtml}${dailyHtml}
     </section>
   `;
-}
-async function refreshAISuggestions() {
-  localStorage.removeItem("restosuite_suggestions_cache");
-  await loadAISuggestions();
 }
 function getGreeting(name) {
   const hour = (/* @__PURE__ */ new Date()).getHours();
@@ -15068,7 +15063,9 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
   const warningCount = issues.filter((i) => i.severity === "warning").length;
   const haccpTemp = kpis.haccp_compliance_today.temperatures;
   const haccpClean = kpis.haccp_compliance_today.cleaning;
-  const haccpPct = haccpTemp.total + haccpClean.total > 0 ? Math.round((haccpTemp.done + haccpClean.done) / (haccpTemp.total + haccpClean.total) * 100) : 100;
+  const haccpPct = Math.round(
+    ((haccpData.temperature_compliance_7d || 100) + (haccpData.cleaning_compliance_7d || 100)) / 2
+  );
   const activeAlerts = kpis.low_stock_count + (haccpData.alerts_count_7d || 0);
   const fcClass = kpis.avg_food_cost_pct < 30 ? "kpi--success" : kpis.avg_food_cost_pct <= 35 ? "kpi--warning" : "kpi--danger";
   app.innerHTML = `
