@@ -4736,9 +4736,9 @@ async function renderHACCPTemperatures() {
         </nav>
         <div class="page-header">
           <h1><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Temp\xE9ratures</h1>
-          <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
-            <button class="btn btn-secondary" id="btn-batch-temp" aria-label="Saisie group\xE9e de temp\xE9ratures">
-              <i data-lucide="table" style="width:18px;height:18px" aria-hidden="true"></i> Saisie group\xE9e
+          <div style="display:flex;gap:var(--space-2)">
+            <button class="btn btn-secondary" id="btn-batch-temps" aria-label="Saisie group\xE9e de tous les relev\xE9s" aria-expanded="false">
+              <i data-lucide="table-2" style="width:18px;height:18px" aria-hidden="true"></i> Saisie group\xE9e
             </button>
             <button class="btn btn-primary" id="btn-new-temp" aria-label="Cr\xE9er un nouveau relev\xE9 de temp\xE9rature">
               <i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouveau relev\xE9
@@ -4747,6 +4747,47 @@ async function renderHACCPTemperatures() {
         </div>
 
         ${haccpBreadcrumb("temperatures")}
+
+        <!-- Batch entry panel -->
+        <div id="batch-temp-panel" style="display:none;background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
+          <h2 style="margin:0 0 var(--space-3) 0;font-size:var(--text-base)">
+            <i data-lucide="table-2" style="width:18px;height:18px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>
+            Saisie group\xE9e \u2014 ${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+          </h2>
+          <div style="overflow-x:auto">
+            <table class="data-table" style="width:100%;min-width:480px" role="grid" aria-label="Saisie group\xE9e des temp\xE9ratures">
+              <thead>
+                <tr>
+                  <th scope="col">Zone</th>
+                  <th scope="col" style="width:140px">Temp\xE9rature (\xB0C)</th>
+                  <th scope="col" style="width:120px">Conformit\xE9</th>
+                </tr>
+              </thead>
+              <tbody id="batch-zones-body">
+                ${zones.map((z) => `
+                  <tr data-zone-id="${z.id}" data-min="${z.min_temp}" data-max="${z.max_temp}">
+                    <td style="font-weight:500">${escapeHtml(z.name)}<br><span class="text-secondary" style="font-size:11px">Seuil : ${z.min_temp}\xB0 / ${z.max_temp}\xB0</span></td>
+                    <td>
+                      <input type="number" class="input batch-temp-input" step="0.1"
+                        placeholder="\u2014" style="max-width:110px;font-size:var(--text-sm)"
+                        aria-label="Temp\xE9rature pour ${escapeHtml(z.name)}">
+                    </td>
+                    <td>
+                      <span class="batch-conform-badge badge" style="font-size:11px">\u2014</span>
+                    </td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-3)">
+            <button class="btn btn-secondary" id="btn-batch-cancel">Annuler</button>
+            <button class="btn btn-accent" id="btn-batch-submit">
+              <i data-lucide="save" style="width:16px;height:16px;margin-right:4px" aria-hidden="true"></i>
+              Enregistrer tout
+            </button>
+          </div>
+        </div>
 
         <!-- Filters -->
         <div class="haccp-filters" role="search" aria-label="Filtrer les relev\xE9s">
@@ -4841,8 +4882,85 @@ function renderTempRows(logs) {
 }
 function setupTemperatureEvents(zones) {
   var _a, _b, _c, _d, _e;
-  (_a = document.getElementById("btn-batch-temp")) == null ? void 0 : _a.addEventListener("click", () => {
-    showBatchTempModal(zones);
+  const batchBtn = document.getElementById("btn-batch-temps");
+  const batchPanel = document.getElementById("batch-temp-panel");
+  const batchCancel = document.getElementById("btn-batch-cancel");
+  const batchSubmit = document.getElementById("btn-batch-submit");
+  batchBtn == null ? void 0 : batchBtn.addEventListener("click", () => {
+    const open = batchPanel.style.display !== "none";
+    batchPanel.style.display = open ? "none" : "block";
+    batchBtn.setAttribute("aria-expanded", String(!open));
+    if (!open && window.lucide) lucide.createIcons({ nodes: [batchPanel] });
+  });
+  batchCancel == null ? void 0 : batchCancel.addEventListener("click", () => {
+    batchPanel.style.display = "none";
+    batchBtn.setAttribute("aria-expanded", "false");
+  });
+  (_a = document.getElementById("batch-zones-body")) == null ? void 0 : _a.addEventListener("input", (e) => {
+    if (!e.target.classList.contains("batch-temp-input")) return;
+    const row = e.target.closest("tr");
+    const badge = row.querySelector(".batch-conform-badge");
+    const min = parseFloat(row.dataset.min);
+    const max = parseFloat(row.dataset.max);
+    const val = parseFloat(e.target.value);
+    if (isNaN(val)) {
+      badge.textContent = "\u2014";
+      badge.className = "batch-conform-badge badge";
+      return;
+    }
+    if (val >= min && val <= max) {
+      badge.textContent = "Conforme \u2713";
+      badge.className = "batch-conform-badge badge badge--success";
+    } else {
+      badge.textContent = "Non conforme \u2717";
+      badge.className = "batch-conform-badge badge badge--danger";
+    }
+  });
+  batchSubmit == null ? void 0 : batchSubmit.addEventListener("click", async () => {
+    var _a2;
+    const rows = document.querySelectorAll("#batch-zones-body tr");
+    const toSave = [];
+    rows.forEach((row) => {
+      const input = row.querySelector(".batch-temp-input");
+      const val = parseFloat(input.value);
+      if (!isNaN(val)) {
+        toSave.push({ zone_id: parseInt(row.dataset.zoneId), temperature: val });
+      }
+    });
+    if (!toSave.length) {
+      showToast("Saisissez au moins une temp\xE9rature", "error");
+      return;
+    }
+    batchSubmit.disabled = true;
+    batchSubmit.textContent = "Enregistrement\u2026";
+    let errors = 0;
+    for (const entry of toSave) {
+      try {
+        await API.request("/haccp/temperature-logs", {
+          method: "POST",
+          body: JSON.stringify({ zone_id: entry.zone_id, temperature: entry.temperature })
+        });
+      } catch (e) {
+        errors++;
+      }
+    }
+    batchSubmit.disabled = false;
+    batchSubmit.innerHTML = '<i data-lucide="save" style="width:16px;height:16px;margin-right:4px"></i>Enregistrer tout';
+    if (window.lucide) lucide.createIcons({ nodes: [batchSubmit] });
+    if (errors > 0) {
+      showToast(`${errors} relev\xE9(s) non enregistr\xE9(s)`, "error");
+    } else {
+      showToast(`${toSave.length} relev\xE9(s) enregistr\xE9(s)`, "success");
+      batchPanel.style.display = "none";
+      batchBtn.setAttribute("aria-expanded", "false");
+      rows.forEach((row) => {
+        row.querySelector(".batch-temp-input").value = "";
+        const badge = row.querySelector(".batch-conform-badge");
+        badge.textContent = "\u2014";
+        badge.className = "batch-conform-badge badge";
+      });
+      (_a2 = document.getElementById("btn-filter")) == null ? void 0 : _a2.click();
+    }
   });
   (_b = document.getElementById("btn-new-temp")) == null ? void 0 : _b.addEventListener("click", () => {
     showNewTempModal(zones);
