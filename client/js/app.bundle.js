@@ -6660,7 +6660,8 @@ async function showCookingModal(editId = null) {
   }
   const account = getAccount();
   const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const nowTime = (/* @__PURE__ */ new Date()).toTimeString().slice(0, 5);
+  const _nt = /* @__PURE__ */ new Date();
+  const nowTime = `${String(_nt.getHours()).padStart(2, "0")}:${String(_nt.getMinutes()).padStart(2, "0")}`;
   const presetOptions = COOKING_PRODUCT_PRESETS.map(
     (p, i) => `<option value="${p.target}">${p.label} (\u2265${p.target}\xB0C)</option>`
   ).join("");

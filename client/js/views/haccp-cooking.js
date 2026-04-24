@@ -162,7 +162,7 @@ async function showCookingModal(editId = null) {
 
   const account = getAccount();
   const today = new Date().toISOString().slice(0, 10);
-  const nowTime = new Date().toTimeString().slice(0, 5);
+  const _nt = new Date(); const nowTime = `${String(_nt.getHours()).padStart(2, '0')}:${String(_nt.getMinutes()).padStart(2, '0')}`;
 
   const presetOptions = COOKING_PRODUCT_PRESETS.map((p, i) =>
     `<option value="${p.target}">${p.label} (≥${p.target}°C)</option>`
