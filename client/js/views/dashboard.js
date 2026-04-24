@@ -508,19 +508,19 @@ function renderDailySummary(recipes, perms) {
   if (!summaryEl) return;
 
   let html = `
-    <div role="group" aria-label="Nombre de fiches techniques" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
+    <a href="#/recipes" role="group" aria-label="Nombre de fiches techniques — voir la liste" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-accent)';this.style.boxShadow='0 0 0 2px var(--color-accent-light)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
       <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recipes.length}</div>
       <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Fiches techniques</div>
-    </div>
+    </a>
   `;
 
   if (perms.view_costs && recipes.length > 0) {
     const totalCost = recipes.reduce((sum, r) => sum + (r.total_cost || 0), 0);
     html += `
-      <div role="group" aria-label="Coût total matière" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
+      <a href="#/analytics" role="group" aria-label="Coût total matière — voir l'analyse" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-success)';this.style.boxShadow='0 0 0 2px rgba(var(--color-success-rgb,34,197,94),0.15)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
         <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-success)">${formatCurrency(totalCost)}</div>
         <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Coût total matière</div>
-      </div>
+      </a>
     `;
   }
 

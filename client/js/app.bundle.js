@@ -1512,18 +1512,18 @@ function renderDailySummary(recipes, perms) {
   const summaryEl = document.getElementById("dashboard-summary");
   if (!summaryEl) return;
   let html = `
-    <div role="group" aria-label="Nombre de fiches techniques" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
+    <a href="#/recipes" role="group" aria-label="Nombre de fiches techniques \u2014 voir la liste" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-accent)';this.style.boxShadow='0 0 0 2px var(--color-accent-light)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
       <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recipes.length}</div>
       <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Fiches techniques</div>
-    </div>
+    </a>
   `;
   if (perms.view_costs && recipes.length > 0) {
     const totalCost = recipes.reduce((sum, r) => sum + (r.total_cost || 0), 0);
     html += `
-      <div role="group" aria-label="Co\xFBt total mati\xE8re" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center">
+      <a href="#/analytics" role="group" aria-label="Co\xFBt total mati\xE8re \u2014 voir l'analyse" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-success)';this.style.boxShadow='0 0 0 2px rgba(var(--color-success-rgb,34,197,94),0.15)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
         <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-success)">${formatCurrency(totalCost)}</div>
         <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Co\xFBt total mati\xE8re</div>
-      </div>
+      </a>
     `;
   }
   const dailyTip = getDailyTip();
@@ -3448,7 +3448,7 @@ async function renderStockReception() {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-3)">
         <div class="form-group">
           <label class="form-label">DLC</label>
-          <input type="date" class="input line-dlc">
+          <input type="date" class="input line-dlc" lang="fr">
         </div>
         <div class="form-group">
           <label class="form-label">T\xB0 r\xE9ception (\xB0C)</label>
@@ -3706,11 +3706,11 @@ async function renderStockVariance() {
     <div class="variance-controls" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5);flex-wrap:wrap;align-items:flex-end">
       <div class="form-group" style="margin:0">
         <label class="form-label" style="font-size:var(--text-xs)">Du</label>
-        <input type="date" id="var-from" class="input" style="width:160px">
+        <input type="date" id="var-from" class="input" lang="fr" style="width:160px">
       </div>
       <div class="form-group" style="margin:0">
         <label class="form-label" style="font-size:var(--text-xs)">Au</label>
-        <input type="date" id="var-to" class="input" style="width:160px">
+        <input type="date" id="var-to" class="input" lang="fr" style="width:160px">
       </div>
       <button class="btn btn-primary" id="var-refresh">Analyser</button>
     </div>
@@ -12002,7 +12002,7 @@ function tdModalHtml(item) {
             </div>
             <div class="form-group">
               <label class="form-label">Date de fabrication</label>
-              <input type="date" class="form-control" id="td-production-date" value="${v.production_date || ""}">
+              <input type="date" class="form-control" id="td-production-date" lang="fr" value="${v.production_date || ""}">
             </div>
             <div class="form-group">
               <label class="form-label">Type de destination</label>
@@ -12034,7 +12034,7 @@ function tdModalHtml(item) {
             </div>
             <div class="form-group">
               <label class="form-label">Date d'exp\xE9dition</label>
-              <input type="date" class="form-control" id="td-dispatch-date" value="${v.dispatch_date || ""}">
+              <input type="date" class="form-control" id="td-dispatch-date" lang="fr" value="${v.dispatch_date || ""}">
             </div>
             <div class="form-group">
               <label class="form-label">Heure d'exp\xE9dition</label>
@@ -12157,11 +12157,11 @@ async function renderTraceabilityDownstream() {
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label" style="margin-bottom:4px">Du</label>
-            <input type="date" class="form-control" id="td-filter-from" style="font-size:0.85rem">
+            <input type="date" class="form-control" id="td-filter-from" lang="fr" style="font-size:0.85rem">
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label" style="margin-bottom:4px">Au</label>
-            <input type="date" class="form-control" id="td-filter-to" style="font-size:0.85rem">
+            <input type="date" class="form-control" id="td-filter-to" lang="fr" style="font-size:0.85rem">
           </div>
           <button class="btn btn-secondary" id="td-filter-apply" style="align-self:flex-end">
             <i data-lucide="filter" style="width:15px;height:15px"></i> Filtrer
@@ -19108,8 +19108,8 @@ async function renderDeliveries() {
         <h1><i data-lucide="truck" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Livraisons</h1>
         <p class="text-secondary">R\xE9ception et suivi des bons de livraison</p>
       </div>
-      <a href="#/haccp/reception" class="btn btn-accent" style="display:flex;align-items:center;gap:var(--space-2)">
-        <i data-lucide="plus" style="width:16px;height:16px"></i>
+      <a href="#/haccp/reception" class="btn btn-primary" style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3) var(--space-5);font-size:var(--text-base);font-weight:600">
+        <i data-lucide="plus" style="width:18px;height:18px"></i>
         Nouvelle r\xE9ception
       </a>
     </div>
@@ -24511,6 +24511,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 const ROUTE_ROLES = {
   "/": ["gerant", "cuisinier", "equipier"],
+  "/recipes": ["gerant", "cuisinier", "equipier"],
   "/new": ["gerant"],
   "/recipe/": ["gerant", "cuisinier", "equipier"],
   "/edit/": ["gerant"],
@@ -24649,7 +24650,7 @@ const NAV_GROUPS = {
   cuisine: {
     label: "Cuisine",
     items: [
-      { label: "Fiches Techniques", route: "/", icon: "clipboard-list", roles: ["gerant", "cuisinier", "equipier"] },
+      { label: "Fiches Techniques", route: "/recipes", icon: "clipboard-list", roles: ["gerant", "cuisinier", "equipier"] },
       { label: "Ingr\xE9dients", route: "/ingredients", icon: "package", roles: ["gerant", "cuisinier", "equipier"] },
       { label: "Stock & R\xE9ception", route: "/stock", icon: "warehouse", roles: ["gerant", "cuisinier"] }
     ]
@@ -24716,6 +24717,7 @@ const NAV_GROUPS = {
 };
 const ROUTE_TO_GROUP = {
   "/": "cuisine",
+  "/recipes": "cuisine",
   "/new": "cuisine",
   "/ingredients": "cuisine",
   "/stock": "cuisine",
@@ -24918,6 +24920,7 @@ function renderTrialHeaderBadge() {
 function registerRoutes() {
   if (Router.routes.length > 0) return;
   Router.add(/^\/$/, renderDashboard);
+  Router.add(/^\/recipes$/, renderDashboard);
   Router.add(/^\/new$/, () => renderRecipeForm(null));
   Router.add(/^\/recipe\/(\d+)$/, (id) => renderRecipeDetail(parseInt(id)));
   Router.add(/^\/edit\/(\d+)$/, (id) => renderRecipeForm(parseInt(id)));

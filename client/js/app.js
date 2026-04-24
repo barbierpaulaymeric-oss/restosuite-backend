@@ -40,7 +40,7 @@ const NAV_GROUPS = {
   cuisine: {
     label: 'Cuisine',
     items: [
-      { label: 'Fiches Techniques',  route: '/',            icon: 'clipboard-list', roles: ['gerant','cuisinier','equipier'] },
+      { label: 'Fiches Techniques',  route: '/recipes',     icon: 'clipboard-list', roles: ['gerant','cuisinier','equipier'] },
       { label: 'Ingrédients',        route: '/ingredients', icon: 'package',        roles: ['gerant','cuisinier','equipier'] },
       { label: 'Stock & Réception',  route: '/stock',       icon: 'warehouse',      roles: ['gerant','cuisinier'] },
     ]
@@ -107,7 +107,7 @@ const NAV_GROUPS = {
 };
 
 const ROUTE_TO_GROUP = {
-  '/': 'cuisine', '/new': 'cuisine', '/ingredients': 'cuisine',
+  '/': 'cuisine', '/recipes': 'cuisine', '/new': 'cuisine', '/ingredients': 'cuisine',
   '/stock': 'cuisine', '/recipe': 'cuisine', '/edit': 'cuisine',
   '/orders': 'operations', '/suppliers': 'operations',
   '/deliveries': 'operations', '/service': 'operations',
@@ -324,6 +324,7 @@ function registerRoutes() {
   if (Router.routes.length > 0) return;
 
   Router.add(/^\/$/, renderDashboard);
+  Router.add(/^\/recipes$/, renderDashboard);
   Router.add(/^\/new$/, () => renderRecipeForm(null));
   Router.add(/^\/recipe\/(\d+)$/, (id) => renderRecipeDetail(parseInt(id)));
   Router.add(/^\/edit\/(\d+)$/, (id) => renderRecipeForm(parseInt(id)));

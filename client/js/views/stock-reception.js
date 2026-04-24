@@ -106,7 +106,7 @@ async function renderStockReception() {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-3)">
         <div class="form-group">
           <label class="form-label">DLC</label>
-          <input type="date" class="input line-dlc">
+          <input type="date" class="input line-dlc" lang="fr">
         </div>
         <div class="form-group">
           <label class="form-label">T° réception (°C)</label>

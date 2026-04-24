@@ -17,11 +17,11 @@ async function renderStockVariance() {
     <div class="variance-controls" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5);flex-wrap:wrap;align-items:flex-end">
       <div class="form-group" style="margin:0">
         <label class="form-label" style="font-size:var(--text-xs)">Du</label>
-        <input type="date" id="var-from" class="input" style="width:160px">
+        <input type="date" id="var-from" class="input" lang="fr" style="width:160px">
       </div>
       <div class="form-group" style="margin:0">
         <label class="form-label" style="font-size:var(--text-xs)">Au</label>
-        <input type="date" id="var-to" class="input" style="width:160px">
+        <input type="date" id="var-to" class="input" lang="fr" style="width:160px">
       </div>
       <button class="btn btn-primary" id="var-refresh">Analyser</button>
     </div>
