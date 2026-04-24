@@ -496,6 +496,8 @@ function initHamburger() {
   const drawer = document.getElementById('nav-drawer');
   const closeBtn = document.getElementById('nav-drawer-close');
   if (!hamburger || !drawer) return;
+  if (hamburger.dataset.initialized) return;
+  hamburger.dataset.initialized = '1';
 
   function populateDrawer() {
     const src = document.querySelector('.nav-links');
@@ -530,12 +532,14 @@ function initHamburger() {
     drawer.classList.remove('open');
     hamburger.setAttribute('aria-expanded', 'false');
     document.body.style.overflow = '';
+    hamburger.focus();
   }
 
   hamburger.addEventListener('click', openDrawer);
   if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
   drawer.querySelector('.nav-drawer-backdrop').addEventListener('click', closeDrawer);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+  const ac = new AbortController();
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); }, { signal: ac.signal });
 }
 
 function updateNavUser(account) {
