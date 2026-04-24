@@ -430,6 +430,7 @@ function bootApp(role, account, opts = {}) {
   updateNavUser(account);
   registerRoutes();
   initNavGroups(role);
+  initMobileNav(role);
 
   // Filter nav items based on role — hide links user cannot access
   const navLinks = document.querySelectorAll('.nav-link[data-roles]');
@@ -640,6 +641,115 @@ function initNavGroups(role) {
 
   if (backdrop) backdrop.addEventListener('click', closePanel);
   window.addEventListener('hashchange', closePanel);
+}
+
+// ═══════════════════════════════════════════
+// Mobile hamburger nav overlay
+// ═══════════════════════════════════════════
+function initMobileNav(role) {
+  const hamburgerBtn = document.getElementById('nav-hamburger-btn');
+  const overlay = document.getElementById('mobile-nav-overlay');
+  const closeBtn = document.getElementById('mobile-nav-close');
+  const body = document.getElementById('mobile-nav-body');
+  if (!hamburgerBtn || !overlay || !body) return;
+
+  const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Groupe' };
+  const currentPath = () => location.hash.replace('#', '') || '/';
+
+  function buildMenu() {
+    body.innerHTML = '';
+    const groupOrder = ['cuisine', 'operations', 'haccp', 'pilotage', 'documents', 'config'];
+    groupOrder.forEach(key => {
+      const group = NAV_GROUPS[key];
+      if (!group) return;
+
+      let items = [];
+      if (Array.isArray(group.subcategories)) {
+        group.subcategories.forEach(sub => {
+          sub.items.filter(i => i.roles.includes(role)).forEach(i => items.push(i));
+        });
+      } else if (Array.isArray(group.items)) {
+        items = group.items.filter(i => i.roles.includes(role));
+      }
+      if (items.length === 0) return;
+
+      const section = document.createElement('div');
+      section.className = 'mobile-nav-section';
+      const title = document.createElement('div');
+      title.className = 'mobile-nav-section-title';
+      title.textContent = group.label;
+      section.appendChild(title);
+
+      items.forEach(item => {
+        const path = currentPath();
+        const isActive = item.route && (path === item.route || (item.route !== '/' && path.startsWith(item.route)));
+        const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
+
+        let el;
+        if (item.action === 'logout') {
+          el = document.createElement('button');
+          el.className = 'mobile-nav-item mobile-nav-item--danger';
+          el.addEventListener('click', () => { closeOverlay(); logout(); });
+        } else if (locked) {
+          el = document.createElement('div');
+          el.className = 'mobile-nav-item mobile-nav-item--locked';
+        } else {
+          el = document.createElement('a');
+          el.href = '#' + item.route;
+          el.className = 'mobile-nav-item' + (isActive ? ' active' : '');
+          el.addEventListener('click', closeOverlay);
+        }
+        el.innerHTML = `<i data-lucide="${item.icon}"></i><span>${escapeHtml(item.label)}</span>` +
+          (locked ? `<span class="mobile-nav-item__badge">${escapeHtml(PLAN_LABELS[item.minPlan] || item.minPlan)}</span>` : '');
+        section.appendChild(el);
+      });
+      body.appendChild(section);
+    });
+
+
+    // Add Alto direct link (not in NAV_GROUPS — direct href)
+    const altoSection = document.createElement('div');
+    altoSection.className = 'mobile-nav-section';
+    const altoTitle = document.createElement('div');
+    altoTitle.className = 'mobile-nav-section-title';
+    altoTitle.textContent = 'Alto IA';
+    altoSection.appendChild(altoTitle);
+    const altoEl = document.createElement('a');
+    const isAltoActive = currentPath() === '/ia' || currentPath().startsWith('/ia');
+    altoEl.href = '#/ia';
+    altoEl.className = 'mobile-nav-item' + (isAltoActive ? ' active' : '');
+    altoEl.innerHTML = `<i data-lucide="sparkles"></i><span>Alto — Assistant IA</span>`;
+    altoEl.addEventListener('click', closeOverlay);
+    altoSection.appendChild(altoEl);
+    body.appendChild(altoSection);
+
+    if (window.lucide) lucide.createIcons({ nodes: [body] });
+  }
+
+  function openOverlay() {
+    buildMenu();
+    overlay.classList.add('open');
+    hamburgerBtn.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+    closeBtn.focus();
+  }
+
+  function closeOverlay() {
+    overlay.classList.remove('open');
+    hamburgerBtn.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+    hamburgerBtn.focus();
+  }
+
+  hamburgerBtn.addEventListener('click', () => {
+    if (overlay.classList.contains('open')) closeOverlay();
+    else openOverlay();
+  });
+  closeBtn.addEventListener('click', closeOverlay);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeOverlay();
+  });
+  window.addEventListener('hashchange', closeOverlay);
 }
 
 (async function init() {

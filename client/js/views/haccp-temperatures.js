@@ -24,9 +24,14 @@ async function renderHACCPTemperatures() {
         </nav>
         <div class="page-header">
           <h1><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Températures</h1>
-          <button class="btn btn-primary" id="btn-new-temp" aria-label="Créer un nouveau relevé de température">
-            <i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouveau relevé
-          </button>
+          <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+            <button class="btn btn-secondary" id="btn-batch-temp" aria-label="Saisie groupée de températures">
+              <i data-lucide="table" style="width:18px;height:18px" aria-hidden="true"></i> Saisie groupée
+            </button>
+            <button class="btn btn-primary" id="btn-new-temp" aria-label="Créer un nouveau relevé de température">
+              <i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouveau relevé
+            </button>
+          </div>
         </div>
 
         ${haccpBreadcrumb('temperatures')}
@@ -126,6 +131,11 @@ function renderTempRows(logs) {
 }
 
 function setupTemperatureEvents(zones) {
+  // Batch temperature entry
+  document.getElementById('btn-batch-temp')?.addEventListener('click', () => {
+    showBatchTempModal(zones);
+  });
+
   // New temperature
   document.getElementById('btn-new-temp')?.addEventListener('click', () => {
     showNewTempModal(zones);
@@ -334,5 +344,144 @@ function showZoneModal(data) {
     } catch (err) {
       showToast('Erreur : ' + err.message, 'error');
     }
+  });
+}
+
+// ─── Batch temperature entry modal ───
+function showBatchTempModal(zones) {
+  const existing = document.querySelector('.modal-overlay');
+  if (existing) existing.remove();
+  const account = getAccount();
+
+  if (!zones || zones.length === 0) {
+    showToast('Aucune zone configurée. Ajoutez une zone d\'abord.', 'error');
+    return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'batch-temp-title');
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:600px">
+      <h2 id="batch-temp-title"><i data-lucide="table" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Saisie groupée des températures</h2>
+      <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-4)">Entrez les températures pour toutes vos zones en une seule fois.</p>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:var(--text-sm)">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border-default)">
+              <th style="text-align:left;padding:var(--space-2) var(--space-3);color:var(--text-secondary)">Zone</th>
+              <th style="text-align:left;padding:var(--space-2) var(--space-3);color:var(--text-secondary)">Plage (°C)</th>
+              <th style="text-align:center;padding:var(--space-2) var(--space-3);color:var(--text-secondary)">Température relevée</th>
+              <th style="text-align:center;padding:var(--space-2) var(--space-3);color:var(--text-secondary)">Conformité</th>
+            </tr>
+          </thead>
+          <tbody id="batch-zone-rows">
+            ${zones.map(z => `
+              <tr data-zone-id="${z.id}" data-min="${z.min_temp}" data-max="${z.max_temp}" style="border-bottom:1px solid var(--border-light)">
+                <td style="padding:var(--space-2) var(--space-3);font-weight:500">${escapeHtml(z.name)}</td>
+                <td style="padding:var(--space-2) var(--space-3);color:var(--text-tertiary);font-size:var(--text-xs)">${z.min_temp}° / ${z.max_temp}°</td>
+                <td style="padding:var(--space-2) var(--space-3)">
+                  <input type="number" step="0.1" class="form-control batch-temp-input"
+                    placeholder="ex: 3.5" inputmode="decimal"
+                    style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base);min-height:40px"
+                    aria-label="Température pour ${escapeHtml(z.name)}">
+                </td>
+                <td style="padding:var(--space-2) var(--space-3);text-align:center">
+                  <span class="batch-conformite" aria-live="polite">—</span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="form-group" style="margin-top:var(--space-4)">
+        <label for="batch-notes">Notes communes (optionnel)</label>
+        <input type="text" class="form-control" id="batch-notes" placeholder="ex: Relevé du matin">
+      </div>
+      <div class="actions-row" style="justify-content:flex-end;margin-top:var(--space-4)">
+        <button class="btn btn-secondary" id="batch-cancel">Annuler</button>
+        <button class="btn btn-primary" id="batch-save" style="min-width:160px">
+          <i data-lucide="check" style="width:18px;height:18px" aria-hidden="true"></i> Enregistrer tout
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+
+  // Live conformity feedback
+  overlay.querySelectorAll('.batch-temp-input').forEach(input => {
+    input.addEventListener('input', () => {
+      const row = input.closest('tr');
+      const min = parseFloat(row.dataset.min);
+      const max = parseFloat(row.dataset.max);
+      const val = parseFloat(input.value);
+      const badge = row.querySelector('.batch-conformite');
+      if (isNaN(val)) {
+        badge.innerHTML = '—';
+        input.style.borderColor = '';
+      } else if (val >= min && val <= max) {
+        badge.innerHTML = '<span class="badge badge--success">✓ OK</span>';
+        input.style.borderColor = 'var(--color-success)';
+      } else {
+        badge.innerHTML = '<span class="badge badge--danger">⚠ ALERTE</span>';
+        input.style.borderColor = 'var(--color-danger)';
+      }
+    });
+  });
+
+  const releaseFocus = trapFocus(overlay);
+  const closeModal = () => { try { releaseFocus(); } catch {} overlay.remove(); };
+  const escHandler = (e) => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', escHandler); } };
+  document.addEventListener('keydown', escHandler);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  document.getElementById('batch-cancel').addEventListener('click', closeModal);
+
+  document.getElementById('batch-save').addEventListener('click', async () => {
+    const notes = document.getElementById('batch-notes').value.trim() || null;
+    const rows = overlay.querySelectorAll('#batch-zone-rows tr[data-zone-id]');
+    const entries = [];
+    rows.forEach(row => {
+      const input = row.querySelector('.batch-temp-input');
+      const temp = parseFloat(input.value);
+      if (!isNaN(temp)) {
+        entries.push({
+          zone_id: Number(row.dataset.zoneId),
+          temperature: temp,
+          notes,
+          recorded_by: account ? account.id : null
+        });
+      }
+    });
+
+    if (entries.length === 0) {
+      showToast('Veuillez saisir au moins une température.', 'error');
+      return;
+    }
+
+    const saveBtn = document.getElementById('batch-save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Enregistrement...';
+
+    let saved = 0, failed = 0;
+    for (const entry of entries) {
+      try {
+        await API.recordTemperature(entry);
+        saved++;
+      } catch {
+        failed++;
+      }
+    }
+
+    closeModal();
+    if (failed === 0) {
+      showToast(`✓ ${saved} relevé${saved > 1 ? 's' : ''} enregistré${saved > 1 ? 's' : ''}`, 'success');
+    } else {
+      showToast(`${saved} enregistrés, ${failed} erreur(s)`, 'error');
+    }
+    renderHACCPTemperatures();
   });
 }

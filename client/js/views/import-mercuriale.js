@@ -130,7 +130,7 @@ async function renderMercurialeResults(data) {
         </select>
       </div>
       ${data.supplier_name ? `<div style="font-size:var(--text-sm);color:var(--text-secondary);padding-bottom:8px">Détecté : <strong>${escapeHtml(data.supplier_name)}</strong></div>` : ''}
-      ${data.date ? `<div style="font-size:var(--text-sm);color:var(--text-secondary);padding-bottom:8px">Date : ${escapeHtml(data.date)}</div>` : ''}
+      ${data.date ? `<div style="font-size:var(--text-sm);color:var(--text-secondary);padding-bottom:8px">Date : ${new Date(data.date).toLocaleDateString('fr-FR')}</div>` : ''}
     </div>
 
     <!-- Items table -->

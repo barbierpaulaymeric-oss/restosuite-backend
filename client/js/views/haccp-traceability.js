@@ -158,24 +158,33 @@ function setupTraceEvents() {
   });
 }
 
-function showReceptionModal() {
+async function showReceptionModal() {
   const existing = document.querySelector('.modal-overlay');
   if (existing) existing.remove();
   const account = getAccount();
+
+  // Fetch existing suppliers for the dropdown
+  let suppliers = [];
+  try { suppliers = await API.getSuppliers(); } catch (e) { /* ignore */ }
+
+  const supplierOptions = suppliers.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal" style="max-width:560px">
-      <h2 id="modal-reception-title"><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Réception marchandise</h2>
+      <h2 id="modal-reception-title"><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Saisie manuelle — Réception marchandise</h2>
       <div class="form-group">
-        <label for="rec-product">Produit *</label>
+        <label for="rec-product">Produit * <span style="font-size:var(--text-xs);color:var(--text-tertiary)">(nom libre)</span></label>
         <input type="text" class="form-control" id="rec-product" placeholder="ex: Filet de bœuf" autofocus required aria-required="true">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label for="rec-supplier">Fournisseur</label>
-          <input type="text" class="form-control" id="rec-supplier" placeholder="ex: Metro">
+          <div style="position:relative">
+            <input type="text" class="form-control" id="rec-supplier" placeholder="Saisir ou choisir…" list="rec-supplier-list" autocomplete="off">
+            <datalist id="rec-supplier-list">${supplierOptions}</datalist>
+          </div>
         </div>
         <div class="form-group">
           <label for="rec-batch">N° de lot</label>
@@ -242,6 +251,19 @@ function showReceptionModal() {
         </select>
       </div>
       <div class="form-group">
+        <label style="font-weight:600;margin-bottom:var(--space-2);display:block">Conformité globale *</label>
+        <div style="display:flex;gap:var(--space-3)">
+          <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:2px solid var(--border-default);flex:1;justify-content:center;font-weight:500" id="rec-conforme-label">
+            <input type="radio" name="rec-conformite" id="rec-conforme" value="conforme" style="accent-color:var(--color-success)" checked>
+            <span style="color:var(--color-success)">✓ Conforme</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:2px solid var(--border-default);flex:1;justify-content:center;font-weight:500" id="rec-nonconforme-label">
+            <input type="radio" name="rec-conformite" id="rec-nonconforme" value="non-conforme" style="accent-color:var(--color-danger)">
+            <span style="color:var(--color-danger)">✗ Non conforme</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-group">
         <label for="rec-notes">Notes</label>
         <input type="text" class="form-control" id="rec-notes" placeholder="ex: Remarque complémentaire">
       </div>
@@ -256,6 +278,27 @@ function showReceptionModal() {
 
   document.body.appendChild(overlay);
   if (window.lucide) lucide.createIcons();
+
+  // Conformity radio visual feedback
+  overlay.querySelectorAll('input[name="rec-conformite"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const labelC = document.getElementById('rec-conforme-label');
+      const labelNC = document.getElementById('rec-nonconforme-label');
+      if (document.getElementById('rec-conforme').checked) {
+        labelC.style.borderColor = 'var(--color-success)';
+        labelC.style.background = 'rgba(34,197,94,0.08)';
+        labelNC.style.borderColor = 'var(--border-default)';
+        labelNC.style.background = '';
+      } else {
+        labelNC.style.borderColor = 'var(--color-danger)';
+        labelNC.style.background = 'rgba(220,38,38,0.08)';
+        labelC.style.borderColor = 'var(--border-default)';
+        labelC.style.background = '';
+      }
+    });
+    // Init state
+    if (radio.checked) radio.dispatchEvent(new Event('change'));
+  });
 
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   document.getElementById('rec-cancel').addEventListener('click', () => overlay.remove());
@@ -277,6 +320,7 @@ function showReceptionModal() {
       unit: document.getElementById('rec-unit').value,
       etat_emballage: document.getElementById('rec-emballage').value || null,
       conformite_organoleptique: document.getElementById('rec-organo').value || null,
+      conformite_globale: document.querySelector('input[name="rec-conformite"]:checked')?.value || 'conforme',
       received_by: account ? account.id : null,
       notes: document.getElementById('rec-notes').value.trim() || null,
     };

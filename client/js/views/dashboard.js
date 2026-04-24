@@ -51,6 +51,48 @@ async function renderOnboardingChecklist() {
   }
 }
 
+// ─── Nav orientation guide ───
+function renderNavGuide() {
+  const container = document.getElementById('dashboard-nav-guide');
+  if (!container) return;
+  const FLAG = 'restosuite_nav_guide_v1_dismissed';
+  if (localStorage.getItem(FLAG)) return;
+
+  container.innerHTML = `
+    <div role="note" aria-label="Guide de navigation" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);position:relative">
+      <button id="dismiss-nav-guide" aria-label="Fermer le guide de navigation"
+        style="position:absolute;top:var(--space-3);right:var(--space-3);background:none;border:none;cursor:pointer;color:var(--text-tertiary);font-size:1.1rem;padding:4px 8px;border-radius:var(--radius-sm);line-height:1">✕</button>
+      <h4 style="margin:0 0 var(--space-3) 0;font-size:var(--text-sm);font-weight:700;display:flex;align-items:center;gap:var(--space-2)">
+        <i data-lucide="map" style="width:16px;height:16px;color:var(--color-accent)" aria-hidden="true"></i>
+        Comment naviguer dans RestoSuite
+      </h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--space-3)">
+        <div style="display:flex;gap:var(--space-2);align-items:flex-start">
+          <i data-lucide="utensils" style="width:18px;height:18px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
+          <div><strong style="font-size:var(--text-sm)">Cuisine</strong><p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Recettes, ingrédients, stock et réceptions</p></div>
+        </div>
+        <div style="display:flex;gap:var(--space-2);align-items:flex-start">
+          <i data-lucide="clipboard-pen" style="width:18px;height:18px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
+          <div><strong style="font-size:var(--text-sm)">Opérations</strong><p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Fournisseurs, livraisons et service en salle</p></div>
+        </div>
+        <div style="display:flex;gap:var(--space-2);align-items:flex-start">
+          <i data-lucide="shield-check" style="width:18px;height:18px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
+          <div><strong style="font-size:var(--text-sm)">HACCP</strong><p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Conformité, traçabilité et hygiène</p></div>
+        </div>
+        <div style="display:flex;gap:var(--space-2);align-items:flex-start">
+          <i data-lucide="bar-chart-3" style="width:18px;height:18px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
+          <div><strong style="font-size:var(--text-sm)">Pilotage</strong><p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Stats, food cost, menu engineering</p></div>
+        </div>
+      </div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons({ nodes: [container] });
+  document.getElementById('dismiss-nav-guide')?.addEventListener('click', () => {
+    localStorage.setItem(FLAG, '1');
+    container.innerHTML = '';
+  });
+}
+
 async function renderDashboard() {
   const app = document.getElementById('app');
   const perms = getPermissions();
@@ -66,6 +108,7 @@ async function renderDashboard() {
       </div>
     </header>
 
+    <div id="dashboard-nav-guide"></div>
     <div id="dashboard-onboarding"></div>
     <div id="dashboard-summary" role="region" aria-label="Résumé du jour" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
 
@@ -207,6 +250,9 @@ async function renderDashboard() {
     });
   });
 
+  // Nav orientation guide (dismissible, shown once per major version)
+  renderNavGuide();
+
   // Onboarding checklist (shown until all 4 steps complete)
   renderOnboardingChecklist();
 
@@ -256,21 +302,25 @@ async function renderDashboard() {
 // ═══════════════════════════════════════════
 // AI Suggestions Card
 // ═══════════════════════════════════════════
-async function loadAISuggestions() {
+const AI_SUGGESTIONS_CACHE_KEY = 'restosuite_suggestions_cache';
+const AI_SUGGESTIONS_TTL = 12 * 60 * 60 * 1000; // 12h
+
+async function loadAISuggestions(forceRefresh = false) {
   const container = document.getElementById('ai-suggestions-container');
   if (!container) return;
 
-  // Check cache first (24h TTL)
-  const cacheKey = 'restosuite_suggestions_cache';
-  const cached = localStorage.getItem(cacheKey);
-  if (cached) {
-    try {
-      const { data, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < 12 * 60 * 60 * 1000) {
-        renderAISuggestions(container, data);
-        return;
-      }
-    } catch (e) { /* invalid cache */ }
+  // Check cache first unless force-refresh
+  if (!forceRefresh) {
+    const cached = localStorage.getItem(AI_SUGGESTIONS_CACHE_KEY);
+    if (cached) {
+      try {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < AI_SUGGESTIONS_TTL) {
+          renderAISuggestions(container, data);
+          return;
+        }
+      } catch (e) { /* invalid cache, refetch */ }
+    }
   }
 
   // Show loading state
@@ -282,14 +332,33 @@ async function loadAISuggestions() {
       <p class="text-secondary text-sm" role="status" aria-live="polite" style="text-align:center;padding:var(--space-4)">Analyse en cours…</p>
     </div>
   `;
+  if (window.lucide) lucide.createIcons({ nodes: [container] });
 
   try {
     const data = await API.request('/ai/menu-suggestions');
     if (data.error) throw new Error(data.error);
-    localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+    if (!data.fallback) {
+      localStorage.setItem(AI_SUGGESTIONS_CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+    }
     renderAISuggestions(container, data);
   } catch (e) {
-    container.innerHTML = '';
+    // Show a minimal error state rather than hiding the section entirely
+    container.innerHTML = `
+      <section role="region" aria-labelledby="ai-suggestions-heading" style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
+          <h3 id="ai-suggestions-heading" style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Suggestions IA</h3>
+          <button id="btn-refresh-ai" class="btn btn-ghost btn-sm" aria-label="Réessayer les suggestions IA" style="font-size:var(--text-xs)">
+            <i data-lucide="refresh-cw" style="width:14px;height:14px" aria-hidden="true"></i> Réessayer
+          </button>
+        </div>
+        <p class="text-secondary text-sm" style="text-align:center;padding:var(--space-2)">Suggestions temporairement indisponibles.</p>
+      </section>
+    `;
+    if (window.lucide) lucide.createIcons({ nodes: [container] });
+    document.getElementById('btn-refresh-ai')?.addEventListener('click', () => {
+      localStorage.removeItem(AI_SUGGESTIONS_CACHE_KEY);
+      loadAISuggestions(true);
+    });
   }
 }
 
@@ -297,6 +366,29 @@ function renderAISuggestions(container, data) {
   const topItems = data.top_profitable || data.top_margin || [];
   const improveItems = data.to_improve || [];
   const daily = data.daily_special || null;
+
+  // Show fallback message when no AI data (missing recipe costs etc.)
+  if (data.fallback && data.message && topItems.length === 0 && improveItems.length === 0 && !daily) {
+    container.innerHTML = `
+      <section role="region" aria-labelledby="ai-suggestions-heading" style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
+          <h3 id="ai-suggestions-heading" style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Suggestions IA</h3>
+          <button id="btn-refresh-ai" class="btn btn-ghost btn-sm" aria-label="Actualiser les suggestions IA" style="font-size:var(--text-xs)">
+            <i data-lucide="refresh-cw" style="width:14px;height:14px" aria-hidden="true"></i> Actualiser
+          </button>
+        </div>
+        <div style="background:var(--bg-sunken);border-radius:var(--radius-md);padding:var(--space-3);font-size:var(--text-sm);color:var(--text-secondary)">
+          <i data-lucide="info" style="width:16px;height:16px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>${escapeHtml(data.message)}
+        </div>
+      </section>
+    `;
+    if (window.lucide) lucide.createIcons({ nodes: [container] });
+    document.getElementById('btn-refresh-ai')?.addEventListener('click', () => {
+      localStorage.removeItem(AI_SUGGESTIONS_CACHE_KEY);
+      loadAISuggestions(true);
+    });
+    return;
+  }
 
   if (topItems.length === 0 && improveItems.length === 0 && !daily) {
     container.innerHTML = '';
@@ -312,7 +404,7 @@ function renderAISuggestions(container, data) {
           <div style="padding:6px 0;border-bottom:1px solid var(--color-border)">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(item.name)}</span>
-              <span class="badge badge--success" style="font-size:11px" aria-label="Food cost ${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : 'inconnu')}%">${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : '?')}%</span>
+              <span class="badge badge--success" style="font-size:11px">${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : '?')}%</span>
             </div>
             <p class="text-secondary" style="font-size:12px;margin-top:2px">${escapeHtml(item.reason || '')}</p>
           </div>
@@ -330,7 +422,7 @@ function renderAISuggestions(container, data) {
           <div style="padding:6px 0;border-bottom:1px solid var(--color-border)">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(item.name)}</span>
-              <span class="badge badge--danger" style="font-size:11px" aria-label="Food cost ${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : 'inconnu')}%">${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : '?')}%</span>
+              <span class="badge badge--danger" style="font-size:11px">${item.food_cost_pct != null ? item.food_cost_pct : (item.food_cost_percent != null ? item.food_cost_percent : '?')}%</span>
             </div>
             <p class="text-secondary" style="font-size:12px;margin-top:2px">${escapeHtml(item.suggestion || '')}</p>
           </div>
@@ -340,13 +432,17 @@ function renderAISuggestions(container, data) {
   }
 
   let dailyHtml = '';
-  if (daily && daily.name) {
+  if (daily && daily.name && daily.name !== 'Suggestion non disponible') {
     dailyHtml = `
       <div>
         <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-accent)"><span aria-hidden="true">⭐</span> Suggestion plat du jour</h4>
-        <div style="background:rgba(232,114,42,0.1);border-radius:var(--radius-md);padding:var(--space-3)">
-          <strong>${escapeHtml(daily.name)}</strong>
+        <div style="background:rgba(196,90,24,0.08);border-radius:var(--radius-md);padding:var(--space-3);border-left:3px solid var(--color-accent)">
+          <strong style="font-size:var(--text-base)">${escapeHtml(daily.name)}</strong>
           <p class="text-secondary" style="font-size:12px;margin-top:4px">${escapeHtml(daily.description || daily.reason || '')}</p>
+          ${daily.key_ingredients && daily.key_ingredients.length > 0 ? `
+            <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
+              ${daily.key_ingredients.map(ing => `<span style="font-size:11px;background:var(--bg-sunken);padding:2px 6px;border-radius:var(--radius-full);color:var(--text-secondary)">${escapeHtml(ing)}</span>`).join('')}
+            </div>` : ''}
         </div>
       </div>
     `;
@@ -354,12 +450,20 @@ function renderAISuggestions(container, data) {
 
   container.innerHTML = `
     <section role="region" aria-labelledby="ai-suggestions-heading" style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
-      <div style="margin-bottom:var(--space-3)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
         <h3 id="ai-suggestions-heading" style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Suggestions IA</h3>
+        <button id="btn-refresh-ai" class="btn btn-ghost btn-sm" aria-label="Actualiser les suggestions IA" style="font-size:var(--text-xs)" title="Actualiser (cache 12h)">
+          <i data-lucide="refresh-cw" style="width:14px;height:14px" aria-hidden="true"></i>
+        </button>
       </div>
       ${topHtml}${improveHtml}${dailyHtml}
     </section>
   `;
+  if (window.lucide) lucide.createIcons({ nodes: [container] });
+  document.getElementById('btn-refresh-ai')?.addEventListener('click', () => {
+    localStorage.removeItem(AI_SUGGESTIONS_CACHE_KEY);
+    loadAISuggestions(true);
+  });
 }
 
 // ═══════════════════════════════════════════

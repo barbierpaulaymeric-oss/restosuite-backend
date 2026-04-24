@@ -126,7 +126,7 @@ function renderScanResults(data) {
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-2)">
       <div><strong>Fournisseur :</strong> ${escapeHtml(data.supplier_name || '—')}</div>
       <div><strong>N° Facture :</strong> ${escapeHtml(data.invoice_number || '—')}</div>
-      <div><strong>Date :</strong> ${escapeHtml(data.invoice_date || '—')}</div>
+      <div><strong>Date :</strong> ${data.invoice_date ? new Date(data.invoice_date).toLocaleDateString('fr-FR') : '—'}</div>
     </div>
   `;
 
