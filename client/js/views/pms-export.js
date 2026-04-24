@@ -88,7 +88,7 @@ function renderPMSShell() {
           ${d.pms_audits && d.pms_audits.items && d.pms_audits.items.length > 0 ? `
           <div class="pms-cover__last-audit">
             Dernier audit interne :
-            <strong>${escapeHtml(d.pms_audits.items[0].audit_date)}</strong>
+            <strong>${fmtDate(d.pms_audits.items[0].audit_date)}</strong>
             ${d.pms_audits.items[0].overall_score != null ? ` — Score : <strong>${d.pms_audits.items[0].overall_score}/100</strong>` : ''}
           </div>
           ` : ''}
@@ -249,7 +249,7 @@ function renderPMSSection1(d) {
               <tr><th>Gérant</th><td>${escapeHtml(r.gerant_name || '—')}</td></tr>
               <tr><th>Email gérant</th><td>${escapeHtml(r.gerant_email || '—')}</td></tr>
               ${s.sanitary_approval_number ? `<tr><th>N° agrément</th><td>${escapeHtml(s.sanitary_approval_number)}</td></tr>` : ''}
-              ${s.sanitary_approval_date ? `<tr><th>Date agrément</th><td>${escapeHtml(s.sanitary_approval_date)}</td></tr>` : ''}
+              ${s.sanitary_approval_date ? `<tr><th>Date agrément</th><td>${fmtDate(s.sanitary_approval_date)}</td></tr>` : ''}
               ${s.sanitary_approval_type ? `<tr><th>Type agrément</th><td>${escapeHtml(s.sanitary_approval_type)}</td></tr>` : ''}
               ${s.activity_type ? `<tr><th>Activité</th><td>${escapeHtml(s.activity_type)}</td></tr>` : ''}
               ${s.dd_pp_office ? `<tr><th>DDPP</th><td>${escapeHtml(s.dd_pp_office)}</td></tr>` : ''}
@@ -615,7 +615,7 @@ function renderPMSSection7(d) {
           <thead><tr><th>Date</th><th>Produit</th><th>N° lot</th><th>Destination</th><th>Type</th><th>Qté</th><th>T° dispatch</th><th>Responsable</th></tr></thead>
           <tbody>
             ${downstream.slice(0, 40).map(r => `<tr>
-              <td style="white-space:nowrap">${escapeHtml(r.dispatch_date)}</td>
+              <td style="white-space:nowrap">${fmtDate(r.dispatch_date)}</td>
               <td>${escapeHtml(r.product_name)}</td>
               <td>${escapeHtml(r.batch_number || '—')}</td>
               <td>${escapeHtml(r.destination_name || '—')}</td>
@@ -691,7 +691,7 @@ function renderPMSSection9(d) {
           <div class="pms-kpi"><span class="pms-kpi__val">${visits.length}</span><span class="pms-kpi__lbl">Visites totales</span></div>
           <div class="pms-kpi pms-kpi--ok"><span class="pms-kpi__val">${compliant_count}</span><span class="pms-kpi__lbl">Conformes</span></div>
           <div class="pms-kpi ${visits.length - compliant_count > 0 ? 'pms-kpi--warning' : 'pms-kpi'}"><span class="pms-kpi__val">${visits.length - compliant_count}</span><span class="pms-kpi__lbl">Actions requises</span></div>
-          ${last_visit ? `<div class="pms-kpi pms-kpi--info"><span class="pms-kpi__val">${escapeHtml(last_visit.visit_date)}</span><span class="pms-kpi__lbl">Dernière visite</span></div>` : ''}
+          ${last_visit ? `<div class="pms-kpi pms-kpi--info"><span class="pms-kpi__val">${fmtDate(last_visit.visit_date)}</span><span class="pms-kpi__lbl">Dernière visite</span></div>` : ''}
         </div>
         ${visits.length === 0 ? '<p class="pms-empty">Aucune visite enregistrée.</p>' : `
         <table class="pms-table">

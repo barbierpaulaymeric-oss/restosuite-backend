@@ -18,6 +18,7 @@ const ROUTE_ROLES = {
   '/haccp': ['gerant', 'cuisinier'],
   '/haccp/': ['gerant', 'cuisinier'],
   '/haccp/ma-journee': ['gerant', 'cuisinier'],
+  '/haccp/reception': ['gerant', 'cuisinier'],
   '/haccp/calibrations': ['gerant', 'cuisinier'],
   '/suppliers': ['gerant'],
   '/ia': ['gerant', 'cuisinier', 'equipier'],

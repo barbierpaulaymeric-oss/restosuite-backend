@@ -1113,6 +1113,46 @@ async function renderOnboardingChecklist() {
     if (container) container.innerHTML = "";
   }
 }
+function renderNavGuide() {
+  var _a;
+  const container = document.getElementById("dashboard-nav-guide");
+  if (!container) return;
+  const FLAG = "restosuite_nav_guide_v1_dismissed";
+  if (localStorage.getItem(FLAG)) return;
+  container.innerHTML = `
+    <div role="note" aria-label="Guide de navigation" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);position:relative">
+      <button id="dismiss-nav-guide" aria-label="Fermer le guide de navigation"
+        style="position:absolute;top:var(--space-3);right:var(--space-3);background:none;border:none;cursor:pointer;color:var(--text-tertiary);font-size:1.1rem;padding:4px 8px;border-radius:var(--radius-sm);line-height:1">\u2715</button>
+      <h4 style="margin:0 0 var(--space-3) 0;font-size:var(--text-sm);font-weight:700;display:flex;align-items:center;gap:var(--space-2)">
+        <i data-lucide="map" style="width:16px;height:16px;color:var(--color-accent)" aria-hidden="true"></i>
+        Comment naviguer dans RestoSuite
+      </h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--space-3)">
+        <div style="display:flex;gap:var(--space-2);align-items:flex-start">
+          <i data-lucide="utensils" style="width:18px;height:18px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
+          <div><strong style="font-size:var(--text-sm)">Cuisine</strong><p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Recettes, ingr\xE9dients, stock et r\xE9ceptions</p></div>
+        </div>
+        <div style="display:flex;gap:var(--space-2);align-items:flex-start">
+          <i data-lucide="clipboard-pen" style="width:18px;height:18px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
+          <div><strong style="font-size:var(--text-sm)">Op\xE9rations</strong><p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Fournisseurs, livraisons et service en salle</p></div>
+        </div>
+        <div style="display:flex;gap:var(--space-2);align-items:flex-start">
+          <i data-lucide="shield-check" style="width:18px;height:18px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
+          <div><strong style="font-size:var(--text-sm)">HACCP</strong><p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Conformit\xE9, tra\xE7abilit\xE9 et hygi\xE8ne</p></div>
+        </div>
+        <div style="display:flex;gap:var(--space-2);align-items:flex-start">
+          <i data-lucide="bar-chart-3" style="width:18px;height:18px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
+          <div><strong style="font-size:var(--text-sm)">Pilotage</strong><p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Stats, food cost, menu engineering</p></div>
+        </div>
+      </div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons({ nodes: [container] });
+  (_a = document.getElementById("dismiss-nav-guide")) == null ? void 0 : _a.addEventListener("click", () => {
+    localStorage.setItem(FLAG, "1");
+    container.innerHTML = "";
+  });
+}
 async function renderDashboard() {
   const app = document.getElementById("app");
   const perms = getPermissions();
@@ -1127,6 +1167,7 @@ async function renderDashboard() {
       </div>
     </header>
 
+    <div id="dashboard-nav-guide"></div>
     <div id="dashboard-onboarding"></div>
     <div id="dashboard-summary" role="region" aria-label="R\xE9sum\xE9 du jour" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
 
@@ -1247,6 +1288,7 @@ async function renderDashboard() {
       renderList(searchInput.value, currentTypeFilter);
     });
   });
+  renderNavGuide();
   renderOnboardingChecklist();
   loadAISuggestions();
   try {
@@ -1286,19 +1328,23 @@ async function renderDashboard() {
   } catch (e) {
   }
 }
-async function loadAISuggestions() {
+const AI_SUGGESTIONS_CACHE_KEY = "restosuite_suggestions_cache";
+const AI_SUGGESTIONS_TTL = 12 * 60 * 60 * 1e3;
+async function loadAISuggestions(forceRefresh = false) {
+  var _a;
   const container = document.getElementById("ai-suggestions-container");
   if (!container) return;
-  const cacheKey = "restosuite_suggestions_cache";
-  const cached = localStorage.getItem(cacheKey);
-  if (cached) {
-    try {
-      const { data, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < 12 * 60 * 60 * 1e3) {
-        renderAISuggestions(container, data);
-        return;
+  if (!forceRefresh) {
+    const cached = localStorage.getItem(AI_SUGGESTIONS_CACHE_KEY);
+    if (cached) {
+      try {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < AI_SUGGESTIONS_TTL) {
+          renderAISuggestions(container, data);
+          return;
+        }
+      } catch (e) {
       }
-    } catch (e) {
     }
   }
   container.innerHTML = `
@@ -1309,19 +1355,59 @@ async function loadAISuggestions() {
       <p class="text-secondary text-sm" role="status" aria-live="polite" style="text-align:center;padding:var(--space-4)">Analyse en cours\u2026</p>
     </div>
   `;
+  if (window.lucide) lucide.createIcons({ nodes: [container] });
   try {
     const data = await API.request("/ai/menu-suggestions");
     if (data.error) throw new Error(data.error);
-    localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() }));
+    if (!data.fallback) {
+      localStorage.setItem(AI_SUGGESTIONS_CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+    }
     renderAISuggestions(container, data);
   } catch (e) {
-    container.innerHTML = "";
+    container.innerHTML = `
+      <section role="region" aria-labelledby="ai-suggestions-heading" style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
+          <h3 id="ai-suggestions-heading" style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Suggestions IA</h3>
+          <button id="btn-refresh-ai" class="btn btn-ghost btn-sm" aria-label="R\xE9essayer les suggestions IA" style="font-size:var(--text-xs)">
+            <i data-lucide="refresh-cw" style="width:14px;height:14px" aria-hidden="true"></i> R\xE9essayer
+          </button>
+        </div>
+        <p class="text-secondary text-sm" style="text-align:center;padding:var(--space-2)">Suggestions temporairement indisponibles.</p>
+      </section>
+    `;
+    if (window.lucide) lucide.createIcons({ nodes: [container] });
+    (_a = document.getElementById("btn-refresh-ai")) == null ? void 0 : _a.addEventListener("click", () => {
+      localStorage.removeItem(AI_SUGGESTIONS_CACHE_KEY);
+      loadAISuggestions(true);
+    });
   }
 }
 function renderAISuggestions(container, data) {
+  var _a, _b;
   const topItems = data.top_profitable || data.top_margin || [];
   const improveItems = data.to_improve || [];
   const daily = data.daily_special || null;
+  if (data.fallback && data.message && topItems.length === 0 && improveItems.length === 0 && !daily) {
+    container.innerHTML = `
+      <section role="region" aria-labelledby="ai-suggestions-heading" style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
+          <h3 id="ai-suggestions-heading" style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Suggestions IA</h3>
+          <button id="btn-refresh-ai" class="btn btn-ghost btn-sm" aria-label="Actualiser les suggestions IA" style="font-size:var(--text-xs)">
+            <i data-lucide="refresh-cw" style="width:14px;height:14px" aria-hidden="true"></i> Actualiser
+          </button>
+        </div>
+        <div style="background:var(--bg-sunken);border-radius:var(--radius-md);padding:var(--space-3);font-size:var(--text-sm);color:var(--text-secondary)">
+          <i data-lucide="info" style="width:16px;height:16px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>${escapeHtml(data.message)}
+        </div>
+      </section>
+    `;
+    if (window.lucide) lucide.createIcons({ nodes: [container] });
+    (_a = document.getElementById("btn-refresh-ai")) == null ? void 0 : _a.addEventListener("click", () => {
+      localStorage.removeItem(AI_SUGGESTIONS_CACHE_KEY);
+      loadAISuggestions(true);
+    });
+    return;
+  }
   if (topItems.length === 0 && improveItems.length === 0 && !daily) {
     container.innerHTML = "";
     return;
@@ -1335,7 +1421,7 @@ function renderAISuggestions(container, data) {
           <div style="padding:6px 0;border-bottom:1px solid var(--color-border)">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(item.name)}</span>
-              <span class="badge badge--success" style="font-size:11px" aria-label="Food cost ${item.food_cost_pct != null ? item.food_cost_pct : item.food_cost_percent != null ? item.food_cost_percent : "inconnu"}%">${item.food_cost_pct != null ? item.food_cost_pct : item.food_cost_percent != null ? item.food_cost_percent : "?"}%</span>
+              <span class="badge badge--success" style="font-size:11px">${item.food_cost_pct != null ? item.food_cost_pct : item.food_cost_percent != null ? item.food_cost_percent : "?"}%</span>
             </div>
             <p class="text-secondary" style="font-size:12px;margin-top:2px">${escapeHtml(item.reason || "")}</p>
           </div>
@@ -1352,7 +1438,7 @@ function renderAISuggestions(container, data) {
           <div style="padding:6px 0;border-bottom:1px solid var(--color-border)">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(item.name)}</span>
-              <span class="badge badge--danger" style="font-size:11px" aria-label="Food cost ${item.food_cost_pct != null ? item.food_cost_pct : item.food_cost_percent != null ? item.food_cost_percent : "inconnu"}%">${item.food_cost_pct != null ? item.food_cost_pct : item.food_cost_percent != null ? item.food_cost_percent : "?"}%</span>
+              <span class="badge badge--danger" style="font-size:11px">${item.food_cost_pct != null ? item.food_cost_pct : item.food_cost_percent != null ? item.food_cost_percent : "?"}%</span>
             </div>
             <p class="text-secondary" style="font-size:12px;margin-top:2px">${escapeHtml(item.suggestion || "")}</p>
           </div>
@@ -1361,25 +1447,37 @@ function renderAISuggestions(container, data) {
     `;
   }
   let dailyHtml = "";
-  if (daily && daily.name) {
+  if (daily && daily.name && daily.name !== "Suggestion non disponible") {
     dailyHtml = `
       <div>
         <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-accent)"><span aria-hidden="true">\u2B50</span> Suggestion plat du jour</h4>
-        <div style="background:rgba(232,114,42,0.1);border-radius:var(--radius-md);padding:var(--space-3)">
-          <strong>${escapeHtml(daily.name)}</strong>
+        <div style="background:rgba(196,90,24,0.08);border-radius:var(--radius-md);padding:var(--space-3);border-left:3px solid var(--color-accent)">
+          <strong style="font-size:var(--text-base)">${escapeHtml(daily.name)}</strong>
           <p class="text-secondary" style="font-size:12px;margin-top:4px">${escapeHtml(daily.description || daily.reason || "")}</p>
+          ${daily.key_ingredients && daily.key_ingredients.length > 0 ? `
+            <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
+              ${daily.key_ingredients.map((ing) => `<span style="font-size:11px;background:var(--bg-sunken);padding:2px 6px;border-radius:var(--radius-full);color:var(--text-secondary)">${escapeHtml(ing)}</span>`).join("")}
+            </div>` : ""}
         </div>
       </div>
     `;
   }
   container.innerHTML = `
     <section role="region" aria-labelledby="ai-suggestions-heading" style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);border:1px solid var(--color-border)">
-      <div style="margin-bottom:var(--space-3)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
         <h3 id="ai-suggestions-heading" style="margin:0"><i data-lucide="lightbulb" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Suggestions IA</h3>
+        <button id="btn-refresh-ai" class="btn btn-ghost btn-sm" aria-label="Actualiser les suggestions IA" style="font-size:var(--text-xs)" title="Actualiser (cache 12h)">
+          <i data-lucide="refresh-cw" style="width:14px;height:14px" aria-hidden="true"></i>
+        </button>
       </div>
       ${topHtml}${improveHtml}${dailyHtml}
     </section>
   `;
+  if (window.lucide) lucide.createIcons({ nodes: [container] });
+  (_b = document.getElementById("btn-refresh-ai")) == null ? void 0 : _b.addEventListener("click", () => {
+    localStorage.removeItem(AI_SUGGESTIONS_CACHE_KEY);
+    loadAISuggestions(true);
+  });
 }
 function getGreeting(name) {
   const hour = (/* @__PURE__ */ new Date()).getHours();
@@ -4347,6 +4445,278 @@ async function renderHACCPMaJournee() {
     app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(e.message)}</p></div>`;
   }
 }
+async function renderHACCPReception() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  let suppliers = [];
+  try {
+    suppliers = await API.getSuppliers();
+  } catch (e) {
+  }
+  const CATEGORIES = [
+    { value: "", label: "\u2014 Cat\xE9gorie produit \u2014" },
+    { value: "viande", label: "Viande fra\xEEche" },
+    { value: "volaille", label: "Volaille" },
+    { value: "poisson", label: "Poisson / Fruits de mer" },
+    { value: "surgele", label: "Surgel\xE9" },
+    { value: "laitier", label: "Produit laitier" },
+    { value: "ovo", label: "Ovoproduit" },
+    { value: "charcuterie", label: "Charcuterie" },
+    { value: "traiteur", label: "Plat traiteur" },
+    { value: "legume", label: "L\xE9gume / Fruit frais" },
+    { value: "sec", label: "\xC9picerie s\xE8che" },
+    { value: "autre", label: "Autre" }
+  ];
+  app.innerHTML = `
+    <section role="region" aria-label="R\xE9ception marchandise HACCP">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <a href="#/haccp">HACCP</a>
+        <span class="breadcrumb-sep" aria-hidden="true">\u203A</span>
+        <span class="breadcrumb-current">R\xE9ception manuelle</span>
+      </nav>
+      <div class="view-header">
+        <div style="display:flex;align-items:center;gap:var(--space-3)">
+          <a href="#/haccp" aria-label="Retour HACCP" style="color:var(--text-secondary);text-decoration:none;font-size:1.5rem">\u2190</a>
+          <div>
+            <h1><i data-lucide="package-check" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>R\xE9ception marchandise</h1>
+            <p class="text-secondary">Saisie manuelle CCP1 \u2014 contr\xF4le temp\xE9rature \xE0 r\xE9ception</p>
+          </div>
+        </div>
+      </div>
+
+      <form id="reception-form" onsubmit="return false;" style="max-width:720px">
+        <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-4)">
+          <div class="form-group">
+            <label class="form-label" for="rec-supplier">Fournisseur</label>
+            <select id="rec-supplier" class="input" aria-required="true">
+              <option value="">\u2014 S\xE9lectionner \u2014</option>
+              ${suppliers.map((s) => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join("")}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="rec-bl">N\xB0 bon de livraison</label>
+            <input type="text" id="rec-bl" class="input" placeholder="BL-2024-001" autocomplete="off">
+          </div>
+        </div>
+
+        <div style="margin-bottom:var(--space-4)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2)">
+            <label class="form-label" style="margin:0">Produits re\xE7us</label>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-add-product" aria-label="Ajouter un produit">
+              <i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i> Ajouter produit
+            </button>
+          </div>
+          <div id="products-list" role="list" aria-label="Liste des produits"></div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:var(--space-4)">
+          <label class="form-label" for="rec-notes">Observations g\xE9n\xE9rales</label>
+          <textarea id="rec-notes" class="input" rows="3" placeholder="Emballages intacts, temp\xE9ratures conformes\u2026" style="resize:vertical"></textarea>
+        </div>
+
+        <button type="button" class="btn btn-accent btn-lg" id="btn-submit-reception" style="width:100%" disabled>
+          <i data-lucide="check-circle" style="width:18px;height:18px;margin-right:6px" aria-hidden="true"></i>
+          Valider la r\xE9ception
+        </button>
+      </form>
+
+      <div style="margin-top:var(--space-6);max-width:720px">
+        <h2 style="font-size:var(--text-base);margin-bottom:var(--space-3)">R\xE9ceptions r\xE9centes</h2>
+        <div id="reception-history"></div>
+      </div>
+    </section>
+  `;
+  if (window.lucide) lucide.createIcons({ nodes: [app] });
+  let productCount = 0;
+  function addProductRow() {
+    productCount++;
+    const id = productCount;
+    const row = document.createElement("div");
+    row.className = "reception-product-row";
+    row.dataset.id = id;
+    row.setAttribute("role", "listitem");
+    row.style.cssText = "background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-2);position:relative";
+    row.innerHTML = `
+      <button type="button" class="btn-remove-product" data-id="${id}" aria-label="Supprimer ce produit"
+        style="position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;color:var(--text-tertiary);font-size:18px;line-height:1;padding:4px">\xD7</button>
+      <div style="display:grid;grid-template-columns:2fr 1fr 80px 100px;gap:var(--space-2);margin-bottom:var(--space-2)">
+        <div class="form-group" style="margin:0">
+          <label class="form-label" for="prod-name-${id}" style="font-size:11px">D\xE9signation *</label>
+          <input type="text" id="prod-name-${id}" class="input prod-name" placeholder="Ex: Escalope de poulet" required autocomplete="off" style="font-size:var(--text-sm)">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label" for="prod-qty-${id}" style="font-size:11px">Quantit\xE9</label>
+          <input type="number" id="prod-qty-${id}" class="input prod-qty" placeholder="5" min="0" step="any" style="font-size:var(--text-sm)">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label" for="prod-unit-${id}" style="font-size:11px">Unit\xE9</label>
+          <select id="prod-unit-${id}" class="input prod-unit" style="font-size:var(--text-sm)">
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+            <option value="l">L</option>
+            <option value="pcs">pcs</option>
+            <option value="bte">bte</option>
+            <option value="carton">carton</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label" for="prod-temp-${id}" style="font-size:11px">Temp. (\xB0C) *</label>
+          <input type="number" id="prod-temp-${id}" class="input prod-temp" placeholder="4" step="0.1" style="font-size:var(--text-sm)">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-2)">
+        <div class="form-group" style="margin:0">
+          <label class="form-label" for="prod-cat-${id}" style="font-size:11px">Cat\xE9gorie</label>
+          <select id="prod-cat-${id}" class="input prod-cat" style="font-size:var(--text-sm)">
+            ${CATEGORIES.map((c) => `<option value="${c.value}">${escapeHtml(c.label)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label" for="prod-lot-${id}" style="font-size:11px">N\xB0 lot</label>
+          <input type="text" id="prod-lot-${id}" class="input prod-lot" placeholder="LOT-240001" autocomplete="off" style="font-size:var(--text-sm)">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label" for="prod-dlc-${id}" style="font-size:11px">DLC / DDM</label>
+          <input type="date" id="prod-dlc-${id}" class="input prod-dlc" lang="fr" style="font-size:var(--text-sm)">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-2)">
+        <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm)">
+          <input type="checkbox" id="prod-conform-${id}" class="prod-conform" checked style="width:18px;height:18px;cursor:pointer" aria-label="Produit conforme">
+          <span>Conforme</span>
+        </label>
+        <span id="prod-temp-badge-${id}" class="badge" style="font-size:11px"></span>
+      </div>
+    `;
+    document.getElementById("products-list").appendChild(row);
+    const tempInput = row.querySelector(".prod-temp");
+    const badge = row.querySelector(`#prod-temp-badge-${id}`);
+    tempInput.addEventListener("input", () => {
+      const v = parseFloat(tempInput.value);
+      if (isNaN(v)) {
+        badge.textContent = "";
+        badge.className = "badge";
+        return;
+      }
+      if (v <= 4) {
+        badge.textContent = `${v}\xB0C \u2713`;
+        badge.className = "badge badge--success";
+      } else if (v <= 8) {
+        badge.textContent = `${v}\xB0C \u26A0\uFE0F`;
+        badge.className = "badge badge--warning";
+      } else {
+        badge.textContent = `${v}\xB0C \u2717`;
+        badge.className = "badge badge--danger";
+      }
+    });
+    row.querySelector(".btn-remove-product").addEventListener("click", () => {
+      row.remove();
+      updateSubmitState();
+    });
+    updateSubmitState();
+  }
+  function updateSubmitState() {
+    const hasProducts = document.querySelectorAll("#products-list .reception-product-row").length > 0;
+    document.getElementById("btn-submit-reception").disabled = !hasProducts;
+  }
+  document.getElementById("btn-add-product").addEventListener("click", addProductRow);
+  addProductRow();
+  document.getElementById("btn-submit-reception").addEventListener("click", async () => {
+    const supplier = document.getElementById("rec-supplier").value.trim();
+    const bl = document.getElementById("rec-bl").value.trim();
+    const notes = document.getElementById("rec-notes").value.trim();
+    const rows = document.querySelectorAll("#products-list .reception-product-row");
+    if (!rows.length) {
+      showToast("Ajoutez au moins un produit", "error");
+      return;
+    }
+    const btn = document.getElementById("btn-submit-reception");
+    btn.disabled = true;
+    btn.textContent = "Enregistrement\u2026";
+    const account = getAccount();
+    let errors = 0;
+    for (const row of rows) {
+      const id = row.dataset.id;
+      const name = row.querySelector(".prod-name").value.trim();
+      const temp = parseFloat(row.querySelector(".prod-temp").value);
+      if (!name) {
+        errors++;
+        continue;
+      }
+      const payload = {
+        product_name: name,
+        supplier: supplier || null,
+        batch_number: row.querySelector(".prod-lot").value.trim() || null,
+        dlc: row.querySelector(".prod-dlc").value || null,
+        temperature_at_reception: isNaN(temp) ? null : temp,
+        quantity: parseFloat(row.querySelector(".prod-qty").value) || null,
+        unit: row.querySelector(".prod-unit").value,
+        product_category: row.querySelector(".prod-cat").value || null,
+        conformite_organoleptique: row.querySelector(".prod-conform").checked ? 1 : 0,
+        numero_bl: bl || null,
+        received_by: account ? account.name : null,
+        notes: notes || null
+      };
+      try {
+        await API.request("/haccp/traceability-log", { method: "POST", body: JSON.stringify(payload) });
+      } catch (e) {
+        errors++;
+      }
+    }
+    if (errors > 0) {
+      showToast(`${errors} produit(s) non enregistr\xE9(s)`, "error");
+    } else {
+      showToast("R\xE9ception enregistr\xE9e avec succ\xE8s", "success");
+      document.getElementById("products-list").innerHTML = "";
+      productCount = 0;
+      document.getElementById("rec-supplier").value = "";
+      document.getElementById("rec-bl").value = "";
+      document.getElementById("rec-notes").value = "";
+      addProductRow();
+      loadRecentReceptions();
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="check-circle" style="width:18px;height:18px;margin-right:6px" aria-hidden="true"></i>Valider la r\xE9ception';
+    if (window.lucide) lucide.createIcons({ nodes: [btn] });
+    updateSubmitState();
+  });
+  loadRecentReceptions();
+}
+async function loadRecentReceptions() {
+  const container = document.getElementById("reception-history");
+  if (!container) return;
+  try {
+    const logs = await API.request("/haccp/traceability-logs?limit=10");
+    if (!logs.length) {
+      container.innerHTML = '<p class="text-secondary text-sm">Aucune r\xE9ception enregistr\xE9e.</p>';
+      return;
+    }
+    container.innerHTML = `
+      <div class="haccp-receptions-list">
+        ${logs.map((r) => `
+          <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-2)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(r.product_name)}</span>
+                ${r.supplier ? `<span class="text-secondary" style="font-size:12px;margin-left:8px">${escapeHtml(r.supplier)}</span>` : ""}
+              </div>
+              <div style="display:flex;gap:var(--space-2);align-items:center">
+                ${r.temperature_at_reception != null ? `
+                  <span class="badge ${r.temperature_at_reception <= 4 ? "badge--success" : r.temperature_at_reception <= 8 ? "badge--warning" : "badge--danger"}" style="font-size:11px">
+                    ${r.temperature_at_reception}\xB0C
+                  </span>` : ""}
+                <span class="text-secondary" style="font-size:11px">${new Date(r.created_at).toLocaleDateString("fr-FR")}</span>
+              </div>
+            </div>
+            ${r.batch_number ? `<div class="text-secondary" style="font-size:11px;margin-top:4px">Lot : ${escapeHtml(r.batch_number)}${r.dlc ? ` \xB7 DLC : ${new Date(r.dlc).toLocaleDateString("fr-FR")}` : ""}</div>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    `;
+  } catch (e) {
+    container.innerHTML = '<p class="text-secondary text-sm">Erreur de chargement.</p>';
+  }
+}
 async function renderHACCPTemperatures() {
   const app = document.getElementById("app");
   app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
@@ -4366,9 +4736,14 @@ async function renderHACCPTemperatures() {
         </nav>
         <div class="page-header">
           <h1><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Temp\xE9ratures</h1>
-          <button class="btn btn-primary" id="btn-new-temp" aria-label="Cr\xE9er un nouveau relev\xE9 de temp\xE9rature">
-            <i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouveau relev\xE9
-          </button>
+          <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+            <button class="btn btn-secondary" id="btn-batch-temp" aria-label="Saisie group\xE9e de temp\xE9ratures">
+              <i data-lucide="table" style="width:18px;height:18px" aria-hidden="true"></i> Saisie group\xE9e
+            </button>
+            <button class="btn btn-primary" id="btn-new-temp" aria-label="Cr\xE9er un nouveau relev\xE9 de temp\xE9rature">
+              <i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouveau relev\xE9
+            </button>
+          </div>
         </div>
 
         ${haccpBreadcrumb("temperatures")}
@@ -4465,11 +4840,14 @@ function renderTempRows(logs) {
   }).join("");
 }
 function setupTemperatureEvents(zones) {
-  var _a, _b, _c, _d;
-  (_a = document.getElementById("btn-new-temp")) == null ? void 0 : _a.addEventListener("click", () => {
+  var _a, _b, _c, _d, _e;
+  (_a = document.getElementById("btn-batch-temp")) == null ? void 0 : _a.addEventListener("click", () => {
+    showBatchTempModal(zones);
+  });
+  (_b = document.getElementById("btn-new-temp")) == null ? void 0 : _b.addEventListener("click", () => {
     showNewTempModal(zones);
   });
-  (_b = document.getElementById("btn-filter")) == null ? void 0 : _b.addEventListener("click", async () => {
+  (_c = document.getElementById("btn-filter")) == null ? void 0 : _c.addEventListener("click", async () => {
     const zone_id = document.getElementById("filter-zone").value;
     const date = document.getElementById("filter-date").value;
     const params = {};
@@ -4478,7 +4856,7 @@ function setupTemperatureEvents(zones) {
     const logs = await API.getTemperatures(params);
     document.getElementById("temp-table-body").innerHTML = renderTempRows(logs);
   });
-  (_c = document.getElementById("btn-export-temp")) == null ? void 0 : _c.addEventListener("click", async () => {
+  (_d = document.getElementById("btn-export-temp")) == null ? void 0 : _d.addEventListener("click", async () => {
     const from = document.getElementById("export-from").value;
     const to = document.getElementById("export-to").value;
     try {
@@ -4511,7 +4889,7 @@ function setupTemperatureEvents(zones) {
       return;
     });
   });
-  (_d = document.getElementById("btn-add-zone")) == null ? void 0 : _d.addEventListener("click", () => showZoneModal(null));
+  (_e = document.getElementById("btn-add-zone")) == null ? void 0 : _e.addEventListener("click", () => showZoneModal(null));
 }
 function showNewTempModal(zones) {
   const existing = document.querySelector(".modal-overlay");
@@ -4680,6 +5058,145 @@ function showZoneModal(data) {
     } catch (err) {
       showToast("Erreur : " + err.message, "error");
     }
+  });
+}
+function showBatchTempModal(zones) {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const account = getAccount();
+  if (!zones || zones.length === 0) {
+    showToast("Aucune zone configur\xE9e. Ajoutez une zone d'abord.", "error");
+    return;
+  }
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "batch-temp-title");
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:600px">
+      <h2 id="batch-temp-title"><i data-lucide="table" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Saisie group\xE9e des temp\xE9ratures</h2>
+      <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-4)">Entrez les temp\xE9ratures pour toutes vos zones en une seule fois.</p>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:var(--text-sm)">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border-default)">
+              <th style="text-align:left;padding:var(--space-2) var(--space-3);color:var(--text-secondary)">Zone</th>
+              <th style="text-align:left;padding:var(--space-2) var(--space-3);color:var(--text-secondary)">Plage (\xB0C)</th>
+              <th style="text-align:center;padding:var(--space-2) var(--space-3);color:var(--text-secondary)">Temp\xE9rature relev\xE9e</th>
+              <th style="text-align:center;padding:var(--space-2) var(--space-3);color:var(--text-secondary)">Conformit\xE9</th>
+            </tr>
+          </thead>
+          <tbody id="batch-zone-rows">
+            ${zones.map((z) => `
+              <tr data-zone-id="${z.id}" data-min="${z.min_temp}" data-max="${z.max_temp}" style="border-bottom:1px solid var(--border-light)">
+                <td style="padding:var(--space-2) var(--space-3);font-weight:500">${escapeHtml(z.name)}</td>
+                <td style="padding:var(--space-2) var(--space-3);color:var(--text-tertiary);font-size:var(--text-xs)">${z.min_temp}\xB0 / ${z.max_temp}\xB0</td>
+                <td style="padding:var(--space-2) var(--space-3)">
+                  <input type="number" step="0.1" class="form-control batch-temp-input"
+                    placeholder="ex: 3.5" inputmode="decimal"
+                    style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base);min-height:40px"
+                    aria-label="Temp\xE9rature pour ${escapeHtml(z.name)}">
+                </td>
+                <td style="padding:var(--space-2) var(--space-3);text-align:center">
+                  <span class="batch-conformite" aria-live="polite">\u2014</span>
+                </td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+      <div class="form-group" style="margin-top:var(--space-4)">
+        <label for="batch-notes">Notes communes (optionnel)</label>
+        <input type="text" class="form-control" id="batch-notes" placeholder="ex: Relev\xE9 du matin">
+      </div>
+      <div class="actions-row" style="justify-content:flex-end;margin-top:var(--space-4)">
+        <button class="btn btn-secondary" id="batch-cancel">Annuler</button>
+        <button class="btn btn-primary" id="batch-save" style="min-width:160px">
+          <i data-lucide="check" style="width:18px;height:18px" aria-hidden="true"></i> Enregistrer tout
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.querySelectorAll(".batch-temp-input").forEach((input) => {
+    input.addEventListener("input", () => {
+      const row = input.closest("tr");
+      const min = parseFloat(row.dataset.min);
+      const max = parseFloat(row.dataset.max);
+      const val = parseFloat(input.value);
+      const badge = row.querySelector(".batch-conformite");
+      if (isNaN(val)) {
+        badge.innerHTML = "\u2014";
+        input.style.borderColor = "";
+      } else if (val >= min && val <= max) {
+        badge.innerHTML = '<span class="badge badge--success">\u2713 OK</span>';
+        input.style.borderColor = "var(--color-success)";
+      } else {
+        badge.innerHTML = '<span class="badge badge--danger">\u26A0 ALERTE</span>';
+        input.style.borderColor = "var(--color-danger)";
+      }
+    });
+  });
+  const releaseFocus = trapFocus(overlay);
+  const closeModal = () => {
+    try {
+      releaseFocus();
+    } catch (e) {
+    }
+    overlay.remove();
+  };
+  const escHandler = (e) => {
+    if (e.key === "Escape") {
+      closeModal();
+      document.removeEventListener("keydown", escHandler);
+    }
+  };
+  document.addEventListener("keydown", escHandler);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeModal();
+  });
+  document.getElementById("batch-cancel").addEventListener("click", closeModal);
+  document.getElementById("batch-save").addEventListener("click", async () => {
+    const notes = document.getElementById("batch-notes").value.trim() || null;
+    const rows = overlay.querySelectorAll("#batch-zone-rows tr[data-zone-id]");
+    const entries = [];
+    rows.forEach((row) => {
+      const input = row.querySelector(".batch-temp-input");
+      const temp = parseFloat(input.value);
+      if (!isNaN(temp)) {
+        entries.push({
+          zone_id: Number(row.dataset.zoneId),
+          temperature: temp,
+          notes,
+          recorded_by: account ? account.id : null
+        });
+      }
+    });
+    if (entries.length === 0) {
+      showToast("Veuillez saisir au moins une temp\xE9rature.", "error");
+      return;
+    }
+    const saveBtn = document.getElementById("batch-save");
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Enregistrement...";
+    let saved = 0, failed = 0;
+    for (const entry of entries) {
+      try {
+        await API.recordTemperature(entry);
+        saved++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    closeModal();
+    if (failed === 0) {
+      showToast(`\u2713 ${saved} relev\xE9${saved > 1 ? "s" : ""} enregistr\xE9${saved > 1 ? "s" : ""}`, "success");
+    } else {
+      showToast(`${saved} enregistr\xE9s, ${failed} erreur(s)`, "error");
+    }
+    renderHACCPTemperatures();
   });
 }
 function calibrationStatus(thermo) {
@@ -5486,23 +6003,32 @@ function setupTraceEvents() {
     }
   });
 }
-function showReceptionModal() {
+async function showReceptionModal() {
   const existing = document.querySelector(".modal-overlay");
   if (existing) existing.remove();
   const account = getAccount();
+  let suppliers = [];
+  try {
+    suppliers = await API.getSuppliers();
+  } catch (e) {
+  }
+  const supplierOptions = suppliers.map((s) => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join("");
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal" style="max-width:560px">
-      <h2 id="modal-reception-title"><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>R\xE9ception marchandise</h2>
+      <h2 id="modal-reception-title"><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Saisie manuelle \u2014 R\xE9ception marchandise</h2>
       <div class="form-group">
-        <label for="rec-product">Produit *</label>
+        <label for="rec-product">Produit * <span style="font-size:var(--text-xs);color:var(--text-tertiary)">(nom libre)</span></label>
         <input type="text" class="form-control" id="rec-product" placeholder="ex: Filet de b\u0153uf" autofocus required aria-required="true">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label for="rec-supplier">Fournisseur</label>
-          <input type="text" class="form-control" id="rec-supplier" placeholder="ex: Metro">
+          <div style="position:relative">
+            <input type="text" class="form-control" id="rec-supplier" placeholder="Saisir ou choisir\u2026" list="rec-supplier-list" autocomplete="off">
+            <datalist id="rec-supplier-list">${supplierOptions}</datalist>
+          </div>
         </div>
         <div class="form-group">
           <label for="rec-batch">N\xB0 de lot</label>
@@ -5569,6 +6095,19 @@ function showReceptionModal() {
         </select>
       </div>
       <div class="form-group">
+        <label style="font-weight:600;margin-bottom:var(--space-2);display:block">Conformit\xE9 globale *</label>
+        <div style="display:flex;gap:var(--space-3)">
+          <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:2px solid var(--border-default);flex:1;justify-content:center;font-weight:500" id="rec-conforme-label">
+            <input type="radio" name="rec-conformite" id="rec-conforme" value="conforme" style="accent-color:var(--color-success)" checked>
+            <span style="color:var(--color-success)">\u2713 Conforme</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:2px solid var(--border-default);flex:1;justify-content:center;font-weight:500" id="rec-nonconforme-label">
+            <input type="radio" name="rec-conformite" id="rec-nonconforme" value="non-conforme" style="accent-color:var(--color-danger)">
+            <span style="color:var(--color-danger)">\u2717 Non conforme</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-group">
         <label for="rec-notes">Notes</label>
         <input type="text" class="form-control" id="rec-notes" placeholder="ex: Remarque compl\xE9mentaire">
       </div>
@@ -5582,11 +6121,30 @@ function showReceptionModal() {
   `;
   document.body.appendChild(overlay);
   if (window.lucide) lucide.createIcons();
+  overlay.querySelectorAll('input[name="rec-conformite"]').forEach((radio) => {
+    radio.addEventListener("change", () => {
+      const labelC = document.getElementById("rec-conforme-label");
+      const labelNC = document.getElementById("rec-nonconforme-label");
+      if (document.getElementById("rec-conforme").checked) {
+        labelC.style.borderColor = "var(--color-success)";
+        labelC.style.background = "rgba(34,197,94,0.08)";
+        labelNC.style.borderColor = "var(--border-default)";
+        labelNC.style.background = "";
+      } else {
+        labelNC.style.borderColor = "var(--color-danger)";
+        labelNC.style.background = "rgba(220,38,38,0.08)";
+        labelC.style.borderColor = "var(--border-default)";
+        labelC.style.background = "";
+      }
+    });
+    if (radio.checked) radio.dispatchEvent(new Event("change"));
+  });
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) overlay.remove();
   });
   document.getElementById("rec-cancel").addEventListener("click", () => overlay.remove());
   document.getElementById("rec-save").addEventListener("click", async () => {
+    var _a;
     const product_name = document.getElementById("rec-product").value.trim();
     if (!product_name) {
       document.getElementById("rec-product").classList.add("form-control--error");
@@ -5604,6 +6162,7 @@ function showReceptionModal() {
       unit: document.getElementById("rec-unit").value,
       etat_emballage: document.getElementById("rec-emballage").value || null,
       conformite_organoleptique: document.getElementById("rec-organo").value || null,
+      conformite_globale: ((_a = document.querySelector('input[name="rec-conformite"]:checked')) == null ? void 0 : _a.value) || "conforme",
       received_by: account ? account.id : null,
       notes: document.getElementById("rec-notes").value.trim() || null
     };
@@ -11962,7 +12521,7 @@ function renderPMSShell() {
           ${d.pms_audits && d.pms_audits.items && d.pms_audits.items.length > 0 ? `
           <div class="pms-cover__last-audit">
             Dernier audit interne :
-            <strong>${escapeHtml(d.pms_audits.items[0].audit_date)}</strong>
+            <strong>${fmtDate(d.pms_audits.items[0].audit_date)}</strong>
             ${d.pms_audits.items[0].overall_score != null ? ` \u2014 Score : <strong>${d.pms_audits.items[0].overall_score}/100</strong>` : ""}
           </div>
           ` : ""}
@@ -12111,7 +12670,7 @@ function renderPMSSection1(d) {
               <tr><th>G\xE9rant</th><td>${escapeHtml(r.gerant_name || "\u2014")}</td></tr>
               <tr><th>Email g\xE9rant</th><td>${escapeHtml(r.gerant_email || "\u2014")}</td></tr>
               ${s.sanitary_approval_number ? `<tr><th>N\xB0 agr\xE9ment</th><td>${escapeHtml(s.sanitary_approval_number)}</td></tr>` : ""}
-              ${s.sanitary_approval_date ? `<tr><th>Date agr\xE9ment</th><td>${escapeHtml(s.sanitary_approval_date)}</td></tr>` : ""}
+              ${s.sanitary_approval_date ? `<tr><th>Date agr\xE9ment</th><td>${fmtDate(s.sanitary_approval_date)}</td></tr>` : ""}
               ${s.sanitary_approval_type ? `<tr><th>Type agr\xE9ment</th><td>${escapeHtml(s.sanitary_approval_type)}</td></tr>` : ""}
               ${s.activity_type ? `<tr><th>Activit\xE9</th><td>${escapeHtml(s.activity_type)}</td></tr>` : ""}
               ${s.dd_pp_office ? `<tr><th>DDPP</th><td>${escapeHtml(s.dd_pp_office)}</td></tr>` : ""}
@@ -12467,7 +13026,7 @@ function renderPMSSection7(d) {
           <thead><tr><th>Date</th><th>Produit</th><th>N\xB0 lot</th><th>Destination</th><th>Type</th><th>Qt\xE9</th><th>T\xB0 dispatch</th><th>Responsable</th></tr></thead>
           <tbody>
             ${downstream.slice(0, 40).map((r) => `<tr>
-              <td style="white-space:nowrap">${escapeHtml(r.dispatch_date)}</td>
+              <td style="white-space:nowrap">${fmtDate(r.dispatch_date)}</td>
               <td>${escapeHtml(r.product_name)}</td>
               <td>${escapeHtml(r.batch_number || "\u2014")}</td>
               <td>${escapeHtml(r.destination_name || "\u2014")}</td>
@@ -12541,7 +13100,7 @@ function renderPMSSection9(d) {
           <div class="pms-kpi"><span class="pms-kpi__val">${visits.length}</span><span class="pms-kpi__lbl">Visites totales</span></div>
           <div class="pms-kpi pms-kpi--ok"><span class="pms-kpi__val">${compliant_count}</span><span class="pms-kpi__lbl">Conformes</span></div>
           <div class="pms-kpi ${visits.length - compliant_count > 0 ? "pms-kpi--warning" : "pms-kpi"}"><span class="pms-kpi__val">${visits.length - compliant_count}</span><span class="pms-kpi__lbl">Actions requises</span></div>
-          ${last_visit ? `<div class="pms-kpi pms-kpi--info"><span class="pms-kpi__val">${escapeHtml(last_visit.visit_date)}</span><span class="pms-kpi__lbl">Derni\xE8re visite</span></div>` : ""}
+          ${last_visit ? `<div class="pms-kpi pms-kpi--info"><span class="pms-kpi__val">${fmtDate(last_visit.visit_date)}</span><span class="pms-kpi__lbl">Derni\xE8re visite</span></div>` : ""}
         </div>
         ${visits.length === 0 ? '<p class="pms-empty">Aucune visite enregistr\xE9e.</p>' : `
         <table class="pms-table">
@@ -19815,7 +20374,7 @@ function renderScanResults(data) {
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-2)">
       <div><strong>Fournisseur :</strong> ${escapeHtml(data.supplier_name || "\u2014")}</div>
       <div><strong>N\xB0 Facture :</strong> ${escapeHtml(data.invoice_number || "\u2014")}</div>
-      <div><strong>Date :</strong> ${escapeHtml(data.invoice_date || "\u2014")}</div>
+      <div><strong>Date :</strong> ${data.invoice_date ? new Date(data.invoice_date).toLocaleDateString("fr-FR") : "\u2014"}</div>
     </div>
   `;
   const tbody = document.getElementById("invoice-items");
@@ -20219,7 +20778,7 @@ async function renderMercurialeResults(data) {
         </select>
       </div>
       ${data.supplier_name ? `<div style="font-size:var(--text-sm);color:var(--text-secondary);padding-bottom:8px">D\xE9tect\xE9 : <strong>${escapeHtml(data.supplier_name)}</strong></div>` : ""}
-      ${data.date ? `<div style="font-size:var(--text-sm);color:var(--text-secondary);padding-bottom:8px">Date : ${escapeHtml(data.date)}</div>` : ""}
+      ${data.date ? `<div style="font-size:var(--text-sm);color:var(--text-secondary);padding-bottom:8px">Date : ${new Date(data.date).toLocaleDateString("fr-FR")}</div>` : ""}
     </div>
 
     <!-- Items table -->
@@ -23816,6 +24375,7 @@ const ROUTE_ROLES = {
   "/haccp": ["gerant", "cuisinier"],
   "/haccp/": ["gerant", "cuisinier"],
   "/haccp/ma-journee": ["gerant", "cuisinier"],
+  "/haccp/reception": ["gerant", "cuisinier"],
   "/haccp/calibrations": ["gerant", "cuisinier"],
   "/suppliers": ["gerant"],
   "/ia": ["gerant", "cuisinier", "equipier"],
@@ -24227,6 +24787,7 @@ function registerRoutes() {
   Router.add(/^\/ia$/, renderAIAssistant);
   Router.add(/^\/haccp$/, renderHACCPDashboard);
   Router.add(/^\/haccp\/ma-journee$/, renderHACCPMaJournee);
+  Router.add(/^\/haccp\/reception$/, () => renderHACCPReception());
   Router.add(/^\/haccp\/temperatures$/, renderHACCPTemperatures);
   Router.add(/^\/haccp\/calibrations$/, renderHACCPCalibrations);
   Router.add(/^\/haccp\/cleaning$/, renderHACCPCleaning);
@@ -24323,7 +24884,7 @@ function bootApp(role, account, opts = {}) {
   updateNavUser(account);
   registerRoutes();
   initNavGroups(role);
-  initHamburger();
+  initMobileNav(role);
   const navLinks = document.querySelectorAll(".nav-link[data-roles]");
   navLinks.forEach((link) => {
     const allowedRoles = link.dataset.roles.split(",").map((r) => r.trim());
@@ -24536,6 +25097,100 @@ function initNavGroups(role) {
   });
   if (backdrop) backdrop.addEventListener("click", closePanel);
   window.addEventListener("hashchange", closePanel);
+}
+function initMobileNav(role) {
+  const hamburgerBtn = document.getElementById("nav-hamburger-btn");
+  const overlay = document.getElementById("mobile-nav-overlay");
+  const closeBtn = document.getElementById("mobile-nav-close");
+  const body = document.getElementById("mobile-nav-body");
+  if (!hamburgerBtn || !overlay || !body) return;
+  const PLAN_LABELS = { essential: "Essential", professional: "Pro", premium: "Premium", enterprise: "Groupe" };
+  const currentPath = () => location.hash.replace("#", "") || "/";
+  function buildMenu() {
+    body.innerHTML = "";
+    const groupOrder = ["cuisine", "operations", "haccp", "pilotage", "documents", "config"];
+    groupOrder.forEach((key) => {
+      const group = NAV_GROUPS[key];
+      if (!group) return;
+      let items = [];
+      if (Array.isArray(group.subcategories)) {
+        group.subcategories.forEach((sub) => {
+          sub.items.filter((i) => i.roles.includes(role)).forEach((i) => items.push(i));
+        });
+      } else if (Array.isArray(group.items)) {
+        items = group.items.filter((i) => i.roles.includes(role));
+      }
+      if (items.length === 0) return;
+      const section = document.createElement("div");
+      section.className = "mobile-nav-section";
+      const title = document.createElement("div");
+      title.className = "mobile-nav-section-title";
+      title.textContent = group.label;
+      section.appendChild(title);
+      items.forEach((item) => {
+        const path = currentPath();
+        const isActive = item.route && (path === item.route || item.route !== "/" && path.startsWith(item.route));
+        const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
+        let el;
+        if (item.action === "logout") {
+          el = document.createElement("button");
+          el.className = "mobile-nav-item mobile-nav-item--danger";
+          el.addEventListener("click", () => {
+            closeOverlay();
+            logout();
+          });
+        } else if (locked) {
+          el = document.createElement("div");
+          el.className = "mobile-nav-item mobile-nav-item--locked";
+        } else {
+          el = document.createElement("a");
+          el.href = "#" + item.route;
+          el.className = "mobile-nav-item" + (isActive ? " active" : "");
+          el.addEventListener("click", closeOverlay);
+        }
+        el.innerHTML = `<i data-lucide="${item.icon}"></i><span>${escapeHtml(item.label)}</span>` + (locked ? `<span class="mobile-nav-item__badge">${escapeHtml(PLAN_LABELS[item.minPlan] || item.minPlan)}</span>` : "");
+        section.appendChild(el);
+      });
+      body.appendChild(section);
+    });
+    const altoSection = document.createElement("div");
+    altoSection.className = "mobile-nav-section";
+    const altoTitle = document.createElement("div");
+    altoTitle.className = "mobile-nav-section-title";
+    altoTitle.textContent = "Alto IA";
+    altoSection.appendChild(altoTitle);
+    const altoEl = document.createElement("a");
+    const isAltoActive = currentPath() === "/ia" || currentPath().startsWith("/ia");
+    altoEl.href = "#/ia";
+    altoEl.className = "mobile-nav-item" + (isAltoActive ? " active" : "");
+    altoEl.innerHTML = `<i data-lucide="sparkles"></i><span>Alto \u2014 Assistant IA</span>`;
+    altoEl.addEventListener("click", closeOverlay);
+    altoSection.appendChild(altoEl);
+    body.appendChild(altoSection);
+    if (window.lucide) lucide.createIcons({ nodes: [body] });
+  }
+  function openOverlay() {
+    buildMenu();
+    overlay.classList.add("open");
+    hamburgerBtn.setAttribute("aria-expanded", "true");
+    document.body.style.overflow = "hidden";
+    closeBtn.focus();
+  }
+  function closeOverlay() {
+    overlay.classList.remove("open");
+    hamburgerBtn.setAttribute("aria-expanded", "false");
+    document.body.style.overflow = "";
+    hamburgerBtn.focus();
+  }
+  hamburgerBtn.addEventListener("click", () => {
+    if (overlay.classList.contains("open")) closeOverlay();
+    else openOverlay();
+  });
+  closeBtn.addEventListener("click", closeOverlay);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.classList.contains("open")) closeOverlay();
+  });
+  window.addEventListener("hashchange", closeOverlay);
 }
 (async function init() {
   const supplierSession = getSupplierSession();

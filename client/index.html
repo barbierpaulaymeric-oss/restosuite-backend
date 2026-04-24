@@ -41,6 +41,11 @@
       <i data-lucide="menu" aria-hidden="true"></i>
     </button>
     <div class="nav-links">
+      <!-- Hamburger — visible only on mobile (CSS hides nav-links on mobile) -->
+      <button class="nav-hamburger" id="nav-hamburger-btn" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="mobile-nav-overlay">
+        <span class="hb-icon" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="hb-label">Menu</span>
+      </button>
       <span class="nav-category" data-category="cuisine" aria-hidden="true">Cuisine</span>
       <button class="nav-link" data-group="cuisine" data-roles="gerant,cuisinier,equipier" aria-expanded="false">
         <span class="nav-icon"><i data-lucide="utensils" aria-hidden="true"></i></span>
@@ -98,6 +103,20 @@
   <div id="nav-panel" class="nav-panel">
     <div class="nav-panel-backdrop"></div>
     <div class="nav-panel-sheet" id="nav-panel-content"></div>
+  </div>
+
+  <!-- Mobile full-screen nav overlay -->
+  <div id="mobile-nav-overlay" class="mobile-nav-overlay" role="dialog" aria-modal="true" aria-label="Menu de navigation">
+    <div class="mobile-nav-overlay__header">
+      <div class="mobile-nav-overlay__logo">
+        <img src="assets/logo-icon.svg" alt="" aria-hidden="true">
+        <span>RestoSuite</span>
+      </div>
+      <button class="mobile-nav-overlay__close" id="mobile-nav-close" aria-label="Fermer le menu">✕</button>
+    </div>
+    <div class="mobile-nav-overlay__body" id="mobile-nav-body">
+      <!-- Populated by JS after role is known -->
+    </div>
   </div>
 
   <!-- Main content -->
