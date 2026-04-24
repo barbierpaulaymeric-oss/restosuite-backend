@@ -4654,11 +4654,11 @@ async function renderHACCPReception() {
         product_category: row.querySelector(".prod-cat").value || null,
         conformite_organoleptique: row.querySelector(".prod-conform").checked ? 1 : 0,
         numero_bl: bl || null,
-        received_by: account ? account.name : null,
+        received_by: account ? account.id : null,
         notes: notes || null
       };
       try {
-        await API.request("/haccp/traceability-log", { method: "POST", body: JSON.stringify(payload) });
+        await API.request("/haccp/traceability", { method: "POST", body: JSON.stringify(payload) });
       } catch (e) {
         errors++;
       }
@@ -4686,7 +4686,7 @@ async function loadRecentReceptions() {
   const container = document.getElementById("reception-history");
   if (!container) return;
   try {
-    const logs = await API.request("/haccp/traceability-logs?limit=10");
+    const logs = await API.request("/haccp/traceability?limit=10");
     if (!logs.length) {
       container.innerHTML = '<p class="text-secondary text-sm">Aucune r\xE9ception enregistr\xE9e.</p>';
       return;
