@@ -380,65 +380,6 @@ h3 {
   transform: scale(0.95);
 }
 
-/* ─── Mobile hamburger button ─── */
-.nav-hamburger {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  border-radius: var(--radius-md);
-  flex-shrink: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-.nav-hamburger svg { width: 24px; height: 24px; }
-
-/* ─── Mobile nav drawer ─── */
-.nav-drawer { display: none; }
-.nav-drawer.open { display: block; }
-.nav-drawer-backdrop {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-  z-index: 8999;
-}
-.nav-drawer-panel {
-  position: fixed; top: 0; left: 0; right: 0;
-  background: var(--color-primary);
-  z-index: 9000;
-  border-bottom: 1px solid var(--border-light);
-  padding-bottom: var(--space-4);
-  max-height: 90vh; overflow-y: auto;
-}
-.nav-drawer-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--border-light);
-}
-.nav-drawer-close {
-  display: flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px;
-  background: none; border: none; color: var(--text-secondary);
-  cursor: pointer; border-radius: var(--radius-md);
-}
-.nav-drawer-close svg { width: 24px; height: 24px; }
-.nav-drawer-links {
-  display: flex; flex-direction: column;
-  padding: var(--space-2) var(--space-3);
-  gap: var(--space-1);
-}
-.nav-drawer-links .nav-link {
-  flex-direction: row; gap: var(--space-3);
-  padding: var(--space-3) var(--space-3);
-  font-size: var(--text-base);
-  min-height: 48px; width: 100%;
-  justify-content: flex-start;
-  border-radius: var(--radius-md);
-}
-.nav-drawer-links .nav-icon svg { width: 20px; height: 20px; }
-
 /* ─── Desktop nav — top bar ─── */
 @media (min-width: 768px) {
   .nav-bottom {
@@ -505,7 +446,6 @@ h3 {
   }
 
   .nav-hamburger { display: none; }
-  .nav-drawer { display: none !important; }
 }
 
 /* ═══════════════════════════════════════════

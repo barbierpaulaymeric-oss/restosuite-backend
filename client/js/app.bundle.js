@@ -24929,52 +24929,6 @@ function bootApp(role, account, opts = {}) {
     maybeStartOnboardingTour(account);
   }
 }
-function initHamburger() {
-  const hamburger = document.getElementById("nav-hamburger");
-  const drawer = document.getElementById("nav-drawer");
-  const closeBtn = document.getElementById("nav-drawer-close");
-  if (!hamburger || !drawer) return;
-  if (hamburger.dataset.initialized) return;
-  hamburger.dataset.initialized = "1";
-  function populateDrawer() {
-    const src = document.querySelector(".nav-links");
-    const dest = document.getElementById("nav-drawer-links");
-    if (!src || !dest) return;
-    dest.innerHTML = src.innerHTML;
-    dest.querySelectorAll("[data-group]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        closeDrawer();
-        const orig = document.querySelector(`.nav-links [data-group="${btn.dataset.group}"]`);
-        if (orig) orig.click();
-      });
-    });
-    dest.querySelectorAll("[data-route]").forEach((a) => {
-      a.addEventListener("click", closeDrawer);
-    });
-    if (window.lucide) lucide.createIcons({ nodes: [dest] });
-  }
-  function openDrawer() {
-    drawer.hidden = false;
-    drawer.classList.add("open");
-    hamburger.setAttribute("aria-expanded", "true");
-    document.body.style.overflow = "hidden";
-    populateDrawer();
-  }
-  function closeDrawer() {
-    drawer.hidden = true;
-    drawer.classList.remove("open");
-    hamburger.setAttribute("aria-expanded", "false");
-    document.body.style.overflow = "";
-    hamburger.focus();
-  }
-  hamburger.addEventListener("click", openDrawer);
-  if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
-  drawer.querySelector(".nav-drawer-backdrop").addEventListener("click", closeDrawer);
-  const ac = new AbortController();
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeDrawer();
-  }, { signal: ac.signal });
-}
 function updateNavUser(account) {
   const existing = document.querySelector(".nav-user-badge");
   if (existing) existing.remove();

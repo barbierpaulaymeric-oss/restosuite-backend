@@ -37,9 +37,6 @@
     <div class="nav-brand">
       <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto;">
     </div>
-    <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu navigation" aria-expanded="false" aria-controls="nav-drawer">
-      <i data-lucide="menu" aria-hidden="true"></i>
-    </button>
     <div class="nav-links">
       <!-- Hamburger — visible only on mobile (CSS hides nav-links on mobile) -->
       <button class="nav-hamburger" id="nav-hamburger-btn" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="mobile-nav-overlay">
@@ -82,22 +79,6 @@
       </a>
     </div>
   </nav>
-
-  <!-- Mobile nav drawer (hamburger) -->
-  <div id="nav-drawer" class="nav-drawer" role="dialog" aria-label="Navigation" aria-modal="true" hidden>
-    <div class="nav-drawer-backdrop"></div>
-    <div class="nav-drawer-panel">
-      <div class="nav-drawer-header">
-        <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:28px;width:auto;">
-        <button class="nav-drawer-close" id="nav-drawer-close" aria-label="Fermer le menu">
-          <i data-lucide="x" aria-hidden="true"></i>
-        </button>
-      </div>
-      <div class="nav-drawer-links" id="nav-drawer-links">
-        <!-- Populated by JS (mirrors .nav-links) -->
-      </div>
-    </div>
-  </div>
 
   <!-- Nav Group Panel (slide-up drawer on mobile, dropdown on desktop) -->
   <div id="nav-panel" class="nav-panel">
