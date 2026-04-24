@@ -482,7 +482,8 @@ async function sendBubbleMessage(msg) {
     }
   } catch (e) {
     loadingEl.remove();
-    showBubbleMessage('Erreur : ' + e.message, 'ai');
+    showBubbleMessage('Alto est temporairement indisponible. Veuillez réessayer dans quelques instants.', 'ai');
+    console.error('[Alto/bubble] Error:', e.message);
   }
 
   messagesEl.scrollTop = messagesEl.scrollHeight;

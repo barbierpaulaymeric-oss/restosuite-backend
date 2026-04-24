@@ -308,11 +308,12 @@ async function sendAIMessage(message) {
     errMsg.setAttribute('role', 'alert');
     errMsg.innerHTML = `
       <div class="ai-msg__avatar" aria-hidden="true">✨</div>
-      <div class="ai-msg__bubble" style="border-color:var(--color-danger)">
-        <p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>
+      <div class="ai-msg__bubble">
+        <p>Alto est temporairement indisponible. Veuillez réessayer dans quelques instants.</p>
       </div>
     `;
     messagesEl.appendChild(errMsg);
+    console.error('[Alto/assistant] Error:', e.message);
   }
 
   messagesEl.scrollTop = messagesEl.scrollHeight;

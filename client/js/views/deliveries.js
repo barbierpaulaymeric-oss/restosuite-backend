@@ -2,12 +2,25 @@
 // Deliveries — Restaurant-side delivery management
 // ═══════════════════════════════════════════
 
+function formatDeliveryDate(dateStr) {
+  if (!dateStr) return null;
+  try {
+    return new Date(dateStr + 'T12:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch (_) { return dateStr; }
+}
+
 async function renderDeliveries() {
   const app = document.getElementById('app');
   app.innerHTML = `
-    <div class="view-header">
-      <h1><i data-lucide="truck" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Livraisons</h1>
-      <p class="text-secondary">Réception et suivi des bons de livraison</p>
+    <div class="view-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-4)">
+      <div>
+        <h1><i data-lucide="truck" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Livraisons</h1>
+        <p class="text-secondary">Réception et suivi des bons de livraison</p>
+      </div>
+      <a href="#/haccp/reception" class="btn btn-accent" style="display:flex;align-items:center;gap:var(--space-2)">
+        <i data-lucide="plus" style="width:16px;height:16px"></i>
+        Nouvelle réception
+      </a>
     </div>
     <div class="delivery-tabs" style="display:flex;gap:var(--space-2);margin-bottom:var(--space-5);flex-wrap:wrap">
       <button class="btn btn-accent delivery-tab active" data-status="">Tous</button>
@@ -109,7 +122,7 @@ function renderDeliveryCard(d) {
         </span>
       </div>
       <div style="display:flex;gap:var(--space-4);font-size:var(--text-sm);color:var(--text-secondary)">
-        <span>📅 ${d.delivery_date || new Date(d.created_at).toLocaleDateString('fr-FR')}</span>
+        <span>📅 ${formatDeliveryDate(d.delivery_date) || new Date(d.created_at).toLocaleDateString('fr-FR')}</span>
         <span>📦 ${d.item_count} produit${d.item_count > 1 ? 's' : ''}</span>
         ${d.total_amount ? `<span>💰 ${d.total_amount.toFixed(2)}€</span>` : ''}
       </div>
@@ -139,7 +152,7 @@ async function renderDeliveryDetail(id) {
           </button>
           <h1><i data-lucide="truck" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Bon #${d.id} — ${escapeHtml(d.supplier_name)}</h1>
           <p class="text-secondary">
-            ${d.delivery_date ? `Livraison prévue : ${d.delivery_date}` : `Créé le ${new Date(d.created_at).toLocaleDateString('fr-FR')}`}
+            ${d.delivery_date ? `Livraison prévue : ${formatDeliveryDate(d.delivery_date)}` : `Créé le ${new Date(d.created_at).toLocaleDateString('fr-FR')}`}
             ${d.received_at ? ` — Réceptionné le ${new Date(d.received_at).toLocaleDateString('fr-FR')} par ${escapeHtml(d.received_by_name || '?')}` : ''}
           </p>
         </div>

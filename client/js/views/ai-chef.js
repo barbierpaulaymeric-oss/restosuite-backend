@@ -143,11 +143,12 @@ async function sendChefMessage(message) {
     errMsg.className = 'chef-msg chef-msg--ai';
     errMsg.innerHTML = `
       <div class="chef-msg__avatar">✨</div>
-      <div class="chef-msg__bubble" style="border-color:var(--color-danger)">
-        <p style="color:var(--color-danger)">Désolé, une erreur est survenue : ${escapeHtml(e.message)}</p>
+      <div class="chef-msg__bubble">
+        <p>Alto est temporairement indisponible. Veuillez réessayer dans quelques instants.</p>
       </div>
     `;
     messagesEl.appendChild(errMsg);
+    console.error('[Alto/chef] Error:', e.message);
   }
 
   messagesEl.scrollTop = messagesEl.scrollHeight;

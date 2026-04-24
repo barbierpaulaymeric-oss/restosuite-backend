@@ -110,6 +110,20 @@ async function renderDashboard() {
 
     <div id="dashboard-nav-guide"></div>
     <div id="dashboard-onboarding"></div>
+
+    <a href="#/haccp/ma-journee" style="display:block;text-decoration:none;margin-bottom:var(--space-4)" aria-label="Ma journée HACCP">
+      <div style="background:var(--color-accent);border-radius:var(--radius-lg);padding:var(--space-4);display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);transition:opacity 0.15s" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+        <div style="display:flex;align-items:center;gap:var(--space-3)">
+          <i data-lucide="clipboard-check" style="width:28px;height:28px;color:white;flex-shrink:0"></i>
+          <div>
+            <div style="font-weight:700;color:white;font-size:var(--text-base)">Ma journée HACCP</div>
+            <div style="color:rgba(255,255,255,0.85);font-size:var(--text-sm)">Températures, nettoyage, réceptions du jour</div>
+          </div>
+        </div>
+        <i data-lucide="chevron-right" style="width:20px;height:20px;color:white;flex-shrink:0"></i>
+      </div>
+    </a>
+
     <div id="dashboard-summary" role="region" aria-label="Résumé du jour" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
 
     <div id="dashboard-alerts" role="region" aria-live="polite" aria-label="Alertes du jour"></div>

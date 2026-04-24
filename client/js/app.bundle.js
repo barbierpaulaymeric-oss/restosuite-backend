@@ -1169,6 +1169,20 @@ async function renderDashboard() {
 
     <div id="dashboard-nav-guide"></div>
     <div id="dashboard-onboarding"></div>
+
+    <a href="#/haccp/ma-journee" style="display:block;text-decoration:none;margin-bottom:var(--space-4)" aria-label="Ma journ\xE9e HACCP">
+      <div style="background:var(--color-accent);border-radius:var(--radius-lg);padding:var(--space-4);display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);transition:opacity 0.15s" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+        <div style="display:flex;align-items:center;gap:var(--space-3)">
+          <i data-lucide="clipboard-check" style="width:28px;height:28px;color:white;flex-shrink:0"></i>
+          <div>
+            <div style="font-weight:700;color:white;font-size:var(--text-base)">Ma journ\xE9e HACCP</div>
+            <div style="color:rgba(255,255,255,0.85);font-size:var(--text-sm)">Temp\xE9ratures, nettoyage, r\xE9ceptions du jour</div>
+          </div>
+        </div>
+        <i data-lucide="chevron-right" style="width:20px;height:20px;color:white;flex-shrink:0"></i>
+      </div>
+    </a>
+
     <div id="dashboard-summary" role="region" aria-label="R\xE9sum\xE9 du jour" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
 
     <div id="dashboard-alerts" role="region" aria-live="polite" aria-label="Alertes du jour"></div>
@@ -19078,12 +19092,26 @@ async function showSupplierOrderDetail(id) {
     content.innerHTML = `<p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>`;
   }
 }
+function formatDeliveryDate(dateStr) {
+  if (!dateStr) return null;
+  try {
+    return (/* @__PURE__ */ new Date(dateStr + "T12:00:00")).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  } catch (_) {
+    return dateStr;
+  }
+}
 async function renderDeliveries() {
   const app = document.getElementById("app");
   app.innerHTML = `
-    <div class="view-header">
-      <h1><i data-lucide="truck" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Livraisons</h1>
-      <p class="text-secondary">R\xE9ception et suivi des bons de livraison</p>
+    <div class="view-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-4)">
+      <div>
+        <h1><i data-lucide="truck" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Livraisons</h1>
+        <p class="text-secondary">R\xE9ception et suivi des bons de livraison</p>
+      </div>
+      <a href="#/haccp/reception" class="btn btn-accent" style="display:flex;align-items:center;gap:var(--space-2)">
+        <i data-lucide="plus" style="width:16px;height:16px"></i>
+        Nouvelle r\xE9ception
+      </a>
     </div>
     <div class="delivery-tabs" style="display:flex;gap:var(--space-2);margin-bottom:var(--space-5);flex-wrap:wrap">
       <button class="btn btn-accent delivery-tab active" data-status="">Tous</button>
@@ -19175,7 +19203,7 @@ function renderDeliveryCard(d) {
         </span>
       </div>
       <div style="display:flex;gap:var(--space-4);font-size:var(--text-sm);color:var(--text-secondary)">
-        <span>\u{1F4C5} ${d.delivery_date || new Date(d.created_at).toLocaleDateString("fr-FR")}</span>
+        <span>\u{1F4C5} ${formatDeliveryDate(d.delivery_date) || new Date(d.created_at).toLocaleDateString("fr-FR")}</span>
         <span>\u{1F4E6} ${d.item_count} produit${d.item_count > 1 ? "s" : ""}</span>
         ${d.total_amount ? `<span>\u{1F4B0} ${d.total_amount.toFixed(2)}\u20AC</span>` : ""}
       </div>
@@ -19202,7 +19230,7 @@ async function renderDeliveryDetail(id) {
           </button>
           <h1><i data-lucide="truck" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Bon #${d.id} \u2014 ${escapeHtml(d.supplier_name)}</h1>
           <p class="text-secondary">
-            ${d.delivery_date ? `Livraison pr\xE9vue : ${d.delivery_date}` : `Cr\xE9\xE9 le ${new Date(d.created_at).toLocaleDateString("fr-FR")}`}
+            ${d.delivery_date ? `Livraison pr\xE9vue : ${formatDeliveryDate(d.delivery_date)}` : `Cr\xE9\xE9 le ${new Date(d.created_at).toLocaleDateString("fr-FR")}`}
             ${d.received_at ? ` \u2014 R\xE9ceptionn\xE9 le ${new Date(d.received_at).toLocaleDateString("fr-FR")} par ${escapeHtml(d.received_by_name || "?")}` : ""}
           </p>
         </div>
@@ -21120,11 +21148,12 @@ async function sendChefMessage(message) {
     errMsg.className = "chef-msg chef-msg--ai";
     errMsg.innerHTML = `
       <div class="chef-msg__avatar">\u2728</div>
-      <div class="chef-msg__bubble" style="border-color:var(--color-danger)">
-        <p style="color:var(--color-danger)">D\xE9sol\xE9, une erreur est survenue : ${escapeHtml(e.message)}</p>
+      <div class="chef-msg__bubble">
+        <p>Alto est temporairement indisponible. Veuillez r\xE9essayer dans quelques instants.</p>
       </div>
     `;
     messagesEl.appendChild(errMsg);
+    console.error("[Alto/chef] Error:", e.message);
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
   _chefLoading = false;
@@ -21403,11 +21432,12 @@ async function sendAIMessage(message) {
     errMsg.setAttribute("role", "alert");
     errMsg.innerHTML = `
       <div class="ai-msg__avatar" aria-hidden="true">\u2728</div>
-      <div class="ai-msg__bubble" style="border-color:var(--color-danger)">
-        <p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>
+      <div class="ai-msg__bubble">
+        <p>Alto est temporairement indisponible. Veuillez r\xE9essayer dans quelques instants.</p>
       </div>
     `;
     messagesEl.appendChild(errMsg);
+    console.error("[Alto/assistant] Error:", e.message);
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
   _aiLoading = false;
@@ -24400,7 +24430,8 @@ async function sendBubbleMessage(msg) {
     }
   } catch (e) {
     loadingEl.remove();
-    showBubbleMessage("Erreur : " + e.message, "ai");
+    showBubbleMessage("Alto est temporairement indisponible. Veuillez r\xE9essayer dans quelques instants.", "ai");
+    console.error("[Alto/bubble] Error:", e.message);
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
