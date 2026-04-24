@@ -17,8 +17,8 @@ async function renderDeliveries() {
         <h1><i data-lucide="truck" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Livraisons</h1>
         <p class="text-secondary">Réception et suivi des bons de livraison</p>
       </div>
-      <a href="#/haccp/reception" class="btn btn-accent" style="display:flex;align-items:center;gap:var(--space-2)">
-        <i data-lucide="plus" style="width:16px;height:16px"></i>
+      <a href="#/haccp/reception" class="btn btn-primary" style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3) var(--space-5);font-size:var(--text-base);font-weight:600">
+        <i data-lucide="plus" style="width:18px;height:18px"></i>
         Nouvelle réception
       </a>
     </div>

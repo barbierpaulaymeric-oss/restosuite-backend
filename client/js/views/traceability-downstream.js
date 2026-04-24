@@ -102,7 +102,7 @@ function tdModalHtml(item) {
             </div>
             <div class="form-group">
               <label class="form-label">Date de fabrication</label>
-              <input type="date" class="form-control" id="td-production-date" value="${v.production_date || ''}">
+              <input type="date" class="form-control" id="td-production-date" lang="fr" value="${v.production_date || ''}">
             </div>
             <div class="form-group">
               <label class="form-label">Type de destination</label>
@@ -134,7 +134,7 @@ function tdModalHtml(item) {
             </div>
             <div class="form-group">
               <label class="form-label">Date d'expédition</label>
-              <input type="date" class="form-control" id="td-dispatch-date" value="${v.dispatch_date || ''}">
+              <input type="date" class="form-control" id="td-dispatch-date" lang="fr" value="${v.dispatch_date || ''}">
             </div>
             <div class="form-group">
               <label class="form-label">Heure d'expédition</label>
@@ -264,11 +264,11 @@ async function renderTraceabilityDownstream() {
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label" style="margin-bottom:4px">Du</label>
-            <input type="date" class="form-control" id="td-filter-from" style="font-size:0.85rem">
+            <input type="date" class="form-control" id="td-filter-from" lang="fr" style="font-size:0.85rem">
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label" style="margin-bottom:4px">Au</label>
-            <input type="date" class="form-control" id="td-filter-to" style="font-size:0.85rem">
+            <input type="date" class="form-control" id="td-filter-to" lang="fr" style="font-size:0.85rem">
           </div>
           <button class="btn btn-secondary" id="td-filter-apply" style="align-self:flex-end">
             <i data-lucide="filter" style="width:15px;height:15px"></i> Filtrer
