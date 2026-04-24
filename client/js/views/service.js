@@ -93,11 +93,11 @@ function _svcRenderConfigScreen(app) {
           <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-3)">
             <div style="flex:1">
               <label style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">Début</label>
-              <input type="time" class="form-control" id="svc-start-time" value="${config.service_start || '11:30'}" style="font-size:var(--text-lg);text-align:center">
+              <input type="time" class="form-control" id="svc-start-time" lang="fr" value="${config.service_start || '11:30'}" style="font-size:var(--text-lg);text-align:center">
             </div>
             <div style="flex:1">
               <label style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">Fin</label>
-              <input type="time" class="form-control" id="svc-end-time" value="${config.service_end || '14:30'}" style="font-size:var(--text-lg);text-align:center">
+              <input type="time" class="form-control" id="svc-end-time" lang="fr" value="${config.service_end || '14:30'}" style="font-size:var(--text-lg);text-align:center">
             </div>
           </div>
           <button class="btn btn-ghost btn-sm" id="svc-save-config" style="width:100%">Enregistrer les horaires</button>

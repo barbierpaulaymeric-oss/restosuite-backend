@@ -391,20 +391,40 @@ function buildRestaurantContext(rid) {
     if (!rid) return '';
     const parts = [];
 
-    // Recipe stats
-    const recipeStats = get(`
+    // Recipe stats — food cost calc must match /api/analytics/kpis (unified formula):
+    // costPerPortion = cost / max(portions,1); foodCostPct = costPerPortion / selling_price * 100
+    const recipeCounts = get(`
       SELECT COUNT(*) as total,
              COUNT(CASE WHEN recipe_type = 'plat' THEN 1 END) as plats,
-             COUNT(CASE WHEN recipe_type = 'sous_recette' THEN 1 END) as sous_recettes,
-             AVG(CASE WHEN selling_price > 0 THEN
-               (SELECT SUM(ri.gross_quantity * COALESCE(
-                 (SELECT sp.price / CASE WHEN LOWER(sp.unit) = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
-                  FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.price ASC LIMIT 1), 0))
-               FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?) / selling_price * 100 END) as avg_food_cost
-      FROM recipes r
-      WHERE r.restaurant_id = ?
-    `, [rid, rid, rid]);
-    parts.push(`FICHES : ${recipeStats.total} fiches techniques (${recipeStats.plats} plats, ${recipeStats.sous_recettes} sous-recettes). Food cost moyen : ${recipeStats.avg_food_cost ? recipeStats.avg_food_cost.toFixed(1) + '%' : 'non calculé'}.`);
+             COUNT(CASE WHEN recipe_type = 'sous_recette' THEN 1 END) as sous_recettes
+      FROM recipes r WHERE r.restaurant_id = ?
+    `, [rid]);
+    const fcRecipes = all(`
+      SELECT r.selling_price, COALESCE(r.portions, 1) as portions,
+        COALESCE((
+          SELECT SUM(
+            ri.gross_quantity * COALESCE(
+              (SELECT sp.price / CASE WHEN LOWER(sp.unit) = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
+               FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.price ASC LIMIT 1),
+              (SELECT i.price_per_unit / CASE WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'kg' THEN 1000 WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'l' THEN 1000 ELSE 1 END
+               FROM ingredients i WHERE i.id = ri.ingredient_id AND i.restaurant_id = ?),
+              0
+            )
+          )
+          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?
+        ), 0) as cost
+      FROM recipes r WHERE r.selling_price > 0 AND r.restaurant_id = ?
+    `, [rid, rid, rid, rid]);
+    let fcTotal = 0, fcCount = 0;
+    for (const r of fcRecipes) {
+      const costPerPortion = r.cost / Math.max(r.portions, 1);
+      if (r.selling_price > 0 && costPerPortion > 0) {
+        fcTotal += (costPerPortion / r.selling_price) * 100;
+        fcCount++;
+      }
+    }
+    const avgFoodCost = fcCount > 0 ? Math.round((fcTotal / fcCount) * 10) / 10 : null;
+    parts.push(`FICHES : ${recipeCounts.total} fiches techniques (${recipeCounts.plats} plats, ${recipeCounts.sous_recettes} sous-recettes). Food cost moyen : ${avgFoodCost !== null ? avgFoodCost.toFixed(1) + '%' : 'non calculé'}.`);
 
     // Top 5 recipes by food cost
     const topRecipes = all(`

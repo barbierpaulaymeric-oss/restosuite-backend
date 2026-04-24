@@ -961,6 +961,16 @@ function formatDateTimeFR(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
+function formatDateInput(dateStr) {
+  if (!dateStr) return "";
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const m2 = String(dateStr).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m2) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return String(dateStr);
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
 document.addEventListener("keydown", function(e) {
   if (e.key === "Escape") {
     const topModal = document.querySelector(".modal-overlay:last-of-type");
@@ -1020,6 +1030,34 @@ document.addEventListener("keydown", function(e) {
   });
   observer.observe(document.body, { childList: true, subtree: true });
   document.querySelectorAll(".modal-overlay").forEach(enhance);
+})();
+(function autoEnhanceDateInputs() {
+  function enhance(node) {
+    if (!(node instanceof HTMLInputElement)) return;
+    const t = node.type;
+    if (t !== "date" && t !== "datetime-local" && t !== "time") return;
+    if (node.__frEnhanced) return;
+    node.__frEnhanced = true;
+    if (!node.hasAttribute("lang")) node.setAttribute("lang", "fr");
+    if (!node.hasAttribute("placeholder")) {
+      node.setAttribute("placeholder", t === "time" ? "hh:mm" : t === "datetime-local" ? "jj/mm/aaaa hh:mm" : "jj/mm/aaaa");
+    }
+  }
+  function deepScan(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('input[type="date"], input[type="datetime-local"], input[type="time"]').forEach(enhance);
+  }
+  if (typeof MutationObserver === "undefined" || !document.body) return;
+  const observer = new MutationObserver((muts) => {
+    for (const m of muts) {
+      m.addedNodes && m.addedNodes.forEach((n) => {
+        if (n instanceof HTMLInputElement) enhance(n);
+        else if (n instanceof HTMLElement) deepScan(n);
+      });
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  deepScan(document);
 })();
 function trapFocus(container) {
   if (!container) return () => {
@@ -14819,11 +14857,11 @@ function _svcRenderConfigScreen(app) {
           <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-3)">
             <div style="flex:1">
               <label style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">D\xE9but</label>
-              <input type="time" class="form-control" id="svc-start-time" value="${config.service_start || "11:30"}" style="font-size:var(--text-lg);text-align:center">
+              <input type="time" class="form-control" id="svc-start-time" lang="fr" value="${config.service_start || "11:30"}" style="font-size:var(--text-lg);text-align:center">
             </div>
             <div style="flex:1">
               <label style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">Fin</label>
-              <input type="time" class="form-control" id="svc-end-time" value="${config.service_end || "14:30"}" style="font-size:var(--text-lg);text-align:center">
+              <input type="time" class="form-control" id="svc-end-time" lang="fr" value="${config.service_end || "14:30"}" style="font-size:var(--text-lg);text-align:center">
             </div>
           </div>
           <button class="btn btn-ghost btn-sm" id="svc-save-config" style="width:100%">Enregistrer les horaires</button>
@@ -17631,17 +17669,16 @@ class LoginView {
     }
   }
   async handleRestaurantLogin() {
-    const email = document.getElementById("login-email").value.trim();
-    const password = document.getElementById("login-password").value;
+    await new Promise((r) => requestAnimationFrame(r));
+    const emailEl = document.getElementById("login-email");
+    const passwordEl = document.getElementById("login-password");
+    const email = (emailEl && emailEl.value || "").trim();
+    const password = passwordEl && passwordEl.value || "";
     const errorEl = document.getElementById("login-error");
     const submitBtn = document.getElementById("login-submit");
     errorEl.textContent = "";
     if (!email) {
       errorEl.textContent = "L'email est requis";
-      return;
-    }
-    if (!password) {
-      errorEl.textContent = "Le mot de passe est requis";
       return;
     }
     submitBtn.disabled = true;
@@ -22581,7 +22618,7 @@ function renderPredictionsContent(data) {
           <div style="display:flex;align-items:center;gap:var(--space-3)">
             <div style="min-width:90px">
               <div style="font-weight:600;font-size:var(--text-sm)">${f.day_name}</div>
-              <div class="text-secondary" style="font-size:10px">${f.date}</div>
+              <div class="text-secondary" style="font-size:10px">${formatDateFR(f.date)}</div>
             </div>
             <div style="flex:1">
               <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:4px">

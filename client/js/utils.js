@@ -98,6 +98,22 @@ function formatDateTimeFR(dateStr) {
     d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
+// ─── Format an ISO date string (YYYY-MM-DD) to French DD/MM/YYYY for display ───
+// Use for reading back an <input type="date"> .value (always YYYY-MM-DD per HTML
+// spec) into French display format, independent of browser/OS locale.
+function formatDateInput(dateStr) {
+  if (!dateStr) return '';
+  // Accept already-french (dd/mm/yyyy) or ISO (yyyy-mm-dd) or full ISO timestamps
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const m2 = String(dateStr).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m2) return dateStr;
+  // Fallback: JS Date parse
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return String(dateStr);
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 // ─── Global: close topmost modal on ESC (fallback for modals without specific handler) ───
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
@@ -171,6 +187,40 @@ document.addEventListener('keydown', function(e) {
 
   // Retroactively upgrade modals already in the DOM
   document.querySelectorAll('.modal-overlay').forEach(enhance);
+})();
+
+// ─── Global: auto-apply lang="fr" + FR placeholder to every <input type="date">
+// Audit 2026-04-24 — some browsers (Chromium on macOS) render native date picker
+// as mm/dd/yyyy regardless of <html lang="fr">. Setting lang on the input itself
+// forces French rendering on supporting browsers; placeholder is defensive and
+// appears in browsers that fall back to a text input (older WebViews).
+(function autoEnhanceDateInputs() {
+  function enhance(node) {
+    if (!(node instanceof HTMLInputElement)) return;
+    const t = node.type;
+    if (t !== 'date' && t !== 'datetime-local' && t !== 'time') return;
+    if (node.__frEnhanced) return;
+    node.__frEnhanced = true;
+    if (!node.hasAttribute('lang')) node.setAttribute('lang', 'fr');
+    if (!node.hasAttribute('placeholder')) {
+      node.setAttribute('placeholder', t === 'time' ? 'hh:mm' : (t === 'datetime-local' ? 'jj/mm/aaaa hh:mm' : 'jj/mm/aaaa'));
+    }
+  }
+  function deepScan(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('input[type="date"], input[type="datetime-local"], input[type="time"]').forEach(enhance);
+  }
+  if (typeof MutationObserver === 'undefined' || !document.body) return;
+  const observer = new MutationObserver((muts) => {
+    for (const m of muts) {
+      m.addedNodes && m.addedNodes.forEach((n) => {
+        if (n instanceof HTMLInputElement) enhance(n);
+        else if (n instanceof HTMLElement) deepScan(n);
+      });
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  deepScan(document);
 })();
 
 // ─── Focus-trap helper for modals ──────────────────────────────────────────

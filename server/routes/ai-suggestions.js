@@ -141,7 +141,7 @@ Réponds en JSON avec cette structure exacte :
       method: 'POST',
       headers: geminiHeaders(),
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: 'Tu es un expert en gestion de restaurant français. Tu réponds TOUJOURS et UNIQUEMENT en français, jamais en anglais ni dans aucune autre langue.' }] },
+        systemInstruction: { parts: [{ text: 'Vous êtes un expert en gestion de restaurant français. Vous répondez TOUJOURS et UNIQUEMENT en français, jamais en anglais ni dans aucune autre langue. VOUVOIEMENT OBLIGATOIRE : utilisez TOUJOURS le vouvoiement (vous/votre/vos). Ne JAMAIS tutoyer.' }] },
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: 'application/json', temperature: 0.5 }
       })

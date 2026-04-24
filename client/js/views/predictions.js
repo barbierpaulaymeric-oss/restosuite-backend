@@ -67,7 +67,7 @@ function renderPredictionsContent(data) {
           <div style="display:flex;align-items:center;gap:var(--space-3)">
             <div style="min-width:90px">
               <div style="font-weight:600;font-size:var(--text-sm)">${f.day_name}</div>
-              <div class="text-secondary" style="font-size:10px">${f.date}</div>
+              <div class="text-secondary" style="font-size:10px">${formatDateFR(f.date)}</div>
             </div>
             <div style="flex:1">
               <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:4px">

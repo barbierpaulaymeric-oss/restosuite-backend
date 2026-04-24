@@ -162,14 +162,24 @@ class LoginView {
   }
 
   async handleRestaurantLogin() {
-    const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value;
+    // Let the browser's autofill settle before reading values. Chrome can leave
+    // .value empty until the first frame after click/Enter when a password
+    // manager auto-fills — reading too early shows "Le mot de passe est requis"
+    // even though the field is visually filled.
+    await new Promise((r) => requestAnimationFrame(r));
+
+    const emailEl = document.getElementById('login-email');
+    const passwordEl = document.getElementById('login-password');
+    const email = (emailEl && emailEl.value || '').trim();
+    const password = (passwordEl && passwordEl.value) || '';
     const errorEl = document.getElementById('login-error');
     const submitBtn = document.getElementById('login-submit');
 
     errorEl.textContent = '';
     if (!email) { errorEl.textContent = "L'email est requis"; return; }
-    if (!password) { errorEl.textContent = 'Le mot de passe est requis'; return; }
+    // Do NOT block on empty password client-side: autofilled values are
+    // sometimes masked from JS until user interaction. Send to server; it will
+    // return a clear error if the password really is missing or wrong.
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Connexion...';
