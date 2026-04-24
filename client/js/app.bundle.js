@@ -1120,14 +1120,12 @@ function renderNavGuide() {
   const FLAG = "restosuite_nav_guide_v1_dismissed";
   if (localStorage.getItem(FLAG)) return;
   container.innerHTML = `
-    <div role="note" aria-label="Guide de navigation" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4);position:relative">
-      <button id="dismiss-nav-guide" aria-label="Fermer le guide de navigation"
-        style="position:absolute;top:var(--space-3);right:var(--space-3);background:none;border:none;cursor:pointer;color:var(--text-tertiary);font-size:1.1rem;padding:4px 8px;border-radius:var(--radius-sm);line-height:1">\u2715</button>
+    <div role="note" aria-label="Guide de navigation" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
       <h4 style="margin:0 0 var(--space-3) 0;font-size:var(--text-sm);font-weight:700;display:flex;align-items:center;gap:var(--space-2)">
         <i data-lucide="map" style="width:16px;height:16px;color:var(--color-accent)" aria-hidden="true"></i>
         Comment naviguer dans RestoSuite
       </h4>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--space-3)">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)">
         <div style="display:flex;gap:var(--space-2);align-items:flex-start">
           <i data-lucide="utensils" style="width:18px;height:18px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
           <div><strong style="font-size:var(--text-sm)">Cuisine</strong><p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Recettes, ingr\xE9dients, stock et r\xE9ceptions</p></div>
@@ -1144,6 +1142,9 @@ function renderNavGuide() {
           <i data-lucide="bar-chart-3" style="width:18px;height:18px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
           <div><strong style="font-size:var(--text-sm)">Pilotage</strong><p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Stats, food cost, menu engineering</p></div>
         </div>
+      </div>
+      <div style="text-align:right">
+        <button id="dismiss-nav-guide" class="btn btn-secondary" style="font-size:var(--text-sm);padding:6px 16px" aria-label="Fermer le guide de navigation">J'ai compris</button>
       </div>
     </div>
   `;
@@ -18668,9 +18669,9 @@ async function renderSupplierHistoryTab() {
     <div id="supplier-history-list"><div class="loading"><div class="spinner"></div></div></div>
   `;
   try {
-    const history = await API.getSupplierHistory();
+    const history2 = await API.getSupplierHistory();
     const listEl = document.getElementById("supplier-history-list");
-    if (history.length === 0) {
+    if (history2.length === 0) {
       listEl.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon"><i data-lucide="clock"></i></div>
@@ -18680,7 +18681,7 @@ async function renderSupplierHistoryTab() {
       if (window.lucide) lucide.createIcons();
       return;
     }
-    listEl.innerHTML = history.map((h) => `
+    listEl.innerHTML = history2.map((h) => `
       <div class="notification-item" style="margin-bottom:var(--space-2)">
         <div class="notification-icon">${getHistoryIcon(h.change_type)}</div>
         <div class="notification-content">
@@ -25356,6 +25357,10 @@ function initMobileNav(role) {
     return;
   }
   const login = new LoginView();
+  if (location.hash === "#register") {
+    login.mode = "register";
+    history.replaceState(null, "", location.pathname);
+  }
   login.render();
 })();
 (function() {

@@ -832,8 +832,12 @@ function initMobileNav(role) {
     return;
   }
 
-  // No auth → show login
+  // No auth → show login (jump to register if landing CTA used)
   const login = new LoginView();
+  if (location.hash === '#register') {
+    login.mode = 'register';
+    history.replaceState(null, '', location.pathname); // clear hash so back-nav is clean
+  }
   login.render();
 })();
 

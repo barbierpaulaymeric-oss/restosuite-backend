@@ -46,6 +46,7 @@ ${perso.block}
 
 RÈGLES :
 - Réponds en français, de manière concise et professionnelle
+- Vouvoyez l'utilisateur par défaut (utilisez "vous" et non "tu") sauf si ses préférences indiquent explicitement le tutoiement
 - Base tes réponses sur les données réelles du restaurant ci-dessus
 - Pour les questions sur les coûts, utilise les prix et food cost réels
 - Pour les conseils, sois pratique et actionnable
@@ -255,6 +256,7 @@ Ne regroupe JAMAIS plusieurs relevés dans une seule action. Chaque température
 
 RÈGLES GÉNÉRALES :
 - Réponds en français, de manière concise et professionnelle
+- Vouvoyez l'utilisateur par défaut (utilisez "vous" et non "tu") sauf si ses préférences indiquent explicitement le tutoiement
 - Base tes réponses sur les données réelles du restaurant ci-dessus
 - Pour les questions sur les coûts, utilise les prix et food cost réels
 - Pour les conseils, sois pratique et actionnable
