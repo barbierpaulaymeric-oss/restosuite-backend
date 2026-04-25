@@ -1326,15 +1326,26 @@ router.delete('/cooking/:id', (req, res) => {
 router.get('/ma-journee', (req, res) => {
   try {
     const rid = req.user.restaurant_id;
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+
+    // Today in Europe/Paris timezone — server runs UTC, France is UTC+1/+2
+    const today = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(now);
+
+    // Compute current Paris UTC offset for adjusting UTC-stored timestamps in SQLite.
+    // Europe/Paris is always UTC+1 (CET) or UTC+2 (CEST); modular math handles midnight crossing.
+    const utcH = now.getUTCHours();
+    const parisH = parseInt(new Intl.DateTimeFormat('en', {
+      timeZone: 'Europe/Paris', hour: '2-digit', hour12: false,
+    }).format(now), 10);
+    const parisOffset = `+${((parisH - utcH + 24) % 24)} hours`;
 
     // Temperature zones + how many logged today
     const zones = all(
       `SELECT z.id, z.name, z.type,
         (SELECT COUNT(*) FROM temperature_logs l
-         WHERE l.zone_id = z.id AND l.restaurant_id = ? AND date(l.recorded_at) = ?) AS logged_today
+         WHERE l.zone_id = z.id AND l.restaurant_id = ? AND date(l.recorded_at, ?) = ?) AS logged_today
        FROM temperature_zones z WHERE z.restaurant_id = ?`,
-      [rid, today, rid]
+      [rid, parisOffset, today, rid]
     );
     const zonesTotal = zones.length;
     const zonesLoggedToday = zones.filter(z => z.logged_today > 0).length;
@@ -1344,21 +1355,21 @@ router.get('/ma-journee', (req, res) => {
     const cleaningDoneToday = cleaningTasks.length > 0
       ? (get(
           `SELECT COUNT(DISTINCT task_id) as done FROM cleaning_logs
-           WHERE restaurant_id = ? AND date(completed_at) = ?
+           WHERE restaurant_id = ? AND date(completed_at, ?) = ?
            AND task_id IN (${cleaningTasks.map(() => '?').join(',')})`,
-          [rid, today, ...cleaningTasks.map(t => t.id)]
+          [rid, parisOffset, today, ...cleaningTasks.map(t => t.id)]
         ) || { done: 0 }).done
       : 0;
     const cleaningTotal = cleaningTasks.length;
 
-    // Cooking records today
+    // Cooking records today (cooking_date is a user-entered date string, already in local time)
     const cookingRow = get(
-      'SELECT COUNT(*) as count FROM cooking_records WHERE restaurant_id = ? AND date(cooking_date) = ?',
+      'SELECT COUNT(*) as count FROM cooking_records WHERE restaurant_id = ? AND cooking_date = ?',
       [rid, today]
     );
     const cookingToday = cookingRow ? cookingRow.count : 0;
 
-    // Witness meals today
+    // Witness meals today (meal_date is a user-entered date string, already in local time)
     const witnessRow = get(
       'SELECT COUNT(*) as count FROM witness_meals WHERE restaurant_id = ? AND meal_date = ?',
       [rid, today]
@@ -1371,8 +1382,8 @@ router.get('/ma-journee', (req, res) => {
     const fryerChecksToday = fryersTotal > 0
       ? (get(
           `SELECT COUNT(DISTINCT fryer_id) as checked FROM fryer_checks
-           WHERE restaurant_id = ? AND date(action_date) = ?`,
-          [rid, today]
+           WHERE restaurant_id = ? AND date(action_date, ?) = ?`,
+          [rid, parisOffset, today]
         ) || { checked: 0 }).checked
       : 0;
 
