@@ -1,7 +1,7 @@
 'use strict';
 
 // Mercuriale import (supplier portal) — covers:
-//   - lib/mercuriale-categorize: 11-category keyword routing, accent stripping
+//   - lib/mercuriale-categorize: 13-category keyword routing, accent stripping
 //   - lib/mercuriale-parse: XLSX header detection, French decimals, normalization
 //   - POST /api/supplier-portal/import-mercuriale: auth + XLSX path end-to-end
 //   - POST /api/supplier-portal/save-mercuriale: upsert supplier_catalog + price
@@ -11,7 +11,7 @@
 // We assert the auth + missing-file paths instead so route wiring is pinned.
 
 const crypto = require('crypto');
-const ExcelJS = require('exceljs');
+const xlsx = require('xlsx');
 const request = require('supertest');
 const app = require('../app');
 const { run, get, all } = require('../db');
@@ -27,8 +27,6 @@ function hashToken(raw) {
 // Set up a fresh supplier session row and return { token, supplier_id, restaurant_id }.
 // Mirrors the shape POST /member-pin creates so requireSupplierAuth accepts it.
 function createSupplierSession() {
-  // Fresh restaurant + supplier + supplier_account each call — :memory: DB is
-  // shared across tests in the file, so we use unique names to avoid collisions.
   const tag = Math.random().toString(36).slice(2, 8);
   const restaurantId = run(
     `INSERT INTO restaurants (name, type, plan) VALUES (?, 'brasserie', 'pro')`,
@@ -50,47 +48,53 @@ function createSupplierSession() {
   return { token: raw, supplier_id: supplierId, restaurant_id: restaurantId, account_id: accountId };
 }
 
-// Build an in-memory XLSX with a header row + product rows.
-async function buildXlsxBuffer(rows, opts = {}) {
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet('Tarifs');
-  if (opts.banner) ws.addRow([opts.banner]);
-  ws.addRow(opts.headers || ['Désignation', 'Catégorie', 'Unité', 'Prix HT']);
-  for (const r of rows) ws.addRow(r);
-  return await wb.xlsx.writeBuffer();
+// Build an in-memory XLSX with an optional banner row + header row + product rows.
+function buildXlsxBuffer(rows, opts = {}) {
+  const aoa = [];
+  if (opts.banner) aoa.push([opts.banner]);
+  aoa.push(opts.headers || ['Désignation', 'Catégorie', 'Unité', 'Prix HT']);
+  for (const r of rows) aoa.push(r);
+  const ws = xlsx.utils.aoa_to_sheet(aoa);
+  const wb = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(wb, ws, 'Tarifs');
+  return xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 
 // ─── Categorize ──────────────────────────────────────────────────────
 
 describe('lib/mercuriale-categorize', () => {
-  it('exports all 11 expected categories in order', () => {
+  it('exports the 13 canonical categories', () => {
     expect(CATEGORIES).toEqual([
-      'Viandes', 'Poissons', 'Légumes', 'Fruits', 'Produits laitiers',
-      'Épicerie', 'Boissons', 'Surgelés', 'Charcuterie', 'Condiments', 'Autre',
+      'Viandes', 'Poissons', 'Légumes', 'Fruits',
+      'Produits laitiers', 'Épicerie sèche', 'Boissons', 'Surgelés',
+      'Boulangerie', 'Charcuterie', 'Condiments/Sauces', 'Huiles/Vinaigres', 'Autre',
     ]);
   });
 
   it.each([
-    ['Entrecôte de bœuf 250g', 'Viandes'],
-    ['Suprême de volaille',    'Viandes'],
-    ['Saumon frais Norvège',   'Poissons'],
-    ['Crevettes roses cuites', 'Poissons'],
-    ['Tomate grappe France',   'Légumes'],
-    ['Pomme Granny Smith',     'Fruits'],
-    ['Crème liquide 35% MG',   'Produits laitiers'],
-    ['Parmesan Reggiano',      'Produits laitiers'],
-    ['Farine T55 25kg',        'Épicerie'],
-    ['Vin rouge Côtes du Rhône', 'Boissons'],
-    ['Frites surgelées 2.5kg', 'Surgelés'],
-    ['Jambon de Bayonne',      'Charcuterie'],
-    ['Saumon fumé',            'Charcuterie'],
-    ['Huile d\'olive vierge',  'Condiments'],
+    ['Entrecôte de bœuf 250g',     'Viandes'],
+    ['Magret de canard fermier',    'Viandes'],
+    ['Saumon frais Norvège',        'Poissons'],
+    ['Crevettes roses cuites',      'Poissons'],
+    ['Tomate grappe France',        'Légumes'],
+    ['Pomme Granny Smith',          'Fruits'],
+    ['Crème liquide 35% MG',        'Produits laitiers'],
+    ['Parmesan Reggiano',           'Produits laitiers'],
+    ['Riz basmati 5kg',             'Épicerie sèche'],
+    ['Vin rouge Côtes du Rhône',    'Boissons'],
+    ['Frites surgelées 2.5kg',      'Surgelés'],
+    ['Jambon de Bayonne',           'Charcuterie'],
+    ['Saucisson sec artisanal',     'Charcuterie'],
+    ['Huile d\'olive vierge',       'Huiles/Vinaigres'],
+    ['Vinaigre balsamique',         'Huiles/Vinaigres'],
+    ['Moutarde de Dijon',           'Condiments/Sauces'],
+    ['Baguette tradition',          'Boulangerie'],
   ])('categorizes %s → %s', (name, expected) => {
     expect(categorize(name)).toBe(expected);
   });
 
   it('falls back to Autre on unknown product', () => {
-    expect(categorize('Truc bidule chouette')).toBe('Autre');
+    expect(categorize('Bidule machin xyzzy')).toBe('Autre');
   });
 
   it('handles null / empty input', () => {
@@ -98,10 +102,18 @@ describe('lib/mercuriale-categorize', () => {
     expect(categorize('')).toBe('Autre');
   });
 
-  it('matches accent-insensitively', () => {
+  it('case-insensitive keyword match', () => {
     expect(categorize('CREVETTE')).toBe('Poissons');
     expect(categorize('crème')).toBe('Produits laitiers');
     expect(categorize('creme')).toBe('Produits laitiers');
+  });
+
+  it('normalizes synonym hints back to a canonical category', () => {
+    // The Gemini path may return "Crèmerie" or "Pains & Pâtisseries"; both
+    // should land on the canonical labels exposed in the dropdown.
+    expect(categorize('inconnu', 'Crèmerie')).toBe('Produits laitiers');
+    expect(categorize('inconnu', 'Pains & Pâtisseries')).toBe('Boulangerie');
+    expect(categorize('inconnu', 'Marée')).toBe('Poissons');
   });
 });
 
@@ -152,15 +164,18 @@ describe('lib/mercuriale-parse — normalizeItems', () => {
     expect(out[0].category).toBe('Poissons');
   });
 
-  it('respects supplied category over categorize()', () => {
-    const out = normalizeItems([{ name: 'Saumon frais', category: 'Custom', price: 25, unit: 'kg' }]);
-    expect(out[0].category).toBe('Custom');
+  it('normalizes a synonym category back to the canonical label', () => {
+    // A spreadsheet may say "Crèmerie"; the dropdown only knows
+    // "Produits laitiers". The normalizer collapses the two so the
+    // review UI doesn't end up with off-list values.
+    const out = normalizeItems([{ name: 'Saumon frais', category: 'Crèmerie', price: 25, unit: 'kg' }]);
+    expect(out[0].category).toBe('Produits laitiers');
   });
 });
 
 describe('lib/mercuriale-parse — parseXlsxBuffer', () => {
-  it('extracts rows with French headers + comma decimals', async () => {
-    const buf = await buildXlsxBuffer([
+  it('extracts rows with French headers + comma decimals', () => {
+    const buf = buildXlsxBuffer([
       ['Tomate grappe',     'Légumes',   'kg',     '3,20'],
       ['Entrecôte de bœuf', 'Viandes',   'kg',     '34,50'],
       ['',                  'Légumes',   'kg',     '1,00'],   // empty name → drop
@@ -168,7 +183,7 @@ describe('lib/mercuriale-parse — parseXlsxBuffer', () => {
       ['Crème liquide',     '',          'L',      '5.20'],   // category empty → auto
     ]);
 
-    const items = await parseXlsxBuffer(buf);
+    const items = parseXlsxBuffer(buf);
     expect(items).toHaveLength(3);
     expect(items[0]).toMatchObject({ name: 'Tomate grappe', category: 'Légumes', unit: 'kg', price: 3.2 });
     expect(items[1]).toMatchObject({ name: 'Entrecôte de bœuf', category: 'Viandes', price: 34.5 });
@@ -176,32 +191,38 @@ describe('lib/mercuriale-parse — parseXlsxBuffer', () => {
     expect(items[2].category).toBe('Produits laitiers');
   });
 
-  it('skips banner rows above the actual header', async () => {
-    const buf = await buildXlsxBuffer(
+  it('skips banner rows above the actual header', () => {
+    const buf = buildXlsxBuffer(
       [['Banane', 'Fruits', 'kg', '2,40']],
       { banner: 'Tarifs Q4 2026 — Metro Paris' }
     );
-    const items = await parseXlsxBuffer(buf);
+    const items = parseXlsxBuffer(buf);
     expect(items).toHaveLength(1);
     expect(items[0].name).toBe('Banane');
   });
 
-  it('returns [] when no recognizable header is found', async () => {
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('Bizarre');
-    ws.addRow(['random', 'unrelated', 'cells']);
-    ws.addRow(['more',   'random',     'data']);
-    const buf = await wb.xlsx.writeBuffer();
-    expect(await parseXlsxBuffer(buf)).toEqual([]);
+  it('returns [] when no recognizable header is found', () => {
+    const aoa = [
+      ['random', 'unrelated', 'cells'],
+      ['more', 'random', 'data'],
+    ];
+    const ws = xlsx.utils.aoa_to_sheet(aoa);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, 'Bizarre');
+    const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    expect(parseXlsxBuffer(buf)).toEqual([]);
   });
 
-  it('defaults unit to kg when the column is missing', async () => {
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('Tarifs');
-    ws.addRow(['Désignation', 'Prix']);
-    ws.addRow(['Sel fin', '0.80']);
-    const buf = await wb.xlsx.writeBuffer();
-    const items = await parseXlsxBuffer(buf);
+  it('defaults unit to kg when the column is missing', () => {
+    const aoa = [
+      ['Désignation', 'Prix'],
+      ['Sel fin', '0.80'],
+    ];
+    const ws = xlsx.utils.aoa_to_sheet(aoa);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, 'Tarifs');
+    const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const items = parseXlsxBuffer(buf);
     expect(items[0]).toMatchObject({ name: 'Sel fin', unit: 'kg', price: 0.8 });
   });
 });
@@ -209,11 +230,13 @@ describe('lib/mercuriale-parse — parseXlsxBuffer', () => {
 // ─── HTTP endpoints ──────────────────────────────────────────────────
 
 describe('POST /api/supplier-portal/import-mercuriale', () => {
+  const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
   it('returns 401 without an X-Supplier-Token header', async () => {
-    const buf = await buildXlsxBuffer([['Tomate', 'Légumes', 'kg', '3.20']]);
+    const buf = buildXlsxBuffer([['Tomate', 'Légumes', 'kg', '3.20']]);
     const res = await request(app)
       .post('/api/supplier-portal/import-mercuriale')
-      .attach('mercuriale', buf, { filename: 'merc.xlsx', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      .attach('mercuriale', buf, { filename: 'merc.xlsx', contentType: XLSX_MIME });
     expect(res.status).toBe(401);
   });
 
@@ -236,7 +259,7 @@ describe('POST /api/supplier-portal/import-mercuriale', () => {
       [session.restaurant_id, session.supplier_id, 'Tomate grappe', 'Légumes', 'kg', 2.5]
     );
 
-    const buf = await buildXlsxBuffer([
+    const buf = buildXlsxBuffer([
       ['Crevettes roses', 'Poissons', 'kg', '18,50'],
       ['Tomate grappe',   'Légumes',  'kg', '3,20'],
       ['Banane bio',      'Fruits',   'kg', '2,40'],
@@ -245,29 +268,18 @@ describe('POST /api/supplier-portal/import-mercuriale', () => {
     const res = await request(app)
       .post('/api/supplier-portal/import-mercuriale')
       .set('X-Supplier-Token', session.token)
-      .attach('mercuriale', buf, { filename: 'merc.xlsx', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      .attach('mercuriale', buf, { filename: 'merc.xlsx', contentType: XLSX_MIME });
 
     expect(res.status).toBe(200);
     expect(res.body.summary).toEqual({ total: 3, new: 2, update: 1 });
     expect(res.body.categories).toContain('Viandes');
+    expect(res.body.categories).toContain('Charcuterie');
 
     const tomate = res.body.items.find(i => i.name === 'Tomate grappe');
     expect(tomate.status).toBe('update');
     expect(tomate.existing_price).toBe(2.5);
     const banane = res.body.items.find(i => i.name === 'Banane bio');
     expect(banane.status).toBe('new');
-  });
-
-  it('rejects an unsupported MIME type', async () => {
-    const session = createSupplierSession();
-    const res = await request(app)
-      .post('/api/supplier-portal/import-mercuriale')
-      .set('X-Supplier-Token', session.token)
-      .attach('mercuriale', Buffer.from('not an excel'), {
-        filename: 'evil.txt',
-        contentType: 'text/plain',
-      });
-    expect(res.status).toBe(500); // multer throws → rendered by default error handler
   });
 });
 

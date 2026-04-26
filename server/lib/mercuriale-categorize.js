@@ -1,14 +1,15 @@
 'use strict';
 
-// ═══════════════════════════════════════════
-// Auto-categorize a French product name into one of 11 brasserie buckets.
+// Keyword-based product categorizer for the supplier mercuriale import.
+// Pure JS, deterministic, no DB or network access. Used by routes/supplier-portal.js
+// to fill in `category` whenever the source file (Excel/CSV) or LLM output
+// (PDF/image) didn't supply one.
 //
-// The mercuriale import (supplier portal) extracts arbitrary product names from
-// PDFs and Excel sheets. To keep the review UI scannable we slot each row into
-// a known category up front; the supplier can correct any mis-classification
-// inline before saving. Order matters: more specific buckets come first so
-// "saumon fumé" lands in `Charcuterie` rather than `Poissons`.
-// ═══════════════════════════════════════════
+// Order matters: more specific buckets win.
+//  - Surgelés before Poissons so "filet de saumon surgelé" → freezer
+//  - Charcuterie before Viandes so "saucisson" → Charcuterie, "saucisse" → Viandes
+//  - Huiles/Vinaigres + Condiments before Épicerie sèche so "huile d'olive"
+//    doesn't end up in groceries
 
 const CATEGORIES = [
   'Viandes',
@@ -16,161 +17,118 @@ const CATEGORIES = [
   'Légumes',
   'Fruits',
   'Produits laitiers',
-  'Épicerie',
+  'Épicerie sèche',
   'Boissons',
   'Surgelés',
+  'Boulangerie',
   'Charcuterie',
-  'Condiments',
+  'Condiments/Sauces',
+  'Huiles/Vinaigres',
   'Autre',
 ];
 
-// Keyword groups. All matched as lowercase substrings, accent-insensitive.
 const RULES = [
-  {
-    cat: 'Surgelés',
-    keywords: ['surgelé', 'surgele', 'congelé', 'congele', 'iqf', 'glacé minute'],
-  },
-  {
-    cat: 'Charcuterie',
-    keywords: [
-      'jambon', 'saucisson', 'chorizo', 'pâté', 'pate ', 'rillette', 'terrine',
-      'salami', 'mortadelle', 'coppa', 'bresaola', 'lardon', 'bacon', 'andouille',
-      'boudin', 'cervelas', 'saumon fumé', 'saumon fume', 'magret fumé', 'pancetta',
-    ],
-  },
-  {
-    cat: 'Viandes',
-    keywords: [
-      'boeuf', 'bœuf', 'entrecote', 'entrecôte', 'faux-filet', 'rumsteak', 'bavette',
-      'onglet', 'tournedos', 'paleron', 'jarret', 'gigot', 'agneau', 'mouton',
-      'porc', 'travers', 'echine', 'échine', 'poitrine de porc', 'haché', 'hache ',
-      'volaille', 'poulet', 'dinde', 'canard', 'magret', 'cuisse', 'aile',
-      'suprême', 'supreme', 'lapin', 'pintade', 'caille', 'veau', 'escalope',
-      'foie', 'rognon', 'côte de', 'cote de',
-    ],
-  },
-  {
-    cat: 'Poissons',
-    keywords: [
-      'saumon', 'cabillaud', 'lieu', 'merlu', 'colin', 'morue', 'sardine', 'maquereau',
-      'thon', 'bar ', 'dorade', 'daurade', 'sole', 'turbot', 'lotte', 'truite',
-      'rouget', 'limande', 'flétan', 'fletan', 'saint-pierre', 'st-pierre',
-      'coquille', 'st jacques', 'saint-jacques', 'crevette', 'gambas', 'langoustine',
-      'homard', 'crabe', 'tourteau', 'moule', 'huître', 'huitre', 'palourde',
-      'bulot', 'encornet', 'calamar', 'calmar', 'poulpe', 'seiche', 'anchois',
-    ],
-  },
-  {
-    cat: 'Produits laitiers',
-    keywords: [
-      'lait', 'crème', 'creme', 'beurre', 'fromage', 'yaourt', 'yogourt', 'faisselle',
-      'mascarpone', 'ricotta', 'parmesan', 'comté', 'comte', 'gruyère', 'gruyere',
-      'emmental', 'mozzarella', 'cheddar', 'roquefort', 'camembert', 'brie',
-      'feta', 'chèvre', 'chevre', 'reblochon', 'tomme', 'fourme', 'morbier',
-      'oeuf', 'œuf',
-    ],
-  },
-  {
-    cat: 'Légumes',
-    keywords: [
-      'tomate', 'pomme de terre', 'pdt', 'patate', 'oignon', 'echalote', 'échalote',
-      'ail ', 'carotte', 'courgette', 'aubergine', 'poivron', 'concombre', 'salade',
-      'laitue', 'roquette', 'mesclun', 'mâche', 'mache', 'épinard', 'epinard',
-      'chou', 'brocoli', 'choux-fleur', 'chou-fleur', 'haricot', 'petit pois',
-      'fève', 'feve', 'lentille', 'pois chiche', 'champignon', 'cèpe', 'cepe',
-      'girolle', 'morille', 'shiitake', 'navet', 'radis', 'betterave', 'panais',
-      'topinambour', 'céleri', 'celeri', 'fenouil', 'poireau', 'asperge', 'artichaut',
-      'endive', 'cresson', 'persil', 'basilic', 'coriandre', 'menthe', 'estragon',
-      'thym', 'romarin', 'sauge', 'aneth', 'ciboulette',
-    ],
-  },
-  {
-    cat: 'Fruits',
-    keywords: [
-      'pomme ', 'poire ', 'banane', 'orange', 'citron', 'pamplemousse', 'mandarine',
-      'clémentine', 'clementine', 'fraise', 'framboise', 'myrtille', 'mûre', 'mure',
-      'cassis', 'groseille', 'cerise', 'abricot', 'pêche', 'peche', 'nectarine',
-      'prune', 'mirabelle', 'reine-claude', 'raisin', 'kiwi', 'mangue', 'ananas',
-      'papaye', 'fruit de la passion', 'litchi', 'figue', 'datte', 'grenade',
-      'melon', 'pastèque', 'pasteque', 'avocat', 'noix de coco',
-    ],
-  },
-  {
-    cat: 'Boissons',
-    keywords: [
-      'vin', 'champagne', 'bière', 'biere', 'cidre', 'eau', 'jus', 'sirop',
-      'soda', 'limonade', 'café', 'cafe', 'thé', 'the ', 'infusion', 'tisane',
-      'whisky', 'vodka', 'gin', 'rhum', 'cognac', 'armagnac', 'pastis', 'liqueur',
-      'porto', 'martini', 'campari', 'spritz', 'kir',
-    ],
-  },
-  {
-    cat: 'Condiments',
-    keywords: [
-      'sel ', 'poivre', 'épice', 'epice', 'moutarde', 'mayonnaise', 'ketchup',
-      'vinaigre', 'huile', 'sauce soja', 'tabasco', 'worcestershire', 'cornichon',
-      'câpre', 'capre', 'olive', 'tapenade', 'pesto', 'harissa', 'curry', 'safran',
-      'paprika', 'piment', 'cumin', 'gingembre', 'curcuma', 'cannelle',
-    ],
-  },
-  {
-    cat: 'Épicerie',
-    keywords: [
-      'farine', 'sucre', 'pâte', 'pate ', 'pâtes ', 'pates ', 'riz', 'semoule',
-      'quinoa', 'boulgour', 'couscous', 'polenta', 'biscotte', 'pain ', 'baguette',
-      'brioche', 'levure', 'chocolat', 'cacao', 'miel', 'confiture', 'compote',
-      'conserve', 'tomate pelée', 'concentré', 'concentre', 'bouillon', 'fond ',
-      'fond de', 'gélatine', 'gelatine', 'agar', 'maizena', 'amidon',
-    ],
-  },
+  { cat: 'Surgelés', words: ['surgelé', 'surgele', 'congelé', 'congele', 'glace ', 'sorbet'] },
+  { cat: 'Charcuterie', words: ['jambon', 'saucisson', 'rillette', 'pâté', 'pate de', 'terrine', 'lardon', 'chorizo', 'salami', 'mortadelle', 'bacon', 'coppa', 'andouille', 'boudin', 'rosette', 'merguez', 'foie gras'] },
+  { cat: 'Poissons', words: ['saumon', 'cabillaud', 'thon', 'lieu', 'merlu', 'sole', 'bar ', 'dorade', 'daurade', 'truite', 'sardine', 'maquereau', 'anchois', 'rouget', 'lotte', 'sandre', 'brochet', 'colin', 'hareng', 'morue', 'haddock', 'crevette', 'gambas', 'langoustine', 'homard', 'crabe', 'tourteau', 'moule', 'huître', 'huitre', 'palourde', 'coquille', 'st-jacques', 'st jacques', 'saint-jacques', 'poulpe', 'calamar', 'encornet', 'seiche', 'poisson', 'fruits de mer', 'fruit de mer', 'turbot'] },
+  { cat: 'Viandes', words: ['boeuf', 'bœuf', 'veau', 'agneau', 'mouton', 'porc', 'cochon', 'poulet', 'poularde', 'chapon', 'pintade', 'canard', 'magret', 'dinde', 'lapin', 'caille', 'pigeon', 'gibier', 'sanglier', 'cerf', 'chevreuil', 'biche', 'entrecôte', 'entrecote', 'rumsteck', 'faux-filet', 'faux filet', 'bavette', 'onglet', 'paleron', 'gigot', 'côtelette', 'cotelette', 'côte de', 'cote de', 'travers', 'filet mignon', 'rôti', 'roti', 'haché', 'hache', 'steak', 'escalope', 'tournedos', 'tartare', 'saucisse', 'foie', 'rognon', 'tripe', 'ris de'] },
+  { cat: 'Produits laitiers', words: ['lait', 'beurre', 'crème', 'creme', 'yaourt', 'fromage', 'comté', 'comte', 'gruyère', 'gruyere', 'emmental', 'parmesan', 'mozzarella', 'feta', 'chèvre', 'chevre', 'brebis', 'roquefort', 'camembert', 'brie', 'reblochon', 'tomme', 'cantal', 'munster', 'fourme', 'bleu', 'mascarpone', 'ricotta', 'fromage blanc', 'faisselle', 'œuf', 'oeuf', 'oeufs', 'œufs'] },
+  { cat: 'Boulangerie', words: ['pain', 'baguette', 'brioche', 'viennoiserie', 'croissant', 'pain au chocolat', 'pain de mie', 'tartine', 'biscotte', 'bun', 'fougasse', 'ciabatta', 'focaccia', 'pita', 'tortilla', 'wrap', 'tarte', 'gâteau', 'gateau', 'biscuit', 'macaron', 'praliné', 'praline', 'feuilletage', 'pâte feuilletée', 'pate feuilletee', 'farine', 'levure'] },
+  { cat: 'Huiles/Vinaigres', words: ['huile', 'vinaigre'] },
+  { cat: 'Condiments/Sauces', words: ['moutarde', 'ketchup', 'mayonnaise', 'sauce', 'pesto', 'tapenade', 'aïoli', 'aioli', 'béarnaise', 'bearnaise', 'hollandaise', 'tabasco', 'soja', 'worcestershire', 'sel', 'poivre', 'épice', 'epice', 'curry', 'paprika', 'cumin', 'muscade', 'cannelle', 'safran', 'piment', 'herbes de provence', 'fond de', 'bouillon', 'concentré de tomate', 'concentre de tomate', 'cornichon', 'câpre', 'capre', 'condiment', 'wasabi', 'miso'] },
+  { cat: 'Légumes', words: ['tomate', 'concombre', 'courgette', 'aubergine', 'poivron', 'carotte', 'oignon', 'échalote', 'echalote', 'ail', 'poireau', 'pomme de terre', 'patate', 'navet', 'radis', 'betterave', 'céleri', 'celeri', 'fenouil', 'chou', 'brocoli', 'chou-fleur', 'chou fleur', 'épinard', 'epinard', 'salade', 'laitue', 'roquette', 'mâche', 'mache', 'cresson', 'endive', 'haricot vert', 'petit pois', 'fève', 'feve', 'champignon', 'pleurote', 'shiitake', 'cèpe', 'cepe', 'girolle', 'morille', 'truffe', 'asperge', 'artichaut', 'potiron', 'butternut', 'courge', 'olive', 'avocat', 'persil', 'basilic', 'coriandre', 'menthe', 'estragon', 'thym', 'romarin', 'sauge', 'aneth', 'ciboulette', 'cerfeuil', 'légume', 'legume'] },
+  { cat: 'Fruits', words: ['pomme', 'poire', 'banane', 'orange', 'citron', 'pamplemousse', 'mandarine', 'clémentine', 'clementine', 'kiwi', 'ananas', 'mangue', 'papaye', 'fruit de la passion', 'litchi', 'fraise', 'framboise', 'mûre', 'mure', 'myrtille', 'cassis', 'groseille', 'cerise', 'abricot', 'pêche', 'peche', 'nectarine', 'prune', 'mirabelle', 'figue', 'datte', 'raisin', 'melon', 'pastèque', 'pasteque', 'rhubarbe', 'grenade', 'kaki', 'fruit'] },
+  { cat: 'Boissons', words: ['eau', 'soda', 'jus de', 'limonade', 'thé', 'the ', 'tisane', 'café', 'cafe', 'expresso', 'vin ', 'bière', 'biere', 'champagne', 'crémant', 'cremant', 'cidre', 'whisky', 'vodka', 'rhum', 'gin ', 'cognac', 'armagnac', 'liqueur', 'apéritif', 'aperitif', 'sirop'] },
+  { cat: 'Épicerie sèche', words: ['riz', 'pâtes', 'pates', 'spaghetti', 'penne', 'fusilli', 'tagliatelle', 'lasagne', 'linguine', 'ravioli', 'gnocchi', 'semoule', 'couscous', 'boulgour', 'quinoa', 'lentille', 'pois chiche', 'haricot sec', 'flageolet', 'sucre', 'chocolat', 'cacao', 'amande', 'noisette', 'noix', 'pistache', 'pignon', 'sésame', 'sesame', 'tournesol', 'lin', 'chia', 'flocon', 'céréale', 'cereale', 'conserve'] },
 ];
 
-function normalize(s) {
-  if (!s) return '';
-  // Strip diacritics so "épicerie" matches "epicerie", and lowercase everything.
-  return String(s)
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
+// LLM/spreadsheet hints get coerced back to one of CATEGORIES so the UI dropdown
+// stays consistent. Any unknown string falls back to keyword matching.
+const HINT_NORMALIZE = {
+  viande: 'Viandes',
+  viandes: 'Viandes',
+  charcuterie: 'Charcuterie',
+  poisson: 'Poissons',
+  poissons: 'Poissons',
+  'poissons/fruits de mer': 'Poissons',
+  'fruit de mer': 'Poissons',
+  'fruits de mer': 'Poissons',
+  'marée': 'Poissons',
+  maree: 'Poissons',
+  legume: 'Légumes',
+  legumes: 'Légumes',
+  'légume': 'Légumes',
+  'légumes': 'Légumes',
+  fruit: 'Fruits',
+  fruits: 'Fruits',
+  laitier: 'Produits laitiers',
+  laitiers: 'Produits laitiers',
+  cremerie: 'Produits laitiers',
+  'crémerie': 'Produits laitiers',
+  'crèmerie': 'Produits laitiers',
+  fromage: 'Produits laitiers',
+  fromages: 'Produits laitiers',
+  'produits laitiers': 'Produits laitiers',
+  epicerie: 'Épicerie sèche',
+  'épicerie': 'Épicerie sèche',
+  'epicerie seche': 'Épicerie sèche',
+  'épicerie sèche': 'Épicerie sèche',
+  boisson: 'Boissons',
+  boissons: 'Boissons',
+  vin: 'Boissons',
+  surgele: 'Surgelés',
+  'surgelé': 'Surgelés',
+  surgeles: 'Surgelés',
+  'surgelés': 'Surgelés',
+  congele: 'Surgelés',
+  'congelé': 'Surgelés',
+  boulangerie: 'Boulangerie',
+  pain: 'Boulangerie',
+  pains: 'Boulangerie',
+  patisserie: 'Boulangerie',
+  'pâtisserie': 'Boulangerie',
+  'pâtisseries': 'Boulangerie',
+  'pains & pâtisseries': 'Boulangerie',
+  'pains et pâtisseries': 'Boulangerie',
+  viennoiserie: 'Boulangerie',
+  condiment: 'Condiments/Sauces',
+  condiments: 'Condiments/Sauces',
+  sauce: 'Condiments/Sauces',
+  sauces: 'Condiments/Sauces',
+  'condiments/sauces': 'Condiments/Sauces',
+  huile: 'Huiles/Vinaigres',
+  huiles: 'Huiles/Vinaigres',
+  vinaigre: 'Huiles/Vinaigres',
+  vinaigres: 'Huiles/Vinaigres',
+  'huiles/vinaigres': 'Huiles/Vinaigres',
+  autre: 'Autre',
+  divers: 'Autre',
+};
+
+function normalizeHint(hint) {
+  if (!hint || typeof hint !== 'string') return null;
+  const k = hint.toLowerCase().trim();
+  if (!k) return null;
+  if (HINT_NORMALIZE[k]) return HINT_NORMALIZE[k];
+  for (const c of CATEGORIES) {
+    if (c.toLowerCase() === k) return c;
+  }
+  return null;
 }
 
-function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+function categorize(productName, hint) {
+  const fromHint = normalizeHint(hint);
+  if (fromHint) return fromHint;
 
-// Word-boundary match against the normalized name with French inflection
-// tolerance. Without inflection support, "crevette" would miss "crevettes"
-// and "surgele" would miss "surgelees". Without boundaries, "chou" would
-// hit "chouette". Trailing inflection group is tight: only the actual French
-// plural/feminine suffixes are accepted, and the match still has to end at a
-// word boundary — so "lait" matches "laits" but not "laitue", "vin" matches
-// "vins" but not "vinaigre".
-const INFLECTION_TAIL = '(?:s|es|e|ee|ees|x)?';
-function buildKeywordRegex(kw) {
-  const norm = normalize(kw).trim();
-  if (!norm) return null;
-  // Skip the inflection tail when the keyword already contains whitespace —
-  // multi-word phrases like "saumon fume" don't decline as a unit.
-  const tail = /\s/.test(norm) ? '' : INFLECTION_TAIL;
-  return new RegExp(`(^|[^a-z0-9])${escapeRegex(norm)}${tail}([^a-z0-9]|$)`);
-}
+  if (!productName || typeof productName !== 'string') return 'Autre';
+  const name = productName.toLowerCase();
 
-// Pre-compile keyword regexes once at module load.
-const COMPILED_RULES = RULES.map(r => ({
-  cat: r.cat,
-  matchers: r.keywords.map(buildKeywordRegex).filter(Boolean),
-}));
-
-function categorize(productName) {
-  const n = normalize(productName);
-  if (!n) return 'Autre';
-
-  for (const rule of COMPILED_RULES) {
-    for (const re of rule.matchers) {
-      if (re.test(n)) return rule.cat;
+  for (const rule of RULES) {
+    for (const w of rule.words) {
+      if (name.includes(w)) return rule.cat;
     }
   }
   return 'Autre';
 }
 
-module.exports = { categorize, CATEGORIES };
+module.exports = { CATEGORIES, categorize, normalizeHint };
