@@ -192,20 +192,19 @@ async function showSuggestionsModal() {
 // ─── New Purchase Order ───
 let _poItems = [];
 let _poSelectedSupplierId = null;
+let _poSupplierProducts = [];
 
 async function renderNewOrder() {
   const app = document.getElementById('app');
   _poItems = [];
   _poSelectedSupplierId = null;
+  _poSupplierProducts = [];
 
   let suppliers = [];
-  let ingredients = [];
   try {
     suppliers = await API.getSuppliers();
-    const ingredientsResponse = await API.getIngredients();
-    ingredients = ingredientsResponse.ingredients || [];
   } catch (e) {
-    showToast('Erreur chargement données', 'error');
+    showToast('Erreur chargement fournisseurs', 'error');
   }
 
   app.innerHTML = `
@@ -225,23 +224,18 @@ async function renderNewOrder() {
         </select>
       </div>
 
-      <div class="section-title" id="section-ingredients">Ingrédients</div>
+      <div class="section-title" id="section-ingredients">Produits du fournisseur</div>
       <div id="ingredients-list" role="region" aria-labelledby="section-ingredients">
-        <label for="ingredient-search" class="visually-hidden">Rechercher un ingrédient</label>
-        <input type="search" class="form-control" id="ingredient-search" placeholder="Rechercher un ingrédient..." style="margin-bottom:12px" aria-label="Rechercher un ingrédient">
-        <div id="ingredients-filtered" role="list" aria-label="Ingrédients disponibles" style="max-height:300px;overflow-y:auto;border:1px solid var(--border-color);border-radius:4px">
-          ${ingredients.map(ing => `
-            <div class="ingredient-item" data-id="${ing.id}" role="listitem" style="padding:8px 12px;border-bottom:1px solid var(--border-color);cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-              <span>${escapeHtml(ing.name)}</span>
-              <button type="button" class="btn btn-sm btn-primary" aria-label="Ajouter ${escapeHtml(ing.name)} à la commande">+</button>
-            </div>
-          `).join('')}
+        <label for="ingredient-search" class="visually-hidden">Rechercher un produit</label>
+        <input type="search" class="form-control" id="ingredient-search" placeholder="Rechercher un produit..." style="margin-bottom:12px" aria-label="Rechercher un produit" disabled>
+        <div id="ingredients-filtered" role="list" aria-label="Produits disponibles" aria-live="polite" style="max-height:300px;overflow-y:auto;border:1px solid var(--border-color);border-radius:4px">
+          <p class="text-muted" style="padding:16px;text-align:center;margin:0">Sélectionnez un fournisseur pour voir les produits disponibles.</p>
         </div>
       </div>
 
       <div class="section-title" id="section-po-items" style="margin-top:20px">Articles de la commande</div>
       <div id="po-items-table" role="region" aria-labelledby="section-po-items" aria-live="polite" style="overflow-x:auto">
-        <p class="text-muted">Aucun article pour le moment. Ajoutez des ingrédients ci-dessus.</p>
+        <p class="text-muted">Aucun article pour le moment. Ajoutez des produits ci-dessus.</p>
       </div>
 
       <div class="section-title" style="margin-top:20px">Total</div>
@@ -266,30 +260,33 @@ async function renderNewOrder() {
   const ingredientSearch = document.getElementById('ingredient-search');
   const ingredientsFiltered = document.getElementById('ingredients-filtered');
 
-  // Supplier selection
-  supplierSelect.addEventListener('change', (e) => {
+  // Supplier selection — fetches products & prices for that supplier
+  supplierSelect.addEventListener('change', async (e) => {
     _poSelectedSupplierId = e.target.value ? parseInt(e.target.value) : null;
+    _poItems = [];
+    ingredientSearch.value = '';
+    await loadSupplierProducts();
     updatePOItemsDisplay();
   });
 
   // Ingredient search
   ingredientSearch.addEventListener('input', (e) => {
     const query = e.target.value.toLowerCase();
-    const items = document.querySelectorAll('.ingredient-item');
-    items.forEach(item => {
-      const name = item.textContent.toLowerCase();
+    document.querySelectorAll('.ingredient-item').forEach(item => {
+      const name = (item.dataset.name || '').toLowerCase();
       item.style.display = name.includes(query) ? '' : 'none';
     });
   });
 
-  // Add ingredient to order
+  // Add ingredient to order — uses cached mercuriale entry
   ingredientsFiltered.addEventListener('click', (e) => {
     const btn = e.target.closest('.ingredient-item button');
     if (!btn) return;
 
     const ingredientItem = e.target.closest('.ingredient-item');
     const ingredientId = parseInt(ingredientItem.dataset.id);
-    const ingredientName = ingredientItem.textContent.trim();
+    const product = _poSupplierProducts.find(p => p.ingredient_id === ingredientId);
+    if (!product) return;
 
     const existing = _poItems.find(i => i.ingredient_id === ingredientId);
     if (existing) {
@@ -297,10 +294,10 @@ async function renderNewOrder() {
     } else {
       _poItems.push({
         ingredient_id: ingredientId,
-        name: ingredientName,
+        name: product.ingredient_name,
         quantity: 1,
-        unit: 'unité',
-        unit_price: 0
+        unit: product.unit || 'unité',
+        unit_price: Number(product.price) || 0
       });
     }
 
@@ -314,6 +311,53 @@ async function renderNewOrder() {
   document.getElementById('btn-save-po').addEventListener('click', async () => {
     await submitPurchaseOrder(false);
   });
+}
+
+async function loadSupplierProducts() {
+  const ingredientsFiltered = document.getElementById('ingredients-filtered');
+  const ingredientSearch = document.getElementById('ingredient-search');
+  if (!ingredientsFiltered) return;
+
+  if (!_poSelectedSupplierId) {
+    _poSupplierProducts = [];
+    if (ingredientSearch) ingredientSearch.disabled = true;
+    ingredientsFiltered.innerHTML = `<p class="text-muted" style="padding:16px;text-align:center;margin:0">Sélectionnez un fournisseur pour voir les produits disponibles.</p>`;
+    return;
+  }
+
+  ingredientsFiltered.innerHTML = `<div class="loading" style="padding:24px"><div class="spinner"></div></div>`;
+  try {
+    const products = await API.getSupplierPrices(_poSelectedSupplierId);
+    _poSupplierProducts = Array.isArray(products) ? products : [];
+  } catch (e) {
+    _poSupplierProducts = [];
+    ingredientsFiltered.innerHTML = `<p class="text-danger" style="padding:16px;margin:0">Erreur : ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+
+  if (ingredientSearch) ingredientSearch.disabled = false;
+
+  if (_poSupplierProducts.length === 0) {
+    ingredientsFiltered.innerHTML = `
+      <div class="empty-state" style="padding:24px">
+        <p>Ce fournisseur n'a pas encore de produits référencés.</p>
+        <p class="text-secondary text-sm">Ajoutez-les depuis la mercuriale du fournisseur.</p>
+      </div>
+    `;
+    return;
+  }
+
+  ingredientsFiltered.innerHTML = _poSupplierProducts.map(p => {
+    const price = Number(p.price) || 0;
+    const unit = p.unit || 'unité';
+    return `
+      <div class="ingredient-item" data-id="${p.ingredient_id}" data-name="${escapeHtml(p.ingredient_name || '')}" role="listitem" style="padding:8px 12px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <span style="flex:1;min-width:0">${escapeHtml(p.ingredient_name || '—')}</span>
+        <span class="text-secondary text-sm" style="font-family:var(--font-mono);white-space:nowrap">${formatCurrency(price)} / ${escapeHtml(unit)}</span>
+        <button type="button" class="btn btn-sm btn-primary" aria-label="Ajouter ${escapeHtml(p.ingredient_name || '')} à la commande">+</button>
+      </div>
+    `;
+  }).join('');
 }
 
 function updatePOItemsDisplay() {
