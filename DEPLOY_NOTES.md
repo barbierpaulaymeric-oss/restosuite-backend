@@ -96,3 +96,29 @@ Voir `.env.example` à la racine pour la liste complète.
 5. Test login fournisseur démo → portail fournisseur.
 6. Vérifier `/api/health` retourne `{ ok: true }`.
 7. Vérifier Stripe webhook reçoit bien les événements (dashboard Stripe → Events).
+
+---
+
+## 5. Comptes de démo (`npm run seed:demo`)
+
+Le seed `server/seed-demo.js` (idempotent — re-running is a no-op) installe le
+restaurant fictif "Chez Laurent — Paris 11" + le fournisseur Metro Paris Nation
+configuré comme compte démo du portail fournisseur.
+
+### Restaurant
+| Rôle      | Identifiant                | Mot de passe / PIN |
+|-----------|----------------------------|--------------------|
+| Gérant    | `demo@restosuite.fr`       | `Demo2026!`        |
+| Cuisinier | Thomas Moreau              | PIN `1234`         |
+| Équipier  | Julie Dubois               | PIN `5678`         |
+| Salle     | Marc Bernard               | PIN `9012`         |
+
+### Fournisseur (portail Metro Paris Nation)
+| Champ       | Valeur                              |
+|-------------|-------------------------------------|
+| Email       | `demo-fournisseur@restosuite.fr`    |
+| Mot de passe| `Demo2026!`                         |
+| PIN membre  | `1111` (Jean Dupont, commercial Metro) |
+
+Flux : depuis `/app` → bouton **Fournisseur** → email + mot de passe →
+sélection du membre **Jean Dupont** → PIN `1111`.

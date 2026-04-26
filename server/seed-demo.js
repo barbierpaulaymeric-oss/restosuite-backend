@@ -91,13 +91,20 @@ for (const s of staff) {
 
 // ─── 3. Suppliers ──────────────────────────────────────────────────────────
 section('Suppliers');
+// The Metro entry doubles as the demo supplier-portal login. We bind the
+// well-known demo email there so prospects can sign in with
+// demo-fournisseur@restosuite.fr / Demo2026! and land in the portal directly.
+const SUPPLIER_DEMO_EMAIL = 'demo-fournisseur@restosuite.fr';
+const SUPPLIER_DEMO_PASSWORD = 'Demo2026!';
+const SUPPLIER_DEMO_PIN = '1111';
+
 const suppliers = [
-  { name: 'Metro Paris Nation',   contact: 'Service pro', phone: '01 40 09 40 00', email: 'pro@metro.fr',               rating: 4, notes: 'Grossiste généraliste, livraison 6j/7' },
+  { name: 'Metro Paris Nation',   contact: 'Jean Dupont', phone: '01 40 09 40 00', email: SUPPLIER_DEMO_EMAIL,            rating: 4, notes: 'Grossiste généraliste, livraison 6j/7' },
   { name: 'Pomona TerreAzur',     contact: 'Sylvie D.',   phone: '01 49 29 30 00', email: 'commandes@pomona-terreazur.fr', rating: 5, notes: 'Fruits & légumes, très bon rapport qualité/prix' },
-  { name: 'Bigard Boucherie Pro', contact: 'Julien B.',   phone: '02 98 85 33 33', email: 'pro@bigard.fr',              rating: 5, notes: 'Viandes françaises, traçabilité complète' },
+  { name: 'Bigard Boucherie Pro', contact: 'Julien B.',   phone: '02 98 85 33 33', email: 'pro@bigard.fr',                rating: 5, notes: 'Viandes françaises, traçabilité complète' },
   { name: 'France Boissons',      contact: 'Karine L.',   phone: '03 88 65 65 65', email: 'commandes@france-boissons.fr', rating: 4, notes: 'Boissons & spiritueux' },
-  { name: 'Brake France',         contact: 'Pierre M.',   phone: '01 58 31 99 00', email: 'pro@brake.fr',               rating: 3, notes: 'Surgelés & produits de la mer' },
-  { name: 'Marée du Jour',        contact: 'Antoine R.',  phone: '02 98 44 20 20', email: 'commandes@maree-du-jour.fr', rating: 5, notes: 'Poissonnerie Rungis, arrivages quotidiens' },
+  { name: 'Brake France',         contact: 'Pierre M.',   phone: '01 58 31 99 00', email: 'pro@brake.fr',                 rating: 3, notes: 'Surgelés & produits de la mer' },
+  { name: 'Marée du Jour',        contact: 'Antoine R.',  phone: '02 98 44 20 20', email: 'commandes@maree-du-jour.fr',   rating: 5, notes: 'Poissonnerie Rungis, arrivages quotidiens' },
 ];
 const supplierIds = {};
 for (const s of suppliers) {
@@ -110,10 +117,22 @@ for (const s of suppliers) {
   log(`${s.name} (★${s.rating})`);
 }
 
+// Wire the company-login credentials onto the Metro row. password_hash and
+// contact_name live in the suppliers table (not supplier_accounts) — that's
+// what /api/supplier-portal/company-login authenticates against.
+const supplierDemoHash = bcrypt.hashSync(SUPPLIER_DEMO_PASSWORD, 10);
+run(
+  `UPDATE suppliers
+      SET password_hash = ?, contact_name = ?
+    WHERE id = ? AND restaurant_id = ?`,
+  [supplierDemoHash, 'Jean Dupont (commercial Metro)', supplierIds['Metro Paris Nation'], RID]
+);
+log(`Metro company-login: ${SUPPLIER_DEMO_EMAIL} / ${SUPPLIER_DEMO_PASSWORD}`);
+
 // ─── 3b. Supplier portal accounts (Metro, Pomona, France Boissons) ─────────
 section('Supplier portal accounts');
 const supplierLogins = [
-  { supplier: 'Metro Paris Nation',   name: 'Metro Pro',        email: 'pro@metro.fr',                  pin: '1111' },
+  { supplier: 'Metro Paris Nation',   name: 'Jean Dupont',      email: SUPPLIER_DEMO_EMAIL,             pin: SUPPLIER_DEMO_PIN },
   { supplier: 'Pomona TerreAzur',     name: 'Pomona Commandes', email: 'commandes@pomona-terreazur.fr', pin: '2222' },
   { supplier: 'France Boissons',      name: 'FB Commandes',     email: 'commandes@france-boissons.fr',  pin: '3333' },
 ];
@@ -818,9 +837,14 @@ log(`${aiPrefs.length} préférences Alto`);
 console.log(`
 ✅ Demo seed complete for "Chez Laurent — Paris 11" (restaurant_id=${RID}).
 
-   Login:
-     Gérant    → ${OWNER_EMAIL}   /  ${OWNER_PASSWORD}
-     Cuisinier → Thomas Moreau    PIN 1234
-     Équipier  → Julie Dubois     PIN 5678
-     Salle     → Marc Bernard     PIN 9012
+   Login restaurant :
+     Gérant     → ${OWNER_EMAIL}   /  ${OWNER_PASSWORD}
+     Cuisinier  → Thomas Moreau    PIN 1234
+     Équipier   → Julie Dubois     PIN 5678
+     Salle      → Marc Bernard     PIN 9012
+
+   Login fournisseur (portail Metro Paris Nation) :
+     Email      → ${SUPPLIER_DEMO_EMAIL}
+     Mot de passe → ${SUPPLIER_DEMO_PASSWORD}
+     PIN membre  → ${SUPPLIER_DEMO_PIN}  (Jean Dupont)
 `);
