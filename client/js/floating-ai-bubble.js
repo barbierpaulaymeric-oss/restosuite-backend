@@ -30,12 +30,12 @@ function initFloatingAIBubble() {
       #floating-ai-bubble-container {
         position: fixed;
         bottom: 88px;
-        right: 20px;
+        right: 24px;
         z-index: 1000;
         font-family: var(--font-sans);
       }
       @media (min-width: 768px) {
-        #floating-ai-bubble-container { bottom: 24px; }
+        #floating-ai-bubble-container { bottom: 24px; right: 24px; }
       }
 
       .bubble-fab {
@@ -43,19 +43,19 @@ function initFloatingAIBubble() {
         width: 56px;
         height: 56px;
         border-radius: 50%;
-        background: #C45A18;
+        background: #1B2A4A;
         border: none;
-        color: #F7F5F2;
+        color: #FFFFFF;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 8px 20px rgba(196, 90, 24, 0.35);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
       }
 
       .bubble-fab:hover {
-        box-shadow: 0 10px 24px rgba(196, 90, 24, 0.45);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
         transform: scale(1.06);
       }
 
@@ -67,7 +67,7 @@ function initFloatingAIBubble() {
         position: absolute;
         inset: -4px;
         border-radius: 50%;
-        border: 2px solid #C45A18;
+        border: 2px solid #1B2A4A;
         animation: bubbleRingPulse 1.6s ease-out infinite;
         pointer-events: none;
       }
@@ -278,10 +278,10 @@ function initFloatingAIBubble() {
       @media (max-width: 640px) {
         #floating-ai-bubble-container {
           bottom: 88px;
-          right: 12px;
+          right: 16px;
         }
         .bubble-panel {
-          width: calc(100vw - 24px);
+          width: calc(100vw - 32px);
           max-height: calc(100vh - 180px);
         }
       }
