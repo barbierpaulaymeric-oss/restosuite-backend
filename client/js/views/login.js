@@ -35,6 +35,9 @@ class LoginView {
     this.restaurantId = null;
     this.pinDigits = [];
     this.prefillEmail = '';
+    // Register form: 'restaurant' (default) or 'supplier'. Persisted across
+    // re-renders triggered by the user toggling the tabs.
+    this.registerType = 'restaurant';
   }
 
   async render() {
@@ -240,10 +243,92 @@ class LoginView {
 
   // ─── Register ───
   renderRegister(app) {
-    const accountType = this.registerAccountType || 'restaurant';
+    const isSupplier = this.registerType === 'supplier';
+    const tabBtnStyle = (active) => `
+      flex:1;padding:10px 12px;border:none;cursor:pointer;
+      background:${active ? 'var(--bg-primary)' : 'transparent'};
+      color:${active ? 'var(--text-primary)' : 'var(--text-tertiary)'};
+      font-weight:${active ? '600' : '500'};
+      font-size:var(--text-sm);
+      border-radius:var(--radius-md);
+      transition:all 0.15s;
+    `;
+
+    const restaurantFields = `
+      <div style="display:flex;gap:var(--space-3)">
+        <div class="form-group" style="flex:1">
+          <label for="reg-firstname">Prénom</label>
+          <input type="text" class="form-control" id="reg-firstname" placeholder="Paul" autocomplete="given-name">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label for="reg-lastname">Nom</label>
+          <input type="text" class="form-control" id="reg-lastname" placeholder="Dupont" autocomplete="family-name">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="reg-email">Email</label>
+        <input type="email" class="form-control" id="reg-email" placeholder="votre@email.com" autocomplete="email" required>
+      </div>
+      <div class="form-group">
+        <label for="reg-password">Mot de passe (8 car. min., 1 majuscule, 1 chiffre)</label>
+        <input type="password" class="form-control" id="reg-password" placeholder="••••••••" autocomplete="new-password" required aria-describedby="reg-password-help">
+      </div>
+      <div class="form-group">
+        <label for="reg-password2">Confirmer le mot de passe</label>
+        <input type="password" class="form-control" id="reg-password2" placeholder="••••••••" autocomplete="new-password" required>
+      </div>
+      <div style="margin-top:var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--border-default)">
+        <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md)">
+          <span style="font-size:1.3rem;line-height:1">💡</span>
+          <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
+            <strong>Deux mots de passe, deux accès :</strong><br>
+            <strong style="color:var(--text-primary)">Votre mot de passe</strong> (ci-dessus) est personnel et donne accès complet au logiciel.<br>
+            <strong style="color:var(--text-primary)">Le mot de passe équipe</strong> (ci-dessous) est un code simple que vous partagez avec votre staff pour qu'ils accèdent à leur espace limité.
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="reg-staff-password">Mot de passe équipe (partagé avec le staff)</label>
+          <input type="text" class="form-control" id="reg-staff-password" placeholder="ex: Resto2026" autocomplete="off"
+                 style="font-family:var(--font-mono);letter-spacing:0.05em">
+        </div>
+        <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-1)">Optionnel — vous pourrez le configurer plus tard dans Équipe.</p>
+      </div>
+    `;
+
+    const supplierFields = `
+      <div class="form-group">
+        <label for="sup-company">Nom de la société</label>
+        <input type="text" class="form-control" id="sup-company" placeholder="Boucherie Martin SARL" autocomplete="organization" required>
+      </div>
+      <div class="form-group">
+        <label for="sup-contact">Nom du contact</label>
+        <input type="text" class="form-control" id="sup-contact" placeholder="Jean Martin" autocomplete="name" required>
+      </div>
+      <div class="form-group">
+        <label for="sup-email">Email professionnel</label>
+        <input type="email" class="form-control" id="sup-email" placeholder="contact@fournisseur.fr" autocomplete="email" required>
+      </div>
+      <div class="form-group">
+        <label for="sup-phone">Téléphone <span style="color:var(--text-tertiary);font-weight:400">(optionnel)</span></label>
+        <input type="tel" class="form-control" id="sup-phone" placeholder="06 12 34 56 78" autocomplete="tel">
+      </div>
+      <div class="form-group">
+        <label for="sup-password">Mot de passe (8 car. min., 1 majuscule, 1 chiffre)</label>
+        <input type="password" class="form-control" id="sup-password" placeholder="••••••••" autocomplete="new-password" required>
+      </div>
+      <div class="form-group">
+        <label for="sup-password2">Confirmer le mot de passe</label>
+        <input type="password" class="form-control" id="sup-password2" placeholder="••••••••" autocomplete="new-password" required>
+      </div>
+      <div style="margin-top:var(--space-4);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md);font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
+        <strong style="color:var(--text-primary)">Comment ça marche ?</strong><br>
+        Après inscription, demandez à un restaurant client de vous ajouter à ses fournisseurs (avec votre email). Vous pourrez alors gérer votre catalogue, vos prix et vos commandes depuis le portail.
+      </div>
+    `;
+
     app.innerHTML = `
       <div class="login-screen">
-        <div class="login-content" style="max-width:400px">
+        <div class="login-content" style="max-width:440px">
           <button class="login-back" id="back-btn" aria-label="Revenir à l'écran précédent">
             <i data-lucide="arrow-left" style="width:20px;height:20px" aria-hidden="true"></i> Retour
           </button>
@@ -251,81 +336,26 @@ class LoginView {
             <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 60px; width: auto;">
           </div>
           <h2 class="login-subtitle">Créer un compte</h2>
-          <p class="login-tagline">Essai gratuit 60 jours — aucun engagement</p>
+          <p class="login-tagline">${isSupplier ? 'Espace fournisseur — inscription gratuite' : 'Essai gratuit 60 jours — aucun engagement'}</p>
 
-          <div role="tablist" aria-label="Type de compte" style="display:flex;gap:8px;width:100%;background:var(--bg-secondary);padding:4px;border-radius:var(--radius-md);margin-bottom:var(--space-4)">
-            <button type="button" role="tab" id="reg-tab-restaurant" aria-selected="${accountType === 'restaurant'}" class="btn ${accountType === 'restaurant' ? 'btn-primary' : 'btn-ghost'}" style="flex:1;padding:10px;font-size:var(--text-sm)">
-              <i data-lucide="utensils-crossed" style="width:16px;height:16px" aria-hidden="true"></i> Restaurant
+          <div role="tablist" aria-label="Type de compte" style="display:flex;gap:4px;padding:4px;background:var(--bg-secondary);border-radius:var(--radius-md);margin-top:var(--space-4);width:100%">
+            <button type="button" role="tab" id="reg-tab-restaurant" aria-selected="${!isSupplier}" style="${tabBtnStyle(!isSupplier)}">
+              🍽️ Restaurant
             </button>
-            <button type="button" role="tab" id="reg-tab-fournisseur" aria-selected="${accountType === 'fournisseur'}" class="btn ${accountType === 'fournisseur' ? 'btn-primary' : 'btn-ghost'}" style="flex:1;padding:10px;font-size:var(--text-sm)">
-              <i data-lucide="truck" style="width:16px;height:16px" aria-hidden="true"></i> Fournisseur
+            <button type="button" role="tab" id="reg-tab-supplier" aria-selected="${isSupplier}" style="${tabBtnStyle(isSupplier)}">
+              🚚 Fournisseur
             </button>
           </div>
 
-          ${accountType === 'fournisseur' ? `
-          <div style="text-align:left;width:100%;padding:var(--space-4);background:var(--bg-secondary);border-radius:var(--radius-md);margin-bottom:var(--space-3)">
-            <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3)">
-              <span style="font-size:1.5rem;line-height:1" aria-hidden="true">📦</span>
-              <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
-                <strong style="color:var(--text-primary)">Les comptes fournisseurs sont créés par invitation.</strong><br>
-                Si un restaurant client vous a invité à rejoindre RestoSuite, connectez-vous au portail fournisseur avec l'email et le mot de passe qu'il vous a fournis.
-              </div>
-            </div>
-            <button class="btn btn-primary" id="reg-go-supplier-login" style="width:100%;padding:12px;font-size:var(--text-base);background:#4A90D9;border-color:#4A90D9">
-              <i data-lucide="log-in" style="width:18px;height:18px" aria-hidden="true"></i> Aller au portail fournisseur
-            </button>
-            <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-3);text-align:center">
-              Vous gérez un restaurant ? <a href="#" id="reg-back-to-restaurant" style="color:var(--accent-primary);text-decoration:underline">Revenir au compte restaurant</a>
-            </p>
-          </div>
-          ` : `
           <div style="text-align:left;width:100%;margin-top:var(--space-4)">
-            <div style="display:flex;gap:var(--space-3)">
-              <div class="form-group" style="flex:1">
-                <label for="reg-firstname">Prénom</label>
-                <input type="text" class="form-control" id="reg-firstname" placeholder="Paul" autocomplete="given-name">
-              </div>
-              <div class="form-group" style="flex:1">
-                <label for="reg-lastname">Nom</label>
-                <input type="text" class="form-control" id="reg-lastname" placeholder="Dupont" autocomplete="family-name">
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="reg-email">Email</label>
-              <input type="email" class="form-control" id="reg-email" placeholder="votre@email.com" autocomplete="email" required>
-            </div>
-            <div class="form-group">
-              <label for="reg-password">Mot de passe (6 caractères min.)</label>
-              <input type="password" class="form-control" id="reg-password" placeholder="••••••••" autocomplete="new-password" required aria-describedby="reg-password-help">
-            </div>
-            <div class="form-group">
-              <label for="reg-password2">Confirmer le mot de passe</label>
-              <input type="password" class="form-control" id="reg-password2" placeholder="••••••••" autocomplete="new-password" required>
-            </div>
-            <div style="margin-top:var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--border-default)">
-              <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md)">
-                <span style="font-size:1.3rem;line-height:1">💡</span>
-                <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
-                  <strong>Deux mots de passe, deux accès :</strong><br>
-                  <strong style="color:var(--text-primary)">Votre mot de passe</strong> (ci-dessus) est personnel et donne accès complet au logiciel.<br>
-                  <strong style="color:var(--text-primary)">Le mot de passe équipe</strong> (ci-dessous) est un code simple que vous partagez avec votre staff pour qu'ils accèdent à leur espace limité.
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="reg-staff-password">Mot de passe équipe (partagé avec le staff)</label>
-                <input type="text" class="form-control" id="reg-staff-password" placeholder="ex: resto2026" autocomplete="off"
-                       style="font-family:var(--font-mono);letter-spacing:0.05em">
-              </div>
-              <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-1)">Optionnel — vous pourrez le configurer plus tard dans Équipe.</p>
-            </div>
+            ${isSupplier ? supplierFields : restaurantFields}
           </div>
 
           <div id="reg-error" role="alert" aria-live="assertive" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
 
           <button class="btn btn-primary" id="reg-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
-            Créer mon compte
+            ${isSupplier ? 'Créer mon compte fournisseur' : 'Créer mon compte'}
           </button>
-          `}
         </div>
       </div>
     `;
@@ -336,29 +366,91 @@ class LoginView {
       this.render();
     });
     document.getElementById('reg-tab-restaurant').addEventListener('click', () => {
-      this.registerAccountType = 'restaurant';
-      this.renderRegister(app);
+      if (this.registerType === 'restaurant') return;
+      this.registerType = 'restaurant';
+      this.render();
     });
-    document.getElementById('reg-tab-fournisseur').addEventListener('click', () => {
-      this.registerAccountType = 'fournisseur';
-      this.renderRegister(app);
+    document.getElementById('reg-tab-supplier').addEventListener('click', () => {
+      if (this.registerType === 'supplier') return;
+      this.registerType = 'supplier';
+      this.render();
     });
-    if (accountType === 'fournisseur') {
-      document.getElementById('reg-go-supplier-login').addEventListener('click', () => {
-        location.hash = '#/supplier/login';
+
+    if (isSupplier) {
+      document.getElementById('reg-submit').addEventListener('click', () => this.handleRegisterSupplier());
+      document.getElementById('sup-password2').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') this.handleRegisterSupplier();
       });
-      const back = document.getElementById('reg-back-to-restaurant');
-      if (back) back.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.registerAccountType = 'restaurant';
-        this.renderRegister(app);
+    } else {
+      document.getElementById('reg-submit').addEventListener('click', () => this.handleRegister());
+      document.getElementById('reg-password2').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') this.handleRegister();
       });
-      return;
     }
-    document.getElementById('reg-submit').addEventListener('click', () => this.handleRegister());
-    document.getElementById('reg-password2').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.handleRegister();
-    });
+  }
+
+  async handleRegisterSupplier() {
+    const company = document.getElementById('sup-company').value.trim();
+    const contact = document.getElementById('sup-contact').value.trim();
+    const email = document.getElementById('sup-email').value.trim();
+    const phone = document.getElementById('sup-phone').value.trim();
+    const password = document.getElementById('sup-password').value;
+    const password2 = document.getElementById('sup-password2').value;
+    const errorEl = document.getElementById('reg-error');
+    const submitBtn = document.getElementById('reg-submit');
+
+    errorEl.textContent = '';
+    if (!company) { errorEl.textContent = 'Le nom de la société est requis'; return; }
+    if (!contact) { errorEl.textContent = 'Le nom du contact est requis'; return; }
+    if (!email) { errorEl.textContent = "L'email est requis"; return; }
+    if (!password || password.length < 8) { errorEl.textContent = 'Le mot de passe doit faire au moins 8 caractères'; return; }
+    if (!/[A-Z]/.test(password)) { errorEl.textContent = 'Le mot de passe doit contenir au moins une majuscule'; return; }
+    if (!/[0-9]/.test(password)) { errorEl.textContent = 'Le mot de passe doit contenir au moins un chiffre'; return; }
+    if (password !== password2) { errorEl.textContent = 'Les mots de passe ne correspondent pas'; return; }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Création...';
+
+    try {
+      const result = await API.registerSupplier({
+        company_name: company,
+        contact_name: contact,
+        email,
+        password,
+        phone: phone || undefined,
+      });
+
+      // No session is issued — the supplier needs a restaurant to invite them
+      // before they can sign in to the portal. Show a confirmation screen with
+      // a clear next step.
+      const app = document.getElementById('app');
+      app.innerHTML = `
+        <div class="login-screen">
+          <div class="login-content" style="max-width:480px">
+            <div class="login-logo">
+              <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:60px;width:auto">
+            </div>
+            <h2 class="login-subtitle" style="color:#4A90D9">Compte fournisseur créé</h2>
+            <p class="login-tagline" style="margin-bottom:var(--space-5)">${escapeHtml(result.message || 'Inscription réussie.')}</p>
+            <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-4);text-align:left;font-size:var(--text-sm);color:var(--text-secondary);line-height:1.6;margin-bottom:var(--space-5)">
+              <strong style="color:var(--text-primary)">Prochaine étape :</strong><br>
+              Communiquez votre email <strong style="color:var(--text-primary)">${escapeHtml(email)}</strong> à un restaurant client. Une fois ajouté à leurs fournisseurs, vous pourrez vous connecter au portail.
+            </div>
+            <button class="btn btn-primary" id="sup-confirm-back" style="width:100%;padding:12px;background:#4A90D9;border-color:#4A90D9">
+              Retour à la connexion
+            </button>
+          </div>
+        </div>
+      `;
+      document.getElementById('sup-confirm-back').addEventListener('click', () => {
+        this.mode = 'choice';
+        this.render();
+      });
+    } catch (e) {
+      errorEl.textContent = e.message || "Erreur lors de l'inscription";
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Créer mon compte fournisseur';
+    }
   }
 
   async handleRegister() {
@@ -373,7 +465,9 @@ class LoginView {
 
     errorEl.textContent = '';
     if (!email) { errorEl.textContent = "L'email est requis"; return; }
-    if (!password || password.length < 6) { errorEl.textContent = 'Le mot de passe doit faire au moins 6 caractères'; return; }
+    if (!password || password.length < 8) { errorEl.textContent = 'Le mot de passe doit faire au moins 8 caractères'; return; }
+    if (!/[A-Z]/.test(password)) { errorEl.textContent = 'Le mot de passe doit contenir au moins une majuscule'; return; }
+    if (!/[0-9]/.test(password)) { errorEl.textContent = 'Le mot de passe doit contenir au moins un chiffre'; return; }
     if (password !== password2) { errorEl.textContent = 'Les mots de passe ne correspondent pas'; return; }
 
     submitBtn.disabled = true;

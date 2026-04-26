@@ -1508,15 +1508,19 @@ tr:has(td[colspan]) td {
 }
 
 .login-screen {
-  position: relative;
-  min-height: 100vh;
-  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
-  align-items: center;
+  /* flex-start (not center) so tall content scrolls from the top instead of
+     being clipped above the viewport when the form is taller than the screen. */
+  align-items: flex-start;
   justify-content: center;
+  overflow-y: auto;
   background: linear-gradient(135deg, #0F1723 0%, #1B2A4A 100%);
   padding: var(--space-6);
-  overflow-y: auto;
   z-index: 100;
 }
 
@@ -1525,6 +1529,9 @@ tr:has(td[colspan]) td {
   max-width: 400px;
   text-align: center;
   animation: login-fadeIn 0.5s ease-out;
+  /* Vertically centers the card when shorter than the viewport; collapses to
+     0 when content exceeds the viewport so scrolling starts from the top. */
+  margin: auto 0;
 }
 
 .login-logo {

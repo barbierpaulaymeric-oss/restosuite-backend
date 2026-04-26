@@ -54,6 +54,79 @@ describe('POST /api/auth/register', () => {
   });
 });
 
+describe('POST /api/auth/register-supplier', () => {
+  const validBody = () => ({
+    company_name: 'Boucherie Martin',
+    contact_name: 'Jean Martin',
+    email: `sup-${Date.now()}-${Math.random().toString(36).slice(2)}@test.fr`,
+    password: 'Secure1pass',
+    phone: '0612345678',
+  });
+
+  it('creates a supplier and returns success', async () => {
+    const res = await request(app).post('/api/auth/register-supplier').send(validBody());
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.message).toMatch(/fournisseur/i);
+  });
+
+  it('persists supplier with restaurant_id NULL (unaffiliated)', async () => {
+    const body = validBody();
+    await request(app).post('/api/auth/register-supplier').send(body);
+    const { get } = require('../db');
+    const row = get('SELECT * FROM suppliers WHERE email = ?', [body.email.toLowerCase()]);
+    expect(row).toBeTruthy();
+    expect(row.restaurant_id).toBeNull();
+    expect(row.password_hash).toBeTruthy();
+    expect(row.password_hash).not.toBe(body.password);
+    expect(row.contact_name).toBe(body.contact_name);
+  });
+
+  it('rejects duplicate email', async () => {
+    const body = validBody();
+    await request(app).post('/api/auth/register-supplier').send(body);
+    const res = await request(app).post('/api/auth/register-supplier').send(body);
+    expect(res.status).toBe(409);
+  });
+
+  it('rejects missing company_name', async () => {
+    const res = await request(app).post('/api/auth/register-supplier').send({ ...validBody(), company_name: '' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects missing contact_name', async () => {
+    const res = await request(app).post('/api/auth/register-supplier').send({ ...validBody(), contact_name: '' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects weak password (no uppercase)', async () => {
+    const res = await request(app).post('/api/auth/register-supplier').send({ ...validBody(), password: 'lowercase1' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects weak password (no digit)', async () => {
+    const res = await request(app).post('/api/auth/register-supplier').send({ ...validBody(), password: 'NoDigitPass' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects short password', async () => {
+    const res = await request(app).post('/api/auth/register-supplier').send({ ...validBody(), password: 'Ab1' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects malformed email', async () => {
+    const res = await request(app).post('/api/auth/register-supplier').send({ ...validBody(), email: 'not-an-email' });
+    expect(res.status).toBe(400);
+  });
+
+  it('accepts missing phone (optional)', async () => {
+    const body = validBody();
+    delete body.phone;
+    const res = await request(app).post('/api/auth/register-supplier').send(body);
+    expect(res.status).toBe(201);
+  });
+});
+
 describe('POST /api/auth/login', () => {
   const email = 'login@test.fr';
   const password = 'Secure1pass';

@@ -167,6 +167,9 @@ const API = {
     if (r && r.csrf_token) setCsrfToken(r.csrf_token);
     return r;
   },
+  async registerSupplier(data) {
+    return this.request('/auth/register-supplier', { method: 'POST', body: data });
+  },
   async login(data) {
     const r = await this.request('/auth/login', { method: 'POST', body: data });
     if (r && r.csrf_token) setCsrfToken(r.csrf_token);

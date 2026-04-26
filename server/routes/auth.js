@@ -324,6 +324,67 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// ─── POST /api/auth/register-supplier ───
+// Self-registration for a supplier company. Creates a `suppliers` row with
+// restaurant_id = NULL (unaffiliated). The supplier becomes accessible to a
+// restaurant once that restaurant invites them by email via the supplier-portal
+// /invite flow, which adopts the row by setting its restaurant_id.
+router.post('/register-supplier', async (req, res) => {
+  const { company_name, contact_name, email, password, phone } = req.body;
+
+  if (!company_name || !company_name.trim()) {
+    return res.status(400).json({ error: 'Le nom de la société est requis' });
+  }
+  if (!contact_name || !contact_name.trim()) {
+    return res.status(400).json({ error: 'Le nom du contact est requis' });
+  }
+  if (!email || !email.trim()) {
+    return res.status(400).json({ error: 'L\'email est requis' });
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email.trim())) {
+    return res.status(400).json({ error: 'Email invalide' });
+  }
+  if (!password || password.length < 8) {
+    return res.status(400).json({ error: 'Le mot de passe doit faire au moins 8 caractères' });
+  }
+  if (!/[A-Z]/.test(password)) {
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins une majuscule' });
+  }
+  if (!/[0-9]/.test(password)) {
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins un chiffre' });
+  }
+
+  const emailLower = email.trim().toLowerCase();
+
+  // The unique partial index `idx_suppliers_email` is global (not per-tenant),
+  // so a duplicate email anywhere in the system would fail the INSERT. Surface
+  // a clean 409 instead of a 500.
+  const existing = get('SELECT id FROM suppliers WHERE email = ?', [emailLower]);
+  if (existing) {
+    return res.status(409).json({ error: 'Un compte fournisseur existe déjà avec cet email' });
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, 10);
+    // restaurant_id is NULL on self-registration: the supplier exists in the
+    // platform but isn't yet attached to any restaurant. The first restaurant
+    // that invites them by email adopts the row (sets restaurant_id).
+    run(
+      `INSERT INTO suppliers (name, contact_name, email, password_hash, phone, restaurant_id)
+       VALUES (?, ?, ?, ?, ?, NULL)`,
+      [company_name.trim(), contact_name.trim(), emailLower, passwordHash, (phone || '').trim() || null]
+    );
+    res.status(201).json({
+      success: true,
+      message: 'Compte fournisseur créé. Un restaurant client doit vous ajouter à ses fournisseurs (avec cet email) pour accéder au portail.'
+    });
+  } catch (e) {
+    console.error('Register-supplier error:', e);
+    res.status(500).json({ error: 'Erreur lors de l\'inscription fournisseur' });
+  }
+});
+
 // ─── POST /api/auth/login ───
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
