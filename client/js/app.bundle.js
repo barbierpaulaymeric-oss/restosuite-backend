@@ -24041,7 +24041,7 @@ function initFloatingAIBubble() {
       #floating-ai-bubble-container {
         position: fixed;
         bottom: 88px;
-        right: 16px;
+        right: 24px;
         z-index: 1000;
         font-family: var(--font-sans);
       }
@@ -24078,7 +24078,7 @@ function initFloatingAIBubble() {
         position: absolute;
         inset: -4px;
         border-radius: 50%;
-        border: 2px solid #1B2A4A;
+        border: 2px solid #C45A18;
         animation: bubbleRingPulse 1.6s ease-out infinite;
         pointer-events: none;
       }
@@ -24289,10 +24289,10 @@ function initFloatingAIBubble() {
       @media (max-width: 640px) {
         #floating-ai-bubble-container {
           bottom: 88px;
-          right: 16px;
+          right: 24px;
         }
         .bubble-panel {
-          width: calc(100vw - 32px);
+          width: calc(100vw - 48px);
           max-height: calc(100vh - 180px);
         }
       }
