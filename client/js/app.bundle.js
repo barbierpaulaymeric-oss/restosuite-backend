@@ -53,7 +53,18 @@ const API = {
     }
     const res = await fetch(url, config);
     if (res.status === 401) {
-      const isLoginAttempt = path.includes("/auth/smart-login") || path.includes("/auth/login") || path.includes("/auth/register") || path.includes("/auth/staff-login") || path.includes("/auth/pin-login") || path.includes("/auth/staff-pin");
+      const LOGIN_PATHS = [
+        "/auth/smart-login",
+        "/auth/login",
+        "/auth/register",
+        "/auth/staff-login",
+        "/auth/pin-login",
+        "/auth/staff-pin",
+        "/supplier-portal/quick-login",
+        "/supplier-portal/company-login",
+        "/supplier-portal/member-pin"
+      ];
+      const isLoginAttempt = LOGIN_PATHS.some((p) => path.includes(p));
       if (isLoginAttempt) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Email ou mot de passe incorrect");

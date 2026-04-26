@@ -18,13 +18,62 @@ const RID = 1;
 const OWNER_EMAIL = 'demo@restosuite.fr';
 const OWNER_PASSWORD = 'Demo2026!';
 
+// Hoisted up so ensureSupplierDemoLogin() (which runs before the early-exit
+// guard for already-seeded DBs) can reach them. Original definitions further
+// down are now redundant but kept removed to avoid a second source of truth.
+const SUPPLIER_DEMO_EMAIL = 'demo-fournisseur@restosuite.fr';
+const SUPPLIER_DEMO_PASSWORD = 'Demo2026!';
+const SUPPLIER_DEMO_PIN = '1111';
+
 function log(msg) { console.log(`  ${msg}`); }
 function section(title) { console.log(`\n▸ ${title}`); }
+
+// ─── Incremental supplier-portal demo provisioning ─────────────────────────
+// Production was seeded before the demo supplier credentials existed (commit
+// 4dfb53e). The early-exit guard below blocks a full re-seed, so without this
+// helper there's no way to add the supplier-portal rows to an existing demo DB
+// short of hand-editing SQLite. Runs idempotently before the guard: if the
+// Metro supplier row exists we attach the company login + member account; if
+// not we no-op and let the full seed below create both from scratch.
+function ensureSupplierDemoLogin() {
+  const metro = get(
+    'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
+    ['Metro Paris Nation', RID]
+  );
+  if (!metro) return false; // full seed path will create everything
+
+  const hash = bcrypt.hashSync(SUPPLIER_DEMO_PASSWORD, 10);
+  run(
+    `UPDATE suppliers
+        SET email = ?, password_hash = ?, contact_name = ?
+      WHERE id = ? AND restaurant_id = ?`,
+    [SUPPLIER_DEMO_EMAIL, hash, 'Jean Dupont (commercial Metro)', metro.id, RID]
+  );
+
+  const accountExists = get(
+    'SELECT id FROM supplier_accounts WHERE supplier_id = ? AND email = ? AND restaurant_id = ?',
+    [metro.id, SUPPLIER_DEMO_EMAIL, RID]
+  );
+  if (!accountExists) {
+    const pinHash = bcrypt.hashSync(SUPPLIER_DEMO_PIN, 10);
+    run(
+      `INSERT INTO supplier_accounts (supplier_id, name, email, pin, restaurant_id)
+       VALUES (?, ?, ?, ?, ?)`,
+      [metro.id, 'Jean Dupont', SUPPLIER_DEMO_EMAIL, pinHash, RID]
+    );
+  }
+  return true;
+}
 
 // ─── Idempotency guard ─────────────────────────────────────────────────────
 const existing = get('SELECT id FROM accounts WHERE email = ?', [OWNER_EMAIL]);
 if (existing) {
-  console.log(`✅ Demo data already present (${OWNER_EMAIL} exists, account id=${existing.id}). Nothing to do.`);
+  const ensured = ensureSupplierDemoLogin();
+  if (ensured) {
+    console.log(`✅ Demo data already present (${OWNER_EMAIL} exists, account id=${existing.id}). Refreshed supplier-portal demo login: ${SUPPLIER_DEMO_EMAIL} / ${SUPPLIER_DEMO_PASSWORD} (PIN ${SUPPLIER_DEMO_PIN}).`);
+  } else {
+    console.log(`✅ Demo data already present (${OWNER_EMAIL} exists, account id=${existing.id}). Nothing to do.`);
+  }
   process.exit(0);
 }
 
@@ -91,13 +140,9 @@ for (const s of staff) {
 
 // ─── 3. Suppliers ──────────────────────────────────────────────────────────
 section('Suppliers');
-// The Metro entry doubles as the demo supplier-portal login. We bind the
-// well-known demo email there so prospects can sign in with
-// demo-fournisseur@restosuite.fr / Demo2026! and land in the portal directly.
-const SUPPLIER_DEMO_EMAIL = 'demo-fournisseur@restosuite.fr';
-const SUPPLIER_DEMO_PASSWORD = 'Demo2026!';
-const SUPPLIER_DEMO_PIN = '1111';
-
+// The Metro entry doubles as the demo supplier-portal login. SUPPLIER_DEMO_*
+// constants are hoisted to the top of the file so ensureSupplierDemoLogin()
+// can reach them when re-seeding an existing demo DB.
 const suppliers = [
   { name: 'Metro Paris Nation',   contact: 'Jean Dupont', phone: '01 40 09 40 00', email: SUPPLIER_DEMO_EMAIL,            rating: 4, notes: 'Grossiste généraliste, livraison 6j/7' },
   { name: 'Pomona TerreAzur',     contact: 'Sylvie D.',   phone: '01 49 29 30 00', email: 'commandes@pomona-terreazur.fr', rating: 5, notes: 'Fruits & légumes, très bon rapport qualité/prix' },

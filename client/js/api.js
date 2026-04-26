@@ -52,10 +52,25 @@ const API = {
     }
     const res = await fetch(url, config);
     if (res.status === 401) {
-      // Check if this is a login attempt (smart-login, login, register) — if so,
-      // don't redirect, just throw with the server's error message so the login
-      // form can display it.
-      const isLoginAttempt = path.includes('/auth/smart-login') || path.includes('/auth/login') || path.includes('/auth/register') || path.includes('/auth/staff-login') || path.includes('/auth/pin-login') || path.includes('/auth/staff-pin');
+      // Check if this is a login attempt (smart-login, login, register, supplier
+      // portal company/member login) — if so, don't redirect, just throw with
+      // the server's error message so the login form can display it.
+      // Supplier portal endpoints are PUBLIC (no auth required) so a 401 from
+      // them means "wrong credentials", NOT an expired session — surfacing the
+      // generic session-expired path here would wipe localStorage, force-reload
+      // the app, and display "Session expirée" instead of the real error.
+      const LOGIN_PATHS = [
+        '/auth/smart-login',
+        '/auth/login',
+        '/auth/register',
+        '/auth/staff-login',
+        '/auth/pin-login',
+        '/auth/staff-pin',
+        '/supplier-portal/quick-login',
+        '/supplier-portal/company-login',
+        '/supplier-portal/member-pin',
+      ];
+      const isLoginAttempt = LOGIN_PATHS.some(p => path.includes(p));
       if (isLoginAttempt) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Email ou mot de passe incorrect');
