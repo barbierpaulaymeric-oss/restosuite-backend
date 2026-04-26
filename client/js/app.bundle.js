@@ -17767,6 +17767,7 @@ class LoginView {
   }
   // ─── Register ───
   renderRegister(app) {
+    const accountType = this.registerAccountType || "restaurant";
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">
@@ -17779,6 +17780,32 @@ class LoginView {
           <h2 class="login-subtitle">Cr\xE9er un compte</h2>
           <p class="login-tagline">Essai gratuit 60 jours \u2014 aucun engagement</p>
 
+          <div role="tablist" aria-label="Type de compte" style="display:flex;gap:8px;width:100%;background:var(--bg-secondary);padding:4px;border-radius:var(--radius-md);margin-bottom:var(--space-4)">
+            <button type="button" role="tab" id="reg-tab-restaurant" aria-selected="${accountType === "restaurant"}" class="btn ${accountType === "restaurant" ? "btn-primary" : "btn-ghost"}" style="flex:1;padding:10px;font-size:var(--text-sm)">
+              <i data-lucide="utensils-crossed" style="width:16px;height:16px" aria-hidden="true"></i> Restaurant
+            </button>
+            <button type="button" role="tab" id="reg-tab-fournisseur" aria-selected="${accountType === "fournisseur"}" class="btn ${accountType === "fournisseur" ? "btn-primary" : "btn-ghost"}" style="flex:1;padding:10px;font-size:var(--text-sm)">
+              <i data-lucide="truck" style="width:16px;height:16px" aria-hidden="true"></i> Fournisseur
+            </button>
+          </div>
+
+          ${accountType === "fournisseur" ? `
+          <div style="text-align:left;width:100%;padding:var(--space-4);background:var(--bg-secondary);border-radius:var(--radius-md);margin-bottom:var(--space-3)">
+            <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3)">
+              <span style="font-size:1.5rem;line-height:1" aria-hidden="true">\u{1F4E6}</span>
+              <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
+                <strong style="color:var(--text-primary)">Les comptes fournisseurs sont cr\xE9\xE9s par invitation.</strong><br>
+                Si un restaurant client vous a invit\xE9 \xE0 rejoindre RestoSuite, connectez-vous au portail fournisseur avec l'email et le mot de passe qu'il vous a fournis.
+              </div>
+            </div>
+            <button class="btn btn-primary" id="reg-go-supplier-login" style="width:100%;padding:12px;font-size:var(--text-base);background:#4A90D9;border-color:#4A90D9">
+              <i data-lucide="log-in" style="width:18px;height:18px" aria-hidden="true"></i> Aller au portail fournisseur
+            </button>
+            <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-3);text-align:center">
+              Vous g\xE9rez un restaurant ? <a href="#" id="reg-back-to-restaurant" style="color:var(--accent-primary);text-decoration:underline">Revenir au compte restaurant</a>
+            </p>
+          </div>
+          ` : `
           <div style="text-align:left;width:100%;margin-top:var(--space-4)">
             <div style="display:flex;gap:var(--space-3)">
               <div class="form-group" style="flex:1">
@@ -17825,6 +17852,7 @@ class LoginView {
           <button class="btn btn-primary" id="reg-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             Cr\xE9er mon compte
           </button>
+          `}
         </div>
       </div>
     `;
@@ -17833,6 +17861,26 @@ class LoginView {
       this.mode = "choice";
       this.render();
     });
+    document.getElementById("reg-tab-restaurant").addEventListener("click", () => {
+      this.registerAccountType = "restaurant";
+      this.renderRegister(app);
+    });
+    document.getElementById("reg-tab-fournisseur").addEventListener("click", () => {
+      this.registerAccountType = "fournisseur";
+      this.renderRegister(app);
+    });
+    if (accountType === "fournisseur") {
+      document.getElementById("reg-go-supplier-login").addEventListener("click", () => {
+        location.hash = "#/supplier/login";
+      });
+      const back = document.getElementById("reg-back-to-restaurant");
+      if (back) back.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.registerAccountType = "restaurant";
+        this.renderRegister(app);
+      });
+      return;
+    }
     document.getElementById("reg-submit").addEventListener("click", () => this.handleRegister());
     document.getElementById("reg-password2").addEventListener("keydown", (e) => {
       if (e.key === "Enter") this.handleRegister();
