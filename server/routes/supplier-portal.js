@@ -4,11 +4,38 @@
 
 const express = require('express');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
 const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
+const { parseXlsxBuffer, normalizeItems } = require('../lib/mercuriale-parse');
+const { categorize, CATEGORIES } = require('../lib/mercuriale-categorize');
 const router = express.Router();
+
+// Mercuriale upload — accepts XLSX (deterministic parse) and PDF (Gemini Vision).
+// Separate multer instance from ai-core's image uploader because the mime list
+// is different (XLSX is the new shape and we don't want to widen the AI uploader).
+const MERCURIALE_UPLOAD_DIR = '/tmp/restosuite-uploads';
+if (!fs.existsSync(MERCURIALE_UPLOAD_DIR)) fs.mkdirSync(MERCURIALE_UPLOAD_DIR, { recursive: true });
+const MERCURIALE_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+  'application/vnd.ms-excel', // .xls — best-effort, ExcelJS may not parse legacy BIFF
+]);
+const mercurialeUpload = multer({
+  dest: MERCURIALE_UPLOAD_DIR,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (MERCURIALE_MIME_TYPES.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Type de fichier non autorisé. Formats acceptés : PDF, XLSX.'));
+    }
+  },
+});
 
 // PENTEST_REPORT C8.2 — no JWT_SECRET fallback. Fail loud at first use.
 function getJwtSecret() {
@@ -636,6 +663,211 @@ router.get('/orders/:id', requireSupplierAuth, (req, res) => {
     [id, rid]
   );
   res.json({ ...order, items });
+});
+
+// ═════════════════════════════════════════
+// MERCURIALE IMPORT (supplier side)
+// ═════════════════════════════════════════
+// Two-step flow:
+//   1. POST /import-mercuriale — supplier uploads PDF or XLSX. We extract
+//      products + auto-categorize and tag each row as 'new' / 'update'
+//      against their existing supplier_catalog. Nothing is saved yet.
+//   2. POST /save-mercuriale — supplier reviews/edits the rows in the UI and
+//      submits the final list. We upsert supplier_catalog and emit the same
+//      price_change_notifications the per-product /catalog endpoints do.
+
+async function extractFromPdfWithGemini(filePath, mimeType) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    const err = new Error('GEMINI_API_KEY not configured');
+    err.code = 'NO_GEMINI';
+    throw err;
+  }
+  const buf = fs.readFileSync(filePath);
+  const base64 = buf.toString('base64');
+
+  const prompt = `Extrais TOUS les produits listés dans cette mercuriale fournisseur (liste de prix professionnelle).
+Retourne un JSON strict de la forme :
+{ "items": [ { "name": "<libellé du produit>", "category": "<catégorie si visible, sinon null>", "unit": "<kg|L|pièce|carton|sac|etc.>", "price": <nombre, prix unitaire HT en euros> } ] }
+Règles :
+- Inclus chaque ligne produit, même les sous-rubriques.
+- Si le prix est absent, ignore la ligne.
+- Convertis les nombres en décimaux (utilise un point, pas de virgule).
+- Ne renvoie aucun texte hors JSON.`;
+
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(45000),
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: mimeType || 'application/pdf', data: base64 } },
+        ],
+      }],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    const err = new Error('Erreur service IA');
+    err.code = 'GEMINI_HTTP';
+    err.details = body;
+    throw err;
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!content) {
+    const err = new Error('Réponse IA vide');
+    err.code = 'GEMINI_EMPTY';
+    throw err;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch (_) {
+    const err = new Error('Réponse IA invalide');
+    err.code = 'GEMINI_INVALID_JSON';
+    throw err;
+  }
+  return Array.isArray(parsed?.items) ? parsed.items : [];
+}
+
+// Tag each item as 'new' or 'update' against the supplier's existing catalog.
+// Match is case-insensitive on product_name within (supplier_id, restaurant_id).
+function annotateAgainstCatalog(items, supplierId, restaurantId) {
+  if (!items.length) return items;
+  const existing = all(
+    'SELECT id, product_name, price FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ?',
+    [supplierId, restaurantId]
+  );
+  const byName = new Map();
+  for (const row of existing) byName.set(row.product_name.toLowerCase(), row);
+  return items.map(it => {
+    const m = byName.get(it.name.toLowerCase());
+    if (m) {
+      return {
+        ...it,
+        status: 'update',
+        existing_id: m.id,
+        existing_price: m.price,
+      };
+    }
+    return { ...it, status: 'new' };
+  });
+}
+
+router.post('/import-mercuriale', requireSupplierAuth, mercurialeUpload.single('mercuriale'), async (req, res) => {
+  const filePath = req.file ? req.file.path : null;
+  if (!filePath) {
+    return res.status(400).json({ error: 'Fichier requis (PDF ou XLSX)' });
+  }
+  const mimeType = req.file.mimetype || '';
+
+  try {
+    let rawItems = [];
+    if (mimeType === 'application/pdf') {
+      rawItems = await extractFromPdfWithGemini(filePath, mimeType);
+    } else {
+      const buffer = fs.readFileSync(filePath);
+      rawItems = await parseXlsxBuffer(buffer);
+    }
+
+    const items = annotateAgainstCatalog(
+      normalizeItems(rawItems),
+      req.supplierAccount.supplier_id,
+      req.supplierAccount.restaurant_id
+    );
+
+    res.json({
+      items,
+      summary: {
+        total: items.length,
+        new: items.filter(i => i.status === 'new').length,
+        update: items.filter(i => i.status === 'update').length,
+      },
+      categories: CATEGORIES,
+    });
+  } catch (e) {
+    if (e && e.code === 'NO_GEMINI') {
+      return res.status(500).json({ error: 'Extraction PDF indisponible (clé IA non configurée)' });
+    }
+    if (e && (e.code === 'GEMINI_HTTP' || e.code === 'GEMINI_EMPTY' || e.code === 'GEMINI_INVALID_JSON')) {
+      return res.status(502).json({ error: e.message });
+    }
+    console.error('Mercuriale import error:', e);
+    return res.status(500).json({ error: 'Erreur lecture du fichier' });
+  } finally {
+    try { fs.unlinkSync(filePath); } catch {}
+  }
+});
+
+router.post('/save-mercuriale', requireSupplierAuth, express.json({ limit: '5mb' }), (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const { items } = req.body || {};
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Aucun produit à enregistrer' });
+  }
+
+  const cleaned = normalizeItems(items);
+  if (cleaned.length === 0) {
+    return res.status(400).json({ error: 'Aucun produit valide à enregistrer' });
+  }
+
+  const { db } = require('../db');
+  let created = 0;
+  let updated = 0;
+
+  const tx = db.transaction(() => {
+    for (const it of cleaned) {
+      const existing = get(
+        'SELECT id, price FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(product_name) = LOWER(?)',
+        [supplierId, rid, it.name]
+      );
+      if (existing) {
+        run(
+          `UPDATE supplier_catalog
+              SET product_name = ?, category = ?, unit = ?, price = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND restaurant_id = ?`,
+          [it.name, it.category, it.unit, it.price, existing.id, rid]
+        );
+        if (existing.price !== it.price) {
+          run(
+            'INSERT INTO price_change_notifications (restaurant_id, supplier_id, product_name, old_price, new_price, change_type) VALUES (?, ?, ?, ?, ?, ?)',
+            [rid, supplierId, it.name, existing.price, it.price, 'update']
+          );
+        }
+        updated++;
+      } else {
+        run(
+          'INSERT INTO supplier_catalog (restaurant_id, supplier_id, product_name, category, unit, price) VALUES (?, ?, ?, ?, ?, ?)',
+          [rid, supplierId, it.name, it.category, it.unit, it.price]
+        );
+        run(
+          'INSERT INTO price_change_notifications (restaurant_id, supplier_id, product_name, old_price, new_price, change_type) VALUES (?, ?, ?, NULL, ?, ?)',
+          [rid, supplierId, it.name, it.price, 'new']
+        );
+        created++;
+      }
+    }
+  });
+
+  try {
+    tx();
+  } catch (e) {
+    console.error('Mercuriale save error:', e);
+    return res.status(500).json({ error: 'Erreur enregistrement' });
+  }
+
+  res.status(201).json({ success: true, created, updated, total: created + updated });
 });
 
 module.exports = router;

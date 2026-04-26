@@ -71,17 +71,27 @@ async function renderSupplierCatalogTab() {
   if (!content) return;
 
   content.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-4)">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)">
       <h2 style="margin:0;font-size:var(--text-xl)">Mon catalogue</h2>
-      <button class="btn btn-primary" id="btn-add-product" style="background:#4A90D9;border-color:#4A90D9">
-        <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter
-      </button>
+      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+        <button class="btn btn-secondary" id="btn-import-mercuriale">
+          <i data-lucide="file-up" style="width:18px;height:18px"></i> Importer ma mercuriale
+        </button>
+        <button class="btn btn-primary" id="btn-add-product" style="background:#4A90D9;border-color:#4A90D9">
+          <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter
+        </button>
+      </div>
     </div>
     <div id="supplier-catalog-list"><div class="loading"><div class="spinner"></div></div></div>
   `;
   if (window.lucide) lucide.createIcons();
 
   document.getElementById('btn-add-product').addEventListener('click', showAddProductModal);
+  document.getElementById('btn-import-mercuriale').addEventListener('click', () => {
+    if (typeof showSupplierMercurialeImport === 'function') {
+      showSupplierMercurialeImport();
+    }
+  });
 
   try {
     const catalog = await API.getSupplierCatalog();

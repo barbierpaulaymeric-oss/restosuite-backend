@@ -505,6 +505,34 @@ const API = {
     return this.supplierRequest(`/orders/${id}`);
   },
 
+  // ─── Supplier Mercuriale Import (supplier side) ───
+  // The upload uses multipart/form-data so we don't go through supplierRequest
+  // (which sets Content-Type: application/json). Auth header is the same.
+  importSupplierMercuriale(file) {
+    const token = getSupplierToken();
+    if (!token) throw new Error('Non connecté');
+    const fd = new FormData();
+    fd.append('mercuriale', file);
+    return fetch(this.base + '/supplier-portal/import-mercuriale', {
+      method: 'POST',
+      headers: { 'X-Supplier-Token': token },
+      body: fd,
+    }).then(async r => {
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: r.statusText }));
+        if (r.status === 401) {
+          clearSupplierSession();
+          location.reload();
+        }
+        throw new Error(err.error || 'Erreur lecture du fichier');
+      }
+      return r.json();
+    });
+  },
+  saveSupplierMercuriale(items) {
+    return this.supplierRequest('/save-mercuriale', { method: 'POST', body: { items } });
+  },
+
   // ─── Deliveries (restaurant side) ───
   getDeliveries(status) {
     const qs = status ? `?status=${encodeURIComponent(status)}` : '';
