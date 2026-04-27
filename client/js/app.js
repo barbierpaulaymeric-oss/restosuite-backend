@@ -230,7 +230,12 @@ async function fetchTrialStatus() {
   const account = getAccount();
   if (!account) return null;
   try {
-    const status = await API.request(`/accounts/${account.id}/status`);
+    // Background poll (5-min ticker, app-wide). A transient 401 here used to
+    // trigger api.js's full cleanup-and-reload — yanking the user out of
+    // whichever screen they were on, which the user reported as "session
+    // expiring between pages". noRedirectOn401 keeps it silent; the user's
+    // NEXT real action hits 401 and reloads normally.
+    const status = await API.request(`/accounts/${account.id}/status`, { noRedirectOn401: true });
     _trialStatus = status;
     return status;
   } catch (e) {

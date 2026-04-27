@@ -2,6 +2,20 @@
 // Supplier Delivery Notes — Supplier-side UI
 // ═══════════════════════════════════════════
 
+// Single-shot prefill payload used when a supplier clicks "Créer le BL"
+// from a confirmed order in supplier-orders.js. The next showNewDeliveryForm()
+// call consumes (and clears) this — explicit one-time semantics so a stale
+// prefill can't leak into a fresh "Nouveau bon" click later.
+let _pendingDeliveryPrefill = null;
+function setPendingDeliveryPrefill(payload) {
+  _pendingDeliveryPrefill = payload || null;
+}
+function _consumePendingDeliveryPrefill() {
+  const p = _pendingDeliveryPrefill;
+  _pendingDeliveryPrefill = null;
+  return p;
+}
+
 async function renderSupplierDeliveriesTab() {
   const content = document.getElementById('supplier-content');
   if (!content) return;
@@ -145,6 +159,9 @@ async function showSupplierDeliveryDetail(id) {
 
 async function showNewDeliveryForm() {
   const content = document.getElementById('supplier-content');
+  // Pull (and clear) any pending pre-fill — the confirmed-order quick-link
+  // path stashes the order's items + restaurant here.
+  const prefill = _consumePendingDeliveryPrefill();
   // Load clients + catalog up-front. Catalog feeds the product autocomplete +
   // unit/price autofill on each item row. Both calls are non-fatal: if either
   // fails we still render the form, just without the affected enhancement.
@@ -174,6 +191,12 @@ async function showNewDeliveryForm() {
       <button class="btn btn-secondary btn-sm" id="back-supplier-deliveries-form">← Retour</button>
     </div>
     <h2 style="margin-bottom:var(--space-4)">Nouveau bon de livraison</h2>
+    ${prefill && prefill.from_order_ref ? `
+      <div class="dn-prefill-banner" style="margin-bottom:var(--space-4);padding:var(--space-3) var(--space-4);background:rgba(56,161,105,0.08);border:1px solid rgba(56,161,105,0.4);border-radius:var(--radius-md);color:#2F855A;display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm)">
+        <i data-lucide="link" style="width:16px;height:16px"></i>
+        Pré-rempli depuis la commande <strong>${escapeHtml(prefill.from_order_ref)}</strong>. Ajoutez les lots et DLC, puis envoyez.
+      </div>
+    ` : ''}
     <datalist id="dn-product-suggestions">
       ${catalog.map(c => `<option value="${escapeHtml(c.product_name)}"></option>`).join('')}
     </datalist>
@@ -308,8 +331,50 @@ async function showNewDeliveryForm() {
     });
   }
 
-  // Add first row
-  addItemRow();
+  // Apply the prefill if we came from a confirmed-order quick-link.
+  // 1) Pre-select the restaurant in the dropdown (if it's in the client list).
+  // 2) Append a notes prefix referencing the source order — useful for the
+  //    restaurant when they receive the BL.
+  // 3) Add one item row per order line, populating product/qty/unit/price.
+  // Otherwise just one empty row to start.
+  if (prefill && Array.isArray(prefill.items) && prefill.items.length) {
+    const restaurantSel = document.getElementById('dn-restaurant');
+    if (restaurantSel && prefill.restaurant_id) {
+      const opt = Array.from(restaurantSel.options).find(o => Number(o.value) === Number(prefill.restaurant_id));
+      if (opt) restaurantSel.value = String(prefill.restaurant_id);
+    }
+    if (prefill.from_order_ref) {
+      const notesEl = document.getElementById('dn-notes');
+      if (notesEl) notesEl.value = `Livraison de la commande ${prefill.from_order_ref}`;
+    }
+    for (const it of prefill.items) {
+      addItemRow();
+      const list = document.getElementById('dn-items-list');
+      const lastRow = list.lastElementChild;
+      if (!lastRow) continue;
+      const nameInput = lastRow.querySelector('.dn-product-name');
+      const qtyInput  = lastRow.querySelector('.dn-quantity');
+      const unitSel   = lastRow.querySelector('.dn-unit');
+      const priceInput = lastRow.querySelector('.dn-price');
+      if (nameInput && it.product_name) nameInput.value = it.product_name;
+      if (qtyInput && it.quantity != null) qtyInput.value = Number(it.quantity);
+      if (unitSel && it.unit) {
+        const matched = Array.from(unitSel.options).find(o => o.value === it.unit);
+        if (!matched) {
+          const newOpt = document.createElement('option');
+          newOpt.value = it.unit; newOpt.textContent = it.unit;
+          unitSel.appendChild(newOpt);
+        }
+        unitSel.value = it.unit;
+      }
+      if (priceInput && it.price_per_unit != null) {
+        priceInput.value = Number(it.price_per_unit).toFixed(2);
+      }
+    }
+  } else {
+    addItemRow();
+  }
+  if (window.lucide) lucide.createIcons();
 
   document.getElementById('dn-add-item').addEventListener('click', addItemRow);
   document.getElementById('back-supplier-deliveries-form').addEventListener('click', renderSupplierDeliveriesTab);

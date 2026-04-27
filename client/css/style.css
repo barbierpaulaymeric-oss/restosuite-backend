@@ -7080,6 +7080,12 @@ body.tour-active { overflow: hidden; }
   border-color: #C53030;
 }
 .supplier-order-btn--refuse:hover { filter: brightness(1.08); }
+.supplier-order-btn--create-bl {
+  background: #4A90D9;
+  color: #fff;
+  border-color: #4A90D9;
+}
+.supplier-order-btn--create-bl:hover { filter: brightness(1.08); }
 
 /* ─── Messaging — restaurant ↔ supplier chat ───────────────────── */
 

@@ -1,8 +1,17 @@
-const CACHE_NAME = 'restosuite-v2';
+// Bumped 2026-04-27: forces a fresh fetch of the bundled SPA on every client.
+// activate() below deletes any cache whose name doesn't match this — so users
+// running on the old cached bundle (where supplier-orders cards lacked the
+// restaurant name, etc.) drop their stale copy on the next visit.
+const CACHE_NAME = 'restosuite-v3';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
-  '/js/app.js',
+  // The actual bundled SPA is /js/app.bundle.js — pre-cache it on install
+  // so the network-first fetch handler has a reliable fallback. The old
+  // STATIC_ASSETS list pointed at /js/app.js (the unbundled source) which
+  // doesn't exist in production, so the bundle was only ever cached
+  // dynamically and never invalidated.
+  '/js/app.bundle.js',
   '/js/router.js',
   '/js/api.js',
   '/assets/logo-icon.svg',

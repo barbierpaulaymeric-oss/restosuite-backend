@@ -20982,6 +20982,15 @@ async function refreshSupplierMessagesNavBadge() {
   } catch (_) {
   }
 }
+let _pendingDeliveryPrefill = null;
+function setPendingDeliveryPrefill(payload) {
+  _pendingDeliveryPrefill = payload || null;
+}
+function _consumePendingDeliveryPrefill() {
+  const p = _pendingDeliveryPrefill;
+  _pendingDeliveryPrefill = null;
+  return p;
+}
 async function renderSupplierDeliveriesTab() {
   const content = document.getElementById("supplier-content");
   if (!content) return;
@@ -21112,6 +21121,7 @@ async function showSupplierDeliveryDetail(id) {
 }
 async function showNewDeliveryForm() {
   const content = document.getElementById("supplier-content");
+  const prefill = _consumePendingDeliveryPrefill();
   let clients = [];
   let catalog = [];
   try {
@@ -21135,6 +21145,12 @@ async function showNewDeliveryForm() {
       <button class="btn btn-secondary btn-sm" id="back-supplier-deliveries-form">\u2190 Retour</button>
     </div>
     <h2 style="margin-bottom:var(--space-4)">Nouveau bon de livraison</h2>
+    ${prefill && prefill.from_order_ref ? `
+      <div class="dn-prefill-banner" style="margin-bottom:var(--space-4);padding:var(--space-3) var(--space-4);background:rgba(56,161,105,0.08);border:1px solid rgba(56,161,105,0.4);border-radius:var(--radius-md);color:#2F855A;display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm)">
+        <i data-lucide="link" style="width:16px;height:16px"></i>
+        Pr\xE9-rempli depuis la commande <strong>${escapeHtml(prefill.from_order_ref)}</strong>. Ajoutez les lots et DLC, puis envoyez.
+      </div>
+    ` : ""}
     <datalist id="dn-product-suggestions">
       ${catalog.map((c) => `<option value="${escapeHtml(c.product_name)}"></option>`).join("")}
     </datalist>
@@ -21259,7 +21275,45 @@ async function showNewDeliveryForm() {
       }
     });
   }
-  addItemRow();
+  if (prefill && Array.isArray(prefill.items) && prefill.items.length) {
+    const restaurantSel = document.getElementById("dn-restaurant");
+    if (restaurantSel && prefill.restaurant_id) {
+      const opt = Array.from(restaurantSel.options).find((o) => Number(o.value) === Number(prefill.restaurant_id));
+      if (opt) restaurantSel.value = String(prefill.restaurant_id);
+    }
+    if (prefill.from_order_ref) {
+      const notesEl = document.getElementById("dn-notes");
+      if (notesEl) notesEl.value = `Livraison de la commande ${prefill.from_order_ref}`;
+    }
+    for (const it of prefill.items) {
+      addItemRow();
+      const list = document.getElementById("dn-items-list");
+      const lastRow = list.lastElementChild;
+      if (!lastRow) continue;
+      const nameInput = lastRow.querySelector(".dn-product-name");
+      const qtyInput = lastRow.querySelector(".dn-quantity");
+      const unitSel = lastRow.querySelector(".dn-unit");
+      const priceInput = lastRow.querySelector(".dn-price");
+      if (nameInput && it.product_name) nameInput.value = it.product_name;
+      if (qtyInput && it.quantity != null) qtyInput.value = Number(it.quantity);
+      if (unitSel && it.unit) {
+        const matched = Array.from(unitSel.options).find((o) => o.value === it.unit);
+        if (!matched) {
+          const newOpt = document.createElement("option");
+          newOpt.value = it.unit;
+          newOpt.textContent = it.unit;
+          unitSel.appendChild(newOpt);
+        }
+        unitSel.value = it.unit;
+      }
+      if (priceInput && it.price_per_unit != null) {
+        priceInput.value = Number(it.price_per_unit).toFixed(2);
+      }
+    }
+  } else {
+    addItemRow();
+  }
+  if (window.lucide) lucide.createIcons();
   document.getElementById("dn-add-item").addEventListener("click", addItemRow);
   document.getElementById("back-supplier-deliveries-form").addEventListener("click", renderSupplierDeliveriesTab);
   document.getElementById("dn-submit").addEventListener("click", async () => {
@@ -21383,6 +21437,7 @@ async function showSupplierOrderDetail(id) {
     const order = await API.getSupplierOrder(id);
     const s = SUPPLIER_ORDER_STATUS[order.status] || { label: order.status, color: "#666" };
     const isPending = ["brouillon", "envoy\xE9e", "envoyee"].includes(order.status);
+    const canCreateBl = ["confirm\xE9e", "confirmee"].includes(order.status);
     content.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)">
         <button class="btn btn-secondary btn-sm" id="back-supplier-orders">
@@ -21436,6 +21491,13 @@ async function showSupplierOrderDetail(id) {
           </button>
         </div>
       ` : ""}
+      ${canCreateBl ? `
+        <div class="supplier-order-actions">
+          <button class="btn supplier-order-btn supplier-order-btn--create-bl" id="supplier-order-create-bl">
+            <i data-lucide="package-plus" style="width:18px;height:18px"></i> Cr\xE9er le bon de livraison
+          </button>
+        </div>
+      ` : ""}
     `;
     if (window.lucide) lucide.createIcons();
     document.getElementById("back-supplier-orders").addEventListener("click", renderSupplierOrdersTab);
@@ -21459,6 +21521,29 @@ async function showSupplierOrderDetail(id) {
         btn.disabled = false;
       }
     });
+    if (canCreateBl) {
+      document.getElementById("supplier-order-create-bl").addEventListener("click", () => {
+        if (typeof setPendingDeliveryPrefill === "function") {
+          setPendingDeliveryPrefill({
+            from_order_id: order.id,
+            from_order_ref: order.reference || `#${order.id}`,
+            restaurant_id: order.restaurant_id,
+            items: (order.items || []).map((it) => ({
+              product_name: it.product_name,
+              quantity: it.quantity,
+              unit: it.unit,
+              price_per_unit: it.unit_price
+            }))
+          });
+        }
+        const tabs = document.querySelectorAll(".supplier-nav__tab");
+        tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === "deliveries"));
+        if (typeof renderSupplierDeliveriesTab === "function") renderSupplierDeliveriesTab();
+        if (typeof showNewDeliveryForm === "function") {
+          setTimeout(() => showNewDeliveryForm(), 0);
+        }
+      });
+    }
     if (isPending) {
       document.getElementById("supplier-order-confirm").addEventListener("click", () => {
         _supplierOrderActionPrompt({
@@ -27273,7 +27358,7 @@ async function fetchTrialStatus() {
   const account = getAccount();
   if (!account) return null;
   try {
-    const status = await API.request(`/accounts/${account.id}/status`);
+    const status = await API.request(`/accounts/${account.id}/status`, { noRedirectOn401: true });
     _trialStatus = status;
     return status;
   } catch (e) {

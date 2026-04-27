@@ -96,6 +96,10 @@ async function showSupplierOrderDetail(id) {
 
     // Pending statuses are the only ones for which Confirmer/Refuser show.
     const isPending = ['brouillon', 'envoyée', 'envoyee'].includes(order.status);
+    // Confirmed-but-not-yet-delivered orders get the "Créer le BL" CTA so the
+    // supplier can drop a delivery note pre-filled with this order's items
+    // without retyping every line.
+    const canCreateBl = ['confirmée', 'confirmee'].includes(order.status);
     content.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)">
         <button class="btn btn-secondary btn-sm" id="back-supplier-orders">
@@ -149,6 +153,13 @@ async function showSupplierOrderDetail(id) {
           </button>
         </div>
       ` : ''}
+      ${canCreateBl ? `
+        <div class="supplier-order-actions">
+          <button class="btn supplier-order-btn supplier-order-btn--create-bl" id="supplier-order-create-bl">
+            <i data-lucide="package-plus" style="width:18px;height:18px"></i> Créer le bon de livraison
+          </button>
+        </div>
+      ` : ''}
     `;
 
     if (window.lucide) lucide.createIcons();
@@ -176,6 +187,39 @@ async function showSupplierOrderDetail(id) {
         btn.disabled = false;
       }
     });
+
+    if (canCreateBl) {
+      // "Créer le BL" — stash the order's items + restaurant for the
+      // delivery-form to pre-fill, then switch to the Livraisons tab. The
+      // form (in supplier-delivery.js) reads + clears the pending payload
+      // on render. We use a module-global because the SPA tab nav doesn't
+      // carry route state; this keeps the contract simple and explicit.
+      document.getElementById('supplier-order-create-bl').addEventListener('click', () => {
+        if (typeof setPendingDeliveryPrefill === 'function') {
+          setPendingDeliveryPrefill({
+            from_order_id: order.id,
+            from_order_ref: order.reference || `#${order.id}`,
+            restaurant_id: order.restaurant_id,
+            items: (order.items || []).map(it => ({
+              product_name: it.product_name,
+              quantity: it.quantity,
+              unit: it.unit,
+              price_per_unit: it.unit_price,
+            })),
+          });
+        }
+        // Activate the Livraisons tab + render its form.
+        const tabs = document.querySelectorAll('.supplier-nav__tab');
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === 'deliveries'));
+        if (typeof renderSupplierDeliveriesTab === 'function') renderSupplierDeliveriesTab();
+        // The deliveries tab landing shows the list — explicitly open the
+        // new-form because the user's intent is to immediately create a BL.
+        if (typeof showNewDeliveryForm === 'function') {
+          // Defer one frame so the tab DOM mounts before the form replaces it.
+          setTimeout(() => showNewDeliveryForm(), 0);
+        }
+      });
+    }
 
     if (isPending) {
       document.getElementById('supplier-order-confirm').addEventListener('click', () => {
