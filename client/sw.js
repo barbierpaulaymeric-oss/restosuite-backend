@@ -1,8 +1,10 @@
 // Bumped 2026-04-27: forces a fresh fetch of the bundled SPA on every client.
-// activate() below deletes any cache whose name doesn't match this — so users
-// running on the old cached bundle (where supplier-orders cards lacked the
-// restaurant name, etc.) drop their stale copy on the next visit.
-const CACHE_NAME = 'restosuite-v3';
+// activate() below deletes any cache whose name doesn't match this AND
+// broadcasts a "sw-update" message to any open client tab so they auto-
+// reload (without this, an already-loaded tab keeps running the old JS in
+// memory until the user manually reloads — which looked like "the fix
+// isn't deployed" in production bug reports).
+const CACHE_NAME = 'restosuite-v4';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
@@ -35,16 +37,21 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// Activate: clean old caches
+// Activate: clean old caches + nudge open clients to reload so they pick up
+// the new bundle. Without this nudge a user who already has the SPA loaded
+// keeps running the OLD JS in memory until they manually reload, which
+// looked like "the fix isn't deployed" in production reports. The page-side
+// listener in app.js does a hard reload when it sees `{ type: 'sw-update' }`.
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-      );
-    })
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)));
+    await self.clients.claim();
+    const clients = await self.clients.matchAll({ type: 'window' });
+    for (const client of clients) {
+      try { client.postMessage({ type: 'sw-update', cache: CACHE_NAME }); } catch {}
+    }
+  })());
 });
 
 // Fetch: network-first with cache fallback (for API calls, always network)

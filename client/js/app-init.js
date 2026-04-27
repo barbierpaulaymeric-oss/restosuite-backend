@@ -56,5 +56,21 @@ document.addEventListener('DOMContentLoaded', function() {
   if (window.lucide) lucide.createIcons();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(function() {});
+    // Listen for the SW's "sw-update" broadcast (fired from sw.js's activate
+    // handler when a new cache name takes over). When the user is sitting on
+    // the page with the OLD JS still in memory, this is the only way to make
+    // them pick up the freshly deployed bundle without a manual reload.
+    // Once-per-session guard: if the user just reloaded, ignore further
+    // messages until the next session-storage gap.
+    navigator.serviceWorker.addEventListener('message', function(event) {
+      if (event && event.data && event.data.type === 'sw-update') {
+        try {
+          if (sessionStorage.getItem('_sw_update_reloaded') === '1') return;
+          sessionStorage.setItem('_sw_update_reloaded', '1');
+        } catch (e) { /* incognito etc. — fall through to reload anyway */ }
+        // Defer briefly so any in-flight click handler completes.
+        setTimeout(function() { window.location.reload(); }, 50);
+      }
+    });
   }
 });

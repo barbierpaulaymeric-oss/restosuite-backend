@@ -224,12 +224,17 @@ function setupTemperatureEvents(zones) {
     batchSubmit.innerHTML = '<i data-lucide="loader-2" class="spin" style="width:18px;height:18px;margin-right:6px" aria-hidden="true"></i>Enregistrement…';
     if (window.lucide) lucide.createIcons({ nodes: [batchSubmit] });
     let errors = 0;
+    // BUGFIX 2026-04-27: every save was 404'ing because the previous code
+    // POSTed via API.request to a non-existent path; the actual server
+    // route is POST /haccp/temperatures (see server/routes/haccp.js).
+    // The single-temperature modal already used API.recordTemperature()
+    // and worked; the batch handler bypassed the helper and got the path
+    // wrong. Aligning with the helper kills the bug AND keeps a single
+    // source of truth for the URL.
+    // (Regression test: server/tests/haccp-batch-temperatures.test.js)
     for (const entry of toSave) {
       try {
-        await API.request('/haccp/temperature-logs', {
-          method: 'POST',
-          body: JSON.stringify({ zone_id: entry.zone_id, temperature: entry.temperature }),
-        });
+        await API.recordTemperature({ zone_id: entry.zone_id, temperature: entry.temperature });
       } catch(e) { errors++; }
     }
 

@@ -5208,10 +5208,7 @@ function setupTemperatureEvents(zones) {
     let errors = 0;
     for (const entry of toSave) {
       try {
-        await API.request("/haccp/temperature-logs", {
-          method: "POST",
-          body: JSON.stringify({ zone_id: entry.zone_id, temperature: entry.temperature })
-        });
+        await API.recordTemperature({ zone_id: entry.zone_id, temperature: entry.temperature });
       } catch (e) {
         errors++;
       }
