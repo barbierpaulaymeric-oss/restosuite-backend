@@ -28,6 +28,215 @@ const SUPPLIER_DEMO_PIN = '1111';
 function log(msg) { console.log(`  ${msg}`); }
 function section(title) { console.log(`\n▸ ${title}`); }
 
+// ─── Supplier catalog demo data ─────────────────────────────────────────────
+// Realistic French wholesale prices for the demo brasserie. Categories use the
+// 13-bucket scheme from server/lib/mercuriale-categorize.js so the supplier
+// portal review UI shows products under the same labels the categorizer
+// auto-assigns. Adjust prices freely — this is sales-demo data, not a price
+// ledger. NEVER store anything tenant-private in this constant.
+const SUPPLIER_CATALOG_DATA = {
+  // ~60 products across most categories — this is the supplier prospects log into
+  // (demo-fournisseur@restosuite.fr) so the catalog has to look generously stocked.
+  'Metro Paris Nation': [
+    // Viandes
+    { name: 'Entrecôte de bœuf',         category: 'Viandes', unit: 'kg', price: 18.90 },
+    { name: 'Filet de poulet',           category: 'Viandes', unit: 'kg', price: 8.50 },
+    { name: 'Côtes d\'agneau',           category: 'Viandes', unit: 'kg', price: 22.00 },
+    { name: 'Bavette d\'aloyau',         category: 'Viandes', unit: 'kg', price: 16.50 },
+    { name: 'Escalope de veau',          category: 'Viandes', unit: 'kg', price: 24.00 },
+    { name: 'Steak haché 15% MG',        category: 'Viandes', unit: 'kg', price: 9.80 },
+    { name: 'Magret de canard',          category: 'Viandes', unit: 'kg', price: 19.50 },
+    { name: 'Saucisse de Toulouse',      category: 'Viandes', unit: 'kg', price: 7.90 },
+    { name: 'Cuisses de poulet',         category: 'Viandes', unit: 'kg', price: 6.20 },
+    { name: 'Jarret de porc',            category: 'Viandes', unit: 'kg', price: 5.90 },
+    // Charcuterie
+    { name: 'Lardons fumés',             category: 'Charcuterie', unit: 'kg', price: 6.50 },
+    { name: 'Jambon de Paris',           category: 'Charcuterie', unit: 'kg', price: 9.80 },
+    { name: 'Saucisson sec',             category: 'Charcuterie', unit: 'kg', price: 18.50 },
+    // Poissons
+    { name: 'Filet de saumon',           category: 'Poissons', unit: 'kg', price: 19.00 },
+    { name: 'Cabillaud',                 category: 'Poissons', unit: 'kg', price: 15.50 },
+    { name: 'Crevettes roses cuites',    category: 'Poissons', unit: 'kg', price: 14.90 },
+    { name: 'Moules de bouchot',         category: 'Poissons', unit: 'kg', price: 4.50 },
+    { name: 'Bar de ligne',              category: 'Poissons', unit: 'kg', price: 28.00 },
+    { name: 'Thon rouge',                category: 'Poissons', unit: 'kg', price: 32.00 },
+    { name: 'Noix de Saint-Jacques',     category: 'Poissons', unit: 'kg', price: 38.00 },
+    { name: 'Gambas',                    category: 'Poissons', unit: 'kg', price: 22.00 },
+    // Légumes
+    { name: 'Pommes de terre',           category: 'Légumes', unit: 'kg', price: 1.20 },
+    { name: 'Carottes',                  category: 'Légumes', unit: 'kg', price: 1.50 },
+    { name: 'Oignons jaunes',            category: 'Légumes', unit: 'kg', price: 1.80 },
+    { name: 'Tomates grappe',            category: 'Légumes', unit: 'kg', price: 3.50 },
+    { name: 'Courgettes',                category: 'Légumes', unit: 'kg', price: 2.80 },
+    { name: 'Haricots verts',            category: 'Légumes', unit: 'kg', price: 4.90 },
+    { name: 'Champignons de Paris',      category: 'Légumes', unit: 'kg', price: 3.20 },
+    { name: 'Poireaux',                  category: 'Légumes', unit: 'kg', price: 2.50 },
+    { name: 'Épinards frais',            category: 'Légumes', unit: 'kg', price: 5.50 },
+    { name: 'Ail',                       category: 'Légumes', unit: 'kg', price: 6.00 },
+    // Fruits
+    { name: 'Citrons',                   category: 'Fruits', unit: 'kg', price: 2.80 },
+    { name: 'Pommes Golden',             category: 'Fruits', unit: 'kg', price: 2.50 },
+    { name: 'Fraises',                   category: 'Fruits', unit: 'kg', price: 8.90 },
+    { name: 'Framboises',                category: 'Fruits', unit: 'kg', price: 18.00 },
+    // Produits laitiers
+    { name: 'Beurre doux',               category: 'Produits laitiers', unit: 'kg', price: 8.50 },
+    { name: 'Crème fraîche 35%',         category: 'Produits laitiers', unit: 'L',  price: 4.20 },
+    { name: 'Lait entier',               category: 'Produits laitiers', unit: 'L',  price: 1.10 },
+    { name: 'Parmesan Reggiano',         category: 'Produits laitiers', unit: 'kg', price: 22.00 },
+    { name: 'Gruyère râpé',              category: 'Produits laitiers', unit: 'kg', price: 9.50 },
+    { name: 'Mozzarella',                category: 'Produits laitiers', unit: 'kg', price: 8.00 },
+    { name: 'Œufs plein air x30',        category: 'Produits laitiers', unit: 'plateau', price: 8.50 },
+    // Boulangerie
+    { name: 'Farine T55',                category: 'Boulangerie', unit: 'kg', price: 0.90 },
+    { name: 'Pain de mie tranché',       category: 'Boulangerie', unit: 'pièce', price: 2.80 },
+    { name: 'Brioche tranchée',          category: 'Boulangerie', unit: 'pièce', price: 4.20 },
+    // Huiles/Vinaigres
+    { name: 'Huile d\'olive vierge extra', category: 'Huiles/Vinaigres', unit: 'L', price: 6.50 },
+    { name: 'Vinaigre balsamique',       category: 'Huiles/Vinaigres', unit: 'L', price: 4.80 },
+    // Condiments/Sauces
+    { name: 'Sel de Guérande',           category: 'Condiments/Sauces', unit: 'kg', price: 3.50 },
+    { name: 'Poivre noir moulu',         category: 'Condiments/Sauces', unit: 'kg', price: 28.00 },
+    { name: 'Moutarde de Dijon',         category: 'Condiments/Sauces', unit: 'kg', price: 3.20 },
+    { name: 'Concentré de tomate',       category: 'Condiments/Sauces', unit: 'kg', price: 2.80 },
+    { name: 'Fond de veau',              category: 'Condiments/Sauces', unit: 'L',  price: 12.00 },
+    { name: 'Bouillon de volaille',      category: 'Condiments/Sauces', unit: 'kg', price: 8.50 },
+    // Épicerie sèche
+    { name: 'Sucre semoule',             category: 'Épicerie sèche', unit: 'kg', price: 1.10 },
+    { name: 'Pâtes penne',               category: 'Épicerie sèche', unit: 'kg', price: 1.50 },
+    { name: 'Riz basmati',               category: 'Épicerie sèche', unit: 'kg', price: 2.20 },
+    { name: 'Lentilles vertes',          category: 'Épicerie sèche', unit: 'kg', price: 3.50 },
+    // Surgelés
+    { name: 'Frites tradition',          category: 'Surgelés', unit: 'kg', price: 2.50 },
+    { name: 'Petits pois',               category: 'Surgelés', unit: 'kg', price: 3.20 },
+    // Boissons
+    { name: 'Eau Évian 1.5L x6',         category: 'Boissons', unit: 'lot', price: 4.50 },
+    { name: 'Coca-Cola 33cl x24',        category: 'Boissons', unit: 'lot', price: 18.00 },
+  ],
+
+  // ~40 products: F&L specialist with slightly tighter prices on hero items and
+  // a deeper bench (heritage tomatoes, herbs, exotic fruits) Metro doesn't carry.
+  'Pomona TerreAzur': [
+    // Légumes
+    { name: 'Pommes de terre Bintje',     category: 'Légumes', unit: 'kg', price: 1.10 },
+    { name: 'Carottes nouvelles',         category: 'Légumes', unit: 'kg', price: 1.40 },
+    { name: 'Oignons rosés de Roscoff',   category: 'Légumes', unit: 'kg', price: 2.20 },
+    { name: 'Tomates anciennes',          category: 'Légumes', unit: 'kg', price: 4.80 },
+    { name: 'Courgettes vertes',          category: 'Légumes', unit: 'kg', price: 2.50 },
+    { name: 'Haricots verts extra-fins',  category: 'Légumes', unit: 'kg', price: 5.50 },
+    { name: 'Champignons de Paris bruns', category: 'Légumes', unit: 'kg', price: 3.50 },
+    { name: 'Poireaux nouveaux',          category: 'Légumes', unit: 'kg', price: 2.20 },
+    { name: 'Épinards branches',          category: 'Légumes', unit: 'kg', price: 5.00 },
+    { name: 'Ail rose de Lautrec',        category: 'Légumes', unit: 'kg', price: 8.00 },
+    { name: 'Endives belges',             category: 'Légumes', unit: 'kg', price: 2.80 },
+    { name: 'Artichauts violets',         category: 'Légumes', unit: 'pièce', price: 2.50 },
+    { name: 'Asperges vertes',            category: 'Légumes', unit: 'kg', price: 9.50 },
+    { name: 'Aubergines',                 category: 'Légumes', unit: 'kg', price: 2.40 },
+    { name: 'Poivrons rouges',            category: 'Légumes', unit: 'kg', price: 3.20 },
+    { name: 'Fenouil',                    category: 'Légumes', unit: 'kg', price: 3.00 },
+    { name: 'Radis roses (botte)',        category: 'Légumes', unit: 'botte', price: 1.20 },
+    { name: 'Salade laitue batavia',      category: 'Légumes', unit: 'pièce', price: 1.10 },
+    { name: 'Roquette',                   category: 'Légumes', unit: 'kg', price: 8.50 },
+    { name: 'Mâche',                      category: 'Légumes', unit: 'kg', price: 12.00 },
+    // Herbes (catégorisées Légumes par le catégoriseur)
+    { name: 'Persil plat (botte)',        category: 'Légumes', unit: 'botte', price: 0.80 },
+    { name: 'Basilic frais (botte)',      category: 'Légumes', unit: 'botte', price: 1.20 },
+    { name: 'Coriandre (botte)',          category: 'Légumes', unit: 'botte', price: 1.00 },
+    { name: 'Menthe fraîche (botte)',     category: 'Légumes', unit: 'botte', price: 1.20 },
+    { name: 'Thym frais (botte)',         category: 'Légumes', unit: 'botte', price: 1.50 },
+    // Fruits
+    { name: 'Citrons primofiori',         category: 'Fruits', unit: 'kg', price: 2.50 },
+    { name: 'Pommes Granny Smith',        category: 'Fruits', unit: 'kg', price: 2.80 },
+    { name: 'Pommes Pink Lady',           category: 'Fruits', unit: 'kg', price: 3.50 },
+    { name: 'Fraises gariguette',         category: 'Fruits', unit: 'kg', price: 9.50 },
+    { name: 'Framboises',                 category: 'Fruits', unit: 'kg', price: 17.50 },
+    { name: 'Mangues',                    category: 'Fruits', unit: 'kg', price: 4.20 },
+    { name: 'Ananas Victoria',            category: 'Fruits', unit: 'pièce', price: 2.80 },
+    { name: 'Bananes',                    category: 'Fruits', unit: 'kg', price: 1.80 },
+    { name: 'Oranges sanguines',          category: 'Fruits', unit: 'kg', price: 2.90 },
+    { name: 'Kiwis',                      category: 'Fruits', unit: 'kg', price: 3.50 },
+    { name: 'Pamplemousses roses',        category: 'Fruits', unit: 'kg', price: 2.20 },
+    { name: 'Poires Williams',            category: 'Fruits', unit: 'kg', price: 3.20 },
+    { name: 'Cerises',                    category: 'Fruits', unit: 'kg', price: 12.00 },
+    { name: 'Abricots',                   category: 'Fruits', unit: 'kg', price: 5.80 },
+    { name: 'Melons charentais',          category: 'Fruits', unit: 'pièce', price: 3.50 },
+  ],
+
+  // ~30 products: drinks-only wholesaler. Bottles ('bouteille'), kegs ('fût')
+  // and packs ('lot') are all real units the brasserie buyer will see — we
+  // intentionally don't normalize to per-litre prices here.
+  'France Boissons': [
+    // Vins
+    { name: 'Côtes du Rhône rouge 75cl',     category: 'Boissons', unit: 'bouteille', price: 5.50 },
+    { name: 'Bordeaux supérieur 75cl',       category: 'Boissons', unit: 'bouteille', price: 7.20 },
+    { name: 'Bourgogne aligoté 75cl',        category: 'Boissons', unit: 'bouteille', price: 9.80 },
+    { name: 'Sancerre blanc 75cl',           category: 'Boissons', unit: 'bouteille', price: 13.50 },
+    { name: 'Côtes de Provence rosé 75cl',   category: 'Boissons', unit: 'bouteille', price: 6.80 },
+    { name: 'Champagne brut 75cl',           category: 'Boissons', unit: 'bouteille', price: 22.00 },
+    { name: 'Crémant d\'Alsace 75cl',        category: 'Boissons', unit: 'bouteille', price: 11.50 },
+    { name: 'Pouilly-Fumé 75cl',             category: 'Boissons', unit: 'bouteille', price: 16.00 },
+    // Bières
+    { name: 'Heineken fût 30L',              category: 'Boissons', unit: 'fût', price: 95.00 },
+    { name: 'Stella Artois fût 30L',         category: 'Boissons', unit: 'fût', price: 88.00 },
+    { name: 'Leffe Blonde fût 20L',          category: 'Boissons', unit: 'fût', price: 78.00 },
+    { name: '1664 33cl x24',                 category: 'Boissons', unit: 'lot', price: 22.00 },
+    { name: 'Carlsberg 33cl x24',            category: 'Boissons', unit: 'lot', price: 19.50 },
+    { name: 'Guinness 50cl x12',             category: 'Boissons', unit: 'lot', price: 28.00 },
+    // Soft drinks + eaux
+    { name: 'Coca-Cola 33cl x24',            category: 'Boissons', unit: 'lot', price: 17.50 },
+    { name: 'Coca-Cola Zero 33cl x24',       category: 'Boissons', unit: 'lot', price: 17.50 },
+    { name: 'Orangina 33cl x24',             category: 'Boissons', unit: 'lot', price: 18.00 },
+    { name: 'Schweppes Tonic 25cl x24',      category: 'Boissons', unit: 'lot', price: 19.50 },
+    { name: 'Perrier 33cl x24',              category: 'Boissons', unit: 'lot', price: 16.50 },
+    { name: 'Eau Vittel 1L x12',             category: 'Boissons', unit: 'lot', price: 8.50 },
+    { name: 'Jus d\'orange Tropicana 1L x6', category: 'Boissons', unit: 'lot', price: 14.50 },
+    { name: 'Limonade artisanale 33cl x12',  category: 'Boissons', unit: 'lot', price: 12.00 },
+    // Spiritueux
+    { name: 'Whisky JB 70cl',                category: 'Boissons', unit: 'bouteille', price: 18.50 },
+    { name: 'Vodka Smirnoff 70cl',           category: 'Boissons', unit: 'bouteille', price: 16.00 },
+    { name: 'Gin Bombay Sapphire 70cl',      category: 'Boissons', unit: 'bouteille', price: 24.00 },
+    { name: 'Rhum Bacardi 70cl',             category: 'Boissons', unit: 'bouteille', price: 17.50 },
+    { name: 'Cognac Hennessy VS 70cl',       category: 'Boissons', unit: 'bouteille', price: 38.00 },
+    { name: 'Pastis Ricard 1L',              category: 'Boissons', unit: 'bouteille', price: 18.50 },
+    { name: 'Liqueur Cointreau 70cl',        category: 'Boissons', unit: 'bouteille', price: 22.00 },
+    { name: 'Martini Bianco 1L',             category: 'Boissons', unit: 'bouteille', price: 12.50 },
+  ],
+};
+
+// Idempotent: deletes the supplier's existing demo catalog rows then bulk-
+// inserts the fresh list inside one transaction. supplier_catalog has no
+// UNIQUE constraint on (supplier_id, product_name), so INSERT OR REPLACE
+// would silently keep duplicates on every re-run — DELETE-then-INSERT is
+// the only safe pattern here. Noops for any supplier that doesn't exist
+// yet (the full-seed path will create them and call this again).
+function ensureSupplierCatalogs() {
+  let totalInserted = 0;
+  let touchedSuppliers = 0;
+  const insertCatalog = db.prepare(
+    `INSERT INTO supplier_catalog (supplier_id, product_name, category, unit, price, restaurant_id)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  );
+  for (const [supplierName, products] of Object.entries(SUPPLIER_CATALOG_DATA)) {
+    const supplier = get(
+      'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
+      [supplierName, RID]
+    );
+    if (!supplier) continue;
+    const tx = db.transaction(() => {
+      run(
+        'DELETE FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ?',
+        [supplier.id, RID]
+      );
+      for (const p of products) {
+        insertCatalog.run(supplier.id, p.name, p.category, p.unit, p.price, RID);
+      }
+    });
+    tx();
+    totalInserted += products.length;
+    touchedSuppliers++;
+  }
+  return { totalInserted, touchedSuppliers };
+}
+
 // ─── Incremental supplier-portal demo provisioning ─────────────────────────
 // Production was seeded before the demo supplier credentials existed (commit
 // 4dfb53e). The early-exit guard below blocks a full re-seed, so without this
@@ -69,10 +278,14 @@ function ensureSupplierDemoLogin() {
 const existing = get('SELECT id FROM accounts WHERE email = ?', [OWNER_EMAIL]);
 if (existing) {
   const ensured = ensureSupplierDemoLogin();
+  const catalog = ensureSupplierCatalogs();
   if (ensured) {
     console.log(`✅ Demo data already present (${OWNER_EMAIL} exists, account id=${existing.id}). Refreshed supplier-portal demo login: ${SUPPLIER_DEMO_EMAIL} / ${SUPPLIER_DEMO_PASSWORD} (PIN ${SUPPLIER_DEMO_PIN}).`);
   } else {
     console.log(`✅ Demo data already present (${OWNER_EMAIL} exists, account id=${existing.id}). Nothing to do.`);
+  }
+  if (catalog.touchedSuppliers > 0) {
+    console.log(`   ↳ Refreshed supplier catalogs: ${catalog.totalInserted} products across ${catalog.touchedSuppliers} suppliers.`);
   }
   process.exit(0);
 }
@@ -189,6 +402,15 @@ for (const sl of supplierLogins) {
     [supplierIds[sl.supplier], sl.name, sl.email, pinHash, RID]
   );
   log(`${sl.name} PIN=${sl.pin}`);
+}
+
+// ─── 3c. Supplier catalogs (Metro / Pomona / France Boissons) ──────────────
+// Same helper used by the early-exit guard so any future re-seed (or first-
+// run) ends with the demo catalogs in identical state.
+section('Supplier catalogs');
+{
+  const catalog = ensureSupplierCatalogs();
+  log(`${catalog.totalInserted} products inserted across ${catalog.touchedSuppliers} suppliers`);
 }
 
 // ─── 4. Ingredients ────────────────────────────────────────────────────────
