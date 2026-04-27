@@ -91,7 +91,6 @@ const JS_FILES = [
   'js/views/crm.js',
   'js/views/api-keys.js',
   'js/views/qrcodes.js',
-  'js/views/plans.js',
   'js/views/command-palette.js',
   'js/views/errors-log.js',
   'js/views/admin.js',

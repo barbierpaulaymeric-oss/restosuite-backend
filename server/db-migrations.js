@@ -1013,7 +1013,7 @@ try {
 try {
   const restPlanCols = all("PRAGMA table_info(restaurants)");
   if (!restPlanCols.some(c => c.name === 'plan')) {
-    db.exec("ALTER TABLE restaurants ADD COLUMN plan TEXT DEFAULT 'discovery'");
+    db.exec("ALTER TABLE restaurants ADD COLUMN plan TEXT DEFAULT 'free'");
     console.log('✅ Migration: added plan to restaurants');
   }
 } catch (e) {

@@ -44,7 +44,6 @@ const ROUTE_ROLES = {
   '/menu-engineering': ['gerant'],
   '/traceability/downstream': ['gerant', 'cuisinier'],
   '/pms/export': ['gerant'],
-  '/settings/plans': ['gerant'],
   '/settings/sanitary-approval': ['gerant'],
   '/import-mercuriale': ['gerant'],
   '/admin': ['admin'],

@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════
 // Plats témoins (witness meals) — Routes API
 // Arrêté du 21 décembre 2009, Article 32
-// Mounted at /api/haccp/witness-meals (inherits planGate('essential'))
+// Mounted at /api/haccp/witness-meals (inherits requireActiveOrTrial via /api/haccp)
 // ═══════════════════════════════════════════
 
 const { Router } = require('express');

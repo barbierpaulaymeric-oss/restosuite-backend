@@ -1,8 +1,7 @@
 // ═══════════════════════════════════════════
 // Alto — AI personalization routes
 // Preferences (key/value), shortcuts (trigger→action), learning read
-// Mounted at /api/ai-preferences (inherits planGate('professional') via /api/ai…
-//   actually mounted standalone — see app.js/index.js)
+// Mounted at /api/ai-preferences (standalone — requireAuth in each route)
 // ═══════════════════════════════════════════
 
 const { Router } = require('express');

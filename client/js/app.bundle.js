@@ -1010,15 +1010,9 @@ const API = {
   importMercuriale(data) {
     return this.request("/ai/import-mercuriale", { method: "POST", body: data });
   },
-  // Plans & Pricing
-  getPlans() {
-    return this.request("/plans");
-  },
+  // Subscription status
   getCurrentPlan() {
     return this.request("/plans/current");
-  },
-  upgradePlan(plan) {
-    return this.request("/plans/upgrade", { method: "POST", body: { plan } });
   },
   // PMS Export
   getPMSExport(period = "3m") {
@@ -26149,131 +26143,6 @@ function renderQRGrid(gridEl, tables) {
     </div>
   `).join("");
 }
-async function renderPlans(highlightPlan) {
-  const app = document.getElementById("app");
-  const account = getAccount();
-  if (!account || account.role !== "gerant") {
-    app.innerHTML = `
-      <div class="empty-state" role="alert">
-        <div class="empty-icon" aria-hidden="true"><i data-lucide="lock"></i></div>
-        <p>Acc\xE8s r\xE9serv\xE9 au g\xE9rant</p>
-        <a href="#/" class="btn btn-primary" aria-label="Retour \xE0 l'accueil">Retour</a>
-      </div>`;
-    if (window.lucide) lucide.createIcons();
-    return;
-  }
-  app.innerHTML = `
-    <section role="region" aria-labelledby="plans-heading">
-      <div class="view-header">
-        <h1 id="plans-heading"><i data-lucide="layers" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Plans & Tarifs</h1>
-        <p class="text-secondary">Choisissez le plan adapt\xE9 \xE0 votre restaurant</p>
-      </div>
-      <div class="plans-loading" role="status" aria-live="polite" aria-label="Chargement des plans">
-        <div class="spinner"></div>
-      </div>
-    </section>`;
-  if (window.lucide) lucide.createIcons();
-  try {
-    let planRank2 = function(p) {
-      return PLAN_ORDER.indexOf(p);
-    }, renderFeature2 = function(f) {
-      const isSectionTitle = f.startsWith("Tout ");
-      return `<li class="plan-feature${isSectionTitle ? " plan-feature--section" : ""}">
-        ${isSectionTitle ? "" : '<i data-lucide="check" style="width:14px;height:14px;flex-shrink:0;color:var(--color-success)" aria-hidden="true"></i>'}
-        <span>${escapeHtml(f)}</span>
-      </li>`;
-    };
-    var planRank = planRank2, renderFeature = renderFeature2;
-    const [{ items: plans }, { plan: currentPlan }] = await Promise.all([
-      API.getPlans(),
-      API.getCurrentPlan()
-    ]);
-    const PLAN_ORDER = ["discovery", "essential", "professional", "premium", "enterprise"];
-    const normalizePlan = (p) => p === "essential" || p === "premium" ? "professional" : p;
-    const normalizedCurrent = normalizePlan(currentPlan);
-    const target = normalizePlan(highlightPlan || currentPlan);
-    const cardsHtml = plans.map((plan) => {
-      const isCurrent = plan.id === normalizedCurrent;
-      const isHighlighted = plan.id === target;
-      const isDowngrade = planRank2(plan.id) < planRank2(normalizedCurrent);
-      const isEnterprise = plan.id === "enterprise";
-      let btnHtml;
-      if (isCurrent) {
-        btnHtml = `<button class="btn btn-secondary btn-sm" disabled aria-label="${escapeHtml(plan.name)} \u2014 votre plan actuel">Plan actuel</button>`;
-      } else if (isEnterprise) {
-        btnHtml = `<a href="mailto:contact@restosuite.fr?subject=Plan Enterprise" class="btn btn-outline btn-sm" aria-label="Contacter le service commercial pour le plan Enterprise">Nous contacter</a>`;
-      } else {
-        const btnClass = isDowngrade ? "btn-outline" : "btn-primary";
-        const label = isDowngrade ? "Passer \xE0 ce plan" : `Choisir ${escapeHtml(plan.name)}`;
-        btnHtml = `<button class="btn ${btnClass} btn-sm plan-upgrade-btn" data-plan="${escapeHtml(plan.id)}" aria-label="${isDowngrade ? "Passer au plan" : "Choisir le plan"} ${escapeHtml(plan.name)}">${label}</button>`;
-      }
-      return `
-        <article class="plan-card${isCurrent ? " plan-card--current" : ""}${isHighlighted && !isCurrent ? " plan-card--highlighted" : ""}" aria-label="Plan ${escapeHtml(plan.name)}"${isCurrent ? ' aria-current="true"' : ""}>
-          ${isCurrent ? '<div class="plan-card__current-badge" aria-hidden="true">Plan actuel</div>' : ""}
-          ${plan.badge && !isCurrent ? `<div class="plan-card__badge">${escapeHtml(plan.badge)}</div>` : ""}
-          <div class="plan-card__header">
-            <h2 class="plan-card__name">${escapeHtml(plan.name)}</h2>
-            <div class="plan-card__price" aria-label="Prix : ${escapeHtml(plan.label)}">${escapeHtml(plan.label)}</div>
-            <p class="plan-card__desc">${escapeHtml(plan.description)}</p>
-          </div>
-          <ul class="plan-features" aria-label="Fonctionnalit\xE9s incluses dans ${escapeHtml(plan.name)}">
-            ${plan.features.map(renderFeature2).join("")}
-          </ul>
-          <div class="plan-card__footer">
-            ${btnHtml}
-          </div>
-        </article>`;
-    }).join("");
-    app.innerHTML = `
-      <section role="region" aria-labelledby="plans-heading-loaded">
-        <div class="view-header">
-          <h1 id="plans-heading-loaded"><i data-lucide="layers" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Plans & Tarifs</h1>
-          <p class="text-secondary">Choisissez le plan adapt\xE9 \xE0 votre restaurant</p>
-        </div>
-
-        ${highlightPlan && highlightPlan !== currentPlan ? `
-          <div class="plans-upgrade-notice" role="alert">
-            <i data-lucide="lock" style="width:16px;height:16px" aria-hidden="true"></i>
-            Cette fonctionnalit\xE9 n\xE9cessite le plan <strong>${escapeHtml(highlightPlan)}</strong> ou sup\xE9rieur.
-            Votre plan actuel : <strong>${escapeHtml(currentPlan)}</strong>.
-          </div>` : ""}
-
-        <div class="plans-grid" role="list" aria-label="Plans disponibles">
-          ${cardsHtml}
-        </div>
-
-        <p class="plans-note text-secondary" style="text-align:center;margin-top:24px;font-size:0.85rem">
-          Les changements de plan sont instantan\xE9s. Pas de paiement requis en phase b\xEAta.
-        </p>
-      </section>`;
-    if (window.lucide) lucide.createIcons();
-    app.querySelectorAll(".plan-upgrade-btn").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const plan = btn.dataset.plan;
-        btn.disabled = true;
-        btn.textContent = "Activation\u2026";
-        try {
-          await API.upgradePlan(plan);
-          _currentPlan = plan;
-          showToast(`Plan ${plan} activ\xE9 avec succ\xE8s`, "success");
-          renderPlans();
-        } catch (e) {
-          showToast(e.message || "Erreur lors du changement de plan", "error");
-          btn.disabled = false;
-          btn.textContent = "R\xE9essayer";
-        }
-      });
-    });
-  } catch (e) {
-    app.innerHTML = `
-      <div class="empty-state" role="alert">
-        <div class="empty-icon" aria-hidden="true"><i data-lucide="wifi-off"></i></div>
-        <p>Impossible de charger les plans</p>
-        <button class="btn btn-primary" onclick="renderPlans()" aria-label="R\xE9essayer de charger les plans">R\xE9essayer</button>
-      </div>`;
-    if (window.lucide) lucide.createIcons();
-  }
-}
 let _commandPaletteOpen = false;
 const _commands = [
   { name: "Nouvelle fiche technique", icon: "plus", hash: "#/new", category: "Fiches" },
@@ -26639,16 +26508,11 @@ class AdminView {
     if (window.lucide) lucide.createIcons();
   }
   _renderStats({ totalUsers, totalRestaurants, byPlan, thisWeek, thisMonth }) {
-    const planColors = {
-      discovery: "#94a3b8",
-      essential: "#60a5fa",
-      professional: "#E8722A",
-      premium: "#a78bfa",
-      enterprise: "#f59e0b"
-    };
-    const planBadges = (byPlan || []).map(
-      (p) => `<span style="display:inline-flex;align-items:center;gap:.35rem;background:${planColors[p.plan] || "#94a3b8"}22;color:${planColors[p.plan] || "#94a3b8"};border:1px solid ${planColors[p.plan] || "#94a3b8"}44;padding:.2rem .6rem;border-radius:999px;font-size:.75rem;font-weight:600">${escapeHtml(p.plan)} <strong>${p.count}</strong></span>`
-    ).join(" ");
+    const planColors = { free: "#94a3b8", pro: "#E8722A" };
+    const planBadges = (byPlan || []).map((p) => {
+      const c = planColors[p.plan] || "#94a3b8";
+      return `<span style="display:inline-flex;align-items:center;gap:.35rem;background:${c}22;color:${c};border:1px solid ${c}44;padding:.2rem .6rem;border-radius:999px;font-size:.75rem;font-weight:600">${escapeHtml(p.plan)} <strong>${p.count}</strong></span>`;
+    }).join(" ");
     document.getElementById("admin-stats-row").innerHTML = `
       <div class="kpi-card">
         <div class="kpi-icon"><i data-lucide="users"></i></div>
@@ -26695,9 +26559,9 @@ class AdminView {
     const fmt = (dt) => dt ? new Date(dt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "\u2014";
     const fmtFull = (dt) => dt ? new Date(dt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "\u2014";
     const planBadge = (plan) => {
-      const colors = { discovery: "#94a3b8", essential: "#60a5fa", professional: "#E8722A", premium: "#a78bfa", enterprise: "#f59e0b" };
+      const colors = { free: "#94a3b8", pro: "#E8722A" };
       const c = colors[plan] || "#94a3b8";
-      return `<span style="background:${c}22;color:${c};border:1px solid ${c}44;padding:.15rem .5rem;border-radius:999px;font-size:.75rem;font-weight:600;white-space:nowrap">${escapeHtml(plan || "discovery")}</span>`;
+      return `<span style="background:${c}22;color:${c};border:1px solid ${c}44;padding:.15rem .5rem;border-radius:999px;font-size:.75rem;font-weight:600;white-space:nowrap">${escapeHtml(plan || "free")}</span>`;
     };
     const rows = users.map((u) => `
       <tr>
@@ -26734,7 +26598,7 @@ class AdminView {
       u.email || "",
       u.name || "",
       u.restaurant_name || "",
-      u.plan || "discovery",
+      u.plan || "free",
       u.created_at || "",
       u.last_login || ""
     ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
@@ -27058,7 +26922,6 @@ const ROUTE_ROLES = {
   "/menu-engineering": ["gerant"],
   "/traceability/downstream": ["gerant", "cuisinier"],
   "/pms/export": ["gerant"],
-  "/settings/plans": ["gerant"],
   "/settings/sanitary-approval": ["gerant"],
   "/import-mercuriale": ["gerant"],
   "/admin": ["admin"],
@@ -27144,16 +27007,6 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e)
     document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
   }
 });
-const PLAN_ORDER_CLIENT = ["discovery", "essential", "professional", "premium", "enterprise"];
-let _currentPlan = "discovery";
-function planRankClient(plan) {
-  const idx = PLAN_ORDER_CLIENT.indexOf(plan);
-  return idx === -1 ? 0 : idx;
-}
-function isPlanUnlocked(minPlan) {
-  if (!minPlan) return true;
-  return planRankClient(_currentPlan) >= planRankClient(minPlan);
-}
 const NAV_GROUPS = {
   cuisine: {
     label: "Cuisine",
@@ -27170,10 +27023,10 @@ const NAV_GROUPS = {
       // /suppliers (just the suppliers list, no orders). Two clicks to reach
       // the orders dashboard. Route now points straight at /orders, which
       // already shows orders + has a "Fournisseurs" button to drill back.
-      { label: "Commandes", route: "/orders", icon: "clipboard-pen", roles: ["gerant"], minPlan: "essential" },
-      { label: "Fournisseurs", route: "/suppliers", icon: "truck", roles: ["gerant"], minPlan: "essential" },
-      { label: "Livraisons", route: "/deliveries", icon: "package-check", roles: ["gerant", "cuisinier"], minPlan: "essential" },
-      { label: "Messages", route: "/messages", icon: "message-square", roles: ["gerant", "cuisinier"], minPlan: "essential", badgeKey: "messages" },
+      { label: "Commandes", route: "/orders", icon: "clipboard-pen", roles: ["gerant"] },
+      { label: "Fournisseurs", route: "/suppliers", icon: "truck", roles: ["gerant"] },
+      { label: "Livraisons", route: "/deliveries", icon: "package-check", roles: ["gerant", "cuisinier"] },
+      { label: "Messages", route: "/messages", icon: "message-square", roles: ["gerant", "cuisinier"], badgeKey: "messages" },
       { label: "Service (Salle)", route: "/service", icon: "concierge-bell", roles: ["gerant", "salle"] },
       { label: "Cuisine (\xE9cran)", route: "/kitchen", icon: "chef-hat", roles: ["gerant", "cuisinier"] }
     ]
@@ -27193,14 +27046,14 @@ const NAV_GROUPS = {
     label: "Param\xE8tres",
     items: [
       { label: "\xC9quipe", route: "/team", icon: "users", roles: ["gerant"] },
-      { label: "Plans & Tarifs", route: "/settings/plans", icon: "layers", roles: ["gerant"] },
-      { label: "CRM & Fid\xE9lit\xE9", route: "/crm", icon: "heart", roles: ["gerant"], minPlan: "essential" },
-      { label: "Int\xE9grations", route: "/integrations", icon: "plug", roles: ["gerant"], minPlan: "professional" },
-      { label: "QR Codes", route: "/qrcodes", icon: "qr-code", roles: ["gerant"], minPlan: "essential" },
-      { label: "Bilan Carbone", route: "/carbon", icon: "leaf", roles: ["gerant"], minPlan: "professional" },
-      { label: "Multi-Sites", route: "/multi-site", icon: "building-2", roles: ["gerant"], minPlan: "premium" },
-      { label: "API", route: "/api-keys", icon: "key", roles: ["gerant"], minPlan: "enterprise" },
-      { label: "Portail Fournisseur", route: "/supplier-portal", icon: "truck", roles: ["gerant"], minPlan: "essential" },
+      { label: "Abonnement", route: "/subscribe", icon: "layers", roles: ["gerant"] },
+      { label: "CRM & Fid\xE9lit\xE9", route: "/crm", icon: "heart", roles: ["gerant"] },
+      { label: "Int\xE9grations", route: "/integrations", icon: "plug", roles: ["gerant"] },
+      { label: "QR Codes", route: "/qrcodes", icon: "qr-code", roles: ["gerant"] },
+      { label: "Bilan Carbone", route: "/carbon", icon: "leaf", roles: ["gerant"] },
+      { label: "Multi-Sites", route: "/multi-site", icon: "building-2", roles: ["gerant"] },
+      { label: "API", route: "/api-keys", icon: "key", roles: ["gerant"] },
+      { label: "Portail Fournisseur", route: "/supplier-portal", icon: "truck", roles: ["gerant"] },
       { label: "Journal erreurs", route: "/errors-log", icon: "bug", roles: ["gerant"] },
       { label: "Agr\xE9ment sanitaire", route: "/settings/sanitary-approval", icon: "badge-check", roles: ["gerant"] },
       { label: "Se d\xE9connecter", route: null, icon: "log-out", roles: ["gerant", "cuisinier", "equipier"], action: "logout" }
@@ -27209,10 +27062,10 @@ const NAV_GROUPS = {
   pilotage: {
     label: "Pilotage",
     items: [
-      { label: "Pilotage", route: "/analytics", icon: "bar-chart-3", roles: ["gerant"], minPlan: "professional" },
-      { label: "Menu Engineering", route: "/menu-engineering", icon: "target", roles: ["gerant"], minPlan: "professional" },
-      { label: "Pr\xE9dictions IA", route: "/predictions", icon: "brain", roles: ["gerant"], minPlan: "professional" },
-      { label: "Mercuriale", route: "/mercuriale", icon: "trending-up", roles: ["gerant"], minPlan: "essential" }
+      { label: "Pilotage", route: "/analytics", icon: "bar-chart-3", roles: ["gerant"] },
+      { label: "Menu Engineering", route: "/menu-engineering", icon: "target", roles: ["gerant"] },
+      { label: "Pr\xE9dictions IA", route: "/predictions", icon: "brain", roles: ["gerant"] },
+      { label: "Mercuriale", route: "/mercuriale", icon: "trending-up", roles: ["gerant"] }
     ]
   },
   traceability: {
@@ -27260,7 +27113,6 @@ const ROUTE_TO_GROUP = {
   "/errors-log": "config",
   "/crm": "config",
   "/subscribe": "config",
-  "/settings/plans": "config",
   "/settings": "config",
   "/settings/sanitary-approval": "config",
   "/traceability/downstream": "haccp",
@@ -27510,9 +27362,11 @@ function registerRoutes() {
   Router.add(/^\/api-keys$/, renderAPIKeys);
   Router.add(/^\/qrcodes$/, renderQRCodes);
   Router.add(/^\/settings$/, () => {
-    location.hash = "#/settings/plans";
+    location.hash = "#/subscribe";
   });
-  Router.add(/^\/settings\/plans$/, (highlightPlan) => renderPlans(highlightPlan));
+  Router.add(/^\/settings\/plans$/, () => {
+    location.hash = "#/subscribe";
+  });
   Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
   Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
   Router.add(/^\/fabrication-diagrams$/, renderFabricationDiagrams);
@@ -27521,32 +27375,6 @@ function registerRoutes() {
     location.hash = "#/fabrication-diagrams";
   });
   Router.add(/^\/admin$/, renderAdmin);
-}
-function showPlanGateModal(planLabel) {
-  const existing = document.querySelector(".modal-overlay");
-  if (existing) existing.remove();
-  const overlay = document.createElement("div");
-  overlay.className = "modal-overlay";
-  overlay.innerHTML = `
-    <div class="modal" style="max-width:420px;text-align:center">
-      <div style="font-size:2.5rem;margin-bottom:var(--space-3)">\u{1F512}</div>
-      <h2 style="margin-bottom:var(--space-3)">Fonctionnalit\xE9 ${escapeHtml(planLabel)}</h2>
-      <p class="text-secondary" style="margin-bottom:var(--space-5)">
-        Cette fonctionnalit\xE9 n\xE9cessite le plan <strong>${escapeHtml(planLabel)}</strong>.<br>
-        Passez \xE0 un plan sup\xE9rieur pour y acc\xE9der.
-      </p>
-      <div class="actions-row" style="justify-content:center;gap:var(--space-3)">
-        <button class="btn btn-secondary" id="plan-gate-cancel">Fermer</button>
-        <a href="#/settings/plans" class="btn btn-primary" id="plan-gate-go">Voir les tarifs \u2192</a>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) overlay.remove();
-  });
-  document.getElementById("plan-gate-cancel").addEventListener("click", () => overlay.remove());
-  document.getElementById("plan-gate-go").addEventListener("click", () => overlay.remove());
 }
 function bootApp(role, account, opts = {}) {
   applyRole(role);
@@ -27586,15 +27414,6 @@ function bootApp(role, account, opts = {}) {
   const displayName = account ? account.name : role;
   console.log("%c RestoSuite ", "background:#E8722A;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600", `loaded (${displayName})`);
   fetchTrialStatus().then(() => renderTrialBanner());
-  API.getCurrentPlan().then((data) => {
-    if (data.trial_active || data.status === "trial") {
-      _currentPlan = "enterprise";
-    } else {
-      _currentPlan = data.plan || "discovery";
-    }
-    if (typeof renderNav === "function") renderNav();
-  }).catch(() => {
-  });
   clearTrialStatusInterval();
   _trialStatusIntervalId = setInterval(() => fetchTrialStatus().then(() => renderTrialBanner()), 5 * 60 * 1e3);
   if (role === "gerant" && typeof maybeStartOnboardingTour === "function") {
@@ -27640,17 +27459,7 @@ function initNavGroups(role) {
           <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
         </button>`;
       }
-      const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
-      const isActive = !locked && (currentPath === item.route || item.route !== "/" && currentPath.startsWith(item.route));
-      if (locked) {
-        const PLAN_LABELS = { essential: "Essential", professional: "Pro", premium: "Premium", enterprise: "Groupe" };
-        const badge = PLAN_LABELS[item.minPlan] || item.minPlan;
-        return `<button class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}" data-action="plan-gate">
-          <i data-lucide="${item.icon}"></i>
-          <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
-          <span class="nav-plan-badge">${escapeHtml(badge)}</span>
-        </button>`;
-      }
+      const isActive = currentPath === item.route || item.route !== "/" && currentPath.startsWith(item.route);
       return `<a href="#${item.route}" data-route="${escapeHtml(item.route)}" class="nav-panel-item${isActive ? " active" : ""}">
         <i data-lucide="${item.icon}"></i>
         <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
@@ -27699,15 +27508,6 @@ function initNavGroups(role) {
     panelContent.querySelectorAll(".nav-panel-item").forEach((item) => {
       item.addEventListener("click", closePanel, { once: true });
     });
-    panelContent.querySelectorAll('[data-action="plan-gate"]').forEach((btn2) => {
-      btn2.addEventListener("click", (e) => {
-        e.stopImmediatePropagation();
-        const plan = btn2.dataset.requiredPlan;
-        const PLAN_LABELS = { essential: "Essential", professional: "Pro", premium: "Premium", enterprise: "Groupe" };
-        const label = PLAN_LABELS[plan] || plan;
-        showPlanGateModal(label);
-      });
-    });
   }
   document.querySelectorAll(".nav-link[data-group]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -27730,7 +27530,6 @@ function initMobileNav(role) {
   const closeBtn = document.getElementById("mobile-nav-close");
   const body = document.getElementById("mobile-nav-body");
   if (!hamburgerBtn || !overlay || !body) return;
-  const PLAN_LABELS = { essential: "Essential", professional: "Pro", premium: "Premium", enterprise: "Groupe" };
   const currentPath = () => location.hash.replace("#", "") || "/";
   function buildMenu() {
     body.innerHTML = "";
@@ -27756,7 +27555,6 @@ function initMobileNav(role) {
       items.forEach((item) => {
         const path = currentPath();
         const isActive = item.route && (path === item.route || item.route !== "/" && path.startsWith(item.route));
-        const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
         let el;
         if (item.action === "logout") {
           el = document.createElement("button");
@@ -27765,9 +27563,6 @@ function initMobileNav(role) {
             closeOverlay();
             logout();
           });
-        } else if (locked) {
-          el = document.createElement("div");
-          el.className = "mobile-nav-item mobile-nav-item--locked";
         } else {
           el = document.createElement("a");
           el.href = "#" + item.route;
@@ -27775,7 +27570,7 @@ function initMobileNav(role) {
           el.className = "mobile-nav-item" + (isActive ? " active" : "");
           el.addEventListener("click", closeOverlay);
         }
-        el.innerHTML = `<i data-lucide="${item.icon}"></i><span>${escapeHtml(item.label)}</span>` + (locked ? `<span class="mobile-nav-item__badge">${escapeHtml(PLAN_LABELS[item.minPlan] || item.minPlan)}</span>` : "");
+        el.innerHTML = `<i data-lucide="${item.icon}"></i><span>${escapeHtml(item.label)}</span>`;
         section.appendChild(el);
       });
       body.appendChild(section);

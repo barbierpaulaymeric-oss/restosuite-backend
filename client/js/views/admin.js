@@ -93,17 +93,13 @@ class AdminView {
   }
 
   _renderStats({ totalUsers, totalRestaurants, byPlan, thisWeek, thisMonth }) {
-    const planColors = {
-      discovery: '#94a3b8',
-      essential: '#60a5fa',
-      professional: '#E8722A',
-      premium: '#a78bfa',
-      enterprise: '#f59e0b',
-    };
+    // Single-plan model: rows are 'free' (trial / no subscription) or 'pro' (active subscription).
+    const planColors = { free: '#94a3b8', pro: '#E8722A' };
 
-    const planBadges = (byPlan || []).map(p =>
-      `<span style="display:inline-flex;align-items:center;gap:.35rem;background:${planColors[p.plan] || '#94a3b8'}22;color:${planColors[p.plan] || '#94a3b8'};border:1px solid ${planColors[p.plan] || '#94a3b8'}44;padding:.2rem .6rem;border-radius:999px;font-size:.75rem;font-weight:600">${escapeHtml(p.plan)} <strong>${p.count}</strong></span>`
-    ).join(' ');
+    const planBadges = (byPlan || []).map(p => {
+      const c = planColors[p.plan] || '#94a3b8';
+      return `<span style="display:inline-flex;align-items:center;gap:.35rem;background:${c}22;color:${c};border:1px solid ${c}44;padding:.2rem .6rem;border-radius:999px;font-size:.75rem;font-weight:600">${escapeHtml(p.plan)} <strong>${p.count}</strong></span>`;
+    }).join(' ');
 
     document.getElementById('admin-stats-row').innerHTML = `
       <div class="kpi-card">
@@ -161,9 +157,9 @@ class AdminView {
     const fmtFull = (dt) => dt ? new Date(dt).toLocaleString('fr-FR', { dateStyle:'short', timeStyle:'short' }) : '—';
 
     const planBadge = (plan) => {
-      const colors = { discovery:'#94a3b8', essential:'#60a5fa', professional:'#E8722A', premium:'#a78bfa', enterprise:'#f59e0b' };
+      const colors = { free: '#94a3b8', pro: '#E8722A' };
       const c = colors[plan] || '#94a3b8';
-      return `<span style="background:${c}22;color:${c};border:1px solid ${c}44;padding:.15rem .5rem;border-radius:999px;font-size:.75rem;font-weight:600;white-space:nowrap">${escapeHtml(plan || 'discovery')}</span>`;
+      return `<span style="background:${c}22;color:${c};border:1px solid ${c}44;padding:.15rem .5rem;border-radius:999px;font-size:.75rem;font-weight:600;white-space:nowrap">${escapeHtml(plan || 'free')}</span>`;
     };
 
     const rows = users.map(u => `
@@ -203,7 +199,7 @@ class AdminView {
       u.email || '',
       u.name || '',
       u.restaurant_name || '',
-      u.plan || 'discovery',
+      u.plan || 'free',
       u.created_at || '',
       u.last_login || '',
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));

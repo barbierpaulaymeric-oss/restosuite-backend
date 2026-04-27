@@ -853,10 +853,8 @@ const API = {
     return this.request('/ai/import-mercuriale', { method: 'POST', body: data });
   },
 
-  // Plans & Pricing
-  getPlans() { return this.request('/plans'); },
+  // Subscription status
   getCurrentPlan() { return this.request('/plans/current'); },
-  upgradePlan(plan) { return this.request('/plans/upgrade', { method: 'POST', body: { plan } }); },
 
   // PMS Export
   getPMSExport(period = '3m') { return this.request(`/pms/export?period=${period}`); },

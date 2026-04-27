@@ -41,7 +41,7 @@ router.get('/users', (req, res) => {
       SELECT a.id, a.email, a.name, a.first_name, a.last_name, a.role,
              a.created_at, a.trial_start, a.last_login,
              r.name AS restaurant_name,
-             COALESCE(r.plan, 'discovery') AS plan
+             COALESCE(r.plan, 'free') AS plan
       FROM accounts a
       LEFT JOIN restaurants r ON r.id = a.restaurant_id
       WHERE a.is_owner = 1
@@ -61,11 +61,11 @@ router.get('/stats', (req, res) => {
     const totalRestaurants = get('SELECT COUNT(*) AS c FROM restaurants').c;
 
     const byPlan = all(`
-      SELECT COALESCE(r.plan, 'discovery') AS plan, COUNT(*) AS count
+      SELECT COALESCE(r.plan, 'free') AS plan, COUNT(*) AS count
       FROM accounts a
       LEFT JOIN restaurants r ON r.id = a.restaurant_id
       WHERE a.is_owner = 1
-      GROUP BY COALESCE(r.plan, 'discovery')
+      GROUP BY COALESCE(r.plan, 'free')
       ORDER BY count DESC
     `);
 
@@ -91,7 +91,7 @@ router.get('/restaurants', (req, res) => {
   try {
     const restaurants = all(`
       SELECT r.id, r.name, r.type, r.city, r.created_at,
-             COALESCE(r.plan, 'discovery') AS plan,
+             COALESCE(r.plan, 'free') AS plan,
              COUNT(DISTINCT a.id) AS nb_accounts,
              MAX(a.last_login) AS last_activity
       FROM restaurants r

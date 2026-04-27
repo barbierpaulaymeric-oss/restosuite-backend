@@ -7,7 +7,7 @@ const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 require('./db'); // initializes tables synchronously
 const { requireAuth } = require('./routes/auth');
-const { planGate } = require('./middleware/plan-gate');
+const { requireActiveOrTrial } = require('./middleware/plan-gate');
 const { backupDatabase } = require('./backup');
 const { appendError, LOG_PATH, MAX_LINES } = require('./routes/errors');
 
@@ -203,7 +203,7 @@ app.get('/manifest.json', (req, res) => {
 // Static files from client directory (but skip index.html for root)
 app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
 
-// ─── Soft JWT decode (populates req.user for planGate without enforcing auth) ──
+// ─── Soft JWT decode (populates req.user without enforcing auth) ──
 // requireAuth inside each route module remains the authoritative auth check.
 {
   const _jwt = require('jsonwebtoken');
@@ -217,57 +217,24 @@ app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
   });
 }
 
-// ─── Plan Gating ─────────────────────────────────────────────────────────────
-// Rules: active trial = full access; expired trial = GET/HEAD-only; paid = plan rank
-// Routes not listed here are public or separately protected (auth, admin, stripe, etc.)
-
-// discovery — free tier
-app.use('/api/ingredients', planGate('discovery'));
-app.use('/api/recipes', planGate('discovery'));
-app.use('/api/stock', planGate('discovery'));
-app.use('/api/prices', planGate('discovery'));
-app.use('/api/variance', planGate('discovery'));
-// Allergen declaration is a legal obligation under EU 1169/2011 (INCO) for
-// every food business since 13/12/2014 — it cannot sit behind a paywall.
-app.use('/api/allergens', planGate('discovery'));
-
-// essential — 29€/month
-app.use('/api/haccp', planGate('essential'));
-app.use('/api/suppliers', planGate('essential'));
-app.use('/api/orders', planGate('essential'));
-app.use('/api/deliveries', planGate('essential'));
-app.use('/api/purchase-orders', planGate('essential'));
-app.use('/api/qrcode', planGate('essential'));
-app.use('/api/menu', planGate('essential'));
-app.use('/api/alerts', planGate('essential'));
-app.use('/api/service', planGate('essential'));
-app.use('/api/crm', planGate('essential'));
-
-// professional — 59€/month
-app.use('/api/haccp-plan', planGate('professional'));
-app.use('/api/analytics', planGate('professional'));
-app.use('/api/ai', planGate('professional'));
-app.use('/api/predictions', planGate('professional'));
-app.use('/api/carbon', planGate('professional'));
-app.use('/api/integrations', planGate('professional'));
-app.use('/api/training', planGate('professional'));
-app.use('/api/pest-control', planGate('professional'));
-app.use('/api/maintenance', planGate('professional'));
-app.use('/api/waste', planGate('professional'));
-app.use('/api/corrective-actions', planGate('professional'));
-app.use('/api/pms-audit', planGate('professional'));
-app.use('/api/pms', planGate('professional')); // pms-audit must appear first (prefix match)
-app.use('/api/sanitary', planGate('professional'));
-app.use('/api/water', planGate('professional'));
-
-// premium — 99€/month
-app.use('/api/traceability', planGate('premium'));
-app.use('/api/recall', planGate('premium'));
-app.use('/api/allergen-plan', planGate('premium'));
-app.use('/api/fabrication-diagrams', planGate('premium'));
-app.use('/api/tiac', planGate('premium'));
-app.use('/api/sites', planGate('premium'));
-
+// ─── Access Gating ───────────────────────────────────────────────────────────
+// Single paid plan model: active trial = full access; expired trial = GET/HEAD only;
+// pro subscription = full access. No tiered feature gating.
+{
+  const GATED_PREFIXES = [
+    '/api/ingredients', '/api/recipes', '/api/stock', '/api/prices', '/api/variance',
+    '/api/allergens',
+    '/api/haccp', '/api/suppliers', '/api/orders', '/api/deliveries', '/api/purchase-orders',
+    '/api/qrcode', '/api/menu', '/api/alerts', '/api/service', '/api/crm',
+    '/api/haccp-plan', '/api/analytics', '/api/ai', '/api/predictions', '/api/carbon',
+    '/api/integrations', '/api/training', '/api/pest-control', '/api/maintenance',
+    '/api/waste', '/api/corrective-actions', '/api/pms-audit', '/api/pms',
+    '/api/sanitary', '/api/water',
+    '/api/traceability', '/api/recall', '/api/allergen-plan', '/api/fabrication-diagrams',
+    '/api/tiac', '/api/sites',
+  ];
+  for (const prefix of GATED_PREFIXES) app.use(prefix, requireActiveOrTrial);
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 // API routes

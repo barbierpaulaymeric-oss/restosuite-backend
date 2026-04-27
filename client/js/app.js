@@ -21,20 +21,6 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
   }
 });
 
-// ─── Plan hierarchy ───
-const PLAN_ORDER_CLIENT = ['discovery', 'essential', 'professional', 'premium', 'enterprise'];
-let _currentPlan = 'discovery';
-
-function planRankClient(plan) {
-  const idx = PLAN_ORDER_CLIENT.indexOf(plan);
-  return idx === -1 ? 0 : idx;
-}
-
-function isPlanUnlocked(minPlan) {
-  if (!minPlan) return true;
-  return planRankClient(_currentPlan) >= planRankClient(minPlan);
-}
-
 // ─── Nav group definitions ───
 const NAV_GROUPS = {
   cuisine: {
@@ -52,10 +38,10 @@ const NAV_GROUPS = {
       // /suppliers (just the suppliers list, no orders). Two clicks to reach
       // the orders dashboard. Route now points straight at /orders, which
       // already shows orders + has a "Fournisseurs" button to drill back.
-      { label: 'Commandes',              route: '/orders',    icon: 'clipboard-pen',  roles: ['gerant'],              minPlan: 'essential' },
-      { label: 'Fournisseurs',          route: '/suppliers',  icon: 'truck',         roles: ['gerant'],              minPlan: 'essential' },
-      { label: 'Livraisons',             route: '/deliveries',icon: 'package-check',  roles: ['gerant','cuisinier'], minPlan: 'essential' },
-      { label: 'Messages',               route: '/messages',  icon: 'message-square', roles: ['gerant','cuisinier'], minPlan: 'essential', badgeKey: 'messages' },
+      { label: 'Commandes',              route: '/orders',    icon: 'clipboard-pen',  roles: ['gerant'] },
+      { label: 'Fournisseurs',          route: '/suppliers',  icon: 'truck',         roles: ['gerant'] },
+      { label: 'Livraisons',             route: '/deliveries',icon: 'package-check',  roles: ['gerant','cuisinier'] },
+      { label: 'Messages',               route: '/messages',  icon: 'message-square', roles: ['gerant','cuisinier'], badgeKey: 'messages' },
       { label: 'Service (Salle)',        route: '/service',   icon: 'concierge-bell', roles: ['gerant','salle'] },
       { label: 'Cuisine (écran)',        route: '/kitchen',   icon: 'chef-hat',       roles: ['gerant','cuisinier'] },
     ]
@@ -75,14 +61,14 @@ const NAV_GROUPS = {
     label: 'Paramètres',
     items: [
       { label: 'Équipe',              route: '/team',            icon: 'users',        roles: ['gerant'] },
-      { label: 'Plans & Tarifs',      route: '/settings/plans',  icon: 'layers',       roles: ['gerant'] },
-      { label: 'CRM & Fidélité',      route: '/crm',             icon: 'heart',        roles: ['gerant'], minPlan: 'essential' },
-      { label: 'Intégrations',        route: '/integrations',    icon: 'plug',         roles: ['gerant'], minPlan: 'professional' },
-      { label: 'QR Codes',            route: '/qrcodes',         icon: 'qr-code',      roles: ['gerant'], minPlan: 'essential' },
-      { label: 'Bilan Carbone',       route: '/carbon',          icon: 'leaf',         roles: ['gerant'], minPlan: 'professional' },
-      { label: 'Multi-Sites',         route: '/multi-site',      icon: 'building-2',   roles: ['gerant'], minPlan: 'premium' },
-      { label: 'API',                 route: '/api-keys',        icon: 'key',          roles: ['gerant'], minPlan: 'enterprise' },
-      { label: 'Portail Fournisseur', route: '/supplier-portal', icon: 'truck',        roles: ['gerant'], minPlan: 'essential' },
+      { label: 'Abonnement',          route: '/subscribe',       icon: 'layers',       roles: ['gerant'] },
+      { label: 'CRM & Fidélité',      route: '/crm',             icon: 'heart',        roles: ['gerant'] },
+      { label: 'Intégrations',        route: '/integrations',    icon: 'plug',         roles: ['gerant'] },
+      { label: 'QR Codes',            route: '/qrcodes',         icon: 'qr-code',      roles: ['gerant'] },
+      { label: 'Bilan Carbone',       route: '/carbon',          icon: 'leaf',         roles: ['gerant'] },
+      { label: 'Multi-Sites',         route: '/multi-site',      icon: 'building-2',   roles: ['gerant'] },
+      { label: 'API',                 route: '/api-keys',        icon: 'key',          roles: ['gerant'] },
+      { label: 'Portail Fournisseur', route: '/supplier-portal', icon: 'truck',        roles: ['gerant'] },
       { label: 'Journal erreurs',     route: '/errors-log',         icon: 'bug',          roles: ['gerant'] },
       { label: 'Agrément sanitaire',  route: '/settings/sanitary-approval', icon: 'badge-check', roles: ['gerant'] },
       { label: 'Se déconnecter',      route: null,               icon: 'log-out',      roles: ['gerant','cuisinier','equipier'], action: 'logout' },
@@ -91,10 +77,10 @@ const NAV_GROUPS = {
   pilotage: {
     label: 'Pilotage',
     items: [
-      { label: 'Pilotage',          route: '/analytics',        icon: 'bar-chart-3',  roles: ['gerant'], minPlan: 'professional' },
-      { label: 'Menu Engineering',  route: '/menu-engineering', icon: 'target',       roles: ['gerant'], minPlan: 'professional' },
-      { label: 'Prédictions IA',    route: '/predictions',      icon: 'brain',        roles: ['gerant'], minPlan: 'professional' },
-      { label: 'Mercuriale',        route: '/mercuriale',       icon: 'trending-up',  roles: ['gerant'], minPlan: 'essential' },
+      { label: 'Pilotage',          route: '/analytics',        icon: 'bar-chart-3',  roles: ['gerant'] },
+      { label: 'Menu Engineering',  route: '/menu-engineering', icon: 'target',       roles: ['gerant'] },
+      { label: 'Prédictions IA',    route: '/predictions',      icon: 'brain',        roles: ['gerant'] },
+      { label: 'Mercuriale',        route: '/mercuriale',       icon: 'trending-up',  roles: ['gerant'] },
     ]
   },
   traceability: {
@@ -124,7 +110,7 @@ const ROUTE_TO_GROUP = {
   '/more': 'config', '/team': 'config', '/integrations': 'config',
   '/multi-site': 'config', '/api-keys': 'config', '/qrcodes': 'config',
   '/carbon': 'config', '/supplier-portal': 'config', '/errors-log': 'config',
-  '/crm': 'config', '/subscribe': 'config', '/settings/plans': 'config',
+  '/crm': 'config', '/subscribe': 'config',
   '/settings': 'config',
   '/settings/sanitary-approval': 'config',
   '/traceability/downstream': 'haccp',
@@ -405,39 +391,14 @@ function registerRoutes() {
   Router.add(/^\/crm$/, renderCRM);
   Router.add(/^\/api-keys$/, renderAPIKeys);
   Router.add(/^\/qrcodes$/, renderQRCodes);
-  Router.add(/^\/settings$/, () => { location.hash = '#/settings/plans'; });
-  Router.add(/^\/settings\/plans$/, (highlightPlan) => renderPlans(highlightPlan));
+  Router.add(/^\/settings$/, () => { location.hash = '#/subscribe'; });
+  Router.add(/^\/settings\/plans$/, () => { location.hash = '#/subscribe'; });
   Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
   Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
   Router.add(/^\/fabrication-diagrams$/, renderFabricationDiagrams);
   Router.add(/^\/pms\/export$/, renderPMSExport);
   Router.add(/^\/docs$/, () => { location.hash = '#/fabrication-diagrams'; });
   Router.add(/^\/admin$/, renderAdmin);
-}
-
-function showPlanGateModal(planLabel) {
-  const existing = document.querySelector('.modal-overlay');
-  if (existing) existing.remove();
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.innerHTML = `
-    <div class="modal" style="max-width:420px;text-align:center">
-      <div style="font-size:2.5rem;margin-bottom:var(--space-3)">🔒</div>
-      <h2 style="margin-bottom:var(--space-3)">Fonctionnalité ${escapeHtml(planLabel)}</h2>
-      <p class="text-secondary" style="margin-bottom:var(--space-5)">
-        Cette fonctionnalité nécessite le plan <strong>${escapeHtml(planLabel)}</strong>.<br>
-        Passez à un plan supérieur pour y accéder.
-      </p>
-      <div class="actions-row" style="justify-content:center;gap:var(--space-3)">
-        <button class="btn btn-secondary" id="plan-gate-cancel">Fermer</button>
-        <a href="#/settings/plans" class="btn btn-primary" id="plan-gate-go">Voir les tarifs →</a>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.getElementById('plan-gate-cancel').addEventListener('click', () => overlay.remove());
-  document.getElementById('plan-gate-go').addEventListener('click', () => overlay.remove());
 }
 
 function bootApp(role, account, opts = {}) {
@@ -488,19 +449,8 @@ function bootApp(role, account, opts = {}) {
   const displayName = account ? account.name : role;
   console.log('%c RestoSuite ', 'background:#E8722A;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600', `loaded (${displayName})`);
 
-  // Fetch trial status and plan in parallel
+  // Trial banner — read-only / expired warnings come from the trial-status helper.
   fetchTrialStatus().then(() => renderTrialBanner());
-  API.getCurrentPlan().then(data => {
-    // If user is in active trial, give them full access (enterprise-level)
-    // so no plan-gate badges/locks appear in the UI during trial.
-    if (data.trial_active || data.status === 'trial') {
-      _currentPlan = 'enterprise';
-    } else {
-      _currentPlan = data.plan || 'discovery';
-    }
-    // Re-render nav to remove any stale lock badges
-    if (typeof renderNav === 'function') renderNav();
-  }).catch(() => {});
 
   // Refresh trial status every 5 minutes (store interval ID for cleanup on logout)
   clearTrialStatusInterval();
@@ -564,17 +514,7 @@ function initNavGroups(role) {
           <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
         </button>`;
       }
-      const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
-      const isActive = !locked && (currentPath === item.route || (item.route !== '/' && currentPath.startsWith(item.route)));
-      if (locked) {
-        const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Groupe' };
-        const badge = PLAN_LABELS[item.minPlan] || item.minPlan;
-        return `<button class="nav-panel-item nav-panel-item--locked" data-required-plan="${escapeHtml(item.minPlan)}" data-action="plan-gate">
-          <i data-lucide="${item.icon}"></i>
-          <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
-          <span class="nav-plan-badge">${escapeHtml(badge)}</span>
-        </button>`;
-      }
+      const isActive = currentPath === item.route || (item.route !== '/' && currentPath.startsWith(item.route));
       return `<a href="#${item.route}" data-route="${escapeHtml(item.route)}" class="nav-panel-item${isActive ? ' active' : ''}">
         <i data-lucide="${item.icon}"></i>
         <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
@@ -635,17 +575,6 @@ function initNavGroups(role) {
     panelContent.querySelectorAll('.nav-panel-item').forEach(item => {
       item.addEventListener('click', closePanel, { once: true });
     });
-
-    // Plan gate : intercepte les clics sur fonctionnalités verrouillées
-    panelContent.querySelectorAll('[data-action="plan-gate"]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopImmediatePropagation();
-        const plan = btn.dataset.requiredPlan;
-        const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Groupe' };
-        const label = PLAN_LABELS[plan] || plan;
-        showPlanGateModal(label);
-      });
-    });
   }
 
   document.querySelectorAll('.nav-link[data-group]').forEach(btn => {
@@ -675,7 +604,6 @@ function initMobileNav(role) {
   const body = document.getElementById('mobile-nav-body');
   if (!hamburgerBtn || !overlay || !body) return;
 
-  const PLAN_LABELS = { essential: 'Essential', professional: 'Pro', premium: 'Premium', enterprise: 'Groupe' };
   const currentPath = () => location.hash.replace('#', '') || '/';
 
   function buildMenu() {
@@ -705,16 +633,12 @@ function initMobileNav(role) {
       items.forEach(item => {
         const path = currentPath();
         const isActive = item.route && (path === item.route || (item.route !== '/' && path.startsWith(item.route)));
-        const locked = item.minPlan && !isPlanUnlocked(item.minPlan);
 
         let el;
         if (item.action === 'logout') {
           el = document.createElement('button');
           el.className = 'mobile-nav-item mobile-nav-item--danger';
           el.addEventListener('click', () => { closeOverlay(); logout(); });
-        } else if (locked) {
-          el = document.createElement('div');
-          el.className = 'mobile-nav-item mobile-nav-item--locked';
         } else {
           el = document.createElement('a');
           el.href = '#' + item.route;
@@ -722,8 +646,7 @@ function initMobileNav(role) {
           el.className = 'mobile-nav-item' + (isActive ? ' active' : '');
           el.addEventListener('click', closeOverlay);
         }
-        el.innerHTML = `<i data-lucide="${item.icon}"></i><span>${escapeHtml(item.label)}</span>` +
-          (locked ? `<span class="mobile-nav-item__badge">${escapeHtml(PLAN_LABELS[item.minPlan] || item.minPlan)}</span>` : '');
+        el.innerHTML = `<i data-lucide="${item.icon}"></i><span>${escapeHtml(item.label)}</span>`;
         section.appendChild(el);
       });
       body.appendChild(section);

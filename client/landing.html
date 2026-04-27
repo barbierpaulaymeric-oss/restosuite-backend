@@ -58,15 +58,8 @@
         "price": "39",
         "priceCurrency": "EUR",
         "priceValidUntil": "2027-12-31",
-        "description": "1 établissement, toutes fonctionnalités",
+        "description": "Toutes les fonctionnalités, sans engagement",
         "url": "https://www.restosuite.fr/app#/subscribe"
-      },
-      {
-        "@type": "Offer",
-        "name": "Groupe",
-        "priceCurrency": "EUR",
-        "description": "Groupes multi-sites — sur devis",
-        "url": "https://www.restosuite.fr/#contact"
       }
     ],
     "author": {
@@ -600,23 +593,22 @@
   <section class="section section--paper" id="tarifs">
     <div class="container">
       <div class="section-header reveal">
-        <h2>Des tarifs simples, sans surprise</h2>
-        <p>Commencez gratuitement. Passez en Pro quand vous êtes prêt.</p>
+        <h2>Une seule offre. Tout inclus.</h2>
+        <p>Essayez gratuitement pendant 60 jours. Passez en Pro quand vous êtes prêt — sans engagement.</p>
       </div>
-      <div class="pricing__grid">
+      <div class="pricing__grid" style="grid-template-columns:repeat(2, minmax(0, 1fr));max-width:760px;margin:0 auto">
         <!-- Essai Gratuit -->
         <div class="pricing-card reveal reveal-delay-1">
-          <div class="pricing-card__name">Essai Gratuit</div>
+          <div class="pricing-card__name">Essai gratuit</div>
           <div class="pricing-card__desc">60 jours · Accès complet</div>
           <div class="pricing-card__price">
             <span class="pricing-card__amount">0€</span>
             <span class="pricing-card__period">pendant 60 jours</span>
           </div>
           <ul class="pricing-card__features">
-            <li><i data-lucide="check"></i> Fiches techniques illimitées</li>
+            <li><i data-lucide="check"></i> Toutes les fonctionnalités</li>
             <li><i data-lucide="check"></i> Saisie vocale IA</li>
-            <li><i data-lucide="check"></i> Module HACCP complet</li>
-            <li><i data-lucide="check"></i> Export PDF</li>
+            <li><i data-lucide="check"></i> HACCP complet</li>
             <li><i data-lucide="check"></i> Multi-comptes</li>
             <li><i data-lucide="check"></i> Aucune carte bancaire requise</li>
           </ul>
@@ -625,41 +617,26 @@
         <!-- Pro -->
         <div class="pricing-card pricing-card--pro reveal reveal-delay-2">
           <div class="pricing-card__name">Pro</div>
-          <div class="pricing-card__desc">Sans engagement, annulable à tout moment</div>
+          <div class="pricing-card__desc">39€/mois — tout inclus, sans engagement</div>
           <div class="pricing-card__price">
             <span class="pricing-card__amount">39€</span>
             <span class="pricing-card__period">/ mois</span>
           </div>
-          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-top:-16px;margin-bottom:20px">ou 31€/mois facturé annuellement (372€/an) — <strong style="color:var(--color-success)">Économisez 20%</strong></p>
           <ul class="pricing-card__features">
-            <li><i data-lucide="check"></i> Fiches techniques illimitées</li>
+            <li><i data-lucide="check"></i> Toutes les fonctionnalités</li>
             <li><i data-lucide="check"></i> Saisie vocale IA</li>
-            <li><i data-lucide="check"></i> Module HACCP complet</li>
-            <li><i data-lucide="check"></i> Export PDF</li>
+            <li><i data-lucide="check"></i> HACCP complet</li>
             <li><i data-lucide="check"></i> Multi-comptes</li>
             <li><i data-lucide="check"></i> Support prioritaire</li>
-            <li><i data-lucide="check"></i> Tout inclus</li>
+            <li><i data-lucide="check"></i> Annulable à tout moment</li>
           </ul>
           <a href="/app#/subscribe" class="btn btn--primary" id="subscribe-btn">S'abonner — 39€/mois</a>
         </div>
-        <!-- Groupe -->
-        <div class="pricing-card reveal reveal-delay-3">
-          <div class="pricing-card__name">Groupe</div>
-          <div class="pricing-card__desc">Groupes & chaînes multi-sites · Sur mesure</div>
-          <div class="pricing-card__price">
-            <span class="pricing-card__amount">Sur devis</span>
-          </div>
-          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:12px;font-weight:500">Tout le plan Pro, plus :</p>
-          <ul class="pricing-card__features">
-            <li><i data-lucide="check"></i> Multi-établissements</li>
-            <li><i data-lucide="check"></i> Support dédié + SLA garanti</li>
-            <li><i data-lucide="check"></i> SSO & authentification centralisée</li>
-            <li><i data-lucide="check"></i> Accès API publique</li>
-            <li><i data-lucide="check"></i> Intégrations sur mesure</li>
-          </ul>
-          <a href="mailto:contact@restosuite.fr?subject=Plan%20Groupe" class="btn btn--secondary">Nous contacter</a>
-        </div>
       </div>
+      <p class="reveal" style="text-align:center;margin-top:28px;font-size:0.9375rem;color:var(--text-secondary)">
+        <i data-lucide="truck" style="width:16px;height:16px;vertical-align:middle;margin-right:6px"></i>
+        <strong>Gratuit pour les fournisseurs</strong> — accès au portail livraisons & commandes inclus, sans frais.
+      </p>
     </div>
   </section>
 
