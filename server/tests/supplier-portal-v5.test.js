@@ -121,16 +121,16 @@ describe('Identity expansion across tenants', () => {
     expect(res.status).toBe(404);
   });
 
-  it('GET /dashboard aggregates across identity tenants', async () => {
+  it('GET /dashboard aggregates across identity tenants (revenue is confirmed+delivered only)', async () => {
     const { a, b, c } = createMultiTenantIdentity();
     seedOrder(a.supplier_id, a.restaurant_id, { total: 100, status: 'livrée' });
-    seedOrder(b.supplier_id, b.restaurant_id, { total: 200, status: 'envoyée' });
+    seedOrder(b.supplier_id, b.restaurant_id, { total: 200, status: 'envoyée' }); // doesn't count
     seedOrder(c.supplier_id, c.restaurant_id, { total: 50,  status: 'livrée' });
     const res = await request(app)
       .get('/api/supplier-portal/dashboard')
       .set('X-Supplier-Token', a.token);
     expect(res.status).toBe(200);
-    expect(res.body.revenue_total).toBe(350);
+    expect(res.body.revenue_total).toBe(150); // 100 + 50, the 'envoyée' doesn't count
     expect(res.body.orders_total).toBe(3);
     expect(res.body.active_clients).toBe(3); // distinct restaurant_ids
     expect(res.body.pending_alerts).toHaveLength(1);

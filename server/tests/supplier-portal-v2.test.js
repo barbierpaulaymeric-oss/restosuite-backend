@@ -179,18 +179,22 @@ describe('GET /api/supplier-portal/dashboard', () => {
     expect(Array.isArray(res.body.pending_alerts)).toBe(true);
   });
 
-  it('aggregates revenue + counts pending orders as alerts', async () => {
+  it('aggregates revenue (confirmed+delivered only) + counts pending orders as alerts', async () => {
     const s = createSupplierSession();
     seedOrder(s, { total: 50, status: 'livrée' });
     seedOrder(s, { total: 80, status: 'envoyée' });
     seedOrder(s, { total: 120, status: 'brouillon' });
+    // revenue_total is supplier-confirmed CA only — drafts/sent/refused don't
+    // count. Only the 50€ livrée counts here.
+    seedOrder(s, { total: 200, status: 'confirmée' });    // counts (confirmed)
+    seedOrder(s, { total: 999, status: 'refusée' });      // doesn't count
 
     const res = await request(app)
       .get('/api/supplier-portal/dashboard')
       .set('X-Supplier-Token', s.token);
     expect(res.status).toBe(200);
-    expect(res.body.revenue_total).toBe(250);
-    expect(res.body.orders_total).toBe(3);
+    expect(res.body.revenue_total).toBe(250); // 50 livrée + 200 confirmée
+    expect(res.body.orders_total).toBe(5);
     expect(res.body.active_clients).toBe(1);
     // Two pending: status in (envoyée, brouillon)
     expect(res.body.pending_alerts).toHaveLength(2);

@@ -75,9 +75,19 @@ const API = {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Email ou mot de passe incorrect');
       }
-      // JWT expired or invalid — force re-login
+      // JWT expired or invalid — force re-login.
+      // We clear BOTH the restaurant token AND any leftover supplier session
+      // before reloading. Without the symmetric clear, app.js init's
+      // supplier-first boot order (line ~770) captures the user into the
+      // supplier portal whenever they had ever logged in there in the same
+      // tab — see feedback_session_cross_clear.md. The user's symptom was
+      // "clicking + on the order form disconnects the session and lands on
+      // a weird page" — that's this 401 path firing on a CSRF-expired POST
+      // and the supplier session winning the post-reload boot.
       localStorage.removeItem('restosuite_token');
       localStorage.removeItem('restosuite_account');
+      try { sessionStorage.removeItem('restosuite_supplier_token'); } catch {}
+      try { sessionStorage.removeItem('restosuite_supplier_session'); } catch {}
       __csrfToken = null;
       if (window.location.hash !== '#/login') {
         window.location.hash = '#/login';
@@ -459,7 +469,13 @@ const API = {
       if (!r.ok) {
         const err = await r.json().catch(() => ({ error: r.statusText }));
         if (r.status === 401) {
+          // Symmetric cleanup with the restaurant 401 path: clear BOTH
+          // session types so a leftover restaurant token can't flip the
+          // boot to the gérant SPA after reload. See
+          // feedback_session_cross_clear.md.
           clearSupplierSession();
+          try { localStorage.removeItem('restosuite_token'); } catch {}
+          try { localStorage.removeItem('restosuite_account'); } catch {}
           location.reload();
         }
         throw new Error(err.error || 'Erreur serveur');
@@ -913,6 +929,11 @@ function getSupplierSession() {
 function setSupplierSession(data) {
   sessionStorage.setItem('restosuite_supplier_token', data.token);
   sessionStorage.setItem('restosuite_supplier_session', JSON.stringify(data));
+  // Clear any leftover restaurant session in this tab so the next reload
+  // doesn't bounce us back to the gérant SPA. See feedback_session_cross_clear.md
+  // for the symmetric story on the restaurant side.
+  try { localStorage.removeItem('restosuite_token'); } catch {}
+  try { localStorage.removeItem('restosuite_account'); } catch {}
 }
 function clearSupplierSession() {
   sessionStorage.removeItem('restosuite_supplier_token');

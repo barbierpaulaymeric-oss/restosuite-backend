@@ -2,6 +2,19 @@
 // Login — Gérant (email/pwd) + Staff (restaurant pwd → team → PIN)
 // ═══════════════════════════════════════════
 
+// On any successful restaurant login we ALSO clear any leftover supplier
+// session in this tab. Without this, a user who logged into the supplier
+// portal earlier (sessionStorage) and then logs into the restaurant in the
+// same tab would, on next reload, get bumped back into the supplier portal
+// because app.js init checks supplier sessionStorage before the restaurant
+// JWT (see feedback_session_cross_clear.md).
+function _persistRestaurantLogin(token, account) {
+  localStorage.setItem('restosuite_token', token);
+  localStorage.setItem('restosuite_account', JSON.stringify(account));
+  try { sessionStorage.removeItem('restosuite_supplier_token'); } catch {}
+  try { sessionStorage.removeItem('restosuite_supplier_session'); } catch {}
+}
+
 const AVATAR_COLORS = [
   '#E8722A', '#2D8B55', '#4A90D9', '#D93025', '#E5A100',
   '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316'
@@ -194,8 +207,8 @@ class LoginView {
 
       if (result.mode === 'owner') {
         // Full gérant session — same wiring as the old handleGerantLogin path.
-        localStorage.setItem('restosuite_token', result.token);
-        localStorage.setItem('restosuite_account', JSON.stringify(result.account));
+        _persistRestaurantLogin(result.token, result.account); /* clears supplier sessionStorage too */
+        /* — handled by _persistRestaurantLogin */
 
         const nav = document.getElementById('nav');
         if (nav) nav.style.display = '';
@@ -475,8 +488,8 @@ class LoginView {
 
     try {
       const result = await API.register({ email, password, first_name: firstName, last_name: lastName, staff_password: staffPassword || undefined });
-      localStorage.setItem('restosuite_token', result.token);
-      localStorage.setItem('restosuite_account', JSON.stringify(result.account));
+      _persistRestaurantLogin(result.token, result.account); /* clears supplier sessionStorage too */
+      /* — handled by _persistRestaurantLogin */
 
       const nav = document.getElementById('nav');
       if (nav) nav.style.display = 'none';
@@ -744,8 +757,8 @@ class LoginView {
     try {
       const result = await API.staffPinLogin(this.selectedMember.id, pin, true);
 
-      localStorage.setItem('restosuite_token', result.token);
-      localStorage.setItem('restosuite_account', JSON.stringify(result.account));
+      _persistRestaurantLogin(result.token, result.account); /* clears supplier sessionStorage too */
+      /* — handled by _persistRestaurantLogin */
 
       const nav = document.getElementById('nav');
       if (nav) nav.style.display = '';
@@ -770,8 +783,8 @@ class LoginView {
     try {
       const result = await API.staffPinLogin(this.selectedMember.id, pin);
 
-      localStorage.setItem('restosuite_token', result.token);
-      localStorage.setItem('restosuite_account', JSON.stringify(result.account));
+      _persistRestaurantLogin(result.token, result.account); /* clears supplier sessionStorage too */
+      /* — handled by _persistRestaurantLogin */
 
       const nav = document.getElementById('nav');
       if (nav) nav.style.display = '';

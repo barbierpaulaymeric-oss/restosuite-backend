@@ -1175,15 +1175,28 @@ router.get('/dashboard', requireSupplierAuth, (req, res) => {
   const w = identityWhereClause(identities);
   const wPo = identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'po');
 
+  // Revenue counts orders from confirmation onwards: a draft (brouillon) or
+  // an unanswered "envoyée" isn't real revenue, and refusée/annulée never
+  // were. The CA bumps as soon as the supplier confirms, then again at
+  // delivery — matching the commercial-audit ask.
+  const CA_STATUS_LIST = ['confirmée', 'confirmee', 'livrée', 'livree'];
+  const caPlaceholders = CA_STATUS_LIST.map(() => '?').join(',');
+  const caParams = [...w.params, ...CA_STATUS_LIST, ...CA_STATUS_LIST];
+
   const totals = get(
     `SELECT
-       COALESCE(SUM(total_amount), 0)               AS revenue_total,
+       COALESCE(SUM(CASE WHEN status IN (${caPlaceholders}) THEN total_amount ELSE 0 END), 0) AS revenue_total,
        COUNT(*)                                     AS orders_total,
        COALESCE(SUM(CASE WHEN strftime('%Y-%m', created_at) = strftime('%Y-%m','now') THEN 1 ELSE 0 END), 0) AS orders_this_month,
-       COALESCE(SUM(CASE WHEN strftime('%Y-%m', created_at) = strftime('%Y-%m','now') THEN total_amount ELSE 0 END), 0) AS revenue_this_month
+       COALESCE(SUM(
+         CASE WHEN strftime('%Y-%m', created_at) = strftime('%Y-%m','now')
+                   AND status IN (${caPlaceholders})
+              THEN total_amount ELSE 0 END
+       ), 0) AS revenue_this_month
      FROM purchase_orders
      WHERE ${w.sql}`,
-    w.params
+    // params order matches CASE WHEN list above: revenue_total, then revenue_this_month
+    [...CA_STATUS_LIST, ...CA_STATUS_LIST, ...w.params]
   );
 
   const activeClients = get(

@@ -71,6 +71,14 @@ const API = {
       }
       localStorage.removeItem("restosuite_token");
       localStorage.removeItem("restosuite_account");
+      try {
+        sessionStorage.removeItem("restosuite_supplier_token");
+      } catch (e) {
+      }
+      try {
+        sessionStorage.removeItem("restosuite_supplier_session");
+      } catch (e) {
+      }
       __csrfToken = null;
       if (window.location.hash !== "#/login") {
         window.location.hash = "#/login";
@@ -546,6 +554,14 @@ const API = {
         const err = await r.json().catch(() => ({ error: r.statusText }));
         if (r.status === 401) {
           clearSupplierSession();
+          try {
+            localStorage.removeItem("restosuite_token");
+          } catch (e) {
+          }
+          try {
+            localStorage.removeItem("restosuite_account");
+          } catch (e) {
+          }
           location.reload();
         }
         throw new Error(err.error || "Erreur serveur");
@@ -1066,6 +1082,14 @@ function getSupplierSession() {
 function setSupplierSession(data) {
   sessionStorage.setItem("restosuite_supplier_token", data.token);
   sessionStorage.setItem("restosuite_supplier_session", JSON.stringify(data));
+  try {
+    localStorage.removeItem("restosuite_token");
+  } catch (e) {
+  }
+  try {
+    localStorage.removeItem("restosuite_account");
+  } catch (e) {
+  }
 }
 function clearSupplierSession() {
   sessionStorage.removeItem("restosuite_supplier_token");
@@ -17746,6 +17770,18 @@ function startOnboardingTour() {
 }
 window.startOnboardingTour = startOnboardingTour;
 window.maybeStartOnboardingTour = maybeStartOnboardingTour;
+function _persistRestaurantLogin(token, account) {
+  localStorage.setItem("restosuite_token", token);
+  localStorage.setItem("restosuite_account", JSON.stringify(account));
+  try {
+    sessionStorage.removeItem("restosuite_supplier_token");
+  } catch (e) {
+  }
+  try {
+    sessionStorage.removeItem("restosuite_supplier_session");
+  } catch (e) {
+  }
+}
 const AVATAR_COLORS = [
   "#E8722A",
   "#2D8B55",
@@ -17925,8 +17961,7 @@ class LoginView {
       } catch (e) {
       }
       if (result.mode === "owner") {
-        localStorage.setItem("restosuite_token", result.token);
-        localStorage.setItem("restosuite_account", JSON.stringify(result.account));
+        _persistRestaurantLogin(result.token, result.account);
         const nav = document.getElementById("nav");
         if (nav) nav.style.display = "";
         if (result.account.onboarding_step < 7 && result.account.is_owner) {
@@ -18215,8 +18250,7 @@ class LoginView {
     submitBtn.textContent = "Cr\xE9ation...";
     try {
       const result = await API.register({ email, password, first_name: firstName, last_name: lastName, staff_password: staffPassword || void 0 });
-      localStorage.setItem("restosuite_token", result.token);
-      localStorage.setItem("restosuite_account", JSON.stringify(result.account));
+      _persistRestaurantLogin(result.token, result.account);
       const nav = document.getElementById("nav");
       if (nav) nav.style.display = "none";
       const wizard = new OnboardingWizard(() => {
@@ -18463,8 +18497,7 @@ class LoginView {
   async handleCreatePinSubmit(pin) {
     try {
       const result = await API.staffPinLogin(this.selectedMember.id, pin, true);
-      localStorage.setItem("restosuite_token", result.token);
-      localStorage.setItem("restosuite_account", JSON.stringify(result.account));
+      _persistRestaurantLogin(result.token, result.account);
       const nav = document.getElementById("nav");
       if (nav) nav.style.display = "";
       bootApp(result.account.role, result.account);
@@ -18485,8 +18518,7 @@ class LoginView {
     const pin = this.pinDigits.join("");
     try {
       const result = await API.staffPinLogin(this.selectedMember.id, pin);
-      localStorage.setItem("restosuite_token", result.token);
-      localStorage.setItem("restosuite_account", JSON.stringify(result.account));
+      _persistRestaurantLogin(result.token, result.account);
       const nav = document.getElementById("nav");
       if (nav) nav.style.display = "";
       bootApp(result.account.role, result.account);
@@ -27037,7 +27069,12 @@ const NAV_GROUPS = {
   operations: {
     label: "Op\xE9rations",
     items: [
-      { label: "Fournisseurs & Commandes", route: "/suppliers", icon: "truck", roles: ["gerant"], minPlan: "essential" },
+      // The label promised "& Commandes" but the route used to point at
+      // /suppliers (just the suppliers list, no orders). Two clicks to reach
+      // the orders dashboard. Route now points straight at /orders, which
+      // already shows orders + has a "Fournisseurs" button to drill back.
+      { label: "Commandes fournisseurs", route: "/orders", icon: "clipboard-pen", roles: ["gerant"], minPlan: "essential" },
+      { label: "Fournisseurs", route: "/suppliers", icon: "truck", roles: ["gerant"], minPlan: "essential" },
       { label: "Livraisons", route: "/deliveries", icon: "package-check", roles: ["gerant", "cuisinier"], minPlan: "essential" },
       { label: "Messages", route: "/messages", icon: "message-square", roles: ["gerant", "cuisinier"], minPlan: "essential", badgeKey: "messages" },
       { label: "Service (Salle)", route: "/service", icon: "concierge-bell", roles: ["gerant", "salle"] },
