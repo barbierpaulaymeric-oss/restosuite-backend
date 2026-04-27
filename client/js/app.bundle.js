@@ -623,6 +623,38 @@ const API = {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1e3);
   },
+  // ─── Messages — restaurant side (gérant JWT) ───
+  getMessageConversations() {
+    return this.request("/messages/conversations");
+  },
+  getMessageThread(supplierId) {
+    return this.request(`/messages/conversations/${supplierId}`);
+  },
+  sendMessage(supplierId, message, related = {}) {
+    const body = { message };
+    if (related.related_to) body.related_to = related.related_to;
+    if (related.related_id != null) body.related_id = related.related_id;
+    return this.request(`/messages/conversations/${supplierId}`, { method: "POST", body });
+  },
+  getMessageUnreadCount() {
+    return this.request("/messages/unread-count");
+  },
+  // ─── Messages — supplier side (X-Supplier-Token) ───
+  getSupplierMessageConversations() {
+    return this.supplierRequest("/messages/conversations");
+  },
+  getSupplierMessageThread(restaurantId) {
+    return this.supplierRequest(`/messages/conversations/${restaurantId}`);
+  },
+  sendSupplierMessage(restaurantId, message, related = {}) {
+    const body = { message };
+    if (related.related_to) body.related_to = related.related_to;
+    if (related.related_id != null) body.related_id = related.related_id;
+    return this.supplierRequest(`/messages/conversations/${restaurantId}`, { method: "POST", body });
+  },
+  getSupplierMessageUnreadCount() {
+    return this.supplierRequest("/messages/unread-count");
+  },
   // ─── Supplier Mercuriale Import (supplier side) ───
   // The upload uses multipart/form-data so we don't go through supplierRequest
   // (which sets Content-Type: application/json). Auth header is the same.
@@ -14641,22 +14673,29 @@ function renderPODetail(po) {
   const statusBadgeClass = getPOStatusBadgeClass(po.status);
   const totalAmount = (po.items || []).reduce((sum, item) => sum + (item.unit_price * item.quantity || 0), 0);
   titleEl.textContent = po.reference;
+  const messagingHref = `#/messages/${po.supplier_id}?related_to=order&related_id=${po.id}&ref=${encodeURIComponent(po.reference || "#" + po.id)}`;
+  const contactBtn = po.supplier_id ? `<a class="btn btn-secondary" href="${messagingHref}"><i data-lucide="message-square" style="width:16px;height:16px"></i> Contacter le fournisseur</a>` : "";
   let actionButtons = "";
   if (po.status === "brouillon") {
     actionButtons = `
       <button class="btn btn-primary" onclick="sendPurchaseOrder(${po.id})"><i data-lucide="send" style="width:16px;height:16px"></i> Envoyer</button>
       <button class="btn btn-secondary" onclick="editPurchaseOrder(${po.id})"><i data-lucide="edit" style="width:16px;height:16px"></i> Modifier</button>
+      ${contactBtn}
       <button class="btn btn-danger" onclick="deletePurchaseOrder(${po.id})"><i data-lucide="trash-2" style="width:16px;height:16px"></i> Supprimer</button>
     `;
   } else if (po.status === "envoy\xE9e") {
     actionButtons = `
       <button class="btn btn-primary" onclick="confirmPurchaseOrder(${po.id})">Confirmer la r\xE9ception</button>
+      ${contactBtn}
       <button class="btn btn-danger" onclick="cancelPurchaseOrder(${po.id})">Annuler</button>
     `;
   } else if (po.status === "confirm\xE9e") {
     actionButtons = `
       <button class="btn btn-primary" onclick="receivePurchaseOrderFromDash(${po.id})">R\xE9ceptionner</button>
+      ${contactBtn}
     `;
+  } else {
+    actionButtons = contactBtn;
   }
   detailEl.innerHTML = `
     <div style="max-width:900px">
@@ -18811,6 +18850,9 @@ function bootSupplierApp(session) {
         <button class="supplier-nav__tab" data-tab="history">
           <i data-lucide="history" style="width:18px;height:18px"></i> Historique
         </button>
+        <button class="supplier-nav__tab" data-tab="messages">
+          <i data-lucide="message-square" style="width:18px;height:18px"></i> Messages
+        </button>
         <button class="supplier-nav__tab" data-tab="notifications">
           <i data-lucide="bell" style="width:18px;height:18px"></i> Notifications
         </button>
@@ -18836,7 +18878,9 @@ function bootSupplierApp(session) {
         renderSupplierOrdersTab();
       } else if (t === "deliveries") renderSupplierDeliveriesTab();
       else if (t === "history") renderSupplierHistoryTab();
-      else if (t === "notifications") {
+      else if (t === "messages") {
+        if (typeof renderSupplierMessagesTab === "function") renderSupplierMessagesTab();
+      } else if (t === "notifications") {
         if (typeof renderSupplierNotificationsTab === "function") {
           renderSupplierNotificationsTab();
         }
@@ -18845,7 +18889,11 @@ function bootSupplierApp(session) {
   });
   renderSupplierDashboardTab();
   refreshSupplierOrdersBadge();
+  if (typeof refreshSupplierMessagesNavBadge === "function") refreshSupplierMessagesNavBadge();
   setInterval(refreshSupplierOrdersBadge, 6e4);
+  setInterval(() => {
+    if (typeof refreshSupplierMessagesNavBadge === "function") refreshSupplierMessagesNavBadge();
+  }, 6e4);
 }
 function refreshSupplierOrdersBadge() {
   if (typeof API.getSupplierOrdersPendingCount !== "function") return;
@@ -20698,6 +20746,199 @@ async function renderSupplierNotificationsTab() {
     });
   });
 }
+let _supplierMsgPollTimer = null;
+function _stopSupplierMsgPoll() {
+  if (_supplierMsgPollTimer) {
+    clearInterval(_supplierMsgPollTimer);
+    _supplierMsgPollTimer = null;
+  }
+}
+async function renderSupplierMessagesTab() {
+  _stopSupplierMsgPoll();
+  const content = document.getElementById("supplier-content");
+  if (!content) return;
+  if (_pendingSupplierMessageRid != null) {
+    const rid = _pendingSupplierMessageRid;
+    const ctx = _pendingSupplierMessageContext;
+    _pendingSupplierMessageRid = null;
+    _pendingSupplierMessageContext = null;
+    return _renderSupplierMessageThread(rid, ctx);
+  }
+  content.innerHTML = `
+    <div style="margin-bottom:var(--space-4)">
+      <h2 style="margin:0;font-size:var(--text-xl)">Messages</h2>
+      <p class="text-secondary" style="margin:var(--space-1) 0 0">Discutez avec vos restaurants clients.</p>
+    </div>
+    <div id="supplier-msg-list"><div class="loading"><div class="spinner"></div></div></div>
+  `;
+  let convs;
+  try {
+    convs = await API.getSupplierMessageConversations();
+  } catch (e) {
+    document.getElementById("supplier-msg-list").innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+  refreshSupplierMessagesNavBadge();
+  if (!convs.length) {
+    document.getElementById("supplier-msg-list").innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon"><i data-lucide="message-square-off"></i></div>
+        <p>Aucun client li\xE9 pour l'instant.</p>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+  const fmtRelative = (s) => {
+    if (!s) return "";
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return "";
+    const diff = Date.now() - d.getTime();
+    if (diff < 6e4) return "\xC0 l'instant";
+    if (diff < 36e5) return `il y a ${Math.floor(diff / 6e4)} min`;
+    if (diff < 864e5) return `il y a ${Math.floor(diff / 36e5)} h`;
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  };
+  document.getElementById("supplier-msg-list").innerHTML = `
+    <ul class="msg-conv-list">
+      ${convs.map((c) => {
+    const previewPrefix = c.last_message ? c.last_sender_type === "supplier" ? "Vous : " : "" : "";
+    const preview = c.last_message ? escapeHtml(previewPrefix + c.last_message) : '<span class="text-tertiary">Aucun message \u2014 envoyez le premier.</span>';
+    return `
+          <li>
+            <button class="msg-conv-item ${c.unread_count > 0 ? "msg-conv-item--unread" : ""}"
+                    data-rid="${c.restaurant_id}">
+              <div class="msg-conv-item__avatar">${escapeHtml((c.restaurant_name || "?").charAt(0).toUpperCase())}</div>
+              <div class="msg-conv-item__main">
+                <div class="msg-conv-item__head">
+                  <strong>${escapeHtml(c.restaurant_name || "\u2014")}</strong>
+                  <span class="text-tertiary text-sm">${fmtRelative(c.last_message_at)}</span>
+                </div>
+                <div class="msg-conv-item__preview">${preview}</div>
+              </div>
+              ${c.unread_count > 0 ? `<span class="msg-conv-item__badge">${c.unread_count}</span>` : ""}
+            </button>
+          </li>`;
+  }).join("")}
+    </ul>
+  `;
+  document.querySelectorAll("#supplier-msg-list [data-rid]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const rid = Number(btn.dataset.rid);
+      _renderSupplierMessageThread(rid);
+    });
+  });
+}
+let _pendingSupplierMessageRid = null;
+let _pendingSupplierMessageContext = null;
+function showSupplierMessageThread(restaurantId, context) {
+  _pendingSupplierMessageRid = restaurantId;
+  _pendingSupplierMessageContext = context || null;
+  const tabs = document.querySelectorAll(".supplier-nav__tab");
+  tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === "messages"));
+  renderSupplierMessagesTab();
+}
+async function _renderSupplierMessageThread(restaurantId, context) {
+  _stopSupplierMsgPoll();
+  const content = document.getElementById("supplier-content");
+  if (!content) return;
+  content.innerHTML = `
+    <div class="msg-thread-shell">
+      <header class="msg-thread__head">
+        <button class="btn-icon msg-thread__back" id="supplier-msg-back" aria-label="Retour aux conversations">
+          <i data-lucide="arrow-left" style="width:18px;height:18px"></i>
+        </button>
+        <div id="supplier-msg-title" class="msg-thread__title"><strong>Chargement\u2026</strong></div>
+      </header>
+      <main class="msg-thread__body" id="supplier-msg-body">
+        <div class="loading"><div class="spinner"></div></div>
+      </main>
+      <footer class="msg-thread__composer">
+        <textarea id="supplier-msg-input" class="msg-thread__input"
+                  placeholder="\xC9crivez votre message\u2026"
+                  rows="2" maxlength="2000"></textarea>
+        <button class="msg-thread__send" id="supplier-msg-send" aria-label="Envoyer">
+          <i data-lucide="send" style="width:18px;height:18px"></i>
+        </button>
+      </footer>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+  const inputEl = document.getElementById("supplier-msg-input");
+  const sendBtn = document.getElementById("supplier-msg-send");
+  let pendingRelated = null;
+  if (context && context.related_to && context.related_id) {
+    pendingRelated = { related_to: context.related_to, related_id: Number(context.related_id) };
+    const label = context.related_to === "order" ? "Commande" : context.related_to === "delivery" ? "BL" : "\xC9l\xE9ment";
+    inputEl.value = `Concernant ${label} ${context.ref || `#${context.related_id}`} : `;
+    setTimeout(() => {
+      inputEl.focus();
+      inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+    }, 50);
+  }
+  document.getElementById("supplier-msg-back").addEventListener("click", renderSupplierMessagesTab);
+  async function loadThread() {
+    let data;
+    try {
+      data = await API.getSupplierMessageThread(restaurantId);
+    } catch (e) {
+      document.getElementById("supplier-msg-body").innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
+      return;
+    }
+    const titleEl = document.getElementById("supplier-msg-title");
+    titleEl.innerHTML = `
+      <strong>${escapeHtml(data.restaurant.name || "\u2014")}</strong>
+      ${data.restaurant.city ? `<span class="text-secondary text-sm">\xB7 ${escapeHtml(data.restaurant.city)}</span>` : ""}
+    `;
+    _renderMessageBubbles("supplier-msg-body", data.messages, "supplier");
+    refreshSupplierMessagesNavBadge();
+  }
+  await loadThread();
+  _supplierMsgPollTimer = setInterval(loadThread, 15e3);
+  async function sendCurrent() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+    sendBtn.disabled = true;
+    try {
+      await API.sendSupplierMessage(restaurantId, text, pendingRelated || {});
+      inputEl.value = "";
+      pendingRelated = null;
+      await loadThread();
+    } catch (e) {
+      showToast(e.message || "Erreur envoi message", "error");
+    } finally {
+      sendBtn.disabled = false;
+    }
+  }
+  sendBtn.addEventListener("click", sendCurrent);
+  inputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendCurrent();
+    }
+  });
+}
+async function refreshSupplierMessagesNavBadge() {
+  if (typeof API.getSupplierMessageUnreadCount !== "function") return;
+  try {
+    const { count } = await API.getSupplierMessageUnreadCount();
+    const tab = document.querySelector('.supplier-nav__tab[data-tab="messages"]');
+    if (!tab) return;
+    let badge = tab.querySelector(".supplier-nav__badge");
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "supplier-nav__badge";
+        tab.appendChild(badge);
+      }
+      badge.textContent = String(count);
+      badge.hidden = false;
+    } else if (badge) {
+      badge.hidden = true;
+    }
+  } catch (_) {
+  }
+}
 async function renderSupplierDeliveriesTab() {
   const content = document.getElementById("supplier-content");
   if (!content) return;
@@ -21100,9 +21341,14 @@ async function showSupplierOrderDetail(id) {
         <button class="btn btn-secondary btn-sm" id="back-supplier-orders">
           <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Retour
         </button>
-        <button class="btn btn-secondary btn-sm" id="supplier-order-pdf">
-          <i data-lucide="download" style="width:16px;height:16px"></i> T\xE9l\xE9charger PDF
-        </button>
+        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" id="supplier-order-message">
+            <i data-lucide="message-square" style="width:16px;height:16px"></i> Contacter le restaurant
+          </button>
+          <button class="btn btn-secondary btn-sm" id="supplier-order-pdf">
+            <i data-lucide="download" style="width:16px;height:16px"></i> T\xE9l\xE9charger PDF
+          </button>
+        </div>
       </div>
       <div class="card" style="padding:var(--space-4);margin-bottom:var(--space-4);border-left:4px solid ${s.color};border-radius:var(--radius-lg);background:var(--bg-elevated)">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap">
@@ -21146,6 +21392,15 @@ async function showSupplierOrderDetail(id) {
     `;
     if (window.lucide) lucide.createIcons();
     document.getElementById("back-supplier-orders").addEventListener("click", renderSupplierOrdersTab);
+    document.getElementById("supplier-order-message").addEventListener("click", () => {
+      if (typeof showSupplierMessageThread === "function") {
+        showSupplierMessageThread(order.restaurant_id, {
+          related_to: "order",
+          related_id: order.id,
+          ref: order.reference || `#${order.id}`
+        });
+      }
+    });
     document.getElementById("supplier-order-pdf").addEventListener("click", async (e) => {
       const btn = e.currentTarget;
       btn.disabled = true;
@@ -21226,6 +21481,251 @@ function _supplierOrderActionPrompt({ orderId, title, body, placeholder, confirm
     }
   };
   document.getElementById("supplier-order-reason").focus();
+}
+let _messagesPollTimer = null;
+let _messagesNavBadgeTimer = null;
+function _stopMessagesPoll() {
+  if (_messagesPollTimer) {
+    clearInterval(_messagesPollTimer);
+    _messagesPollTimer = null;
+  }
+}
+async function renderMessagesConversations() {
+  _stopMessagesPoll();
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="page-header">
+      <h1>Messages</h1>
+      <p class="page-header__sub">Discutez avec vos fournisseurs.</p>
+    </div>
+    <div id="msg-conv-list"><div class="loading"><div class="spinner"></div></div></div>
+  `;
+  let convs;
+  try {
+    convs = await API.getMessageConversations();
+  } catch (e) {
+    document.getElementById("msg-conv-list").innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+  refreshMessagesNavBadge();
+  if (!convs.length) {
+    document.getElementById("msg-conv-list").innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon"><i data-lucide="message-square-off"></i></div>
+        <p>Aucun fournisseur enregistr\xE9.</p>
+        <p class="text-secondary text-sm">Ajoutez vos fournisseurs dans Op\xE9rations \u2192 Fournisseurs pour commencer une discussion.</p>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+  const fmtRelative = (s) => {
+    if (!s) return "";
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return "";
+    const diff = Date.now() - d.getTime();
+    if (diff < 6e4) return "\xC0 l'instant";
+    if (diff < 36e5) return `il y a ${Math.floor(diff / 6e4)} min`;
+    if (diff < 864e5) return `il y a ${Math.floor(diff / 36e5)} h`;
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  };
+  document.getElementById("msg-conv-list").innerHTML = `
+    <ul class="msg-conv-list">
+      ${convs.map((c) => {
+    const previewPrefix = c.last_message ? c.last_sender_type === "restaurant" ? "Vous : " : "" : "";
+    const preview = c.last_message ? escapeHtml(previewPrefix + c.last_message) : '<span class="text-tertiary">Aucun message \u2014 d\xE9marrez la conversation.</span>';
+    return `
+          <li>
+            <a href="#/messages/${c.supplier_id}" class="msg-conv-item ${c.unread_count > 0 ? "msg-conv-item--unread" : ""}">
+              <div class="msg-conv-item__avatar">${escapeHtml((c.supplier_name || "?").charAt(0).toUpperCase())}</div>
+              <div class="msg-conv-item__main">
+                <div class="msg-conv-item__head">
+                  <strong>${escapeHtml(c.supplier_name || "\u2014")}</strong>
+                  <span class="text-tertiary text-sm">${fmtRelative(c.last_message_at)}</span>
+                </div>
+                <div class="msg-conv-item__preview">${preview}</div>
+              </div>
+              ${c.unread_count > 0 ? `<span class="msg-conv-item__badge">${c.unread_count}</span>` : ""}
+            </a>
+          </li>`;
+  }).join("")}
+    </ul>
+  `;
+}
+async function renderMessagesThread(supplierId) {
+  _stopMessagesPoll();
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="msg-thread-shell">
+      <header class="msg-thread__head">
+        <a href="#/messages" class="btn-icon msg-thread__back" aria-label="Retour aux conversations">
+          <i data-lucide="arrow-left" style="width:18px;height:18px"></i>
+        </a>
+        <div id="msg-thread-title" class="msg-thread__title">
+          <strong>Chargement\u2026</strong>
+        </div>
+      </header>
+      <main class="msg-thread__body" id="msg-thread-body">
+        <div class="loading"><div class="spinner"></div></div>
+      </main>
+      <footer class="msg-thread__composer">
+        <textarea id="msg-thread-input" class="msg-thread__input"
+                  placeholder="\xC9crivez votre message\u2026"
+                  rows="2" maxlength="2000"></textarea>
+        <button class="msg-thread__send" id="msg-thread-send" aria-label="Envoyer">
+          <i data-lucide="send" style="width:18px;height:18px"></i>
+        </button>
+      </footer>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+  const inputEl = document.getElementById("msg-thread-input");
+  const sendBtn = document.getElementById("msg-thread-send");
+  let pendingRelated = null;
+  try {
+    const hash = String(window.location.hash || "");
+    const qIdx = hash.indexOf("?");
+    if (qIdx >= 0) {
+      const qs = new URLSearchParams(hash.slice(qIdx + 1));
+      const rt = qs.get("related_to");
+      const rid = qs.get("related_id");
+      const ref = qs.get("ref");
+      if (rt && rid) {
+        pendingRelated = { related_to: rt, related_id: Number(rid) };
+        const label = rt === "order" ? "Commande" : rt === "delivery" ? "BL" : "\xC9l\xE9ment";
+        inputEl.value = `Concernant ${label} ${ref || `#${rid}`} : `;
+        setTimeout(() => {
+          inputEl.focus();
+          inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+        }, 50);
+      }
+    }
+  } catch (_) {
+  }
+  async function loadThread() {
+    let data;
+    try {
+      data = await API.getMessageThread(supplierId);
+    } catch (e) {
+      document.getElementById("msg-thread-body").innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
+      return;
+    }
+    const titleEl = document.getElementById("msg-thread-title");
+    titleEl.innerHTML = `
+      <strong>${escapeHtml(data.supplier.name || "\u2014")}</strong>
+      ${data.supplier.contact_name ? `<span class="text-secondary text-sm">\xB7 ${escapeHtml(data.supplier.contact_name)}</span>` : ""}
+    `;
+    _renderMessageBubbles("msg-thread-body", data.messages, "restaurant");
+    refreshMessagesNavBadge();
+  }
+  await loadThread();
+  _messagesPollTimer = setInterval(loadThread, 15e3);
+  async function sendCurrent() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+    sendBtn.disabled = true;
+    try {
+      await API.sendMessage(supplierId, text, pendingRelated || {});
+      inputEl.value = "";
+      pendingRelated = null;
+      await loadThread();
+    } catch (e) {
+      showToast(e.message || "Erreur envoi message", "error");
+    } finally {
+      sendBtn.disabled = false;
+    }
+  }
+  sendBtn.addEventListener("click", sendCurrent);
+  inputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendCurrent();
+    }
+  });
+}
+function _renderMessageBubbles(hostId, messages, mySide) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  if (!messages.length) {
+    host.innerHTML = `<p class="text-secondary" style="padding:var(--space-5);text-align:center">Aucun message. Lancez la conversation ci-dessous.</p>`;
+    return;
+  }
+  const fmtTimeOnly = (s) => {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  };
+  const fmtDateOnly = (s) => {
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return "";
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const yest = new Date(today.getTime() - 864e5);
+    const dayStart = new Date(d);
+    dayStart.setHours(0, 0, 0, 0);
+    if (dayStart.getTime() === today.getTime()) return "Aujourd'hui";
+    if (dayStart.getTime() === yest.getTime()) return "Hier";
+    return d.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long" });
+  };
+  const contextBadge = (m) => {
+    if (!m.related_to || !m.related_id) return "";
+    const label = m.related_to === "order" ? `Commande #${m.related_id}` : m.related_to === "delivery" ? `BL #${m.related_id}` : m.related_to === "product" ? `Produit #${m.related_id}` : `R\xE9f #${m.related_id}`;
+    return `<span class="msg-context-badge">${escapeHtml(label)}</span>`;
+  };
+  let html = "";
+  let prevDate = null;
+  for (const m of messages) {
+    const dayKey = String(m.created_at || "").slice(0, 10);
+    if (dayKey !== prevDate) {
+      html += `<div class="msg-date-sep"><span>${escapeHtml(fmtDateOnly(m.created_at))}</span></div>`;
+      prevDate = dayKey;
+    }
+    const isMine = m.sender_type === mySide;
+    const sideClass = isMine ? "msg-bubble--mine" : "msg-bubble--theirs";
+    const status = isMine ? m.read_at ? "Lu" : "Envoy\xE9" : "";
+    html += `
+      <div class="msg-row ${isMine ? "msg-row--mine" : "msg-row--theirs"}">
+        <div class="msg-bubble ${sideClass}">
+          ${!isMine ? `<div class="msg-bubble__sender">${escapeHtml(m.sender_name || "")}</div>` : ""}
+          ${contextBadge(m)}
+          <div class="msg-bubble__text">${escapeHtml(m.message).replace(/\n/g, "<br>")}</div>
+          <div class="msg-bubble__meta">
+            <span class="msg-bubble__time">${fmtTimeOnly(m.created_at)}</span>
+            ${status ? `<span class="msg-bubble__status">${status}</span>` : ""}
+          </div>
+        </div>
+      </div>`;
+  }
+  host.innerHTML = html;
+  host.scrollTop = host.scrollHeight;
+}
+async function refreshMessagesNavBadge() {
+  if (typeof API.getMessageUnreadCount !== "function") return;
+  try {
+    const { count } = await API.getMessageUnreadCount();
+    _setMessagesNavBadge(count);
+  } catch (_) {
+  }
+}
+function _setMessagesNavBadge(count) {
+  const links = document.querySelectorAll('a[data-route="/messages"]');
+  links.forEach((a) => {
+    let badge = a.querySelector(".nav-badge");
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "nav-badge";
+        a.appendChild(badge);
+      }
+      badge.textContent = String(count);
+    } else if (badge) {
+      badge.remove();
+    }
+  });
+}
+function startMessagesNavBadgePolling() {
+  if (_messagesNavBadgeTimer) return;
+  refreshMessagesNavBadge();
+  _messagesNavBadgeTimer = setInterval(refreshMessagesNavBadge, 6e4);
 }
 function formatDeliveryDate(dateStr) {
   if (!dateStr) return null;
@@ -21369,6 +21869,11 @@ async function renderDeliveryDetail(id) {
             ${d.received_at ? ` \u2014 R\xE9ceptionn\xE9 le ${new Date(d.received_at).toLocaleDateString("fr-FR")} par ${escapeHtml(d.received_by_name || "?")}` : ""}
           </p>
         </div>
+        ${d.supplier_id ? `
+          <a class="btn btn-secondary" href="#/messages/${d.supplier_id}?related_to=delivery&related_id=${d.id}&ref=${encodeURIComponent("BL #" + d.id)}">
+            <i data-lucide="message-square" style="width:16px;height:16px"></i> Contacter le fournisseur
+          </a>
+        ` : ""}
       </div>
       ${d.notes ? `<div style="background:var(--bg-sunken);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-4);font-size:var(--text-sm)">\u{1F4DD} ${escapeHtml(d.notes)}</div>` : ""}
       <div style="overflow-x:auto;margin-bottom:var(--space-5)">
@@ -26534,6 +27039,7 @@ const NAV_GROUPS = {
     items: [
       { label: "Fournisseurs & Commandes", route: "/suppliers", icon: "truck", roles: ["gerant"], minPlan: "essential" },
       { label: "Livraisons", route: "/deliveries", icon: "package-check", roles: ["gerant", "cuisinier"], minPlan: "essential" },
+      { label: "Messages", route: "/messages", icon: "message-square", roles: ["gerant", "cuisinier"], minPlan: "essential", badgeKey: "messages" },
       { label: "Service (Salle)", route: "/service", icon: "concierge-bell", roles: ["gerant", "salle"] },
       { label: "Cuisine (\xE9cran)", route: "/kitchen", icon: "chef-hat", roles: ["gerant", "cuisinier"] }
     ]
@@ -26601,6 +27107,7 @@ const ROUTE_TO_GROUP = {
   "/suppliers": "operations",
   "/deliveries": "operations",
   "/service": "operations",
+  "/messages": "operations",
   "/kitchen": "operations",
   "/scan-invoice": "operations",
   "/analytics": "pilotage",
@@ -26802,6 +27309,8 @@ function registerRoutes() {
   Router.add(/^\/stock$/, renderStockDashboard);
   Router.add(/^\/deliveries$/, renderDeliveries);
   Router.add(/^\/deliveries\/(\d+)$/, (id) => renderDeliveryDetail(parseInt(id)));
+  Router.add(/^\/messages$/, renderMessagesConversations);
+  Router.add(/^\/messages\/(\d+)$/, (id) => renderMessagesThread(parseInt(id)));
   Router.add(/^\/stock\/reception$/, renderStockReception);
   Router.add(/^\/stock\/movements$/, renderStockMovements);
   Router.add(/^\/stock\/variance$/, renderStockVariance);
@@ -26911,6 +27420,9 @@ function bootApp(role, account, opts = {}) {
   registerRoutes();
   initNavGroups(role);
   initMobileNav(role);
+  if (typeof startMessagesNavBadgePolling === "function" && (role === "gerant" || role === "cuisinier")) {
+    startMessagesNavBadgePolling();
+  }
   const navLinks = document.querySelectorAll(".nav-link[data-roles]");
   navLinks.forEach((link) => {
     const allowedRoles = link.dataset.roles.split(",").map((r) => r.trim());
@@ -27005,7 +27517,7 @@ function initNavGroups(role) {
           <span class="nav-plan-badge">${escapeHtml(badge)}</span>
         </button>`;
       }
-      return `<a href="#${item.route}" class="nav-panel-item${isActive ? " active" : ""}">
+      return `<a href="#${item.route}" data-route="${escapeHtml(item.route)}" class="nav-panel-item${isActive ? " active" : ""}">
         <i data-lucide="${item.icon}"></i>
         <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
       </a>`;
@@ -27125,6 +27637,7 @@ function initMobileNav(role) {
         } else {
           el = document.createElement("a");
           el.href = "#" + item.route;
+          el.dataset.route = item.route;
           el.className = "mobile-nav-item" + (isActive ? " active" : "");
           el.addEventListener("click", closeOverlay);
         }

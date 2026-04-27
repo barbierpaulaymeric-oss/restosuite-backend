@@ -300,6 +300,7 @@ app.use('/api/recall', require('./routes/recall'));
 app.use('/api/stock', require('./routes/stock'));
 app.use('/api/stripe', require('./routes/stripe'));
 app.use('/api/supplier-portal', require('./routes/supplier-portal'));
+app.use('/api/messages', require('./routes/messages'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/deliveries', require('./routes/deliveries'));

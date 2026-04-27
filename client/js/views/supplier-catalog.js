@@ -46,6 +46,9 @@ function bootSupplierApp(session) {
         <button class="supplier-nav__tab" data-tab="history">
           <i data-lucide="history" style="width:18px;height:18px"></i> Historique
         </button>
+        <button class="supplier-nav__tab" data-tab="messages">
+          <i data-lucide="message-square" style="width:18px;height:18px"></i> Messages
+        </button>
         <button class="supplier-nav__tab" data-tab="notifications">
           <i data-lucide="bell" style="width:18px;height:18px"></i> Notifications
         </button>
@@ -79,6 +82,9 @@ function bootSupplierApp(session) {
       }
       else if (t === 'deliveries') renderSupplierDeliveriesTab();
       else if (t === 'history') renderSupplierHistoryTab();
+      else if (t === 'messages') {
+        if (typeof renderSupplierMessagesTab === 'function') renderSupplierMessagesTab();
+      }
       else if (t === 'notifications') {
         if (typeof renderSupplierNotificationsTab === 'function') {
           renderSupplierNotificationsTab();
@@ -87,13 +93,17 @@ function bootSupplierApp(session) {
     });
   });
 
-  // Initial: load dashboard + populate notification badge in parallel.
+  // Initial: load dashboard + populate the two badges in parallel.
   renderSupplierDashboardTab();
   refreshSupplierOrdersBadge();
+  if (typeof refreshSupplierMessagesNavBadge === 'function') refreshSupplierMessagesNavBadge();
   // Cheap auto-refresh every 60s while the portal is open. setInterval is
   // intentionally not cleaned up — bootSupplierApp is only called once per
   // session and a logout reloads the page, dropping the timer.
   setInterval(refreshSupplierOrdersBadge, 60_000);
+  setInterval(() => {
+    if (typeof refreshSupplierMessagesNavBadge === 'function') refreshSupplierMessagesNavBadge();
+  }, 60_000);
 }
 
 function refreshSupplierOrdersBadge() {

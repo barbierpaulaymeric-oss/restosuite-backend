@@ -1774,4 +1774,138 @@ router.get('/delivery-notes/:id/pdf', requireSupplierAuth, (req, res) => {
   doc.end();
 });
 
+// ═════════════════════════════════════════
+// MESSAGING (supplier side)
+// ═════════════════════════════════════════
+// Mirror of /api/messages on the restaurant side, scoped to the supplier's
+// identity tenants. Conversations are keyed by (supplier_id, restaurant_id);
+// the supplier sees one conversation per restaurant in their identity.
+
+function _conversationId(supplierId, restaurantId) {
+  return `supplier_${Number(supplierId)}_restaurant_${Number(restaurantId)}`;
+}
+
+router.get('/messages/unread-count', requireSupplierAuth, (req, res) => {
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities);
+  const row = get(
+    `SELECT COUNT(*) AS c FROM messages
+      WHERE (${w.sql})
+        AND sender_type = 'restaurant' AND read_at IS NULL`,
+    w.params
+  );
+  res.json({ count: row.c });
+});
+
+router.get('/messages/conversations', requireSupplierAuth, (req, res) => {
+  const identities = getSupplierIdentities(req.supplierAccount);
+  // One conversation row per identity tenant, with last-message preview +
+  // unread count from the supplier's POV (incoming = sender_type='restaurant').
+  const rows = identities.map(({ supplier_id, restaurant_id }) => {
+    const restaurant = get(
+      'SELECT id, name, city, phone FROM restaurants WHERE id = ?',
+      [restaurant_id]
+    );
+    const last = get(
+      `SELECT message, sender_type, created_at FROM messages
+        WHERE supplier_id = ? AND restaurant_id = ?
+        ORDER BY created_at DESC LIMIT 1`,
+      [supplier_id, restaurant_id]
+    );
+    const unread = get(
+      `SELECT COUNT(*) AS c FROM messages
+        WHERE supplier_id = ? AND restaurant_id = ?
+          AND sender_type = 'restaurant' AND read_at IS NULL`,
+      [supplier_id, restaurant_id]
+    );
+    return {
+      restaurant_id,
+      supplier_id,
+      restaurant_name: restaurant ? restaurant.name : '—',
+      restaurant_city: restaurant ? restaurant.city : null,
+      restaurant_phone: restaurant ? restaurant.phone : null,
+      last_message: last ? last.message : null,
+      last_sender_type: last ? last.sender_type : null,
+      last_message_at: last ? last.created_at : null,
+      unread_count: unread.c,
+    };
+  });
+  // Newest activity first; conversations with no messages fall to the bottom.
+  rows.sort((a, b) => {
+    if (!a.last_message_at && !b.last_message_at) return (a.restaurant_name || '').localeCompare(b.restaurant_name || '', 'fr');
+    if (!a.last_message_at) return 1;
+    if (!b.last_message_at) return -1;
+    return String(b.last_message_at).localeCompare(String(a.last_message_at));
+  });
+  res.json(rows);
+});
+
+router.get('/messages/conversations/:restaurantId', requireSupplierAuth, (req, res) => {
+  const requestedRid = Number(req.params.restaurantId);
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const match = identities.find(i => i.restaurant_id === requestedRid);
+  if (!match) return res.status(404).json({ error: 'Restaurant introuvable' });
+
+  const restaurant = get(
+    'SELECT id, name, city, phone FROM restaurants WHERE id = ?',
+    [requestedRid]
+  );
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant introuvable' });
+
+  // Mark all incoming messages read first → response carries up-to-date read_at.
+  run(
+    `UPDATE messages SET read_at = datetime('now')
+      WHERE supplier_id = ? AND restaurant_id = ?
+        AND sender_type = 'restaurant' AND read_at IS NULL`,
+    [match.supplier_id, match.restaurant_id]
+  );
+
+  const messages = all(
+    `SELECT id, conversation_id, sender_type, sender_id, sender_name, message,
+            related_to, related_id, read_at, created_at
+       FROM messages
+      WHERE supplier_id = ? AND restaurant_id = ?
+      ORDER BY created_at ASC
+      LIMIT 500`,
+    [match.supplier_id, match.restaurant_id]
+  );
+  res.json({ restaurant, messages });
+});
+
+router.post('/messages/conversations/:restaurantId', requireSupplierAuth, express.json({ limit: '256kb' }), (req, res) => {
+  const requestedRid = Number(req.params.restaurantId);
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const match = identities.find(i => i.restaurant_id === requestedRid);
+  if (!match) return res.status(404).json({ error: 'Restaurant introuvable' });
+
+  const message = req.body && typeof req.body.message === 'string' ? req.body.message.trim() : '';
+  if (!message) return res.status(400).json({ error: 'Message requis' });
+  if (message.length > 2000) return res.status(400).json({ error: 'Message trop long (max 2000 caractères)' });
+
+  const relatedTo = req.body && typeof req.body.related_to === 'string'
+    ? req.body.related_to.trim().slice(0, 32) || null
+    : null;
+  const relatedId = req.body && req.body.related_id != null
+    ? Number(req.body.related_id) || null
+    : null;
+
+  const senderName = req.supplierAccount.name || req.supplierAccount.supplier_name || 'Fournisseur';
+
+  const result = run(
+    `INSERT INTO messages
+       (conversation_id, restaurant_id, supplier_id,
+        sender_type, sender_id, sender_name,
+        message, related_to, related_id)
+     VALUES (?, ?, ?, 'supplier', ?, ?, ?, ?, ?)`,
+    [
+      _conversationId(match.supplier_id, match.restaurant_id),
+      match.restaurant_id, match.supplier_id,
+      req.supplierAccount.id, senderName,
+      message, relatedTo, relatedId,
+    ]
+  );
+  const row = get('SELECT * FROM messages WHERE id = ?', [result.lastInsertRowid]);
+  res.status(201).json(row);
+});
+
 module.exports = router;

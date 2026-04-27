@@ -548,22 +548,35 @@ function renderPODetail(po) {
 
   titleEl.textContent = po.reference;
 
+  // Quick-link to messaging — pre-fills the chat input with order context.
+  // Available for any non-draft order (a draft hasn't been sent to the
+  // supplier yet, so there's nothing to discuss).
+  const messagingHref = `#/messages/${po.supplier_id}?related_to=order&related_id=${po.id}&ref=${encodeURIComponent(po.reference || ('#' + po.id))}`;
+  const contactBtn = po.supplier_id
+    ? `<a class="btn btn-secondary" href="${messagingHref}"><i data-lucide="message-square" style="width:16px;height:16px"></i> Contacter le fournisseur</a>`
+    : '';
+
   let actionButtons = '';
   if (po.status === 'brouillon') {
     actionButtons = `
       <button class="btn btn-primary" onclick="sendPurchaseOrder(${po.id})"><i data-lucide="send" style="width:16px;height:16px"></i> Envoyer</button>
       <button class="btn btn-secondary" onclick="editPurchaseOrder(${po.id})"><i data-lucide="edit" style="width:16px;height:16px"></i> Modifier</button>
+      ${contactBtn}
       <button class="btn btn-danger" onclick="deletePurchaseOrder(${po.id})"><i data-lucide="trash-2" style="width:16px;height:16px"></i> Supprimer</button>
     `;
   } else if (po.status === 'envoyée') {
     actionButtons = `
       <button class="btn btn-primary" onclick="confirmPurchaseOrder(${po.id})">Confirmer la réception</button>
+      ${contactBtn}
       <button class="btn btn-danger" onclick="cancelPurchaseOrder(${po.id})">Annuler</button>
     `;
   } else if (po.status === 'confirmée') {
     actionButtons = `
       <button class="btn btn-primary" onclick="receivePurchaseOrderFromDash(${po.id})">Réceptionner</button>
+      ${contactBtn}
     `;
+  } else {
+    actionButtons = contactBtn;
   }
 
   detailEl.innerHTML = `

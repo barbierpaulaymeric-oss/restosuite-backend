@@ -156,6 +156,11 @@ async function renderDeliveryDetail(id) {
             ${d.received_at ? ` — Réceptionné le ${new Date(d.received_at).toLocaleDateString('fr-FR')} par ${escapeHtml(d.received_by_name || '?')}` : ''}
           </p>
         </div>
+        ${d.supplier_id ? `
+          <a class="btn btn-secondary" href="#/messages/${d.supplier_id}?related_to=delivery&related_id=${d.id}&ref=${encodeURIComponent('BL #' + d.id)}">
+            <i data-lucide="message-square" style="width:16px;height:16px"></i> Contacter le fournisseur
+          </a>
+        ` : ''}
       </div>
       ${d.notes ? `<div style="background:var(--bg-sunken);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-4);font-size:var(--text-sm)">📝 ${escapeHtml(d.notes)}</div>` : ''}
       <div style="overflow-x:auto;margin-bottom:var(--space-5)">

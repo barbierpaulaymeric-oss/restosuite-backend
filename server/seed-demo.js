@@ -573,6 +573,13 @@ function ensureExtraDemoRestaurants() {
       'DELETE FROM purchase_orders WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?',
       [metroRow.id, r.id, `${EXTRA_DEMO_REF_PREFIX}%`]
     );
+    // Wipe Marie/Sakura supplier_notifications too (identified by [DEMO]
+    // prefix) before the order loop seeds new ones.
+    run(
+      `DELETE FROM supplier_notifications
+        WHERE supplier_id = ? AND restaurant_id = ? AND message LIKE ?`,
+      [metroRow.id, r.id, '[DEMO]%']
+    );
 
     // Spread orders across last ~60 days (oldest first).
     const span = 60;
@@ -616,6 +623,20 @@ function ensureExtraDemoRestaurants() {
           [orderId, r.id, ln.name, ln.qty, ln.unit, ln.price, ln.total]
         );
       }
+      // One supplier_notifications row per order so the supplier portal's
+      // Notifications tab + identity-aware unread badge get something to show
+      // for these tenants. The most recent order (idx=0) stays unread.
+      run(
+        `INSERT INTO supplier_notifications
+           (supplier_id, restaurant_id, type, order_id, message, read, created_at)
+         VALUES (?, ?, 'order_created', ?, ?, ?, ?)`,
+        [
+          metroRow.id, r.id, orderId,
+          `[DEMO] Nouvelle commande ${ref} — ${total_amount.toFixed(2)} €`,
+          idx === 0 ? 0 : 1,
+          createdSql,
+        ]
+      );
       if (r.id === 2) summary.marie_orders++;
       else if (r.id === 3) summary.sakura_orders++;
     });
@@ -683,6 +704,66 @@ function ensureExtraDemoRestaurants() {
   }
 
   return summary;
+}
+
+// Demo messages between Chez Laurent (restaurant_id=1) and Metro Paris Nation
+// (the suppliers row in tenant 1). Six-turn conversation: chef reports a
+// short-delivery, supplier apologizes + commits to a make-good, chef confirms,
+// then a new disponibilité ping for the next service. The thread is tagged
+// with `related_to='general'`/`'order'` so the context-badge UI lights up.
+//
+// Idempotent: deletes ALL messages between the (Metro tenant-1, Chez Laurent)
+// conversation_id before re-inserting. We don't try to identify rows by
+// content — re-running fully replaces the demo thread.
+const _DEMO_MESSAGES = [
+  { sender: 'restaurant', name: 'Laurent Martin',          msg: 'Bonjour, il manquait 2 kg de filet de saumon dans la livraison de ce matin.', daysAgo: 3, hour: 10, minute: 12, related_to: 'delivery' },
+  { sender: 'supplier',   name: 'Jean Dupont (Metro)',     msg: 'Bonjour Laurent, désolé pour l\'oubli. On vous les envoie demain matin en première tournée.', daysAgo: 3, hour: 10, minute: 47, related_to: 'delivery' },
+  { sender: 'restaurant', name: 'Laurent Martin',          msg: 'Parfait, merci pour la réactivité.',          daysAgo: 3, hour: 11, minute: 5,  related_to: null },
+  { sender: 'restaurant', name: 'Laurent Martin',          msg: 'Pourriez-vous me confirmer la disponibilité des noix de Saint-Jacques pour vendredi ?', daysAgo: 1, hour: 14, minute: 32, related_to: 'product' },
+  { sender: 'supplier',   name: 'Jean Dupont (Metro)',     msg: 'Oui, pas de souci. En calibre 20/30 ou 30/40 ?', daysAgo: 1, hour: 15, minute: 18, related_to: 'product' },
+  { sender: 'restaurant', name: 'Laurent Martin',          msg: '30/40 svp, 5 kg.',                            daysAgo: 1, hour: 15, minute: 22, related_to: 'product' },
+];
+
+function ensureDemoMessages() {
+  const metro = get(
+    'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
+    ['Metro Paris Nation', RID]
+  );
+  if (!metro) return { inserted: 0 };
+
+  const conversationId = `supplier_${metro.id}_restaurant_${RID}`;
+  // Wipe + reinsert in one transaction. The most-recent supplier message
+  // stays unread (read_at = NULL) so the restaurant nav badge ticks up; older
+  // supplier messages are pre-marked read so the chat doesn't look unattended.
+  const tx = db.transaction(() => {
+    run('DELETE FROM messages WHERE conversation_id = ?', [conversationId]);
+    let inserted = 0;
+    _DEMO_MESSAGES.forEach((m, i) => {
+      const created = new Date(Date.now() - m.daysAgo * 86_400_000);
+      created.setHours(m.hour, m.minute, 0, 0);
+      const createdSql = created.toISOString().replace('T', ' ').slice(0, 19);
+      // Last 2 messages (the live exchange) are unread on whichever side is
+      // the recipient; older ones are read on both sides.
+      const isRecent = i >= _DEMO_MESSAGES.length - 2;
+      const readAt = isRecent ? null : createdSql;
+      run(
+        `INSERT INTO messages
+           (conversation_id, restaurant_id, supplier_id,
+            sender_type, sender_id, sender_name,
+            message, related_to, related_id, read_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+        [
+          conversationId, RID, metro.id,
+          m.sender, m.sender === 'restaurant' ? 1 : 1, m.name,
+          m.msg, m.related_to, readAt, createdSql,
+        ]
+      );
+      inserted++;
+    });
+    return inserted;
+  });
+  const inserted = tx();
+  return { inserted, conversationId };
 }
 
 function ensureSupplierOrders() {
@@ -881,6 +962,7 @@ if (existing) {
   const catalog = ensureSupplierCatalogs();
   const extras = ensureExtraDemoRestaurants();
   const orders = ensureSupplierOrders();
+  const messages = ensureDemoMessages();
   if (ensured) {
     console.log(`✅ Demo data already present (${OWNER_EMAIL} exists, account id=${existing.id}). Refreshed supplier-portal demo login: ${SUPPLIER_DEMO_EMAIL} / ${SUPPLIER_DEMO_PASSWORD} (PIN ${SUPPLIER_DEMO_PIN}).`);
   } else {
@@ -894,6 +976,9 @@ if (existing) {
   }
   if (extras.restaurants > 0) {
     console.log(`   ↳ Refreshed extra demo restaurants: ${extras.restaurants} resto + ${extras.marie_orders + extras.sakura_orders} Metro orders + ${extras.pomona_orders} Pomona orders.`);
+  }
+  if (messages && messages.inserted > 0) {
+    console.log(`   ↳ Refreshed demo messages: ${messages.inserted} entre Chez Laurent et Metro.`);
   }
   process.exit(0);
 }
@@ -1038,6 +1123,13 @@ section('Extra demo restaurants + cross-tenant orders');
 {
   const e = ensureExtraDemoRestaurants();
   log(`${e.restaurants} restaurant(s) · ${e.marie_orders} Marie + ${e.sakura_orders} Sakura Metro orders · ${e.pomona_orders} Chez Laurent → Pomona orders`);
+}
+
+// ─── 3f. Demo messages (Chez Laurent ↔ Metro) ──────────────────────────────
+section('Demo messages');
+{
+  const m = ensureDemoMessages();
+  log(`${m.inserted} messages dans la conversation ${m.conversationId}`);
 }
 
 // ─── 4. Ingredients ────────────────────────────────────────────────────────

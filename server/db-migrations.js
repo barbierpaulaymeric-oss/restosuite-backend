@@ -1783,6 +1783,43 @@ try {
   console.warn('⚠️ Supplier portal v3 migration error:', e.message);
 }
 
+// ─── Messaging: restaurant ↔ supplier conversations ───
+// `conversation_id` is a deterministic string ("supplier_<sid>_restaurant_<rid>")
+// so endpoints can resolve the conversation from a (supplier_id, restaurant_id)
+// pair without a JOIN. We denormalize restaurant_id + supplier_id into columns
+// so tenancy filtering stays a simple WHERE — and so Phase 2 indexing applies.
+// No FK REFERENCES, matching the cooling_logs/witness_meals convention so the
+// :memory: test DB is happy (per feedback_fk_references_test_db.md).
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id TEXT NOT NULL,
+      restaurant_id INTEGER NOT NULL,
+      supplier_id INTEGER NOT NULL,
+      sender_type TEXT NOT NULL,
+      sender_id INTEGER NOT NULL,
+      sender_name TEXT NOT NULL,
+      message TEXT NOT NULL,
+      related_to TEXT,
+      related_id INTEGER,
+      read_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_messages_conv_created
+      ON messages(conversation_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_messages_conv_read
+      ON messages(conversation_id, read_at);
+    CREATE INDEX IF NOT EXISTS idx_messages_restaurant
+      ON messages(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_supplier
+      ON messages(supplier_id);
+  `);
+  console.log('✅ Migration: messages table ready');
+} catch (e) {
+  console.warn('⚠️ Messages migration error:', e.message);
+}
+
 // ─── Alto AI personalization: preferences, learning, shortcuts ───
 // No FK REFERENCES (keeps :memory: test DB happy — matches cooling_logs convention)
 try {

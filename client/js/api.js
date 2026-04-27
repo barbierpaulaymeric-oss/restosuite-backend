@@ -537,6 +537,28 @@ const API = {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
 
+  // ─── Messages — restaurant side (gérant JWT) ───
+  getMessageConversations() { return this.request('/messages/conversations'); },
+  getMessageThread(supplierId) { return this.request(`/messages/conversations/${supplierId}`); },
+  sendMessage(supplierId, message, related = {}) {
+    const body = { message };
+    if (related.related_to) body.related_to = related.related_to;
+    if (related.related_id != null) body.related_id = related.related_id;
+    return this.request(`/messages/conversations/${supplierId}`, { method: 'POST', body });
+  },
+  getMessageUnreadCount() { return this.request('/messages/unread-count'); },
+
+  // ─── Messages — supplier side (X-Supplier-Token) ───
+  getSupplierMessageConversations() { return this.supplierRequest('/messages/conversations'); },
+  getSupplierMessageThread(restaurantId) { return this.supplierRequest(`/messages/conversations/${restaurantId}`); },
+  sendSupplierMessage(restaurantId, message, related = {}) {
+    const body = { message };
+    if (related.related_to) body.related_to = related.related_to;
+    if (related.related_id != null) body.related_id = related.related_id;
+    return this.supplierRequest(`/messages/conversations/${restaurantId}`, { method: 'POST', body });
+  },
+  getSupplierMessageUnreadCount() { return this.supplierRequest('/messages/unread-count'); },
+
   // ─── Supplier Mercuriale Import (supplier side) ───
   // The upload uses multipart/form-data so we don't go through supplierRequest
   // (which sets Content-Type: application/json). Auth header is the same.

@@ -50,6 +50,7 @@ const NAV_GROUPS = {
     items: [
       { label: 'Fournisseurs & Commandes', route: '/suppliers', icon: 'truck',        roles: ['gerant'],              minPlan: 'essential' },
       { label: 'Livraisons',             route: '/deliveries',icon: 'package-check',  roles: ['gerant','cuisinier'], minPlan: 'essential' },
+      { label: 'Messages',               route: '/messages',  icon: 'message-square', roles: ['gerant','cuisinier'], minPlan: 'essential', badgeKey: 'messages' },
       { label: 'Service (Salle)',        route: '/service',   icon: 'concierge-bell', roles: ['gerant','salle'] },
       { label: 'Cuisine (écran)',        route: '/kitchen',   icon: 'chef-hat',       roles: ['gerant','cuisinier'] },
     ]
@@ -110,7 +111,7 @@ const ROUTE_TO_GROUP = {
   '/': 'cuisine', '/recipes': 'cuisine', '/new': 'cuisine', '/ingredients': 'cuisine',
   '/stock': 'cuisine', '/recipe': 'cuisine', '/edit': 'cuisine',
   '/orders': 'operations', '/suppliers': 'operations',
-  '/deliveries': 'operations', '/service': 'operations',
+  '/deliveries': 'operations', '/service': 'operations', '/messages': 'operations',
   '/kitchen': 'operations', '/scan-invoice': 'operations',
   '/analytics': 'pilotage',
   '/menu-engineering': 'pilotage', '/predictions': 'pilotage',
@@ -332,6 +333,8 @@ function registerRoutes() {
   Router.add(/^\/stock$/, renderStockDashboard);
   Router.add(/^\/deliveries$/, renderDeliveries);
   Router.add(/^\/deliveries\/(\d+)$/, (id) => renderDeliveryDetail(parseInt(id)));
+  Router.add(/^\/messages$/, renderMessagesConversations);
+  Router.add(/^\/messages\/(\d+)$/, (id) => renderMessagesThread(parseInt(id)));
   Router.add(/^\/stock\/reception$/, renderStockReception);
   Router.add(/^\/stock\/movements$/, renderStockMovements);
   Router.add(/^\/stock\/variance$/, renderStockVariance);
@@ -433,6 +436,13 @@ function bootApp(role, account, opts = {}) {
   registerRoutes();
   initNavGroups(role);
   initMobileNav(role);
+
+  // Poll the messages unread count so the nav badge stays current. Only for
+  // roles that can see Messages (gérant + cuisinier). The polling helper
+  // lives in views/messages.js.
+  if (typeof startMessagesNavBadgePolling === 'function' && (role === 'gerant' || role === 'cuisinier')) {
+    startMessagesNavBadgePolling();
+  }
 
   // Filter nav items based on role — hide links user cannot access
   const navLinks = document.querySelectorAll('.nav-link[data-roles]');
@@ -555,7 +565,7 @@ function initNavGroups(role) {
           <span class="nav-plan-badge">${escapeHtml(badge)}</span>
         </button>`;
       }
-      return `<a href="#${item.route}" class="nav-panel-item${isActive ? ' active' : ''}">
+      return `<a href="#${item.route}" data-route="${escapeHtml(item.route)}" class="nav-panel-item${isActive ? ' active' : ''}">
         <i data-lucide="${item.icon}"></i>
         <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
       </a>`;
@@ -698,6 +708,7 @@ function initMobileNav(role) {
         } else {
           el = document.createElement('a');
           el.href = '#' + item.route;
+          el.dataset.route = item.route;
           el.className = 'mobile-nav-item' + (isActive ? ' active' : '');
           el.addEventListener('click', closeOverlay);
         }

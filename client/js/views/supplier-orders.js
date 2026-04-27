@@ -92,9 +92,14 @@ async function showSupplierOrderDetail(id) {
         <button class="btn btn-secondary btn-sm" id="back-supplier-orders">
           <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Retour
         </button>
-        <button class="btn btn-secondary btn-sm" id="supplier-order-pdf">
-          <i data-lucide="download" style="width:16px;height:16px"></i> Télécharger PDF
-        </button>
+        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" id="supplier-order-message">
+            <i data-lucide="message-square" style="width:16px;height:16px"></i> Contacter le restaurant
+          </button>
+          <button class="btn btn-secondary btn-sm" id="supplier-order-pdf">
+            <i data-lucide="download" style="width:16px;height:16px"></i> Télécharger PDF
+          </button>
+        </div>
       </div>
       <div class="card" style="padding:var(--space-4);margin-bottom:var(--space-4);border-left:4px solid ${s.color};border-radius:var(--radius-lg);background:var(--bg-elevated)">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap">
@@ -139,6 +144,17 @@ async function showSupplierOrderDetail(id) {
 
     if (window.lucide) lucide.createIcons();
     document.getElementById('back-supplier-orders').addEventListener('click', renderSupplierOrdersTab);
+
+    document.getElementById('supplier-order-message').addEventListener('click', () => {
+      // The supplier order has restaurant_id (the buyer); thread is keyed on that.
+      if (typeof showSupplierMessageThread === 'function') {
+        showSupplierMessageThread(order.restaurant_id, {
+          related_to: 'order',
+          related_id: order.id,
+          ref: order.reference || `#${order.id}`,
+        });
+      }
+    });
 
     document.getElementById('supplier-order-pdf').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
