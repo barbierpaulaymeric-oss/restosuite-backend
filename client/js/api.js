@@ -504,6 +504,38 @@ const API = {
   getSupplierOrder(id) {
     return this.supplierRequest(`/orders/${id}`);
   },
+  getSupplierOrdersPendingCount() {
+    return this.supplierRequest('/orders/pending-count');
+  },
+  confirmSupplierOrder(id, reason) {
+    return this.supplierRequest(`/orders/${id}/confirm`, { method: 'PUT', body: { reason: reason || null } });
+  },
+  refuseSupplierOrder(id, reason) {
+    return this.supplierRequest(`/orders/${id}/refuse`, { method: 'PUT', body: { reason: reason || null } });
+  },
+  // PDF download — same blob+anchor pattern as the BL PDF, see
+  // feedback_authenticated_blob_download.md.
+  async downloadSupplierOrderPdf(id) {
+    const token = getSupplierToken();
+    if (!token) throw new Error('Non connecté');
+    const res = await fetch(this.base + `/supplier-portal/orders/${id}/pdf`, {
+      headers: { 'X-Supplier-Token': token },
+    });
+    if (!res.ok) {
+      if (res.status === 401) { clearSupplierSession(); location.reload(); }
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || 'Erreur téléchargement PDF');
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `commande-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
 
   // ─── Supplier Mercuriale Import (supplier side) ───
   // The upload uses multipart/form-data so we don't go through supplierRequest
@@ -559,11 +591,12 @@ const API = {
     return this.supplierRequest('/notifications/me/read-all', { method: 'PUT' });
   },
   // ─── Supplier portal v3: historique / stats / price overrides ───
-  getSupplierHistorique({ from, to, restaurant_id } = {}) {
+  getSupplierHistorique({ from, to, restaurant_id, status } = {}) {
     const qs = new URLSearchParams();
     if (from) qs.set('from', from);
     if (to) qs.set('to', to);
     if (restaurant_id) qs.set('restaurant_id', restaurant_id);
+    if (status && status !== 'all') qs.set('status', status);
     const suffix = qs.toString() ? `?${qs}` : '';
     return this.supplierRequest(`/historique${suffix}`);
   },

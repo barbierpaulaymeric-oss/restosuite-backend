@@ -588,6 +588,41 @@ const API = {
   getSupplierOrder(id) {
     return this.supplierRequest(`/orders/${id}`);
   },
+  getSupplierOrdersPendingCount() {
+    return this.supplierRequest("/orders/pending-count");
+  },
+  confirmSupplierOrder(id, reason) {
+    return this.supplierRequest(`/orders/${id}/confirm`, { method: "PUT", body: { reason: reason || null } });
+  },
+  refuseSupplierOrder(id, reason) {
+    return this.supplierRequest(`/orders/${id}/refuse`, { method: "PUT", body: { reason: reason || null } });
+  },
+  // PDF download — same blob+anchor pattern as the BL PDF, see
+  // feedback_authenticated_blob_download.md.
+  async downloadSupplierOrderPdf(id) {
+    const token = getSupplierToken();
+    if (!token) throw new Error("Non connect\xE9");
+    const res = await fetch(this.base + `/supplier-portal/orders/${id}/pdf`, {
+      headers: { "X-Supplier-Token": token }
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        clearSupplierSession();
+        location.reload();
+      }
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || "Erreur t\xE9l\xE9chargement PDF");
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `commande-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1e3);
+  },
   // ─── Supplier Mercuriale Import (supplier side) ───
   // The upload uses multipart/form-data so we don't go through supplierRequest
   // (which sets Content-Type: application/json). Auth header is the same.
@@ -641,11 +676,12 @@ const API = {
     return this.supplierRequest("/notifications/me/read-all", { method: "PUT" });
   },
   // ─── Supplier portal v3: historique / stats / price overrides ───
-  getSupplierHistorique({ from, to, restaurant_id } = {}) {
+  getSupplierHistorique({ from, to, restaurant_id, status } = {}) {
     const qs = new URLSearchParams();
     if (from) qs.set("from", from);
     if (to) qs.set("to", to);
     if (restaurant_id) qs.set("restaurant_id", restaurant_id);
+    if (status && status !== "all") qs.set("status", status);
     const suffix = qs.toString() ? `?${qs}` : "";
     return this.supplierRequest(`/historique${suffix}`);
   },
@@ -18797,15 +18833,6 @@ function bootSupplierApp(session) {
       else if (t === "clients") renderSupplierClientsTab();
       else if (t === "orders") {
         renderSupplierOrdersTab();
-        const badge = document.getElementById("supplier-orders-badge");
-        if (badge) {
-          badge.hidden = true;
-          badge.textContent = "0";
-        }
-        if (typeof API.markAllSupplierMyNotificationsRead === "function") {
-          API.markAllSupplierMyNotificationsRead().catch(() => {
-          });
-        }
       } else if (t === "deliveries") renderSupplierDeliveriesTab();
       else if (t === "history") renderSupplierHistoryTab();
       else if (t === "notifications") {
@@ -18820,8 +18847,8 @@ function bootSupplierApp(session) {
   setInterval(refreshSupplierOrdersBadge, 6e4);
 }
 function refreshSupplierOrdersBadge() {
-  if (typeof API.getSupplierMyUnreadCount !== "function") return;
-  API.getSupplierMyUnreadCount().then(({ count }) => {
+  if (typeof API.getSupplierOrdersPendingCount !== "function") return;
+  API.getSupplierOrdersPendingCount().then(({ count }) => {
     const badge = document.getElementById("supplier-orders-badge");
     if (!badge) return;
     if (count > 0) {
@@ -19468,9 +19495,18 @@ async function renderSupplierHistoryTab() {
     _historiqueState = {
       from: from.toISOString().slice(0, 10),
       to: today.toISOString().slice(0, 10),
-      restaurantId: ""
+      restaurantId: "",
+      status: "all"
     };
   }
+  const STATUS_CHIPS = [
+    { key: "all", label: "Toutes" },
+    { key: "brouillon", label: "Brouillon" },
+    { key: "envoy\xE9e", label: "Envoy\xE9es" },
+    { key: "confirm\xE9e", label: "Confirm\xE9es" },
+    { key: "livr\xE9e", label: "Livr\xE9es" },
+    { key: "refus\xE9e", label: "Refus\xE9es" }
+  ];
   content.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
       <h2 style="margin:0;font-size:var(--text-xl)">Historique des commandes</h2>
@@ -19491,6 +19527,15 @@ async function renderSupplierHistoryTab() {
         </select>
       </label>
       <div class="historique-totals" id="historique-totals"></div>
+    </div>
+    <div class="historique-chips">
+      ${STATUS_CHIPS.map((c) => `
+        <button type="button"
+                class="historique-chip ${c.key === _historiqueState.status ? "historique-chip--active" : ""}"
+                data-status="${escapeHtml(c.key)}">
+          ${escapeHtml(c.label)}
+        </button>
+      `).join("")}
     </div>
     <div id="historique-body"><div class="loading"><div class="spinner"></div></div></div>
   `;
@@ -19518,6 +19563,15 @@ async function renderSupplierHistoryTab() {
     _historiqueState.restaurantId = e.target.value;
     _loadHistorique();
   });
+  document.querySelectorAll(".historique-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      _historiqueState.status = chip.dataset.status;
+      document.querySelectorAll(".historique-chip").forEach((c) => {
+        c.classList.toggle("historique-chip--active", c.dataset.status === _historiqueState.status);
+      });
+      _loadHistorique();
+    });
+  });
   _loadHistorique();
 }
 let _historiqueState = null;
@@ -19531,7 +19585,8 @@ async function _loadHistorique() {
     data = await API.getSupplierHistorique({
       from: _historiqueState.from,
       to: _historiqueState.to,
-      restaurant_id: _historiqueState.restaurantId || void 0
+      restaurant_id: _historiqueState.restaurantId || void 0,
+      status: _historiqueState.status
     });
   } catch (e) {
     body.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
@@ -20709,9 +20764,19 @@ async function showSupplierDeliveryDetail(id) {
 async function showNewDeliveryForm() {
   const content = document.getElementById("supplier-content");
   let clients = [];
+  let catalog = [];
   try {
-    clients = await API.getSupplierClients();
+    const results = await Promise.allSettled([
+      API.getSupplierClients(),
+      API.getSupplierCatalog()
+    ]);
+    if (results[0].status === "fulfilled") clients = results[0].value || [];
+    if (results[1].status === "fulfilled") catalog = results[1].value || [];
   } catch (_) {
+  }
+  const catalogByName = /* @__PURE__ */ new Map();
+  for (const c of catalog) {
+    if (c && c.product_name) catalogByName.set(String(c.product_name).toLowerCase(), c);
   }
   const clientOptions = clients.map((c) => `
     <option value="${c.restaurant_id}">${escapeHtml(c.restaurant_name || `#${c.restaurant_id}`)}${c.restaurant_city ? " \u2014 " + escapeHtml(c.restaurant_city) : ""}</option>
@@ -20721,6 +20786,9 @@ async function showNewDeliveryForm() {
       <button class="btn btn-secondary btn-sm" id="back-supplier-deliveries-form">\u2190 Retour</button>
     </div>
     <h2 style="margin-bottom:var(--space-4)">Nouveau bon de livraison</h2>
+    <datalist id="dn-product-suggestions">
+      ${catalog.map((c) => `<option value="${escapeHtml(c.product_name)}"></option>`).join("")}
+    </datalist>
     <div class="form-row" style="margin-bottom:var(--space-4)">
       <div class="form-group" style="flex:2">
         <label class="form-label">Restaurant client *</label>
@@ -20761,7 +20829,8 @@ async function showNewDeliveryForm() {
       <div style="display:grid;grid-template-columns:1fr 80px 80px 100px;gap:var(--space-2);margin-bottom:var(--space-2)">
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">Produit *</label>
-          <input type="text" class="input dn-product-name" placeholder="Nom du produit" required>
+          <input type="text" class="input dn-product-name" placeholder="Nom du produit" required
+                 list="dn-product-suggestions" autocomplete="off">
         </div>
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">Quantit\xE9 *</label>
@@ -20820,6 +20889,26 @@ async function showNewDeliveryForm() {
     `;
     list.appendChild(row);
     row.querySelector(".dn-remove-item").addEventListener("click", () => row.remove());
+    const nameInput = row.querySelector(".dn-product-name");
+    nameInput.addEventListener("input", () => {
+      const match = catalogByName.get(String(nameInput.value).trim().toLowerCase());
+      if (!match) return;
+      const unitSel = row.querySelector(".dn-unit");
+      const priceInput = row.querySelector(".dn-price");
+      if (unitSel && match.unit) {
+        const matchOpt = Array.from(unitSel.options).find((o) => o.value === match.unit);
+        if (!matchOpt) {
+          const opt = document.createElement("option");
+          opt.value = match.unit;
+          opt.textContent = match.unit;
+          unitSel.appendChild(opt);
+        }
+        unitSel.value = match.unit;
+      }
+      if (priceInput && (priceInput.value === "" || priceInput.value === "0") && match.price != null) {
+        priceInput.value = Number(match.price).toFixed(2);
+      }
+    });
   }
   addItemRow();
   document.getElementById("dn-add-item").addEventListener("click", addItemRow);
@@ -20940,14 +21029,18 @@ async function showSupplierOrderDetail(id) {
   try {
     const order = await API.getSupplierOrder(id);
     const s = SUPPLIER_ORDER_STATUS[order.status] || { label: order.status, color: "#666" };
+    const isPending = ["brouillon", "envoy\xE9e", "envoyee"].includes(order.status);
     content.innerHTML = `
-      <div style="margin-bottom:var(--space-4)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)">
         <button class="btn btn-secondary btn-sm" id="back-supplier-orders">
           <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Retour
         </button>
+        <button class="btn btn-secondary btn-sm" id="supplier-order-pdf">
+          <i data-lucide="download" style="width:16px;height:16px"></i> T\xE9l\xE9charger PDF
+        </button>
       </div>
       <div class="card" style="padding:var(--space-4);margin-bottom:var(--space-4);border-left:4px solid ${s.color};border-radius:var(--radius-lg);background:var(--bg-elevated)">
-        <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap">
           <h2 style="margin:0;font-size:var(--text-xl)">${escapeHtml(order.reference || `Commande #${order.id}`)}</h2>
           <span class="badge" style="background:${s.color};color:white;padding:4px 10px;border-radius:var(--radius-md)">${escapeHtml(s.label)}</span>
         </div>
@@ -20975,12 +21068,99 @@ async function showSupplierOrderDetail(id) {
       <div style="margin-top:var(--space-4);text-align:right;font-size:var(--text-lg)">
         <strong>Total : ${order.total_amount != null ? formatCurrency(order.total_amount) : "\u2014"}</strong>
       </div>
+      ${isPending ? `
+        <div class="supplier-order-actions">
+          <button class="btn supplier-order-btn supplier-order-btn--confirm" id="supplier-order-confirm">
+            <i data-lucide="check-circle" style="width:18px;height:18px"></i> Confirmer la commande
+          </button>
+          <button class="btn supplier-order-btn supplier-order-btn--refuse" id="supplier-order-refuse">
+            <i data-lucide="x-circle" style="width:18px;height:18px"></i> Refuser la commande
+          </button>
+        </div>
+      ` : ""}
     `;
     if (window.lucide) lucide.createIcons();
     document.getElementById("back-supplier-orders").addEventListener("click", renderSupplierOrdersTab);
+    document.getElementById("supplier-order-pdf").addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        await API.downloadSupplierOrderPdf(order.id);
+      } catch (err) {
+        showToast(err.message || "Erreur t\xE9l\xE9chargement", "error");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    if (isPending) {
+      document.getElementById("supplier-order-confirm").addEventListener("click", () => {
+        _supplierOrderActionPrompt({
+          orderId: order.id,
+          title: "Confirmer la commande",
+          body: `Confirmer la commande ${order.reference || `#${order.id}`} ?`,
+          placeholder: "Note pour le client (optionnel)",
+          confirmLabel: "Confirmer",
+          confirmClass: "btn supplier-order-btn--confirm",
+          action: "confirm"
+        });
+      });
+      document.getElementById("supplier-order-refuse").addEventListener("click", () => {
+        _supplierOrderActionPrompt({
+          orderId: order.id,
+          title: "Refuser la commande",
+          body: `Refuser la commande ${order.reference || `#${order.id}`} ?`,
+          placeholder: "Motif (recommand\xE9)",
+          confirmLabel: "Refuser",
+          confirmClass: "btn supplier-order-btn--refuse",
+          action: "refuse"
+        });
+      });
+    }
   } catch (e) {
     content.innerHTML = `<p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>`;
   }
+}
+function _supplierOrderActionPrompt({ orderId, title, body, placeholder, confirmLabel, confirmClass, action }) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:480px">
+      <h2>${escapeHtml(title)}</h2>
+      <p>${escapeHtml(body)}</p>
+      <div class="form-group">
+        <label>${escapeHtml(placeholder)}</label>
+        <textarea id="supplier-order-reason" class="form-control" rows="3" maxlength="500" placeholder="${escapeHtml(placeholder)}"></textarea>
+      </div>
+      <div class="actions-row">
+        <button class="${confirmClass}" id="supplier-order-action-confirm">${escapeHtml(confirmLabel)}</button>
+        <button class="btn btn-secondary" id="supplier-order-action-cancel">Annuler</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector("#supplier-order-action-cancel").onclick = close;
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close();
+  });
+  overlay.querySelector("#supplier-order-action-confirm").onclick = async () => {
+    const reason = document.getElementById("supplier-order-reason").value.trim();
+    try {
+      if (action === "confirm") {
+        await API.confirmSupplierOrder(orderId, reason);
+        showToast("Commande confirm\xE9e", "success");
+      } else {
+        await API.refuseSupplierOrder(orderId, reason);
+        showToast("Commande refus\xE9e", "success");
+      }
+      close();
+      if (typeof refreshSupplierOrdersBadge === "function") refreshSupplierOrdersBadge();
+      showSupplierOrderDetail(orderId);
+    } catch (e) {
+      showToast(e.message || "Erreur", "error");
+    }
+  };
+  document.getElementById("supplier-order-reason").focus();
 }
 function formatDeliveryDate(dateStr) {
   if (!dateStr) return null;

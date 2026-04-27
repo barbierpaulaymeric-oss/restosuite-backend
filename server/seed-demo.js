@@ -358,6 +358,13 @@ function ensureSupplierOrders() {
     'DELETE FROM purchase_orders WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?',
     [metro.id, RID, `${DEMO_ORDER_REFS_PREFIX}%`]
   );
+  // Wipe previous demo notifications. They reference ids that are about to be
+  // deleted/recreated; we identify them by the DEMO- message prefix.
+  run(
+    `DELETE FROM supplier_notifications
+      WHERE supplier_id = ? AND restaurant_id = ? AND message LIKE ?`,
+    [metro.id, RID, '[DEMO]%']
+  );
 
   const insertOrder = db.prepare(
     `INSERT INTO purchase_orders
@@ -369,8 +376,20 @@ function ensureSupplierOrders() {
        (purchase_order_id, restaurant_id, ingredient_id, product_name, quantity, unit, unit_price, total_price)
      VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`
   );
+  // Notifications mirror the order-creation hook (notifySupplierOfOrder in
+  // purchase-orders.js). Demo orders bypass that hook because they're inserted
+  // directly, so we drop matching rows here. Message prefixed [DEMO] so the
+  // wipe-on-reseed query can find them. The 10 most recent orders get one
+  // notification each — older ones don't, mirroring "you've already been
+  // notified about these in the past".
+  const insertNotif = db.prepare(
+    `INSERT INTO supplier_notifications
+       (supplier_id, restaurant_id, type, order_id, message, read, created_at)
+     VALUES (?, ?, 'order_created', ?, ?, ?, ?)`
+  );
 
   let inserted = 0;
+  let notifs = 0;
   const total = _DEMO_ORDER_RECIPES.length;
   // Spread orders across the past ~90 days, oldest first.
   const spanDays = 90;
@@ -407,10 +426,24 @@ function ensureSupplierOrders() {
         insertItem.run(orderId, RID, ln.name, ln.qty, ln.unit, ln.price, ln.total);
       }
       inserted++;
+
+      // Drop a matching notification for the 10 most recent orders. The 4
+      // newest stay unread (badge populates), older 6 are pre-marked read so
+      // the list isn't all-bold. idx=0 is newest.
+      if (idx < 10) {
+        const isUnread = idx < 4 ? 1 : 0;
+        insertNotif.run(
+          metro.id, RID, orderId,
+          `[DEMO] Nouvelle commande ${ref} — ${total_amount.toFixed(2)} €`,
+          1 - isUnread, // schema is `read` (1=read, 0=unread)
+          createdSql
+        );
+        notifs++;
+      }
     });
   });
   tx();
-  return { inserted };
+  return { inserted, notifs };
 }
 
 // Idempotent: deletes the supplier's existing demo catalog rows then bulk-
@@ -507,7 +540,7 @@ if (existing) {
     console.log(`   ↳ Refreshed supplier catalogs: ${catalog.totalInserted} products across ${catalog.touchedSuppliers} suppliers.`);
   }
   if (orders.inserted > 0) {
-    console.log(`   ↳ Refreshed supplier demo orders: ${orders.inserted} purchase_orders for Metro Paris Nation.`);
+    console.log(`   ↳ Refreshed supplier demo orders: ${orders.inserted} purchase_orders + ${orders.notifs} notifications for Metro Paris Nation.`);
   }
   process.exit(0);
 }
@@ -641,7 +674,7 @@ section('Supplier catalogs');
 section('Supplier demo orders');
 {
   const o = ensureSupplierOrders();
-  log(`${o.inserted} purchase_orders for Metro Paris Nation`);
+  log(`${o.inserted} purchase_orders + ${o.notifs} notifications for Metro Paris Nation`);
 }
 
 // ─── 4. Ingredients ────────────────────────────────────────────────────────

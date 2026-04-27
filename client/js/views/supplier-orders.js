@@ -85,14 +85,19 @@ async function showSupplierOrderDetail(id) {
     const order = await API.getSupplierOrder(id);
     const s = SUPPLIER_ORDER_STATUS[order.status] || { label: order.status, color: '#666' };
 
+    // Pending statuses are the only ones for which Confirmer/Refuser show.
+    const isPending = ['brouillon', 'envoyée', 'envoyee'].includes(order.status);
     content.innerHTML = `
-      <div style="margin-bottom:var(--space-4)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)">
         <button class="btn btn-secondary btn-sm" id="back-supplier-orders">
           <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Retour
         </button>
+        <button class="btn btn-secondary btn-sm" id="supplier-order-pdf">
+          <i data-lucide="download" style="width:16px;height:16px"></i> Télécharger PDF
+        </button>
       </div>
       <div class="card" style="padding:var(--space-4);margin-bottom:var(--space-4);border-left:4px solid ${s.color};border-radius:var(--radius-lg);background:var(--bg-elevated)">
-        <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap">
           <h2 style="margin:0;font-size:var(--text-xl)">${escapeHtml(order.reference || `Commande #${order.id}`)}</h2>
           <span class="badge" style="background:${s.color};color:white;padding:4px 10px;border-radius:var(--radius-md)">${escapeHtml(s.label)}</span>
         </div>
@@ -120,11 +125,105 @@ async function showSupplierOrderDetail(id) {
       <div style="margin-top:var(--space-4);text-align:right;font-size:var(--text-lg)">
         <strong>Total : ${order.total_amount != null ? formatCurrency(order.total_amount) : '—'}</strong>
       </div>
+      ${isPending ? `
+        <div class="supplier-order-actions">
+          <button class="btn supplier-order-btn supplier-order-btn--confirm" id="supplier-order-confirm">
+            <i data-lucide="check-circle" style="width:18px;height:18px"></i> Confirmer la commande
+          </button>
+          <button class="btn supplier-order-btn supplier-order-btn--refuse" id="supplier-order-refuse">
+            <i data-lucide="x-circle" style="width:18px;height:18px"></i> Refuser la commande
+          </button>
+        </div>
+      ` : ''}
     `;
 
     if (window.lucide) lucide.createIcons();
     document.getElementById('back-supplier-orders').addEventListener('click', renderSupplierOrdersTab);
+
+    document.getElementById('supplier-order-pdf').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        await API.downloadSupplierOrderPdf(order.id);
+      } catch (err) {
+        showToast(err.message || 'Erreur téléchargement', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    if (isPending) {
+      document.getElementById('supplier-order-confirm').addEventListener('click', () => {
+        _supplierOrderActionPrompt({
+          orderId: order.id,
+          title: 'Confirmer la commande',
+          body: `Confirmer la commande ${order.reference || `#${order.id}`} ?`,
+          placeholder: 'Note pour le client (optionnel)',
+          confirmLabel: 'Confirmer',
+          confirmClass: 'btn supplier-order-btn--confirm',
+          action: 'confirm',
+        });
+      });
+      document.getElementById('supplier-order-refuse').addEventListener('click', () => {
+        _supplierOrderActionPrompt({
+          orderId: order.id,
+          title: 'Refuser la commande',
+          body: `Refuser la commande ${order.reference || `#${order.id}`} ?`,
+          placeholder: 'Motif (recommandé)',
+          confirmLabel: 'Refuser',
+          confirmClass: 'btn supplier-order-btn--refuse',
+          action: 'refuse',
+        });
+      });
+    }
   } catch (e) {
     content.innerHTML = `<p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>`;
   }
+}
+
+// Confirm/refuse modal — captures an optional reason then fires the matching
+// API call. On success, refresh the badge (pending count just dropped) and
+// re-render the detail so the supplier sees the new status without a manual
+// reload.
+function _supplierOrderActionPrompt({ orderId, title, body, placeholder, confirmLabel, confirmClass, action }) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:480px">
+      <h2>${escapeHtml(title)}</h2>
+      <p>${escapeHtml(body)}</p>
+      <div class="form-group">
+        <label>${escapeHtml(placeholder)}</label>
+        <textarea id="supplier-order-reason" class="form-control" rows="3" maxlength="500" placeholder="${escapeHtml(placeholder)}"></textarea>
+      </div>
+      <div class="actions-row">
+        <button class="${confirmClass}" id="supplier-order-action-confirm">${escapeHtml(confirmLabel)}</button>
+        <button class="btn btn-secondary" id="supplier-order-action-cancel">Annuler</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector('#supplier-order-action-cancel').onclick = close;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  overlay.querySelector('#supplier-order-action-confirm').onclick = async () => {
+    const reason = document.getElementById('supplier-order-reason').value.trim();
+    try {
+      if (action === 'confirm') {
+        await API.confirmSupplierOrder(orderId, reason);
+        showToast('Commande confirmée', 'success');
+      } else {
+        await API.refuseSupplierOrder(orderId, reason);
+        showToast('Commande refusée', 'success');
+      }
+      close();
+      // Pending count just dropped — refresh the badge.
+      if (typeof refreshSupplierOrdersBadge === 'function') refreshSupplierOrdersBadge();
+      showSupplierOrderDetail(orderId);
+    } catch (e) {
+      showToast(e.message || 'Erreur', 'error');
+    }
+  };
+  document.getElementById('supplier-order-reason').focus();
 }

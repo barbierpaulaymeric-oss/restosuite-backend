@@ -145,13 +145,25 @@ async function showSupplierDeliveryDetail(id) {
 
 async function showNewDeliveryForm() {
   const content = document.getElementById('supplier-content');
-  // Load clients up-front so we can populate the dropdown. Failure is non-
-  // fatal — we still render the form, just without the picker (UX falls back
-  // to "your default restaurant" semantics on the server side).
+  // Load clients + catalog up-front. Catalog feeds the product autocomplete +
+  // unit/price autofill on each item row. Both calls are non-fatal: if either
+  // fails we still render the form, just without the affected enhancement.
   let clients = [];
+  let catalog = [];
   try {
-    clients = await API.getSupplierClients();
-  } catch (_) { /* offline / 401 → form still renders with empty picker */ }
+    const results = await Promise.allSettled([
+      API.getSupplierClients(),
+      API.getSupplierCatalog(),
+    ]);
+    if (results[0].status === 'fulfilled') clients = results[0].value || [];
+    if (results[1].status === 'fulfilled') catalog = results[1].value || [];
+  } catch (_) { /* shouldn't happen with allSettled */ }
+  // Build a name→catalog-row index for the autofill lookup. Case-insensitive
+  // match (matches what the server-side mercuriale code does).
+  const catalogByName = new Map();
+  for (const c of catalog) {
+    if (c && c.product_name) catalogByName.set(String(c.product_name).toLowerCase(), c);
+  }
 
   const clientOptions = clients.map(c => `
     <option value="${c.restaurant_id}">${escapeHtml(c.restaurant_name || `#${c.restaurant_id}`)}${c.restaurant_city ? ' — ' + escapeHtml(c.restaurant_city) : ''}</option>
@@ -162,6 +174,9 @@ async function showNewDeliveryForm() {
       <button class="btn btn-secondary btn-sm" id="back-supplier-deliveries-form">← Retour</button>
     </div>
     <h2 style="margin-bottom:var(--space-4)">Nouveau bon de livraison</h2>
+    <datalist id="dn-product-suggestions">
+      ${catalog.map(c => `<option value="${escapeHtml(c.product_name)}"></option>`).join('')}
+    </datalist>
     <div class="form-row" style="margin-bottom:var(--space-4)">
       <div class="form-group" style="flex:2">
         <label class="form-label">Restaurant client *</label>
@@ -204,7 +219,8 @@ async function showNewDeliveryForm() {
       <div style="display:grid;grid-template-columns:1fr 80px 80px 100px;gap:var(--space-2);margin-bottom:var(--space-2)">
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">Produit *</label>
-          <input type="text" class="input dn-product-name" placeholder="Nom du produit" required>
+          <input type="text" class="input dn-product-name" placeholder="Nom du produit" required
+                 list="dn-product-suggestions" autocomplete="off">
         </div>
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">Quantité *</label>
@@ -264,6 +280,32 @@ async function showNewDeliveryForm() {
     list.appendChild(row);
 
     row.querySelector('.dn-remove-item').addEventListener('click', () => row.remove());
+
+    // Autofill unit + price when a catalog product is picked from the datalist.
+    // We listen on `input` so it fires whether the user typed or selected from
+    // the dropdown — `change` only fires on blur and skips datalist clicks in
+    // some browsers. Only autofill empty fields so user-entered overrides win.
+    const nameInput = row.querySelector('.dn-product-name');
+    nameInput.addEventListener('input', () => {
+      const match = catalogByName.get(String(nameInput.value).trim().toLowerCase());
+      if (!match) return;
+      const unitSel = row.querySelector('.dn-unit');
+      const priceInput = row.querySelector('.dn-price');
+      if (unitSel && match.unit) {
+        const matchOpt = Array.from(unitSel.options).find(o => o.value === match.unit);
+        // If the catalog unit isn't in the static <option> list, append it.
+        if (!matchOpt) {
+          const opt = document.createElement('option');
+          opt.value = match.unit;
+          opt.textContent = match.unit;
+          unitSel.appendChild(opt);
+        }
+        unitSel.value = match.unit;
+      }
+      if (priceInput && (priceInput.value === '' || priceInput.value === '0') && match.price != null) {
+        priceInput.value = Number(match.price).toFixed(2);
+      }
+    });
   }
 
   // Add first row

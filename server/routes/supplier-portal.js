@@ -661,6 +661,21 @@ router.get('/orders', requireSupplierAuth, (req, res) => {
   res.json(orders);
 });
 
+// GET /orders/pending-count — count of orders awaiting confirmation. Used by
+// the Commandes tab badge in the supplier portal nav. MUST be defined before
+// /orders/:id so Express doesn't try to coerce 'pending-count' to an id.
+router.get('/orders/pending-count', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const row = get(
+    `SELECT COUNT(*) AS c FROM purchase_orders
+      WHERE supplier_id = ? AND restaurant_id = ?
+        AND status IN ('brouillon', 'envoyée', 'envoyee')`,
+    [supplierId, rid]
+  );
+  res.json({ count: row.c });
+});
+
 // GET /orders/:id — Order detail with items
 router.get('/orders/:id', requireSupplierAuth, (req, res) => {
   const id = Number(req.params.id);
@@ -678,6 +693,206 @@ router.get('/orders/:id', requireSupplierAuth, (req, res) => {
     [id, rid]
   );
   res.json({ ...order, items });
+});
+
+// PUT /orders/:id/confirm — supplier accepts the order. Optional reason captured
+// in notes (appended, not overwritten — we want to keep the restaurant's notes).
+router.put('/orders/:id/confirm', requireSupplierAuth, (req, res) => {
+  const id = Number(req.params.id);
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const order = get(
+    'SELECT id, status, notes FROM purchase_orders WHERE id = ? AND supplier_id = ? AND restaurant_id = ?',
+    [id, supplierId, rid]
+  );
+  if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+  // Already-confirmed/refused/livrée orders shouldn't be re-confirmed silently.
+  // The supplier portal hides the buttons for these statuses, but be defensive
+  // at the route level too.
+  if (['confirmée', 'confirmee', 'livrée', 'livree', 'refusée', 'refusee'].includes(order.status)) {
+    return res.status(409).json({ error: 'Cette commande n\'est plus en attente de confirmation', status: order.status });
+  }
+  const reason = (req.body && req.body.reason ? String(req.body.reason).trim().slice(0, 500) : '') || null;
+  const newNotes = reason
+    ? (order.notes ? `${order.notes}\n[Confirmée fournisseur] ${reason}` : `[Confirmée fournisseur] ${reason}`)
+    : order.notes;
+  run(
+    `UPDATE purchase_orders SET status = 'confirmée', notes = ? WHERE id = ? AND supplier_id = ? AND restaurant_id = ?`,
+    [newNotes, id, supplierId, rid]
+  );
+  res.json({ success: true, status: 'confirmée' });
+});
+
+// PUT /orders/:id/refuse — supplier rejects the order. Reason recommended (the
+// client UI prompts for it) but optional at the API level.
+router.put('/orders/:id/refuse', requireSupplierAuth, (req, res) => {
+  const id = Number(req.params.id);
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const order = get(
+    'SELECT id, status, notes FROM purchase_orders WHERE id = ? AND supplier_id = ? AND restaurant_id = ?',
+    [id, supplierId, rid]
+  );
+  if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+  if (['confirmée', 'confirmee', 'livrée', 'livree', 'refusée', 'refusee'].includes(order.status)) {
+    return res.status(409).json({ error: 'Cette commande n\'est plus en attente de confirmation', status: order.status });
+  }
+  const reason = (req.body && req.body.reason ? String(req.body.reason).trim().slice(0, 500) : '') || null;
+  const newNotes = reason
+    ? (order.notes ? `${order.notes}\n[Refusée fournisseur] ${reason}` : `[Refusée fournisseur] ${reason}`)
+    : order.notes;
+  run(
+    `UPDATE purchase_orders SET status = 'refusée', notes = ? WHERE id = ? AND supplier_id = ? AND restaurant_id = ?`,
+    [newNotes, id, supplierId, rid]
+  );
+  res.json({ success: true, status: 'refusée' });
+});
+
+// GET /orders/:id/pdf — Buffered order PDF. Same anti-compression pattern as
+// the BL endpoint (see feedback_pdf_compression_corruption.md).
+router.get('/orders/:id/pdf', requireSupplierAuth, (req, res) => {
+  const id = Number(req.params.id);
+  const supplierId = req.supplierAccount.supplier_id;
+  const supplierName = req.supplierAccount.supplier_name;
+  const rid = req.supplierAccount.restaurant_id;
+
+  const order = get(
+    `SELECT po.*, r.name AS restaurant_name, r.address AS restaurant_address,
+            r.city AS restaurant_city, r.postal_code AS restaurant_postal,
+            r.phone AS restaurant_phone
+       FROM purchase_orders po
+       JOIN restaurants r ON r.id = po.restaurant_id
+      WHERE po.id = ? AND po.supplier_id = ? AND po.restaurant_id = ?`,
+    [id, supplierId, rid]
+  );
+  if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+
+  // Enrich items with SKU + TVA from supplier_catalog. LEFT JOIN by lower(name)
+  // so unmatched rows still render (with default 5.5% TVA). We use supplierId
+  // and rid as parameters rather than re-joining purchase_orders — the order's
+  // tenancy was already verified above and re-deriving it via JOIN is brittle
+  // (better-sqlite3 rejects forward references inside LEFT JOIN ON clauses).
+  const items = all(
+    `SELECT poi.id, poi.product_name, poi.quantity, poi.unit, poi.unit_price, poi.total_price,
+            sc.sku, sc.tva_rate
+       FROM purchase_order_items poi
+       LEFT JOIN supplier_catalog sc
+              ON LOWER(sc.product_name) = LOWER(poi.product_name)
+             AND sc.supplier_id = ?
+             AND sc.restaurant_id = ?
+      WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,
+    [supplierId, rid, id, rid]
+  );
+
+  // Per-line TVA → aggregate into HT/TVA/TTC totals.
+  let totalHt = 0;
+  let totalTva = 0;
+  for (const it of items) {
+    const lineHt = Number(it.total_price) || 0;
+    const tvaRate = it.tva_rate != null ? Number(it.tva_rate) : 5.5;
+    totalHt += lineHt;
+    totalTva += lineHt * (tvaRate / 100);
+  }
+  totalHt = Math.round(totalHt * 100) / 100;
+  totalTva = Math.round(totalTva * 100) / 100;
+  const totalTtc = Math.round((totalHt + totalTva) * 100) / 100;
+
+  const PDFDocument = require('pdfkit');
+  const doc = new PDFDocument({ size: 'A4', margin: 42 });
+  const safeRef = String(order.reference || `cmd-${id}`).replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 60);
+  const chunks = [];
+  doc.on('data', (c) => chunks.push(c));
+  doc.on('end', () => {
+    const buf = Buffer.concat(chunks);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', buf.length);
+    res.setHeader('Content-Disposition', `attachment; filename="commande-${safeRef}.pdf"`);
+    res.end(buf);
+  });
+  doc.on('error', (e) => {
+    console.error('PDFKit order error:', e);
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur génération PDF' });
+  });
+
+  // Header
+  doc.font('Helvetica-Bold').fontSize(16).text('Commande fournisseur', { align: 'left' });
+  doc.font('Helvetica').fontSize(10).fillColor('#555').text(`Référence : ${order.reference || `#${id}`}`, { align: 'left' });
+  doc.moveDown(0.5);
+
+  // Two-column meta: supplier (left) + restaurant client (right)
+  const metaY = doc.y;
+  const colW = (doc.page.width - 84) / 2;
+  doc.fillColor('#000').font('Helvetica-Bold').fontSize(10).text('Fournisseur', 42, metaY);
+  doc.font('Helvetica').fontSize(10).text(supplierName || '—', 42, metaY + 14, { width: colW });
+
+  doc.font('Helvetica-Bold').fontSize(10).text('Client (restaurant)', 42 + colW, metaY);
+  doc.font('Helvetica').fontSize(10).text(order.restaurant_name || '—', 42 + colW, metaY + 14, { width: colW });
+  if (order.restaurant_address || order.restaurant_city) {
+    doc.text(`${order.restaurant_address || ''} ${order.restaurant_postal || ''} ${order.restaurant_city || ''}`.trim(), 42 + colW, doc.y, { width: colW });
+  }
+  if (order.restaurant_phone) doc.text(`Tél : ${order.restaurant_phone}`, 42 + colW, doc.y, { width: colW });
+
+  doc.y = metaY + 60;
+  doc.moveTo(42, doc.y).lineTo(doc.page.width - 42, doc.y).strokeColor('#000').stroke();
+  doc.moveDown(0.5);
+
+  // Date / status row
+  const created = order.created_at ? new Date(order.created_at).toLocaleDateString('fr-FR') : '—';
+  doc.font('Helvetica-Bold').fontSize(10).text('Date : ', { continued: true }).font('Helvetica').text(created);
+  doc.font('Helvetica-Bold').text('Statut : ', { continued: true }).font('Helvetica').text(String(order.status || '—'));
+  if (order.expected_delivery) {
+    doc.font('Helvetica-Bold').text('Livraison prévue : ', { continued: true }).font('Helvetica').text(String(order.expected_delivery));
+  }
+  doc.moveDown(0.5);
+
+  // Items table
+  const tableY = doc.y + 4;
+  const cols = [
+    { label: 'Produit',    x: 42,  w: 180 },
+    { label: 'SKU',        x: 224, w: 70 },
+    { label: 'Qté',        x: 296, w: 35, align: 'right' },
+    { label: 'Unité',      x: 333, w: 35 },
+    { label: 'P.U. HT',    x: 370, w: 55, align: 'right' },
+    { label: 'Total HT',   x: 427, w: 55, align: 'right' },
+    { label: 'TVA',        x: 484, w: 32, align: 'right' },
+    { label: 'TTC',        x: 518, w: 35, align: 'right' },
+  ];
+  doc.font('Helvetica-Bold').fontSize(9).fillColor('#000');
+  for (const c of cols) doc.text(c.label, c.x, tableY, { width: c.w, align: c.align || 'left' });
+  doc.moveTo(42, tableY + 14).lineTo(doc.page.width - 42, tableY + 14).strokeColor('#888').stroke();
+  let rowY = tableY + 18;
+
+  doc.font('Helvetica').fontSize(9);
+  for (const it of items) {
+    if (rowY > doc.page.height - 130) { doc.addPage(); rowY = 42; }
+    const lineHt = Number(it.total_price) || 0;
+    const tvaRate = it.tva_rate != null ? Number(it.tva_rate) : 5.5;
+    const lineTva = Math.round(lineHt * tvaRate) / 100;
+    const lineTtc = Math.round((lineHt + lineTva) * 100) / 100;
+    doc.fillColor('#000');
+    doc.text(String(it.product_name || ''), cols[0].x, rowY, { width: cols[0].w });
+    doc.text(String(it.sku || ''),         cols[1].x, rowY, { width: cols[1].w });
+    doc.text(String(it.quantity ?? ''),    cols[2].x, rowY, { width: cols[2].w, align: 'right' });
+    doc.text(String(it.unit || ''),        cols[3].x, rowY, { width: cols[3].w });
+    doc.text(`${(Number(it.unit_price) || 0).toFixed(2)} €`,  cols[4].x, rowY, { width: cols[4].w, align: 'right' });
+    doc.text(`${lineHt.toFixed(2)} €`,                        cols[5].x, rowY, { width: cols[5].w, align: 'right' });
+    doc.text(`${tvaRate}%`,                                   cols[6].x, rowY, { width: cols[6].w, align: 'right' });
+    doc.text(`${lineTtc.toFixed(2)} €`,                       cols[7].x, rowY, { width: cols[7].w, align: 'right' });
+    rowY += 16;
+  }
+
+  // Totals
+  if (rowY > doc.page.height - 100) { doc.addPage(); rowY = 42; }
+  rowY += 10;
+  doc.moveTo(42, rowY).lineTo(doc.page.width - 42, rowY).strokeColor('#000').stroke();
+  rowY += 10;
+  doc.font('Helvetica-Bold').fontSize(11).fillColor('#000');
+  const totalsX = doc.page.width - 42 - 200;
+  doc.text(`Total HT : ${totalHt.toFixed(2)} €`, totalsX, rowY, { width: 200, align: 'right' });
+  doc.text(`TVA : ${totalTva.toFixed(2)} €`,     totalsX, rowY + 16, { width: 200, align: 'right' });
+  doc.text(`Total TTC : ${totalTtc.toFixed(2)} €`, totalsX, rowY + 32, { width: 200, align: 'right' });
+
+  doc.end();
 });
 
 // ═════════════════════════════════════════
@@ -1171,7 +1386,7 @@ router.put('/notifications/me/read-all', requireSupplierAuth, (req, res) => {
 router.get('/historique', requireSupplierAuth, (req, res) => {
   const supplierId = req.supplierAccount.supplier_id;
   const rid = req.supplierAccount.restaurant_id;
-  const { from, to, restaurant_id } = req.query;
+  const { from, to, restaurant_id, status } = req.query;
 
   const params = [supplierId, rid];
   let where = 'po.supplier_id = ? AND po.restaurant_id = ?';
@@ -1185,6 +1400,26 @@ router.get('/historique', requireSupplierAuth, (req, res) => {
   }
   if (from) { where += ' AND date(po.created_at) >= date(?)'; params.push(String(from)); }
   if (to)   { where += ' AND date(po.created_at) <= date(?)'; params.push(String(to)); }
+  if (status && status !== 'all') {
+    // Accept both accented and unaccented variants ('envoyée'/'envoyee') so the
+    // filter chips work whichever spelling lives in the DB.
+    const STATUS_VARIANTS = {
+      brouillon:  ['brouillon'],
+      envoyee:    ['envoyée', 'envoyee'],
+      'envoyée':  ['envoyée', 'envoyee'],
+      confirmee:  ['confirmée', 'confirmee'],
+      'confirmée': ['confirmée', 'confirmee'],
+      livree:     ['livrée', 'livree'],
+      'livrée':   ['livrée', 'livree'],
+      refusee:    ['refusée', 'refusee'],
+      'refusée':  ['refusée', 'refusee'],
+      annulee:    ['annulée', 'annulee'],
+      'annulée':  ['annulée', 'annulee'],
+    };
+    const variants = STATUS_VARIANTS[status] || [String(status)];
+    where += ` AND po.status IN (${variants.map(() => '?').join(',')})`;
+    params.push(...variants);
+  }
 
   const orders = all(
     `SELECT po.id, po.reference, po.status, po.total_amount, po.created_at, po.expected_delivery,

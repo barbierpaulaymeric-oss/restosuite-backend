@@ -73,13 +73,9 @@ function bootSupplierApp(session) {
       else if (t === 'clients') renderSupplierClientsTab();
       else if (t === 'orders') {
         renderSupplierOrdersTab();
-        // Mark all as read on tab open. Optimistic — UI clears badge first;
-        // background request can fail silently without bothering the supplier.
-        const badge = document.getElementById('supplier-orders-badge');
-        if (badge) { badge.hidden = true; badge.textContent = '0'; }
-        if (typeof API.markAllSupplierMyNotificationsRead === 'function') {
-          API.markAllSupplierMyNotificationsRead().catch(() => {});
-        }
+        // The badge is "pending orders awaiting confirmation", not "unread
+        // notifications" — clicking the tab doesn't change that state. The
+        // badge will tick down as the supplier confirms/refuses orders.
       }
       else if (t === 'deliveries') renderSupplierDeliveriesTab();
       else if (t === 'history') renderSupplierHistoryTab();
@@ -101,8 +97,13 @@ function bootSupplierApp(session) {
 }
 
 function refreshSupplierOrdersBadge() {
-  if (typeof API.getSupplierMyUnreadCount !== 'function') return;
-  API.getSupplierMyUnreadCount()
+  // Commandes-tab badge = orders awaiting confirmation (status 'brouillon' or
+  // 'envoyée'). Reading from supplier_notifications.unread used to overcount
+  // when the seed pre-populated read notifications and undercount when the
+  // supplier muted notifications without acting on the order — the
+  // pending-count endpoint always reflects the actual workload.
+  if (typeof API.getSupplierOrdersPendingCount !== 'function') return;
+  API.getSupplierOrdersPendingCount()
     .then(({ count }) => {
       const badge = document.getElementById('supplier-orders-badge');
       if (!badge) return;
@@ -782,8 +783,8 @@ async function renderSupplierHistoryTab() {
   const content = document.getElementById('supplier-content');
   if (!content) return;
 
-  // Default range: last 90 days. Stored at module scope so re-rendering
-  // (filter change) keeps the user's selection.
+  // Default range: last 90 days + status='all'. Stored at module scope so
+  // re-rendering (filter change) keeps the user's selection.
   if (!_historiqueState) {
     const today = new Date();
     const from = new Date(today.getTime() - 90 * 86400_000);
@@ -791,8 +792,20 @@ async function renderSupplierHistoryTab() {
       from: from.toISOString().slice(0, 10),
       to: today.toISOString().slice(0, 10),
       restaurantId: '',
+      status: 'all',
     };
   }
+
+  // Chip status keys map 1:1 to ?status= server values; the server accepts
+  // both accented + unaccented spellings (see /historique tests).
+  const STATUS_CHIPS = [
+    { key: 'all',         label: 'Toutes' },
+    { key: 'brouillon',   label: 'Brouillon' },
+    { key: 'envoyée',     label: 'Envoyées' },
+    { key: 'confirmée',   label: 'Confirmées' },
+    { key: 'livrée',      label: 'Livrées' },
+    { key: 'refusée',     label: 'Refusées' },
+  ];
 
   content.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
@@ -814,6 +827,15 @@ async function renderSupplierHistoryTab() {
         </select>
       </label>
       <div class="historique-totals" id="historique-totals"></div>
+    </div>
+    <div class="historique-chips">
+      ${STATUS_CHIPS.map(c => `
+        <button type="button"
+                class="historique-chip ${c.key === _historiqueState.status ? 'historique-chip--active' : ''}"
+                data-status="${escapeHtml(c.key)}">
+          ${escapeHtml(c.label)}
+        </button>
+      `).join('')}
     </div>
     <div id="historique-body"><div class="loading"><div class="spinner"></div></div></div>
   `;
@@ -844,6 +866,16 @@ async function renderSupplierHistoryTab() {
     _historiqueState.restaurantId = e.target.value;
     _loadHistorique();
   });
+  document.querySelectorAll('.historique-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      _historiqueState.status = chip.dataset.status;
+      // Repaint chips active state without re-fetching the client dropdown.
+      document.querySelectorAll('.historique-chip').forEach(c => {
+        c.classList.toggle('historique-chip--active', c.dataset.status === _historiqueState.status);
+      });
+      _loadHistorique();
+    });
+  });
 
   _loadHistorique();
 }
@@ -861,6 +893,7 @@ async function _loadHistorique() {
       from: _historiqueState.from,
       to: _historiqueState.to,
       restaurant_id: _historiqueState.restaurantId || undefined,
+      status: _historiqueState.status,
     });
   } catch (e) {
     body.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
