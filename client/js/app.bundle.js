@@ -676,12 +676,13 @@ const API = {
     return this.supplierRequest("/notifications/me/read-all", { method: "PUT" });
   },
   // ─── Supplier portal v3: historique / stats / price overrides ───
-  getSupplierHistorique({ from, to, restaurant_id, status } = {}) {
+  getSupplierHistorique({ from, to, restaurant_id, status, q } = {}) {
     const qs = new URLSearchParams();
     if (from) qs.set("from", from);
     if (to) qs.set("to", to);
     if (restaurant_id) qs.set("restaurant_id", restaurant_id);
     if (status && status !== "all") qs.set("status", status);
+    if (q && String(q).trim()) qs.set("q", String(q).trim());
     const suffix = qs.toString() ? `?${qs}` : "";
     return this.supplierRequest(`/historique${suffix}`);
   },
@@ -19496,9 +19497,11 @@ async function renderSupplierHistoryTab() {
       from: from.toISOString().slice(0, 10),
       to: today.toISOString().slice(0, 10),
       restaurantId: "",
-      status: "all"
+      status: "all",
+      q: ""
     };
   }
+  _historiqueLastOrders = _historiqueLastOrders || [];
   const STATUS_CHIPS = [
     { key: "all", label: "Toutes" },
     { key: "brouillon", label: "Brouillon" },
@@ -19510,6 +19513,9 @@ async function renderSupplierHistoryTab() {
   content.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
       <h2 style="margin:0;font-size:var(--text-xl)">Historique des commandes</h2>
+      <button class="btn btn-secondary btn-sm" id="historique-csv">
+        <i data-lucide="download" style="width:16px;height:16px"></i> Exporter CSV
+      </button>
     </div>
     <div class="historique-toolbar">
       <label>
@@ -19525,6 +19531,12 @@ async function renderSupplierHistoryTab() {
         <select id="historique-restaurant" class="form-control">
           <option value="">Tous</option>
         </select>
+      </label>
+      <label style="flex:1;min-width:180px">
+        <span class="text-secondary text-sm">R\xE9f\xE9rence</span>
+        <input type="search" id="historique-q" class="form-control"
+               placeholder="ex: DEMO-PO-005"
+               value="${escapeHtml(_historiqueState.q || "")}">
       </label>
       <div class="historique-totals" id="historique-totals"></div>
     </div>
@@ -19572,9 +19584,60 @@ async function renderSupplierHistoryTab() {
       _loadHistorique();
     });
   });
+  let _historiqueQTimer = null;
+  document.getElementById("historique-q").addEventListener("input", (e) => {
+    _historiqueState.q = e.target.value;
+    clearTimeout(_historiqueQTimer);
+    _historiqueQTimer = setTimeout(_loadHistorique, 250);
+  });
+  document.getElementById("historique-csv").addEventListener("click", _exportHistoriqueCsv);
   _loadHistorique();
 }
+function _exportHistoriqueCsv() {
+  if (!_historiqueLastOrders || !_historiqueLastOrders.length) {
+    showToast("Aucune commande \xE0 exporter sur la p\xE9riode s\xE9lectionn\xE9e", "warning");
+    return;
+  }
+  const header = ["Date", "R\xE9f\xE9rence", "Restaurant", "Statut", "Montant HT (\u20AC)", "TVA (\u20AC)", "Montant TTC (\u20AC)"];
+  const escapeCsv = (val) => {
+    if (val == null) return '""';
+    const s = String(val).replace(/"/g, '""');
+    return `"${s}"`;
+  };
+  const fmtDate2 = (s) => {
+    if (!s) return "";
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? String(s) : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
+  const lines = [header.map(escapeCsv).join(",")];
+  for (const o of _historiqueLastOrders) {
+    const ht = Number(o.total_amount) || 0;
+    const tva = Math.round(ht * 0.055 * 100) / 100;
+    const ttc = Math.round((ht + tva) * 100) / 100;
+    lines.push([
+      fmtDate2(o.created_at),
+      o.reference || "",
+      o.restaurant_name || "",
+      o.status || "",
+      ht.toFixed(2),
+      tva.toFixed(2),
+      ttc.toFixed(2)
+    ].map(escapeCsv).join(","));
+  }
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  a.download = `historique-${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1e3);
+  showToast(`${_historiqueLastOrders.length} commandes export\xE9es`, "success");
+}
 let _historiqueState = null;
+let _historiqueLastOrders = null;
 async function _loadHistorique() {
   const body = document.getElementById("historique-body");
   const totalsEl = document.getElementById("historique-totals");
@@ -19586,8 +19649,10 @@ async function _loadHistorique() {
       from: _historiqueState.from,
       to: _historiqueState.to,
       restaurant_id: _historiqueState.restaurantId || void 0,
-      status: _historiqueState.status
+      status: _historiqueState.status,
+      q: _historiqueState.q || void 0
     });
+    _historiqueLastOrders = data.orders || [];
   } catch (e) {
     body.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
     return;

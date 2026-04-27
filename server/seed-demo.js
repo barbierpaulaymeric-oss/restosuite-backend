@@ -336,6 +336,355 @@ const _DEMO_ORDER_STATUS_MIX = (idx, total) => {
   return idx > total - 4 ? 'livrée' : (Math.random() < 0.85 ? 'livrée' : 'envoyée');
 };
 
+// Realistic restaurant→supplier order notes. Rotated by idx so re-seeds give
+// the same notes for the same orders. `null` is allowed (≈ 1/4 orders) so the
+// portal looks lifelike (real users don't always leave a note).
+const _DEMO_ORDER_NOTES = [
+  null,
+  'Livraison souhaitée avant 10h',
+  'Merci de confirmer la dispo du saumon',
+  'Commande hebdomadaire habituelle',
+  'Service midi, livraison avant 11h impérative',
+  'Préciser DLC sur le bon SVP',
+  'Glace requise pour les produits frais',
+  'Sortie marché 6h, prévoir livraison 5h30',
+  'RAS, commande standard',
+  'Nouveau livreur : sonner à l\'interphone "restaurant"',
+  null,
+  'Réception par chef Thomas, merci',
+  'Bons frais SVP, weekend chargé',
+  'Vérifier la qualité des framboises (incident la semaine dernière)',
+  'Livraison côté cour, pas la rue',
+  null,
+  'Carton entier seulement, merci',
+  'Doubler la commande de pommes de terre si possible',
+];
+function _demoNoteFor(idx) {
+  return _DEMO_ORDER_NOTES[idx % _DEMO_ORDER_NOTES.length];
+}
+
+// Extra demo restaurants used to populate Mes clients with more than one
+// entry. Each becomes its own tenant (separate restaurant_id) with its own
+// "Metro Paris Nation" suppliers row sharing the demo email, so the supplier
+// portal's getSupplierIdentities() (email-based) groups them under the same
+// vendor for read-only views.
+const EXTRA_DEMO_RESTAURANTS = [
+  {
+    id: 2,
+    name: 'Le Bistrot de Marie - Paris 6',
+    type: 'bistrot',
+    address: '18 rue de Buci',
+    city: 'Paris',
+    postal_code: '75006',
+    phone: '01 43 26 00 00',
+    covers: 40,
+    siret: '23456789000123',
+    plan: 'pro',
+    owner_email: 'marie@bistrot-marie.fr',
+    owner_name: 'Marie Lefèvre',
+    owner_first: 'Marie',
+    owner_last: 'Lefèvre',
+    metro_supplier_account: { name: 'Marie Lefèvre', pin: '4242' },
+  },
+  {
+    id: 3,
+    name: 'Sakura - Paris 2',
+    type: 'fusion',
+    address: '24 rue Sainte-Anne',
+    city: 'Paris',
+    postal_code: '75002',
+    phone: '01 42 60 80 80',
+    covers: 30,
+    siret: '34567890000123',
+    plan: 'pro',
+    owner_email: 'kenji@sakura-paris.fr',
+    owner_name: 'Kenji Tanaka',
+    owner_first: 'Kenji',
+    owner_last: 'Tanaka',
+    metro_supplier_account: { name: 'Kenji Tanaka', pin: '8888' },
+  },
+];
+
+// Order recipes for Marie (bistrot — viandes/cremes) and Sakura (fusion —
+// poisson/asia notes). Smaller baskets than Chez Laurent's 18-recipe set so
+// each restaurant looks like a different operation.
+const _MARIE_ORDER_RECIPES = [
+  { items: [
+      { name: 'Bavette d\'aloyau', qty: 4, unit: 'kg', price: 16.50 },
+      { name: 'Pommes de terre',   qty: 12, unit: 'kg', price: 1.20 },
+      { name: 'Beurre doux',       qty: 1.5, unit: 'kg', price: 8.50 },
+      { name: 'Échalotes',         qty: 1, unit: 'kg', price: 5.50 },
+    ] },
+  { items: [
+      { name: 'Filet de poulet',     qty: 5, unit: 'kg', price: 8.50 },
+      { name: 'Crème fraîche 35%',   qty: 2, unit: 'L', price: 4.20 },
+      { name: 'Champignons de Paris', qty: 2, unit: 'kg', price: 3.20 },
+      { name: 'Œufs plein air x30',  qty: 2, unit: 'plateau', price: 8.50 },
+    ] },
+  { items: [
+      { name: 'Steak haché 15% MG', qty: 8, unit: 'kg', price: 9.80 },
+      { name: 'Frites tradition',   qty: 10, unit: 'kg', price: 2.50 },
+      { name: 'Mozzarella',         qty: 2, unit: 'kg', price: 8.00 },
+    ] },
+  { items: [
+      { name: 'Magret de canard',   qty: 3, unit: 'kg', price: 19.50 },
+      { name: 'Pommes Golden',      qty: 4, unit: 'kg', price: 2.50 },
+      { name: 'Pommes de terre',    qty: 10, unit: 'kg', price: 1.20 },
+    ] },
+  { items: [
+      { name: 'Saucisse de Toulouse', qty: 4, unit: 'kg', price: 7.90 },
+      { name: 'Lentilles vertes',     qty: 3, unit: 'kg', price: 3.50 },
+      { name: 'Carottes',             qty: 4, unit: 'kg', price: 1.50 },
+    ] },
+  { items: [
+      { name: 'Cabillaud',           qty: 2, unit: 'kg', price: 15.50 },
+      { name: 'Beurre doux',         qty: 2, unit: 'kg', price: 8.50 },
+      { name: 'Citrons',             qty: 2, unit: 'kg', price: 2.80 },
+      { name: 'Sel de Guérande',     qty: 1, unit: 'kg', price: 3.50 },
+    ] },
+];
+const _SAKURA_ORDER_RECIPES = [
+  { items: [
+      { name: 'Filet de saumon', qty: 6, unit: 'kg', price: 19.00 },
+      { name: 'Riz basmati',     qty: 8, unit: 'kg', price: 2.20 },
+      { name: 'Citrons',         qty: 2, unit: 'kg', price: 2.80 },
+    ] },
+  { items: [
+      { name: 'Thon rouge',                qty: 3, unit: 'kg', price: 32.00 },
+      { name: 'Crevettes roses cuites',    qty: 2, unit: 'kg', price: 14.90 },
+      { name: 'Riz basmati',               qty: 6, unit: 'kg', price: 2.20 },
+    ] },
+  { items: [
+      { name: 'Gambas',          qty: 3, unit: 'kg', price: 22.00 },
+      { name: 'Bar de ligne',    qty: 2, unit: 'kg', price: 28.00 },
+      { name: 'Citrons',         qty: 2, unit: 'kg', price: 2.80 },
+    ] },
+  { items: [
+      { name: 'Filet de poulet',           qty: 4, unit: 'kg', price: 8.50 },
+      { name: 'Riz basmati',               qty: 5, unit: 'kg', price: 2.20 },
+      { name: 'Œufs plein air x30',        qty: 3, unit: 'plateau', price: 8.50 },
+    ] },
+  { items: [
+      { name: 'Noix de Saint-Jacques',     qty: 2, unit: 'kg', price: 38.00 },
+      { name: 'Beurre doux',               qty: 1, unit: 'kg', price: 8.50 },
+      { name: 'Citrons',                   qty: 1, unit: 'kg', price: 2.80 },
+    ] },
+];
+
+const EXTRA_DEMO_REF_PREFIX = 'DEMO-PO-X-';
+const POMONA_REF_PREFIX = 'DEMO-PO-POM-';
+
+// Build/refresh the extra demo restaurants + their Metro supplier rows + their
+// supplier_accounts (email-linked to the same demo identity) + a handful of
+// orders + a couple Chez Laurent → Pomona orders so Pomona is non-empty.
+// Idempotent: identifies its own rows by id (restaurants) or supplier name +
+// reference prefixes (suppliers/orders) and re-inserts on every run.
+function ensureExtraDemoRestaurants() {
+  const summary = { restaurants: 0, marie_orders: 0, sakura_orders: 0, pomona_orders: 0 };
+
+  for (const r of EXTRA_DEMO_RESTAURANTS) {
+    // Restaurant — UPSERT by id.
+    const existing = get('SELECT id FROM restaurants WHERE id = ?', [r.id]);
+    if (existing) {
+      run(
+        `UPDATE restaurants SET
+           name = ?, type = ?, address = ?, city = ?, postal_code = ?,
+           phone = ?, covers = ?, siret = ?, plan = ?
+         WHERE id = ?`,
+        [r.name, r.type, r.address, r.city, r.postal_code, r.phone, r.covers, r.siret, r.plan, r.id]
+      );
+    } else {
+      run(
+        `INSERT INTO restaurants (id, name, type, address, city, postal_code, phone, covers, siret, plan)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [r.id, r.name, r.type, r.address, r.city, r.postal_code, r.phone, r.covers, r.siret, r.plan]
+      );
+    }
+    summary.restaurants++;
+
+    // Owner account — INSERT once. We don't update the password on re-seed
+    // so any manual changes stick.
+    const ownerExists = get('SELECT id FROM accounts WHERE email = ?', [r.owner_email]);
+    if (!ownerExists) {
+      const ownerHash = bcrypt.hashSync(OWNER_PASSWORD, 10);
+      const ownerPerms = JSON.stringify({
+        view_recipes: true, view_costs: true, edit_recipes: true,
+        view_suppliers: true, export_pdf: true,
+      });
+      run(
+        `INSERT INTO accounts (name, pin, role, permissions, email, password_hash, first_name, last_name, restaurant_id, onboarding_step, is_owner, trial_start)
+         VALUES (?, NULL, 'gerant', ?, ?, ?, ?, ?, ?, 10, 1, datetime('now'))`,
+        [r.owner_name, ownerPerms, r.owner_email, ownerHash, r.owner_first, r.owner_last, r.id]
+      );
+    }
+
+    // Metro Paris Nation supplier in this tenant. Same email as the demo
+    // login so getSupplierIdentities() groups all 3 tenants under the one
+    // vendor identity.
+    let metroRow = get(
+      'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
+      ['Metro Paris Nation', r.id]
+    );
+    if (!metroRow) {
+      const metroHash = bcrypt.hashSync(SUPPLIER_DEMO_PASSWORD, 10);
+      const metroId = run(
+        `INSERT INTO suppliers (name, contact, phone, email, password_hash, contact_name, quality_rating, quality_notes, restaurant_id)
+         VALUES (?, ?, ?, ?, ?, ?, 4, ?, ?)`,
+        [
+          'Metro Paris Nation',
+          'Jean Dupont',
+          '01 40 09 40 00',
+          SUPPLIER_DEMO_EMAIL,
+          metroHash,
+          'Jean Dupont (commercial Metro)',
+          'Grossiste généraliste, livraison 6j/7',
+          r.id,
+        ]
+      ).lastInsertRowid;
+      metroRow = { id: metroId };
+    }
+
+    // supplier_account row for the demo identity in this tenant — same email
+    // and password hash.
+    const supplierAccountExists = get(
+      'SELECT id FROM supplier_accounts WHERE supplier_id = ? AND email = ? AND restaurant_id = ?',
+      [metroRow.id, SUPPLIER_DEMO_EMAIL, r.id]
+    );
+    if (!supplierAccountExists) {
+      const pinHash = bcrypt.hashSync(r.metro_supplier_account.pin, 10);
+      run(
+        `INSERT INTO supplier_accounts (restaurant_id, supplier_id, name, email, pin)
+         VALUES (?, ?, ?, ?, ?)`,
+        [r.id, metroRow.id, r.metro_supplier_account.name, SUPPLIER_DEMO_EMAIL, pinHash]
+      );
+    }
+
+    // Orders for this restaurant. Wipe previous ones first by ref prefix.
+    const recipes = r.id === 2 ? _MARIE_ORDER_RECIPES : _SAKURA_ORDER_RECIPES;
+    run(
+      `DELETE FROM purchase_order_items
+        WHERE purchase_order_id IN (
+          SELECT id FROM purchase_orders
+           WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?
+        )`,
+      [metroRow.id, r.id, `${EXTRA_DEMO_REF_PREFIX}%`]
+    );
+    run(
+      'DELETE FROM purchase_orders WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?',
+      [metroRow.id, r.id, `${EXTRA_DEMO_REF_PREFIX}%`]
+    );
+
+    // Spread orders across last ~60 days (oldest first).
+    const span = 60;
+    recipes.forEach((recipe, i) => {
+      const total = recipes.length;
+      const idx = total - 1 - i;
+      const dayOffset = Math.round((idx / Math.max(1, total - 1)) * span);
+      const created = new Date(Date.now() - dayOffset * 86_400_000);
+      created.setHours(8 + (i % 4), (10 + i * 13) % 60, 0, 0);
+      const createdSql = created.toISOString().replace('T', ' ').slice(0, 19);
+      const dateTag = createdSql.slice(0, 10).replace(/-/g, '');
+      const ref = `${EXTRA_DEMO_REF_PREFIX}R${r.id}-${dateTag}-${String(idx + 1).padStart(2, '0')}`;
+      // Mostly livrée; the most recent one for each restaurant stays
+      // 'envoyée' so the dashboard alert + pending-count badge ticks up.
+      const status = idx === 0 ? 'envoyée' : 'livrée';
+
+      let total_amount = 0;
+      const lines = recipe.items.map(it => {
+        const line = Math.round(it.qty * it.price * 100) / 100;
+        total_amount += line;
+        return { ...it, total: line };
+      });
+      total_amount = Math.round(total_amount * 100) / 100;
+
+      const orderId = run(
+        `INSERT INTO purchase_orders
+           (supplier_id, restaurant_id, reference, status, total_amount, expected_delivery, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          metroRow.id, r.id, ref, status, total_amount,
+          new Date(created.getTime() + 86_400_000).toISOString().slice(0, 10),
+          _demoNoteFor(idx + r.id), createdSql,
+        ]
+      ).lastInsertRowid;
+
+      for (const ln of lines) {
+        run(
+          `INSERT INTO purchase_order_items
+             (purchase_order_id, restaurant_id, ingredient_id, product_name, quantity, unit, unit_price, total_price)
+           VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
+          [orderId, r.id, ln.name, ln.qty, ln.unit, ln.price, ln.total]
+        );
+      }
+      if (r.id === 2) summary.marie_orders++;
+      else if (r.id === 3) summary.sakura_orders++;
+    });
+  }
+
+  // Bonus: a couple Chez Laurent → Pomona orders so Pomona's portal isn't
+  // empty if a sales demo logs in as the Pomona supplier later.
+  const pomona = get(
+    'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
+    ['Pomona TerreAzur', RID]
+  );
+  if (pomona) {
+    run(
+      `DELETE FROM purchase_order_items
+        WHERE purchase_order_id IN (
+          SELECT id FROM purchase_orders
+           WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?
+        )`,
+      [pomona.id, RID, `${POMONA_REF_PREFIX}%`]
+    );
+    run(
+      'DELETE FROM purchase_orders WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?',
+      [pomona.id, RID, `${POMONA_REF_PREFIX}%`]
+    );
+
+    const pomonaRecipes = [
+      { offsetDays: 5, items: [
+        { name: 'Tomates anciennes',    qty: 8, unit: 'kg', price: 4.80 },
+        { name: 'Roquette',             qty: 1, unit: 'kg', price: 8.50 },
+        { name: 'Basilic frais (botte)', qty: 6, unit: 'botte', price: 1.20 },
+      ] },
+      { offsetDays: 14, items: [
+        { name: 'Asperges vertes',     qty: 4, unit: 'kg', price: 9.50 },
+        { name: 'Fraises gariguette',  qty: 5, unit: 'kg', price: 9.50 },
+        { name: 'Citrons primofiori',  qty: 3, unit: 'kg', price: 2.50 },
+      ] },
+    ];
+    pomonaRecipes.forEach((recipe, i) => {
+      const created = new Date(Date.now() - recipe.offsetDays * 86_400_000);
+      created.setHours(7, 30 + i * 10, 0, 0);
+      const createdSql = created.toISOString().replace('T', ' ').slice(0, 19);
+      const dateTag = createdSql.slice(0, 10).replace(/-/g, '');
+      const ref = `${POMONA_REF_PREFIX}${dateTag}-${String(i + 1).padStart(2, '0')}`;
+      const total_amount = Math.round(recipe.items.reduce((s, it) => s + it.qty * it.price, 0) * 100) / 100;
+      const orderId = run(
+        `INSERT INTO purchase_orders
+           (supplier_id, restaurant_id, reference, status, total_amount, expected_delivery, notes, created_at)
+         VALUES (?, ?, ?, 'livrée', ?, ?, ?, ?)`,
+        [
+          pomona.id, RID, ref, total_amount,
+          new Date(created.getTime() + 86_400_000).toISOString().slice(0, 10),
+          _demoNoteFor(i + 5), createdSql,
+        ]
+      ).lastInsertRowid;
+      for (const it of recipe.items) {
+        run(
+          `INSERT INTO purchase_order_items
+             (purchase_order_id, restaurant_id, ingredient_id, product_name, quantity, unit, unit_price, total_price)
+           VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
+          [orderId, RID, it.name, it.qty, it.unit, it.price, Math.round(it.qty * it.price * 100) / 100]
+        );
+      }
+      summary.pomona_orders++;
+    });
+  }
+
+  return summary;
+}
+
 function ensureSupplierOrders() {
   const metro = get(
     'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
@@ -419,7 +768,7 @@ function ensureSupplierOrders() {
 
       const orderId = insertOrder.run(
         metro.id, RID, ref, status, total_amount,
-        expected, 'Commande démo générée par seed-demo.js', createdSql
+        expected, _demoNoteFor(idx), createdSql
       ).lastInsertRowid;
 
       for (const ln of lines) {
@@ -530,6 +879,7 @@ const existing = get('SELECT id FROM accounts WHERE email = ?', [OWNER_EMAIL]);
 if (existing) {
   const ensured = ensureSupplierDemoLogin();
   const catalog = ensureSupplierCatalogs();
+  const extras = ensureExtraDemoRestaurants();
   const orders = ensureSupplierOrders();
   if (ensured) {
     console.log(`✅ Demo data already present (${OWNER_EMAIL} exists, account id=${existing.id}). Refreshed supplier-portal demo login: ${SUPPLIER_DEMO_EMAIL} / ${SUPPLIER_DEMO_PASSWORD} (PIN ${SUPPLIER_DEMO_PIN}).`);
@@ -541,6 +891,9 @@ if (existing) {
   }
   if (orders.inserted > 0) {
     console.log(`   ↳ Refreshed supplier demo orders: ${orders.inserted} purchase_orders + ${orders.notifs} notifications for Metro Paris Nation.`);
+  }
+  if (extras.restaurants > 0) {
+    console.log(`   ↳ Refreshed extra demo restaurants: ${extras.restaurants} resto + ${extras.marie_orders + extras.sakura_orders} Metro orders + ${extras.pomona_orders} Pomona orders.`);
   }
   process.exit(0);
 }
@@ -675,6 +1028,16 @@ section('Supplier demo orders');
 {
   const o = ensureSupplierOrders();
   log(`${o.inserted} purchase_orders + ${o.notifs} notifications for Metro Paris Nation`);
+}
+
+// ─── 3e. Extra demo restaurants (Marie / Sakura) + Pomona orders ───────────
+// Multi-tenant supplier identity: each restaurant has its own Metro suppliers
+// row keyed on the demo email; the supplier portal uses email-based identity
+// expansion to span all 3 in Mes clients/Historique/Dashboard/Stats.
+section('Extra demo restaurants + cross-tenant orders');
+{
+  const e = ensureExtraDemoRestaurants();
+  log(`${e.restaurants} restaurant(s) · ${e.marie_orders} Marie + ${e.sakura_orders} Sakura Metro orders · ${e.pomona_orders} Chez Laurent → Pomona orders`);
 }
 
 // ─── 4. Ingredients ────────────────────────────────────────────────────────

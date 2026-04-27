@@ -69,6 +69,45 @@ function tokenExpiresAt() {
   return new Date(Date.now() + SUPPLIER_TOKEN_TTL_MS).toISOString();
 }
 
+// ─── Multi-tenant supplier identity expansion ───
+// A supplier_account is bound to ONE (supplier_id, restaurant_id) pair, but in
+// reality a wholesaler like "Metro Paris Nation" serves many restaurants and
+// each restaurant has its own suppliers row. We treat all suppliers rows that
+// share the bound supplier's email as the same vendor identity for READ-ONLY
+// portal views (Mes clients, Historique, Dashboard, Stats, Notifications,
+// /orders, /orders/:id, pending-count). This lets the demo prospect logging
+// in see all 3 demo restaurants. Write endpoints (catalog edit, mercuriale,
+// price-overrides, confirm/refuse, mark-read) stay bound to the single
+// supplier_account so each tenant's edits don't bleed across.
+//
+// The email match is the cheapest + safest key for now. A future real-world
+// rollout should add an explicit `supplier_account_tenants` M:N table.
+function getSupplierIdentities(supplierAccount) {
+  const me = get('SELECT email FROM suppliers WHERE id = ?', [supplierAccount.supplier_id]);
+  if (!me || !me.email) {
+    // Bound supplier has no email → fall back to the single-tenant view.
+    return [{ supplier_id: supplierAccount.supplier_id, restaurant_id: supplierAccount.restaurant_id }];
+  }
+  const rows = all(
+    'SELECT id AS supplier_id, restaurant_id FROM suppliers WHERE email = ?',
+    [me.email]
+  );
+  return rows.length
+    ? rows
+    : [{ supplier_id: supplierAccount.supplier_id, restaurant_id: supplierAccount.restaurant_id }];
+}
+
+// Helper: build a SQL fragment + params that match the (supplier_id,
+// restaurant_id) pairs in the identity list. Pairs are OR-ed:
+//   (po.supplier_id = ? AND po.restaurant_id = ?) OR (...) OR (...)
+function identityWhereClause(identities, supplierCol = 'supplier_id', restaurantCol = 'restaurant_id', tableAlias = '') {
+  const prefix = tableAlias ? `${tableAlias}.` : '';
+  const clauses = identities.map(() => `(${prefix}${supplierCol} = ? AND ${prefix}${restaurantCol} = ?)`);
+  const params = [];
+  for (const i of identities) { params.push(i.supplier_id, i.restaurant_id); }
+  return { sql: clauses.join(' OR '), params };
+}
+
 // ─── Middleware: Authenticate supplier via token ───
 // PENTEST_REPORT A.2 — lookup compares sha256(presented token) against stored
 // token_hash. Legacy access_token column is no longer read.
@@ -646,51 +685,51 @@ router.get('/delivery-notes/:id', requireSupplierAuth, (req, res) => {
 // PURCHASE ORDERS (supplier side — read-only)
 // ═════════════════════════════════════════
 
-// GET /orders — List purchase orders the restaurant has placed with this supplier
+// GET /orders — List purchase orders across the supplier's identity tenants.
 router.get('/orders', requireSupplierAuth, (req, res) => {
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities);
   const orders = all(
-    `SELECT id, reference, status, total_amount, expected_delivery, notes, created_at
-       FROM purchase_orders
-      WHERE supplier_id = ? AND restaurant_id = ?
-      ORDER BY created_at DESC
+    `SELECT po.id, po.reference, po.status, po.total_amount, po.expected_delivery,
+            po.notes, po.created_at, r.name AS restaurant_name
+       FROM purchase_orders po
+       JOIN restaurants r ON r.id = po.restaurant_id
+      WHERE ${identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'po').sql}
+      ORDER BY po.created_at DESC
       LIMIT 100`,
-    [supplierId, rid]
+    identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'po').params
   );
   res.json(orders);
 });
 
-// GET /orders/pending-count — count of orders awaiting confirmation. Used by
-// the Commandes tab badge in the supplier portal nav. MUST be defined before
-// /orders/:id so Express doesn't try to coerce 'pending-count' to an id.
+// GET /orders/pending-count — count of orders awaiting confirmation across
+// the supplier's identity tenants. Drives the Commandes-tab badge.
 router.get('/orders/pending-count', requireSupplierAuth, (req, res) => {
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities);
   const row = get(
     `SELECT COUNT(*) AS c FROM purchase_orders
-      WHERE supplier_id = ? AND restaurant_id = ?
+      WHERE (${w.sql})
         AND status IN ('brouillon', 'envoyée', 'envoyee')`,
-    [supplierId, rid]
+    w.params
   );
   res.json({ count: row.c });
 });
 
-// GET /orders/:id — Order detail with items
+// GET /orders/:id — Order detail. Order must live in one of the identity tenants.
 router.get('/orders/:id', requireSupplierAuth, (req, res) => {
   const id = Number(req.params.id);
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
-
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities);
   const order = get(
-    'SELECT * FROM purchase_orders WHERE id = ? AND supplier_id = ? AND restaurant_id = ?',
-    [id, supplierId, rid]
+    `SELECT * FROM purchase_orders WHERE id = ? AND (${w.sql})`,
+    [id, ...w.params]
   );
   if (!order) return res.status(404).json({ error: 'Commande introuvable' });
 
   const items = all(
     'SELECT id, product_name, quantity, unit, unit_price, total_price, notes FROM purchase_order_items WHERE purchase_order_id = ? AND restaurant_id = ?',
-    [id, rid]
+    [id, order.restaurant_id]
   );
   res.json({ ...order, items });
 });
@@ -699,16 +738,14 @@ router.get('/orders/:id', requireSupplierAuth, (req, res) => {
 // in notes (appended, not overwritten — we want to keep the restaurant's notes).
 router.put('/orders/:id/confirm', requireSupplierAuth, (req, res) => {
   const id = Number(req.params.id);
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities);
   const order = get(
-    'SELECT id, status, notes FROM purchase_orders WHERE id = ? AND supplier_id = ? AND restaurant_id = ?',
-    [id, supplierId, rid]
+    `SELECT id, status, notes, supplier_id, restaurant_id FROM purchase_orders
+      WHERE id = ? AND (${w.sql})`,
+    [id, ...w.params]
   );
   if (!order) return res.status(404).json({ error: 'Commande introuvable' });
-  // Already-confirmed/refused/livrée orders shouldn't be re-confirmed silently.
-  // The supplier portal hides the buttons for these statuses, but be defensive
-  // at the route level too.
   if (['confirmée', 'confirmee', 'livrée', 'livree', 'refusée', 'refusee'].includes(order.status)) {
     return res.status(409).json({ error: 'Cette commande n\'est plus en attente de confirmation', status: order.status });
   }
@@ -718,7 +755,7 @@ router.put('/orders/:id/confirm', requireSupplierAuth, (req, res) => {
     : order.notes;
   run(
     `UPDATE purchase_orders SET status = 'confirmée', notes = ? WHERE id = ? AND supplier_id = ? AND restaurant_id = ?`,
-    [newNotes, id, supplierId, rid]
+    [newNotes, id, order.supplier_id, order.restaurant_id]
   );
   res.json({ success: true, status: 'confirmée' });
 });
@@ -727,11 +764,12 @@ router.put('/orders/:id/confirm', requireSupplierAuth, (req, res) => {
 // client UI prompts for it) but optional at the API level.
 router.put('/orders/:id/refuse', requireSupplierAuth, (req, res) => {
   const id = Number(req.params.id);
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities);
   const order = get(
-    'SELECT id, status, notes FROM purchase_orders WHERE id = ? AND supplier_id = ? AND restaurant_id = ?',
-    [id, supplierId, rid]
+    `SELECT id, status, notes, supplier_id, restaurant_id FROM purchase_orders
+      WHERE id = ? AND (${w.sql})`,
+    [id, ...w.params]
   );
   if (!order) return res.status(404).json({ error: 'Commande introuvable' });
   if (['confirmée', 'confirmee', 'livrée', 'livree', 'refusée', 'refusee'].includes(order.status)) {
@@ -743,7 +781,7 @@ router.put('/orders/:id/refuse', requireSupplierAuth, (req, res) => {
     : order.notes;
   run(
     `UPDATE purchase_orders SET status = 'refusée', notes = ? WHERE id = ? AND supplier_id = ? AND restaurant_id = ?`,
-    [newNotes, id, supplierId, rid]
+    [newNotes, id, order.supplier_id, order.restaurant_id]
   );
   res.json({ success: true, status: 'refusée' });
 });
@@ -752,9 +790,9 @@ router.put('/orders/:id/refuse', requireSupplierAuth, (req, res) => {
 // the BL endpoint (see feedback_pdf_compression_corruption.md).
 router.get('/orders/:id/pdf', requireSupplierAuth, (req, res) => {
   const id = Number(req.params.id);
-  const supplierId = req.supplierAccount.supplier_id;
   const supplierName = req.supplierAccount.supplier_name;
-  const rid = req.supplierAccount.restaurant_id;
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'po');
 
   const order = get(
     `SELECT po.*, r.name AS restaurant_name, r.address AS restaurant_address,
@@ -762,16 +800,14 @@ router.get('/orders/:id/pdf', requireSupplierAuth, (req, res) => {
             r.phone AS restaurant_phone
        FROM purchase_orders po
        JOIN restaurants r ON r.id = po.restaurant_id
-      WHERE po.id = ? AND po.supplier_id = ? AND po.restaurant_id = ?`,
-    [id, supplierId, rid]
+      WHERE po.id = ? AND (${w.sql})`,
+    [id, ...w.params]
   );
   if (!order) return res.status(404).json({ error: 'Commande introuvable' });
 
-  // Enrich items with SKU + TVA from supplier_catalog. LEFT JOIN by lower(name)
-  // so unmatched rows still render (with default 5.5% TVA). We use supplierId
-  // and rid as parameters rather than re-joining purchase_orders — the order's
-  // tenancy was already verified above and re-deriving it via JOIN is brittle
-  // (better-sqlite3 rejects forward references inside LEFT JOIN ON clauses).
+  // The order's own tenant drives the catalog enrichment — each tenant has
+  // its own SKU/TVA per row, so we use order.supplier_id / order.restaurant_id
+  // (not the logged-in supplier_account's bound tuple).
   const items = all(
     `SELECT poi.id, poi.product_name, poi.quantity, poi.unit, poi.unit_price, poi.total_price,
             sc.sku, sc.tva_rate
@@ -781,7 +817,7 @@ router.get('/orders/:id/pdf', requireSupplierAuth, (req, res) => {
              AND sc.supplier_id = ?
              AND sc.restaurant_id = ?
       WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,
-    [supplierId, rid, id, rid]
+    [order.supplier_id, order.restaurant_id, id, order.restaurant_id]
   );
 
   // Per-line TVA → aggregate into HT/TVA/TTC totals.
@@ -1135,13 +1171,10 @@ router.post('/save-mercuriale', requireSupplierAuth, express.json({ limit: '5mb'
 // month / lifetime), active clients (≥1 order in last 30 days), 5 most recent
 // orders, and pending-confirmation alerts (status='brouillon' or 'envoyée').
 router.get('/dashboard', requireSupplierAuth, (req, res) => {
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities);
+  const wPo = identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'po');
 
-  // The supplier portal is currently restaurant-scoped (one supplier_account
-  // belongs to ONE restaurant) — the restaurant_id filter both keeps the
-  // tenant isolation guarantee AND limits the figures to the data the
-  // supplier can see in /orders.
   const totals = get(
     `SELECT
        COALESCE(SUM(total_amount), 0)               AS revenue_total,
@@ -1149,16 +1182,16 @@ router.get('/dashboard', requireSupplierAuth, (req, res) => {
        COALESCE(SUM(CASE WHEN strftime('%Y-%m', created_at) = strftime('%Y-%m','now') THEN 1 ELSE 0 END), 0) AS orders_this_month,
        COALESCE(SUM(CASE WHEN strftime('%Y-%m', created_at) = strftime('%Y-%m','now') THEN total_amount ELSE 0 END), 0) AS revenue_this_month
      FROM purchase_orders
-     WHERE supplier_id = ? AND restaurant_id = ?`,
-    [supplierId, rid]
+     WHERE ${w.sql}`,
+    w.params
   );
 
   const activeClients = get(
     `SELECT COUNT(DISTINCT restaurant_id) AS c
        FROM purchase_orders
-      WHERE supplier_id = ? AND restaurant_id = ?
+      WHERE (${w.sql})
         AND created_at >= datetime('now', '-30 days')`,
-    [supplierId, rid]
+    w.params
   );
 
   const recentOrders = all(
@@ -1166,10 +1199,10 @@ router.get('/dashboard', requireSupplierAuth, (req, res) => {
             r.name AS restaurant_name
        FROM purchase_orders po
        JOIN restaurants r ON r.id = po.restaurant_id
-      WHERE po.supplier_id = ? AND po.restaurant_id = ?
+      WHERE ${wPo.sql}
       ORDER BY po.created_at DESC
       LIMIT 5`,
-    [supplierId, rid]
+    wPo.params
   );
 
   // 'brouillon' = restaurant draft, 'envoyée' = sent and waiting for supplier
@@ -1179,11 +1212,11 @@ router.get('/dashboard', requireSupplierAuth, (req, res) => {
             r.name AS restaurant_name
        FROM purchase_orders po
        JOIN restaurants r ON r.id = po.restaurant_id
-      WHERE po.supplier_id = ? AND po.restaurant_id = ?
+      WHERE (${wPo.sql})
         AND po.status IN ('brouillon', 'envoyée', 'envoyee')
       ORDER BY po.created_at DESC
       LIMIT 20`,
-    [supplierId, rid]
+    wPo.params
   );
 
   res.json({
@@ -1202,12 +1235,14 @@ router.get('/dashboard', requireSupplierAuth, (req, res) => {
 // ═════════════════════════════════════════
 
 router.get('/clients', requireSupplierAuth, (req, res) => {
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
+  // Aggregate per restaurant across every (supplier_id, restaurant_id) pair
+  // owned by this vendor identity. Each restaurant only matches its own
+  // supplier_id pair, so order counts/revenue stay tenant-clean.
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const restaurantIds = identities.map(i => i.restaurant_id);
+  const placeholders = restaurantIds.map(() => '?').join(',');
+  const w = identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'po');
 
-  // Aggregate per restaurant: orders count, last order date, average order
-  // value, and total revenue. Restricted to the supplier's tenant (rid) — a
-  // future multi-restaurant supplier_account model would relax this.
   const clients = all(
     `SELECT r.id          AS restaurant_id,
             r.name        AS restaurant_name,
@@ -1219,26 +1254,29 @@ router.get('/clients', requireSupplierAuth, (req, res) => {
             COALESCE(AVG(po.total_amount), 0)                  AS avg_order_value
        FROM restaurants r
        LEFT JOIN purchase_orders po
-              ON po.restaurant_id = r.id AND po.supplier_id = ?
-      WHERE r.id = ?
+              ON po.restaurant_id = r.id AND (${w.sql})
+      WHERE r.id IN (${placeholders})
    GROUP BY r.id
    ORDER BY orders_count DESC, r.name ASC`,
-    [supplierId, rid]
+    [...w.params, ...restaurantIds]
   );
 
   res.json(clients);
 });
 
 router.get('/clients/:restaurantId', requireSupplierAuth, (req, res) => {
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
   const requestedRid = Number(req.params.restaurantId);
-  // Suppliers can only inspect THEIR restaurant's drill-in. Cross-tenant
-  // access returns 404 (not 403) to hide existence.
-  if (requestedRid !== rid) return res.status(404).json({ error: 'Restaurant introuvable' });
+  const identities = getSupplierIdentities(req.supplierAccount);
+  // Find the (supplier_id, restaurant_id) tuple matching the requested rid.
+  // If no identity owns this restaurant, return 404 (existence-hide).
+  const match = identities.find(i => i.restaurant_id === requestedRid);
+  if (!match) return res.status(404).json({ error: 'Restaurant introuvable' });
 
-  const restaurant = get('SELECT id, name, city, phone, address FROM restaurants WHERE id = ?', [rid]);
+  const restaurant = get('SELECT id, name, city, phone, address FROM restaurants WHERE id = ?', [requestedRid]);
   if (!restaurant) return res.status(404).json({ error: 'Restaurant introuvable' });
+
+  const supplierId = match.supplier_id;
+  const rid = match.restaurant_id;
 
   const orders = all(
     `SELECT po.id, po.reference, po.status, po.total_amount, po.created_at, po.expected_delivery
@@ -1249,8 +1287,6 @@ router.get('/clients/:restaurantId', requireSupplierAuth, (req, res) => {
     [supplierId, rid]
   );
 
-  // "Favorite products" = top 5 by quantity ordered across this client's
-  // history with this supplier. Joined back to purchase_order_items.
   const favorites = all(
     `SELECT poi.product_name,
             SUM(poi.quantity)    AS total_quantity,
@@ -1265,9 +1301,6 @@ router.get('/clients/:restaurantId', requireSupplierAuth, (req, res) => {
     [supplierId, rid]
   );
 
-  // Order frequency = average days between consecutive orders. SQLite has no
-  // window functions in older versions but better-sqlite3 ships modern SQLite,
-  // so LAG works. Fall back gracefully when there are <2 orders.
   let frequencyDays = null;
   if (orders.length >= 2) {
     const first = new Date(orders[orders.length - 1].created_at).getTime();
@@ -1297,11 +1330,13 @@ router.get('/clients/:restaurantId', requireSupplierAuth, (req, res) => {
 });
 
 router.get('/clients/:restaurantId/orders/:orderId', requireSupplierAuth, (req, res) => {
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
   const requestedRid = Number(req.params.restaurantId);
   const orderId = Number(req.params.orderId);
-  if (requestedRid !== rid) return res.status(404).json({ error: 'Commande introuvable' });
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const match = identities.find(i => i.restaurant_id === requestedRid);
+  if (!match) return res.status(404).json({ error: 'Commande introuvable' });
+  const supplierId = match.supplier_id;
+  const rid = match.restaurant_id;
 
   const order = get(
     `SELECT po.*, r.name AS restaurant_name
@@ -1330,48 +1365,48 @@ router.get('/clients/:restaurantId/orders/:orderId', requireSupplierAuth, (req, 
 // to avoid collision and keep auth middleware split.
 
 router.get('/notifications/me', requireSupplierAuth, (req, res) => {
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'sn');
   const notifs = all(
     `SELECT sn.*, r.name AS restaurant_name
        FROM supplier_notifications sn
        LEFT JOIN restaurants r ON r.id = sn.restaurant_id
-      WHERE sn.supplier_id = ? AND sn.restaurant_id = ?
+      WHERE ${w.sql}
       ORDER BY sn.created_at DESC
       LIMIT 100`,
-    [supplierId, rid]
+    w.params
   );
   res.json(notifs);
 });
 
 router.get('/notifications/me/unread-count', requireSupplierAuth, (req, res) => {
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities);
   const row = get(
-    'SELECT COUNT(*) AS c FROM supplier_notifications WHERE supplier_id = ? AND restaurant_id = ? AND read = 0',
-    [supplierId, rid]
+    `SELECT COUNT(*) AS c FROM supplier_notifications WHERE (${w.sql}) AND read = 0`,
+    w.params
   );
   res.json({ count: row.c });
 });
 
 router.put('/notifications/me/:id/read', requireSupplierAuth, (req, res) => {
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
   const id = Number(req.params.id);
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities);
   const result = run(
-    'UPDATE supplier_notifications SET read = 1 WHERE id = ? AND supplier_id = ? AND restaurant_id = ?',
-    [id, supplierId, rid]
+    `UPDATE supplier_notifications SET read = 1 WHERE id = ? AND (${w.sql})`,
+    [id, ...w.params]
   );
   if (result.changes === 0) return res.status(404).json({ error: 'Notification introuvable' });
   res.json({ success: true });
 });
 
 router.put('/notifications/me/read-all', requireSupplierAuth, (req, res) => {
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities);
   run(
-    'UPDATE supplier_notifications SET read = 1 WHERE supplier_id = ? AND restaurant_id = ? AND read = 0',
-    [supplierId, rid]
+    `UPDATE supplier_notifications SET read = 1 WHERE (${w.sql}) AND read = 0`,
+    w.params
   );
   res.json({ success: true });
 });
@@ -1384,20 +1419,21 @@ router.put('/notifications/me/read-all', requireSupplierAuth, (req, res) => {
 // but the supplier portal client now reads from /historique. Both name and
 // purpose have changed enough to keep them separate.
 router.get('/historique', requireSupplierAuth, (req, res) => {
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
-  const { from, to, restaurant_id, status } = req.query;
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const { from, to, restaurant_id, status, q } = req.query;
 
-  const params = [supplierId, rid];
-  let where = 'po.supplier_id = ? AND po.restaurant_id = ?';
-  if (restaurant_id) {
-    // Cross-tenant filter has no effect: the supplier_account is already
-    // tenant-bound. We still accept it for forward-compat with multi-tenant
-    // supplier accounts and silently coerce to the bound tenant.
-    if (Number(restaurant_id) !== rid) {
-      return res.json({ orders: [], totals: { count: 0, revenue_ht: 0 } });
-    }
+  // restaurant_id filter must intersect the identity set; if it doesn't, the
+  // result is empty (cross-tenant existence-hide).
+  const requestedRid = restaurant_id ? Number(restaurant_id) : null;
+  const filteredIdentities = requestedRid
+    ? identities.filter(i => i.restaurant_id === requestedRid)
+    : identities;
+  if (!filteredIdentities.length) {
+    return res.json({ orders: [], totals: { count: 0, revenue_ht: 0 } });
   }
+  const w = identityWhereClause(filteredIdentities, 'supplier_id', 'restaurant_id', 'po');
+  const params = [...w.params];
+  let where = `(${w.sql})`;
   if (from) { where += ' AND date(po.created_at) >= date(?)'; params.push(String(from)); }
   if (to)   { where += ' AND date(po.created_at) <= date(?)'; params.push(String(to)); }
   if (status && status !== 'all') {
@@ -1419,6 +1455,12 @@ router.get('/historique', requireSupplierAuth, (req, res) => {
     const variants = STATUS_VARIANTS[status] || [String(status)];
     where += ` AND po.status IN (${variants.map(() => '?').join(',')})`;
     params.push(...variants);
+  }
+  // Reference number search. Case-insensitive partial match — restaurants
+  // typically search "DEMO-PO-005" or "PO-2026" with the prefix only.
+  if (q && String(q).trim()) {
+    where += ' AND LOWER(po.reference) LIKE LOWER(?)';
+    params.push(`%${String(q).trim()}%`);
   }
 
   const orders = all(
@@ -1449,11 +1491,10 @@ router.get('/historique', requireSupplierAuth, (req, res) => {
 // computed off purchase_orders + purchase_order_items, scoped to (supplier_id,
 // restaurant_id) so cross-tenant data never leaks.
 router.get('/stats', requireSupplierAuth, (req, res) => {
-  const supplierId = req.supplierAccount.supplier_id;
-  const rid = req.supplierAccount.restaurant_id;
+  const identities = getSupplierIdentities(req.supplierAccount);
+  const w = identityWhereClause(identities);
+  const wPo = identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'po');
 
-  // Top 10 by revenue contribution (total_price aggregated). Ties resolved by
-  // total quantity ordered, then product_name alphabetical.
   const topProducts = all(
     `SELECT poi.product_name,
             SUM(poi.total_price) AS revenue,
@@ -1461,44 +1502,47 @@ router.get('/stats', requireSupplierAuth, (req, res) => {
             COUNT(DISTINCT po.id) AS times_ordered
        FROM purchase_order_items poi
        JOIN purchase_orders po ON po.id = poi.purchase_order_id
-      WHERE po.supplier_id = ? AND po.restaurant_id = ?
+      WHERE ${wPo.sql}
    GROUP BY poi.product_name
    ORDER BY revenue DESC, quantity DESC, poi.product_name ASC
       LIMIT 10`,
-    [supplierId, rid]
+    wPo.params
   );
 
-  // Revenue by month, last 12 months. Months with zero revenue are filled in
-  // client-side; here we only return the months that actually had orders.
   const revenueByMonth = all(
     `SELECT strftime('%Y-%m', created_at) AS month,
             COALESCE(SUM(total_amount), 0) AS revenue,
             COUNT(*) AS orders_count
        FROM purchase_orders
-      WHERE supplier_id = ? AND restaurant_id = ?
+      WHERE (${w.sql})
         AND created_at >= date('now', '-12 months')
    GROUP BY month
    ORDER BY month ASC`,
-    [supplierId, rid]
+    w.params
   );
 
-  // Revenue by catalog category. We attempt a name-match between
-  // purchase_order_items.product_name and supplier_catalog.product_name
-  // (case-insensitive). Items with no catalog match fall under 'Autre'.
+  // Revenue by catalog category. better-sqlite3 rejects forward-referenced
+  // aliases inside LEFT JOIN ON clauses (see feedback memory) — so we don't
+  // try to JOIN supplier_catalog by po.supplier_id inside the LEFT JOIN. We
+  // accept best-effort categorization: any catalog row across the identity
+  // tenants matching the product name supplies the category. Cross-tenant
+  // category-of-product ambiguity is unlikely (Metro's "Tomate" is "Tomate"
+  // in every tenant we control).
   const revenueByCategory = all(
-    `SELECT COALESCE(sc.category, 'Autre') AS category,
-            COALESCE(SUM(poi.total_price), 0) AS revenue,
-            SUM(poi.quantity) AS quantity
+    `SELECT COALESCE((
+              SELECT category FROM supplier_catalog sc
+               WHERE LOWER(sc.product_name) = LOWER(poi.product_name)
+                 AND (${identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'sc').sql})
+               LIMIT 1
+            ), 'Autre') AS category,
+            SUM(poi.total_price) AS revenue,
+            SUM(poi.quantity)    AS quantity
        FROM purchase_order_items poi
        JOIN purchase_orders po ON po.id = poi.purchase_order_id
-       LEFT JOIN supplier_catalog sc
-              ON LOWER(sc.product_name) = LOWER(poi.product_name)
-             AND sc.supplier_id = po.supplier_id
-             AND sc.restaurant_id = po.restaurant_id
-      WHERE po.supplier_id = ? AND po.restaurant_id = ?
+      WHERE ${wPo.sql}
    GROUP BY category
    ORDER BY revenue DESC`,
-    [supplierId, rid]
+    [...identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'sc').params, ...wPo.params]
   );
 
   res.json({ top_products: topProducts, revenue_by_month: revenueByMonth, revenue_by_category: revenueByCategory });

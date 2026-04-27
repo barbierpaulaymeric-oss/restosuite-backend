@@ -591,12 +591,13 @@ const API = {
     return this.supplierRequest('/notifications/me/read-all', { method: 'PUT' });
   },
   // ─── Supplier portal v3: historique / stats / price overrides ───
-  getSupplierHistorique({ from, to, restaurant_id, status } = {}) {
+  getSupplierHistorique({ from, to, restaurant_id, status, q } = {}) {
     const qs = new URLSearchParams();
     if (from) qs.set('from', from);
     if (to) qs.set('to', to);
     if (restaurant_id) qs.set('restaurant_id', restaurant_id);
     if (status && status !== 'all') qs.set('status', status);
+    if (q && String(q).trim()) qs.set('q', String(q).trim());
     const suffix = qs.toString() ? `?${qs}` : '';
     return this.supplierRequest(`/historique${suffix}`);
   },

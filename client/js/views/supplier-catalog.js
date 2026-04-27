@@ -783,8 +783,8 @@ async function renderSupplierHistoryTab() {
   const content = document.getElementById('supplier-content');
   if (!content) return;
 
-  // Default range: last 90 days + status='all'. Stored at module scope so
-  // re-rendering (filter change) keeps the user's selection.
+  // Default range: last 90 days + status='all' + q=''. Stored at module scope
+  // so re-rendering (filter change) keeps the user's selection.
   if (!_historiqueState) {
     const today = new Date();
     const from = new Date(today.getTime() - 90 * 86400_000);
@@ -793,8 +793,12 @@ async function renderSupplierHistoryTab() {
       to: today.toISOString().slice(0, 10),
       restaurantId: '',
       status: 'all',
+      q: '',
     };
   }
+  // Cache last fetched orders for the CSV export — avoids a re-fetch when
+  // the user clicks "Exporter CSV" right after applying a filter.
+  _historiqueLastOrders = _historiqueLastOrders || [];
 
   // Chip status keys map 1:1 to ?status= server values; the server accepts
   // both accented + unaccented spellings (see /historique tests).
@@ -810,6 +814,9 @@ async function renderSupplierHistoryTab() {
   content.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
       <h2 style="margin:0;font-size:var(--text-xl)">Historique des commandes</h2>
+      <button class="btn btn-secondary btn-sm" id="historique-csv">
+        <i data-lucide="download" style="width:16px;height:16px"></i> Exporter CSV
+      </button>
     </div>
     <div class="historique-toolbar">
       <label>
@@ -825,6 +832,12 @@ async function renderSupplierHistoryTab() {
         <select id="historique-restaurant" class="form-control">
           <option value="">Tous</option>
         </select>
+      </label>
+      <label style="flex:1;min-width:180px">
+        <span class="text-secondary text-sm">Référence</span>
+        <input type="search" id="historique-q" class="form-control"
+               placeholder="ex: DEMO-PO-005"
+               value="${escapeHtml(_historiqueState.q || '')}">
       </label>
       <div class="historique-totals" id="historique-totals"></div>
     </div>
@@ -877,10 +890,72 @@ async function renderSupplierHistoryTab() {
     });
   });
 
+  // Debounce the reference search so we don't fire a request per keystroke.
+  let _historiqueQTimer = null;
+  document.getElementById('historique-q').addEventListener('input', (e) => {
+    _historiqueState.q = e.target.value;
+    clearTimeout(_historiqueQTimer);
+    _historiqueQTimer = setTimeout(_loadHistorique, 250);
+  });
+
+  document.getElementById('historique-csv').addEventListener('click', _exportHistoriqueCsv);
+
   _loadHistorique();
 }
 
+// CSV export of the LAST loaded historique result. Same UTF-8 BOM + quoted-cell
+// pattern as the catalog CSV export. Columns: Date / Référence / Restaurant /
+// Statut / Montant HT / TVA / Montant TTC. TVA is approximated at 5.5%
+// (food default) — mixed-rate baskets will be slightly off, mirroring the
+// table view in the historique tab.
+function _exportHistoriqueCsv() {
+  if (!_historiqueLastOrders || !_historiqueLastOrders.length) {
+    showToast('Aucune commande à exporter sur la période sélectionnée', 'warning');
+    return;
+  }
+  const header = ['Date', 'Référence', 'Restaurant', 'Statut', 'Montant HT (€)', 'TVA (€)', 'Montant TTC (€)'];
+  const escapeCsv = (val) => {
+    if (val == null) return '""';
+    const s = String(val).replace(/"/g, '""');
+    return `"${s}"`;
+  };
+  const fmtDate = (s) => {
+    if (!s) return '';
+    const d = new Date(s);
+    return Number.isNaN(d.getTime())
+      ? String(s)
+      : d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+  const lines = [header.map(escapeCsv).join(',')];
+  for (const o of _historiqueLastOrders) {
+    const ht = Number(o.total_amount) || 0;
+    const tva = Math.round(ht * 0.055 * 100) / 100;
+    const ttc = Math.round((ht + tva) * 100) / 100;
+    lines.push([
+      fmtDate(o.created_at),
+      o.reference || '',
+      o.restaurant_name || '',
+      o.status || '',
+      ht.toFixed(2),
+      tva.toFixed(2),
+      ttc.toFixed(2),
+    ].map(escapeCsv).join(','));
+  }
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.download = `historique-${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast(`${_historiqueLastOrders.length} commandes exportées`, 'success');
+}
+
 let _historiqueState = null;
+let _historiqueLastOrders = null;
 
 async function _loadHistorique() {
   const body = document.getElementById('historique-body');
@@ -894,7 +969,9 @@ async function _loadHistorique() {
       to: _historiqueState.to,
       restaurant_id: _historiqueState.restaurantId || undefined,
       status: _historiqueState.status,
+      q: _historiqueState.q || undefined,
     });
+    _historiqueLastOrders = data.orders || [];
   } catch (e) {
     body.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
     return;
