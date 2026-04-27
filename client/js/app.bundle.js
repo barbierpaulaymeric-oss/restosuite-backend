@@ -640,6 +640,32 @@ const API = {
   markAllSupplierMyNotificationsRead() {
     return this.supplierRequest("/notifications/me/read-all", { method: "PUT" });
   },
+  // ─── Supplier portal v3: historique / stats / price overrides ───
+  getSupplierHistorique({ from, to, restaurant_id } = {}) {
+    const qs = new URLSearchParams();
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
+    if (restaurant_id) qs.set("restaurant_id", restaurant_id);
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return this.supplierRequest(`/historique${suffix}`);
+  },
+  getSupplierStats() {
+    return this.supplierRequest("/stats");
+  },
+  getSupplierClientCatalog(restaurantId) {
+    return this.supplierRequest(`/clients/${restaurantId}/catalog`);
+  },
+  setSupplierClientPriceOverride(restaurantId, catalogId, price, notes) {
+    return this.supplierRequest(`/clients/${restaurantId}/price-overrides/${catalogId}`, {
+      method: "PUT",
+      body: { price, notes: notes || null }
+    });
+  },
+  clearSupplierClientPriceOverride(restaurantId, catalogId) {
+    return this.supplierRequest(`/clients/${restaurantId}/price-overrides/${catalogId}`, {
+      method: "DELETE"
+    });
+  },
   // PDF download: fetch as blob (so the X-Supplier-Token header travels in the
   // request properly — `<a href>` can't carry custom headers and we don't want
   // the token in URL/referer logs). Caller hands the returned blob to a
@@ -18748,6 +18774,9 @@ function bootSupplierApp(session) {
         <button class="supplier-nav__tab" data-tab="history">
           <i data-lucide="history" style="width:18px;height:18px"></i> Historique
         </button>
+        <button class="supplier-nav__tab" data-tab="notifications">
+          <i data-lucide="bell" style="width:18px;height:18px"></i> Notifications
+        </button>
       </nav>
       <main class="supplier-main" id="supplier-content"></main>
     </div>
@@ -18778,7 +18807,12 @@ function bootSupplierApp(session) {
           });
         }
       } else if (t === "deliveries") renderSupplierDeliveriesTab();
-      else renderSupplierHistoryTab();
+      else if (t === "history") renderSupplierHistoryTab();
+      else if (t === "notifications") {
+        if (typeof renderSupplierNotificationsTab === "function") {
+          renderSupplierNotificationsTab();
+        }
+      }
     });
   });
   renderSupplierDashboardTab();
@@ -18829,6 +18863,9 @@ async function renderSupplierCatalogTab() {
     <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
       <h2 style="margin:0;font-size:var(--text-xl)">Mon catalogue</h2>
       <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+        <button class="btn btn-secondary" id="btn-export-csv" title="Exporter le catalogue au format CSV">
+          <i data-lucide="download" style="width:18px;height:18px"></i> Exporter CSV
+        </button>
         <button class="btn btn-secondary" id="btn-import-mercuriale">
           <i data-lucide="file-up" style="width:18px;height:18px"></i> Importer ma mercuriale
         </button>
@@ -18848,6 +18885,7 @@ async function renderSupplierCatalogTab() {
       showSupplierMercurialeImport();
     }
   });
+  document.getElementById("btn-export-csv").addEventListener("click", _exportSupplierCatalogCsv);
   try {
     const catalog = await API.getSupplierCatalog();
     _supplierCatalogState.catalog = catalog;
@@ -19020,6 +19058,9 @@ function _supplierProductCardHtml(p) {
           <input type="checkbox" ${p.available ? "checked" : ""} data-toggle-id="${p.id}">
           <span class="supplier-toggle__slider"></span>
         </label>
+        <button class="btn-icon supplier-product-card__edit" aria-label="Modifier le produit" data-edit-id="${p.id}" title="Modifier">
+          <i data-lucide="pencil" style="width:16px;height:16px"></i>
+        </button>
         <button class="btn-icon supplier-product-card__delete" aria-label="Supprimer le produit" data-delete-id="${p.id}" data-delete-name="${escapeHtml(p.product_name)}" title="Supprimer">
           <i data-lucide="trash-2" style="width:16px;height:16px"></i>
         </button>
@@ -19054,6 +19095,13 @@ function _wireSupplierCatalogCardEvents(listEl) {
       }
     });
   });
+  listEl.querySelectorAll("[data-edit-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = Number(btn.dataset.editId);
+      const product = _supplierCatalogState.catalog.find((p) => p.id === id);
+      if (product) showEditProductModal(product);
+    });
+  });
   listEl.querySelectorAll("[data-delete-id]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.dataset.deleteId;
@@ -19069,6 +19117,153 @@ function _wireSupplierCatalogCardEvents(listEl) {
       }, { confirmText: "Retirer", confirmClass: "btn btn-danger" });
     });
   });
+}
+function showEditProductModal(product) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  const UNIT_OPTS = ["kg", "L", "pi\xE8ce", "botte", "barquette", "carton", "sac", "bouteille", "f\xFBt", "lot", "plateau"];
+  if (product.unit && !UNIT_OPTS.includes(product.unit)) UNIT_OPTS.push(product.unit);
+  const TVA_OPTS = [5.5, 10, 20];
+  const tvaCurrent = product.tva_rate != null ? Number(product.tva_rate) : 5.5;
+  if (!TVA_OPTS.includes(tvaCurrent)) TVA_OPTS.push(tvaCurrent);
+  overlay.innerHTML = `
+    <div class="modal">
+      <h2>Modifier le produit</h2>
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Nom du produit</label>
+          <input type="text" class="form-control" id="me-name" value="${escapeHtml(product.product_name || "")}">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>SKU</label>
+          <input type="text" class="form-control" id="me-sku" value="${escapeHtml(product.sku || "")}" placeholder="ex: MET-LEG-042" maxlength="64">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Cat\xE9gorie</label>
+        <input type="text" class="form-control" id="me-category" value="${escapeHtml(product.category || "")}">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Prix HT (\u20AC)</label>
+          <input type="number" class="form-control" id="me-price" step="0.01" min="0" value="${Number(product.price || 0).toFixed(2)}" style="font-family:var(--font-mono)">
+        </div>
+        <div class="form-group">
+          <label>Unit\xE9</label>
+          <select class="form-control" id="me-unit">
+            ${UNIT_OPTS.map((u) => `<option value="${escapeHtml(u)}" ${u === product.unit ? "selected" : ""}>${escapeHtml(u)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>TVA (%)</label>
+          <select class="form-control" id="me-tva">
+            ${TVA_OPTS.sort((a, b) => a - b).map((t) => `<option value="${t}" ${t === tvaCurrent ? "selected" : ""}>${t} %</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Conditionnement</label>
+          <input type="text" class="form-control" id="me-pkg" value="${escapeHtml(product.packaging || "")}" placeholder="ex: Carton 5 kg" maxlength="80">
+        </div>
+        <div class="form-group">
+          <label>Commande min</label>
+          <input type="number" class="form-control" id="me-min" step="0.1" min="0" value="${Number(product.min_order || 0)}">
+        </div>
+      </div>
+      <div class="actions-row">
+        <button class="btn btn-primary" id="me-save" style="background:#4A90D9;border-color:#4A90D9">
+          <i data-lucide="check" style="width:18px;height:18px"></i> Enregistrer
+        </button>
+        <button class="btn btn-secondary" id="me-cancel">Annuler</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  const close = () => overlay.remove();
+  overlay.querySelector("#me-cancel").onclick = close;
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close();
+  });
+  overlay.querySelector("#me-save").onclick = async () => {
+    const name = document.getElementById("me-name").value.trim();
+    const category = document.getElementById("me-category").value.trim();
+    const price = parseFloat(document.getElementById("me-price").value);
+    const unit = document.getElementById("me-unit").value;
+    const min_order = parseFloat(document.getElementById("me-min").value) || 0;
+    const sku = document.getElementById("me-sku").value.trim();
+    const packaging = document.getElementById("me-pkg").value.trim();
+    const tva_rate = parseFloat(document.getElementById("me-tva").value);
+    if (!name) {
+      showToast("Nom du produit requis", "error");
+      return;
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      showToast("Prix invalide", "error");
+      return;
+    }
+    try {
+      await API.updateSupplierProduct(product.id, {
+        product_name: name,
+        category: category || null,
+        price,
+        unit,
+        min_order,
+        sku: sku || null,
+        tva_rate: Number.isFinite(tva_rate) ? tva_rate : 5.5,
+        packaging: packaging || null
+      });
+      showToast("Produit mis \xE0 jour", "success");
+      close();
+      renderSupplierCatalogTab();
+    } catch (e) {
+      showToast(e.message || "Erreur de sauvegarde", "error");
+    }
+  };
+  document.getElementById("me-name").focus();
+}
+function _exportSupplierCatalogCsv() {
+  const rows = _supplierCatalogState.catalog;
+  if (!rows.length) {
+    showToast("Catalogue vide \u2014 rien \xE0 exporter", "warning");
+    return;
+  }
+  const header = ["Nom", "SKU", "Cat\xE9gorie", "Unit\xE9", "Conditionnement", "Prix HT (\u20AC)", "TVA (%)", "Prix TTC (\u20AC)", "Commande min", "Disponible", "Derni\xE8re M\xE0J"];
+  const escapeCsv = (val) => {
+    if (val == null) return '""';
+    const s = String(val).replace(/"/g, '""');
+    return `"${s}"`;
+  };
+  const lines = [header.map(escapeCsv).join(",")];
+  for (const p of rows) {
+    const tva = p.tva_rate != null ? Number(p.tva_rate) : 5.5;
+    const ttc = (Number(p.price) || 0) * (1 + tva / 100);
+    lines.push([
+      p.product_name || "",
+      p.sku || "",
+      p.category || "",
+      p.unit || "",
+      p.packaging || "",
+      (Number(p.price) || 0).toFixed(2),
+      tva,
+      ttc.toFixed(2),
+      Number(p.min_order || 0),
+      p.available ? "Oui" : "Non",
+      p.updated_at || ""
+    ].map(escapeCsv).join(","));
+  }
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  a.download = `catalogue-${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1e3);
+  showToast(`${rows.length} produits export\xE9s`, "success");
 }
 function _startInlineSkuEdit(skuEl, id, currentSku) {
   const input = document.createElement("input");
@@ -19267,69 +19462,146 @@ function showAddProductModal() {
 async function renderSupplierHistoryTab() {
   const content = document.getElementById("supplier-content");
   if (!content) return;
+  if (!_historiqueState) {
+    const today = /* @__PURE__ */ new Date();
+    const from = new Date(today.getTime() - 90 * 864e5);
+    _historiqueState = {
+      from: from.toISOString().slice(0, 10),
+      to: today.toISOString().slice(0, 10),
+      restaurantId: ""
+    };
+  }
   content.innerHTML = `
-    <h2 style="margin:0 0 var(--space-4);font-size:var(--text-xl)">Historique des modifications</h2>
-    <div id="supplier-history-list"><div class="loading"><div class="spinner"></div></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
+      <h2 style="margin:0;font-size:var(--text-xl)">Historique des commandes</h2>
+    </div>
+    <div class="historique-toolbar">
+      <label>
+        <span class="text-secondary text-sm">Du</span>
+        <input type="date" id="historique-from" class="form-control" value="${_historiqueState.from}">
+      </label>
+      <label>
+        <span class="text-secondary text-sm">Au</span>
+        <input type="date" id="historique-to" class="form-control" value="${_historiqueState.to}">
+      </label>
+      <label>
+        <span class="text-secondary text-sm">Client</span>
+        <select id="historique-restaurant" class="form-control">
+          <option value="">Tous</option>
+        </select>
+      </label>
+      <div class="historique-totals" id="historique-totals"></div>
+    </div>
+    <div id="historique-body"><div class="loading"><div class="spinner"></div></div></div>
   `;
   try {
-    const history2 = await API.getSupplierHistory();
-    const listEl = document.getElementById("supplier-history-list");
-    if (history2.length === 0) {
-      listEl.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon"><i data-lucide="clock"></i></div>
-          <p>Aucune modification pour le moment</p>
-        </div>
-      `;
-      if (window.lucide) lucide.createIcons();
-      return;
+    const clients = await API.getSupplierClients();
+    const sel = document.getElementById("historique-restaurant");
+    for (const c of clients) {
+      const opt = document.createElement("option");
+      opt.value = c.restaurant_id;
+      opt.textContent = c.restaurant_name || `#${c.restaurant_id}`;
+      if (String(c.restaurant_id) === String(_historiqueState.restaurantId)) opt.selected = true;
+      sel.appendChild(opt);
     }
-    listEl.innerHTML = history2.map((h) => `
-      <div class="notification-item" style="margin-bottom:var(--space-2)">
-        <div class="notification-icon">${getHistoryIcon(h.change_type)}</div>
-        <div class="notification-content">
-          <strong>${escapeHtml(h.product_name)}</strong>
-          <br><span class="text-secondary text-sm">${getHistoryLabel(h)}</span>
-        </div>
-        <span class="text-tertiary text-sm">${formatDateShort(h.created_at)}</span>
-      </div>
-    `).join("");
+  } catch (_) {
+  }
+  document.getElementById("historique-from").addEventListener("change", (e) => {
+    _historiqueState.from = e.target.value;
+    _loadHistorique();
+  });
+  document.getElementById("historique-to").addEventListener("change", (e) => {
+    _historiqueState.to = e.target.value;
+    _loadHistorique();
+  });
+  document.getElementById("historique-restaurant").addEventListener("change", (e) => {
+    _historiqueState.restaurantId = e.target.value;
+    _loadHistorique();
+  });
+  _loadHistorique();
+}
+let _historiqueState = null;
+async function _loadHistorique() {
+  const body = document.getElementById("historique-body");
+  const totalsEl = document.getElementById("historique-totals");
+  if (!body) return;
+  body.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  let data;
+  try {
+    data = await API.getSupplierHistorique({
+      from: _historiqueState.from,
+      to: _historiqueState.to,
+      restaurant_id: _historiqueState.restaurantId || void 0
+    });
   } catch (e) {
-    document.getElementById("supplier-history-list").innerHTML = `<p class="text-danger">Erreur: ${escapeHtml(e.message)}</p>`;
+    body.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+    return;
   }
-}
-function getHistoryIcon(type) {
-  switch (type) {
-    case "new":
-      return "\u{1F195}";
-    case "update":
-      return "\u{1F4B0}";
-    case "removed":
-      return "\u{1F5D1}\uFE0F";
-    case "unavailable":
-      return "\u26A0\uFE0F";
-    default:
-      return "\u{1F4DD}";
+  const fmtCurrency = (n) => formatCurrency(Number(n) || 0);
+  const fmtDate2 = (s) => {
+    if (!s) return "\u2014";
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? "\u2014" : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
+  const statusPill = (status) => {
+    const map = {
+      "brouillon": "pill--draft",
+      "envoy\xE9e": "pill--sent",
+      "envoyee": "pill--sent",
+      "confirm\xE9e": "pill--ok",
+      "confirmee": "pill--ok",
+      "livr\xE9e": "pill--ok",
+      "livree": "pill--ok",
+      "annul\xE9e": "pill--cancel",
+      "annulee": "pill--cancel"
+    };
+    return `<span class="supplier-pill ${map[status] || "pill--draft"}">${escapeHtml(status || "\u2014")}</span>`;
+  };
+  if (totalsEl) {
+    totalsEl.innerHTML = `
+      <span><strong>${data.totals.count}</strong> commande${data.totals.count > 1 ? "s" : ""}</span>
+      <span><strong class="text-mono">${fmtCurrency(data.totals.revenue_ht)}</strong> HT</span>
+    `;
   }
-}
-function getHistoryLabel(h) {
-  switch (h.change_type) {
-    case "new":
-      return `Ajout\xE9 au catalogue \u2014 ${formatCurrency(h.new_price)}`;
-    case "update":
-      return `Prix modifi\xE9: ${formatCurrency(h.old_price)} \u2192 ${formatCurrency(h.new_price)}`;
-    case "removed":
-      return "Retir\xE9 du catalogue";
-    case "unavailable":
-      return "Marqu\xE9 indisponible";
-    default:
-      return "Modification";
+  if (!data.orders.length) {
+    body.innerHTML = `
+      <p class="text-secondary" style="padding:var(--space-4) 0;text-align:center">
+        Aucune commande sur cette p\xE9riode.
+      </p>
+    `;
+    return;
   }
-}
-function formatDateShort(dateStr) {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  body.innerHTML = `
+    <div class="supplier-orders-table-wrap">
+      <table class="supplier-orders-table">
+        <thead>
+          <tr>
+            <th>R\xE9f\xE9rence</th>
+            <th>Date</th>
+            <th>Client</th>
+            <th>Statut</th>
+            <th style="text-align:right">Montant HT</th>
+            <th style="text-align:right">Montant TTC</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.orders.map((o) => {
+    const ttc = (Number(o.total_amount) || 0) * 1.055;
+    return `
+              <tr>
+                <td><strong>${escapeHtml(o.reference || `#${o.id}`)}</strong></td>
+                <td>${fmtDate2(o.created_at)}</td>
+                <td>${escapeHtml(o.restaurant_name || "\u2014")}</td>
+                <td>${statusPill(o.status)}</td>
+                <td style="text-align:right" class="text-mono">${fmtCurrency(o.total_amount)}</td>
+                <td style="text-align:right" class="text-mono text-tertiary">${fmtCurrency(ttc)}</td>
+              </tr>
+            `;
+  }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 const MERCURIALE_CATEGORIES = [
   "Viandes",
@@ -19748,6 +20020,96 @@ async function renderSupplierDashboardTab() {
             </ul>`}
       </section>
     </div>
+
+    <section class="supplier-dashboard-block" style="margin-top:var(--space-5)" id="supplier-stats-host">
+      <div class="supplier-dashboard-block__head">
+        <h3>Statistiques de vente</h3>
+        <span class="text-tertiary text-sm">Sur l'historique des commandes</span>
+      </div>
+      <div id="supplier-stats-body"><div class="loading"><div class="spinner"></div></div></div>
+    </section>
+  `;
+  _loadSupplierStats();
+}
+async function _loadSupplierStats() {
+  const host = document.getElementById("supplier-stats-body");
+  if (!host) return;
+  let stats;
+  try {
+    stats = await API.getSupplierStats();
+  } catch (e) {
+    host.innerHTML = `<p class="text-secondary">Statistiques indisponibles : ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+  const fmt = (n) => formatCurrency(Number(n) || 0);
+  const FR_MONTHS = ["janv.", "f\xE9vr.", "mars", "avr.", "mai", "juin", "juil.", "ao\xFBt", "sept.", "oct.", "nov.", "d\xE9c."];
+  const monthLabel = (yyyymm) => {
+    const [y, m] = String(yyyymm).split("-");
+    return `${FR_MONTHS[Number(m) - 1] || m} ${String(y).slice(2)}`;
+  };
+  const monthMax = stats.revenue_by_month.reduce((m, r) => Math.max(m, Number(r.revenue) || 0), 0) || 1;
+  const catMax = stats.revenue_by_category.reduce((m, r) => Math.max(m, Number(r.revenue) || 0), 0) || 1;
+  const PRODUCT_COLORS = ["#4A90D9", "#38A169", "#DD6B20", "#805AD5", "#319795", "#D69E2E", "#9C4221", "#C53030", "#319795", "#718096"];
+  if (!stats.top_products.length && !stats.revenue_by_month.length && !stats.revenue_by_category.length) {
+    host.innerHTML = `<p class="text-secondary" style="padding:var(--space-3) 0">Pas encore de donn\xE9es \u2014 les statistiques appara\xEEtront d\xE8s vos premi\xE8res commandes.</p>`;
+    return;
+  }
+  host.innerHTML = `
+    <div class="supplier-stats-grid">
+      <div class="supplier-stats-block">
+        <h4 class="supplier-stats-title">Top 10 produits</h4>
+        ${stats.top_products.length === 0 ? `<p class="text-secondary text-sm">Aucun produit vendu.</p>` : `<ul class="supplier-stats-bars">
+              ${stats.top_products.map((p, i) => {
+    const pct = (Number(p.revenue) || 0) / (Number(stats.top_products[0].revenue) || 1) * 100;
+    const color = PRODUCT_COLORS[i % PRODUCT_COLORS.length];
+    return `
+                  <li>
+                    <div class="supplier-stats-bar-row">
+                      <span class="supplier-stats-bar-label" title="${escapeHtml(p.product_name)}">${escapeHtml(p.product_name)}</span>
+                      <span class="supplier-stats-bar-value text-mono">${fmt(p.revenue)}</span>
+                    </div>
+                    <div class="supplier-stats-bar-track">
+                      <div class="supplier-stats-bar-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div>
+                    </div>
+                  </li>`;
+  }).join("")}
+            </ul>`}
+      </div>
+
+      <div class="supplier-stats-block">
+        <h4 class="supplier-stats-title">CA par mois (12 derniers)</h4>
+        ${stats.revenue_by_month.length === 0 ? `<p class="text-secondary text-sm">Aucune commande sur les 12 derniers mois.</p>` : `<div class="supplier-stats-month-bars">
+              ${stats.revenue_by_month.map((m) => {
+    const h = (Number(m.revenue) || 0) / monthMax * 100;
+    return `
+                  <div class="supplier-stats-month-bar" title="${escapeHtml(monthLabel(m.month))} \u2014 ${fmt(m.revenue)} (${m.orders_count} cmd)">
+                    <div class="supplier-stats-month-bar__fill" style="height:${h.toFixed(1)}%"></div>
+                    <span class="supplier-stats-month-bar__label">${escapeHtml(monthLabel(m.month))}</span>
+                  </div>`;
+  }).join("")}
+            </div>`}
+      </div>
+
+      <div class="supplier-stats-block">
+        <h4 class="supplier-stats-title">CA par cat\xE9gorie</h4>
+        ${stats.revenue_by_category.length === 0 ? `<p class="text-secondary text-sm">Aucune cat\xE9gorie avec des ventes.</p>` : `<ul class="supplier-stats-bars">
+              ${stats.revenue_by_category.map((c, i) => {
+    const pct = (Number(c.revenue) || 0) / catMax * 100;
+    const color = PRODUCT_COLORS[i % PRODUCT_COLORS.length];
+    return `
+                  <li>
+                    <div class="supplier-stats-bar-row">
+                      <span class="supplier-stats-bar-label">${escapeHtml(c.category)}</span>
+                      <span class="supplier-stats-bar-value text-mono">${fmt(c.revenue)}</span>
+                    </div>
+                    <div class="supplier-stats-bar-track">
+                      <div class="supplier-stats-bar-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div>
+                    </div>
+                  </li>`;
+  }).join("")}
+            </ul>`}
+      </div>
+    </div>
   `;
 }
 async function renderSupplierClientsTab() {
@@ -19922,6 +20284,14 @@ async function renderSupplierClientDetail(restaurantId) {
           </ul>`}
     </section>
 
+    <section class="supplier-dashboard-block" style="margin-top:var(--space-5)" id="supplier-client-overrides-host">
+      <div class="supplier-dashboard-block__head">
+        <h3>Grille tarifaire</h3>
+        <span class="text-tertiary text-sm">Tarif sp\xE9cial pour ce client (laissez vide pour utiliser le tarif standard)</span>
+      </div>
+      <div id="supplier-client-overrides-body"><div class="loading"><div class="spinner"></div></div></div>
+    </section>
+
     <section class="supplier-dashboard-block" style="margin-top:var(--space-5)">
       <div class="supplier-dashboard-block__head"><h3>Historique des commandes</h3></div>
       ${detail.orders.length === 0 ? `<p class="text-secondary" style="padding:var(--space-3) 0">Aucune commande pour ce client.</p>` : `<div class="supplier-orders-table-wrap">
@@ -19953,6 +20323,111 @@ async function renderSupplierClientDetail(restaurantId) {
     row.addEventListener("click", () => {
       const id = Number(row.dataset.orderId);
       if (Number.isFinite(id)) showSupplierClientOrderDetail(restaurantId, id);
+    });
+  });
+  _loadSupplierClientOverrides(restaurantId);
+}
+async function _loadSupplierClientOverrides(restaurantId) {
+  const body = document.getElementById("supplier-client-overrides-body");
+  if (!body) return;
+  let rows;
+  try {
+    rows = await API.getSupplierClientCatalog(restaurantId);
+  } catch (e) {
+    body.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+  if (!rows.length) {
+    body.innerHTML = `<p class="text-secondary text-sm" style="padding:var(--space-3) 0">Catalogue vide.</p>`;
+    return;
+  }
+  const fmtCurrency = (n) => formatCurrency(Number(n) || 0);
+  const cats = /* @__PURE__ */ new Map();
+  for (const r of rows) {
+    const k = r.category || "Sans cat\xE9gorie";
+    if (!cats.has(k)) cats.set(k, []);
+    cats.get(k).push(r);
+  }
+  body.innerHTML = `
+    <div class="supplier-orders-table-wrap">
+      <table class="supplier-orders-table supplier-overrides-table">
+        <thead>
+          <tr>
+            <th>Produit</th>
+            <th>SKU</th>
+            <th>Unit\xE9</th>
+            <th style="text-align:right">Tarif standard HT</th>
+            <th style="text-align:right">Prix sp\xE9cial HT</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Array.from(cats.entries()).map(([cat, items]) => `
+            <tr class="supplier-overrides-cat-row"><td colspan="6"><strong>${escapeHtml(cat)}</strong> <span class="text-tertiary text-sm">(${items.length})</span></td></tr>
+            ${items.map((r) => `
+              <tr data-catalog-id="${r.id}">
+                <td>${escapeHtml(r.product_name)}</td>
+                <td class="text-mono text-tertiary">${escapeHtml(r.sku || "\u2014")}</td>
+                <td>${escapeHtml(r.unit || "")}</td>
+                <td style="text-align:right" class="text-mono">${fmtCurrency(r.standard_price)}</td>
+                <td style="text-align:right">
+                  <input type="number" step="0.01" min="0" class="form-control supplier-override-input"
+                         value="${r.override_price != null ? Number(r.override_price).toFixed(2) : ""}"
+                         placeholder="\u2014"
+                         data-catalog-id="${r.id}"
+                         data-original="${r.override_price != null ? r.override_price : ""}"
+                         style="width:100px;text-align:right;font-family:var(--font-mono)">
+                </td>
+                <td style="text-align:center">
+                  ${r.override_price != null ? `<button class="btn-icon supplier-override-clear" data-catalog-id="${r.id}" aria-label="Retirer le tarif sp\xE9cial" title="Retirer">
+                         <i data-lucide="x" style="width:14px;height:14px"></i>
+                       </button>` : ""}
+                </td>
+              </tr>
+            `).join("")}
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+  body.querySelectorAll(".supplier-override-input").forEach((input) => {
+    input.addEventListener("blur", async () => {
+      const catalogId = Number(input.dataset.catalogId);
+      const original = input.dataset.original;
+      const raw = input.value.trim();
+      if (raw === original) return;
+      try {
+        if (raw === "") {
+          await API.clearSupplierClientPriceOverride(restaurantId, catalogId);
+          showToast("Tarif sp\xE9cial retir\xE9", "success");
+        } else {
+          const num = parseFloat(raw);
+          if (!Number.isFinite(num) || num <= 0) {
+            showToast("Prix invalide", "error");
+            input.value = original;
+            return;
+          }
+          await API.setSupplierClientPriceOverride(restaurantId, catalogId, num);
+          showToast("Tarif sp\xE9cial mis \xE0 jour", "success");
+        }
+        _loadSupplierClientOverrides(restaurantId);
+      } catch (e) {
+        showToast(e.message || "Erreur de sauvegarde", "error");
+        input.value = original;
+      }
+    });
+  });
+  body.querySelectorAll(".supplier-override-clear").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const catalogId = Number(btn.dataset.catalogId);
+      try {
+        await API.clearSupplierClientPriceOverride(restaurantId, catalogId);
+        showToast("Tarif sp\xE9cial retir\xE9", "success");
+        _loadSupplierClientOverrides(restaurantId);
+      } catch (e) {
+        showToast(e.message || "Erreur", "error");
+      }
     });
   });
 }
@@ -20011,6 +20486,96 @@ async function showSupplierClientOrderDetail(restaurantId, orderId) {
   overlay.querySelector("#supplier-order-detail-close").onclick = () => overlay.remove();
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) overlay.remove();
+  });
+}
+async function renderSupplierNotificationsTab() {
+  const content = document.getElementById("supplier-content");
+  if (!content) return;
+  content.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)">
+      <div>
+        <h2 style="margin:0;font-size:var(--text-xl)">Notifications</h2>
+        <p class="text-secondary" style="margin:var(--space-1) 0 0">Alertes commandes, mises \xE0 jour fournisseur.</p>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="supplier-notif-mark-all">
+        <i data-lucide="check-check" style="width:16px;height:16px"></i> Tout marquer lu
+      </button>
+    </div>
+    <div id="supplier-notif-body"><div class="loading"><div class="spinner"></div></div></div>
+  `;
+  if (window.lucide) lucide.createIcons();
+  document.getElementById("supplier-notif-mark-all").addEventListener("click", async () => {
+    try {
+      await API.markAllSupplierMyNotificationsRead();
+      showToast("Toutes les notifications marqu\xE9es comme lues", "success");
+      if (typeof refreshSupplierOrdersBadge === "function") refreshSupplierOrdersBadge();
+      renderSupplierNotificationsTab();
+    } catch (e) {
+      showToast(e.message || "Erreur", "error");
+    }
+  });
+  const body = document.getElementById("supplier-notif-body");
+  let notifs;
+  try {
+    notifs = await API.getSupplierMyNotifications();
+  } catch (e) {
+    body.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+  if (!notifs.length) {
+    body.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon"><i data-lucide="bell-off"></i></div>
+        <p>Aucune notification pour l'instant.</p>
+        <p class="text-secondary text-sm">Vous serez alert\xE9 ici quand un restaurant passera commande.</p>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+  const fmtDate2 = (s) => {
+    if (!s) return "\u2014";
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? "\u2014" : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
+  const TYPE_ICON = {
+    order_created: "shopping-cart",
+    order_confirmed: "check-circle",
+    order_cancelled: "x-circle",
+    default: "bell"
+  };
+  body.innerHTML = `
+    <ul class="supplier-notif-list">
+      ${notifs.map((n) => `
+        <li class="supplier-notif-item ${n.read ? "" : "supplier-notif-item--unread"}">
+          <div class="supplier-notif-icon">
+            <i data-lucide="${TYPE_ICON[n.type] || TYPE_ICON.default}" style="width:18px;height:18px"></i>
+          </div>
+          <div class="supplier-notif-main">
+            <div class="supplier-notif-message">${escapeHtml(n.message || n.type || "")}</div>
+            <div class="text-secondary text-sm">
+              ${escapeHtml(n.restaurant_name || "\u2014")} \xB7 ${fmtDate2(n.created_at)}
+            </div>
+          </div>
+          ${n.read ? `<span class="text-tertiary text-sm">Lue</span>` : `<button class="btn btn-secondary btn-sm supplier-notif-read-btn" data-id="${n.id}">
+                 <i data-lucide="check" style="width:14px;height:14px"></i> Lue
+               </button>`}
+        </li>
+      `).join("")}
+    </ul>
+  `;
+  if (window.lucide) lucide.createIcons();
+  body.querySelectorAll(".supplier-notif-read-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = Number(btn.dataset.id);
+      try {
+        await API.markSupplierMyNotificationRead(id);
+        if (typeof refreshSupplierOrdersBadge === "function") refreshSupplierOrdersBadge();
+        renderSupplierNotificationsTab();
+      } catch (e) {
+        showToast(e.message || "Erreur", "error");
+      }
+    });
   });
 }
 async function renderSupplierDeliveriesTab() {
@@ -20141,16 +20706,32 @@ async function showSupplierDeliveryDetail(id) {
     content.innerHTML = `<p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>`;
   }
 }
-function showNewDeliveryForm() {
+async function showNewDeliveryForm() {
   const content = document.getElementById("supplier-content");
+  let clients = [];
+  try {
+    clients = await API.getSupplierClients();
+  } catch (_) {
+  }
+  const clientOptions = clients.map((c) => `
+    <option value="${c.restaurant_id}">${escapeHtml(c.restaurant_name || `#${c.restaurant_id}`)}${c.restaurant_city ? " \u2014 " + escapeHtml(c.restaurant_city) : ""}</option>
+  `).join("");
   content.innerHTML = `
     <div style="margin-bottom:var(--space-4)">
       <button class="btn btn-secondary btn-sm" id="back-supplier-deliveries-form">\u2190 Retour</button>
     </div>
     <h2 style="margin-bottom:var(--space-4)">Nouveau bon de livraison</h2>
-    <div class="form-group" style="margin-bottom:var(--space-4)">
-      <label class="form-label">Date de livraison</label>
-      <input type="date" id="dn-date" class="input" value="${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}">
+    <div class="form-row" style="margin-bottom:var(--space-4)">
+      <div class="form-group" style="flex:2">
+        <label class="form-label">Restaurant client *</label>
+        <select id="dn-restaurant" class="input">
+          ${clientOptions || '<option value="">Aucun client li\xE9</option>'}
+        </select>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Date de livraison</label>
+        <input type="date" id="dn-date" class="input" value="${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}">
+      </div>
     </div>
     <div class="form-group" style="margin-bottom:var(--space-4)">
       <label class="form-label">Notes</label>
@@ -20246,6 +20827,12 @@ function showNewDeliveryForm() {
   document.getElementById("dn-submit").addEventListener("click", async () => {
     const delivery_date = document.getElementById("dn-date").value || null;
     const notes = document.getElementById("dn-notes").value || null;
+    const restaurantSel = document.getElementById("dn-restaurant");
+    const restaurant_id = restaurantSel && restaurantSel.value ? Number(restaurantSel.value) : null;
+    if (clients.length && !restaurant_id) {
+      showToast("S\xE9lectionnez un restaurant client", "error");
+      return;
+    }
     const rows = document.querySelectorAll(".dn-item-row");
     const items = [];
     for (const row of rows) {
@@ -20274,7 +20861,7 @@ function showNewDeliveryForm() {
       return;
     }
     try {
-      await API.createSupplierDeliveryNote({ delivery_date, notes, items });
+      await API.createSupplierDeliveryNote({ delivery_date, notes, items, restaurant_id });
       showToast("Bon de livraison envoy\xE9 !", "success");
       renderSupplierDeliveriesTab();
     } catch (e) {

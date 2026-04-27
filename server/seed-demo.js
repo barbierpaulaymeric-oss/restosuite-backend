@@ -207,6 +207,212 @@ const SUPPLIER_CATALOG_DATA = {
   ],
 };
 
+// Idempotent demo purchase orders for Chez Laurent → Metro Paris Nation over
+// the last ~90 days. Without these the supplier-portal dashboard, historique,
+// stats, and Mes clients drill-in all show zeros, which is exactly what the
+// commercial audit flagged. References are prefixed with DEMO-PO- so we can
+// safely DELETE-then-INSERT on every re-seed without touching real data.
+//
+// We intentionally don't draw from supplier_catalog rows by FK — those rows
+// may not exist yet when this runs from the early-exit guard, and the data
+// is just for display. Items reference catalog products by NAME so the
+// /stats LEFT JOIN by product_name still resolves the category bucket.
+const DEMO_ORDER_REFS_PREFIX = 'DEMO-PO-';
+
+const _DEMO_ORDER_RECIPES = [
+  // Bistrot favorites — picked from Metro's catalog by name
+  { items: [
+      { name: 'Entrecôte de bœuf', qty: 6, unit: 'kg', price: 18.90 },
+      { name: 'Pommes de terre', qty: 25, unit: 'kg', price: 1.20 },
+      { name: 'Beurre doux', qty: 3, unit: 'kg', price: 8.50 },
+      { name: 'Tomates grappe', qty: 6, unit: 'kg', price: 3.50 },
+      { name: 'Champignons de Paris', qty: 2, unit: 'kg', price: 3.20 },
+    ] },
+  { items: [
+      { name: 'Filet de saumon', qty: 4, unit: 'kg', price: 19.00 },
+      { name: 'Crème fraîche 35%', qty: 5, unit: 'L', price: 4.20 },
+      { name: 'Citrons', qty: 3, unit: 'kg', price: 2.80 },
+      { name: 'Aneth (botte)', qty: 2, unit: 'botte', price: 1.50 }, // matches "Autre"
+    ] },
+  { items: [
+      { name: 'Filet de poulet', qty: 8, unit: 'kg', price: 8.50 },
+      { name: 'Crème fraîche 35%', qty: 4, unit: 'L', price: 4.20 },
+      { name: 'Champignons de Paris', qty: 3, unit: 'kg', price: 3.20 },
+      { name: 'Riz basmati', qty: 5, unit: 'kg', price: 2.20 },
+    ] },
+  { items: [
+      { name: 'Magret de canard', qty: 5, unit: 'kg', price: 19.50 },
+      { name: 'Pommes de terre', qty: 20, unit: 'kg', price: 1.20 },
+      { name: 'Oignons jaunes', qty: 5, unit: 'kg', price: 1.80 },
+      { name: 'Vinaigre balsamique', qty: 1, unit: 'L', price: 4.80 },
+    ] },
+  { items: [
+      { name: 'Steak haché 15% MG', qty: 12, unit: 'kg', price: 9.80 },
+      { name: 'Frites tradition', qty: 15, unit: 'kg', price: 2.50 },
+      { name: 'Œufs plein air x30', qty: 4, unit: 'plateau', price: 8.50 },
+      { name: 'Lardons fumés', qty: 2, unit: 'kg', price: 6.50 },
+    ] },
+  { items: [
+      { name: 'Cabillaud', qty: 3, unit: 'kg', price: 15.50 },
+      { name: 'Moules de bouchot', qty: 8, unit: 'kg', price: 4.50 },
+      { name: 'Pommes de terre', qty: 10, unit: 'kg', price: 1.20 },
+      { name: 'Crème fraîche 35%', qty: 3, unit: 'L', price: 4.20 },
+    ] },
+  { items: [
+      { name: 'Bavette d\'aloyau', qty: 5, unit: 'kg', price: 16.50 },
+      { name: 'Échalotes', qty: 2, unit: 'kg', price: 5.50 },     // matches "Autre"
+      { name: 'Beurre doux', qty: 2, unit: 'kg', price: 8.50 },
+      { name: 'Frites tradition', qty: 10, unit: 'kg', price: 2.50 },
+    ] },
+  { items: [
+      { name: 'Côtes d\'agneau', qty: 4, unit: 'kg', price: 22.00 },
+      { name: 'Pommes de terre', qty: 15, unit: 'kg', price: 1.20 },
+      { name: 'Haricots verts', qty: 4, unit: 'kg', price: 4.90 },
+    ] },
+  { items: [
+      { name: 'Escalope de veau', qty: 4, unit: 'kg', price: 24.00 },
+      { name: 'Crème fraîche 35%', qty: 4, unit: 'L', price: 4.20 },
+      { name: 'Champignons de Paris', qty: 3, unit: 'kg', price: 3.20 },
+    ] },
+  { items: [
+      { name: 'Saucisse de Toulouse', qty: 6, unit: 'kg', price: 7.90 },
+      { name: 'Lentilles vertes', qty: 4, unit: 'kg', price: 3.50 },
+      { name: 'Carottes', qty: 5, unit: 'kg', price: 1.50 },
+      { name: 'Jambon de Paris', qty: 2, unit: 'kg', price: 9.80 },
+    ] },
+  { items: [
+      { name: 'Filet de saumon', qty: 5, unit: 'kg', price: 19.00 },
+      { name: 'Riz basmati', qty: 6, unit: 'kg', price: 2.20 },
+      { name: 'Citrons', qty: 4, unit: 'kg', price: 2.80 },
+    ] },
+  { items: [
+      { name: 'Entrecôte de bœuf', qty: 7, unit: 'kg', price: 18.90 },
+      { name: 'Beurre doux', qty: 4, unit: 'kg', price: 8.50 },
+      { name: 'Pommes de terre', qty: 30, unit: 'kg', price: 1.20 },
+      { name: 'Sel de Guérande', qty: 2, unit: 'kg', price: 3.50 },
+    ] },
+  { items: [
+      { name: 'Crevettes roses cuites', qty: 3, unit: 'kg', price: 14.90 },
+      { name: 'Mozzarella', qty: 2, unit: 'kg', price: 8.00 },
+      { name: 'Tomates grappe', qty: 8, unit: 'kg', price: 3.50 },
+      { name: 'Huile d\'olive vierge extra', qty: 2, unit: 'L', price: 6.50 },
+    ] },
+  { items: [
+      { name: 'Filet de poulet', qty: 6, unit: 'kg', price: 8.50 },
+      { name: 'Pâtes penne', qty: 5, unit: 'kg', price: 1.50 },
+      { name: 'Parmesan Reggiano', qty: 1, unit: 'kg', price: 22.00 },
+      { name: 'Crème fraîche 35%', qty: 3, unit: 'L', price: 4.20 },
+    ] },
+  { items: [
+      { name: 'Magret de canard', qty: 4, unit: 'kg', price: 19.50 },
+      { name: 'Pommes Golden', qty: 5, unit: 'kg', price: 2.50 },
+      { name: 'Beurre doux', qty: 2, unit: 'kg', price: 8.50 },
+    ] },
+  { items: [
+      { name: 'Bar de ligne', qty: 2, unit: 'kg', price: 28.00 },
+      { name: 'Citrons', qty: 3, unit: 'kg', price: 2.80 },
+      { name: 'Huile d\'olive vierge extra', qty: 1, unit: 'L', price: 6.50 },
+      { name: 'Sel de Guérande', qty: 1, unit: 'kg', price: 3.50 },
+    ] },
+  { items: [
+      { name: 'Steak haché 15% MG', qty: 10, unit: 'kg', price: 9.80 },
+      { name: 'Pain de mie tranché', qty: 6, unit: 'pièce', price: 2.80 },
+      { name: 'Mozzarella', qty: 3, unit: 'kg', price: 8.00 },
+      { name: 'Tomates grappe', qty: 5, unit: 'kg', price: 3.50 },
+    ] },
+  { items: [
+      { name: 'Filet de saumon', qty: 6, unit: 'kg', price: 19.00 },
+      { name: 'Lait entier', qty: 12, unit: 'L', price: 1.10 },
+      { name: 'Beurre doux', qty: 3, unit: 'kg', price: 8.50 },
+      { name: 'Farine T55', qty: 5, unit: 'kg', price: 0.90 },
+    ] },
+];
+
+// Status mix: most are 'livrée', a couple recent ones are 'envoyée' (alert),
+// one is 'brouillon' for the dashboard alert badge.
+const _DEMO_ORDER_STATUS_MIX = (idx, total) => {
+  if (idx === 0) return 'brouillon';                                       // newest = draft
+  if (idx === 1 || idx === 2) return 'envoyée';                            // 2 awaiting confirmation
+  return idx > total - 4 ? 'livrée' : (Math.random() < 0.85 ? 'livrée' : 'envoyée');
+};
+
+function ensureSupplierOrders() {
+  const metro = get(
+    'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
+    ['Metro Paris Nation', RID]
+  );
+  if (!metro) return { inserted: 0 };
+
+  // Wipe previous demo orders + their items first. Real (non-DEMO-) orders
+  // stay untouched.
+  run(
+    `DELETE FROM purchase_order_items
+      WHERE purchase_order_id IN (
+        SELECT id FROM purchase_orders
+         WHERE supplier_id = ? AND restaurant_id = ?
+           AND reference LIKE ?
+      )`,
+    [metro.id, RID, `${DEMO_ORDER_REFS_PREFIX}%`]
+  );
+  run(
+    'DELETE FROM purchase_orders WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?',
+    [metro.id, RID, `${DEMO_ORDER_REFS_PREFIX}%`]
+  );
+
+  const insertOrder = db.prepare(
+    `INSERT INTO purchase_orders
+       (supplier_id, restaurant_id, reference, status, total_amount, expected_delivery, notes, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const insertItem = db.prepare(
+    `INSERT INTO purchase_order_items
+       (purchase_order_id, restaurant_id, ingredient_id, product_name, quantity, unit, unit_price, total_price)
+     VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`
+  );
+
+  let inserted = 0;
+  const total = _DEMO_ORDER_RECIPES.length;
+  // Spread orders across the past ~90 days, oldest first.
+  const spanDays = 90;
+  const tx = db.transaction(() => {
+    _DEMO_ORDER_RECIPES.forEach((recipe, i) => {
+      // Reverse-index so idx=0 is the newest (draft), idx=total-1 the oldest.
+      const idx = total - 1 - i;
+      const dayOffset = Math.round((idx / Math.max(1, total - 1)) * spanDays);
+      const created = new Date(Date.now() - dayOffset * 86_400_000);
+      // Skew the time to lunch-prep hours so the timestamps feel real.
+      created.setHours(8 + (i % 4), 30 + (i * 7) % 30, 0, 0);
+      const createdSql = created.toISOString().replace('T', ' ').slice(0, 19);
+      const dateTag = createdSql.slice(0, 10).replace(/-/g, '');
+      const seq = String(idx + 1).padStart(3, '0');
+      const ref = `${DEMO_ORDER_REFS_PREFIX}${dateTag}-${seq}`;
+      const status = _DEMO_ORDER_STATUS_MIX(idx, total);
+      const expected = new Date(created.getTime() + 86_400_000)
+        .toISOString().slice(0, 10);
+
+      let total_amount = 0;
+      const lines = recipe.items.map(it => {
+        const line = Math.round(it.qty * it.price * 100) / 100;
+        total_amount += line;
+        return { ...it, total: line };
+      });
+      total_amount = Math.round(total_amount * 100) / 100;
+
+      const orderId = insertOrder.run(
+        metro.id, RID, ref, status, total_amount,
+        expected, 'Commande démo générée par seed-demo.js', createdSql
+      ).lastInsertRowid;
+
+      for (const ln of lines) {
+        insertItem.run(orderId, RID, ln.name, ln.qty, ln.unit, ln.price, ln.total);
+      }
+      inserted++;
+    });
+  });
+  tx();
+  return { inserted };
+}
+
 // Idempotent: deletes the supplier's existing demo catalog rows then bulk-
 // inserts the fresh list inside one transaction. supplier_catalog has no
 // UNIQUE constraint on (supplier_id, product_name), so INSERT OR REPLACE
@@ -291,6 +497,7 @@ const existing = get('SELECT id FROM accounts WHERE email = ?', [OWNER_EMAIL]);
 if (existing) {
   const ensured = ensureSupplierDemoLogin();
   const catalog = ensureSupplierCatalogs();
+  const orders = ensureSupplierOrders();
   if (ensured) {
     console.log(`✅ Demo data already present (${OWNER_EMAIL} exists, account id=${existing.id}). Refreshed supplier-portal demo login: ${SUPPLIER_DEMO_EMAIL} / ${SUPPLIER_DEMO_PASSWORD} (PIN ${SUPPLIER_DEMO_PIN}).`);
   } else {
@@ -298,6 +505,9 @@ if (existing) {
   }
   if (catalog.touchedSuppliers > 0) {
     console.log(`   ↳ Refreshed supplier catalogs: ${catalog.totalInserted} products across ${catalog.touchedSuppliers} suppliers.`);
+  }
+  if (orders.inserted > 0) {
+    console.log(`   ↳ Refreshed supplier demo orders: ${orders.inserted} purchase_orders for Metro Paris Nation.`);
   }
   process.exit(0);
 }
@@ -423,6 +633,15 @@ section('Supplier catalogs');
 {
   const catalog = ensureSupplierCatalogs();
   log(`${catalog.totalInserted} products inserted across ${catalog.touchedSuppliers} suppliers`);
+}
+
+// ─── 3d. Supplier demo orders (Chez Laurent → Metro, last 90 days) ─────────
+// Drives the supplier-portal dashboard KPIs, /historique tab, /stats panel,
+// and Mes clients drill-in. Without these the portal looks dead.
+section('Supplier demo orders');
+{
+  const o = ensureSupplierOrders();
+  log(`${o.inserted} purchase_orders for Metro Paris Nation`);
 }
 
 // ─── 4. Ingredients ────────────────────────────────────────────────────────

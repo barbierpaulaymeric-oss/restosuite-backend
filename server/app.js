@@ -43,7 +43,16 @@ app.set('trust proxy', 1);
 // Request-ID must come first so every subsequent middleware + logger sees req.id
 app.use(requestId);
 
-app.use(compression());
+// Compression: skip application/pdf so buffered PDFs reach the client byte-for-byte.
+// Render's nginx + global gzip can corrupt streamed PDFs (the browser's blob()
+// mishandled the doubly-encoded body in prod) — see feedback_pdf_compression.md.
+app.use(compression({
+  filter: (req, res) => {
+    const ct = res.getHeader('Content-Type');
+    if (typeof ct === 'string' && ct.includes('application/pdf')) return false;
+    return compression.filter(req, res);
+  },
+}));
 
 // CORS: explicit allowlist in production + localhost whitelist in dev. Never echo
 // arbitrary origins while credentials:true — would leak auth cookies/headers to any

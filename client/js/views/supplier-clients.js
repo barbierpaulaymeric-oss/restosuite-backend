@@ -193,6 +193,14 @@ async function renderSupplierClientDetail(restaurantId) {
       }
     </section>
 
+    <section class="supplier-dashboard-block" style="margin-top:var(--space-5)" id="supplier-client-overrides-host">
+      <div class="supplier-dashboard-block__head">
+        <h3>Grille tarifaire</h3>
+        <span class="text-tertiary text-sm">Tarif spécial pour ce client (laissez vide pour utiliser le tarif standard)</span>
+      </div>
+      <div id="supplier-client-overrides-body"><div class="loading"><div class="spinner"></div></div></div>
+    </section>
+
     <section class="supplier-dashboard-block" style="margin-top:var(--space-5)">
       <div class="supplier-dashboard-block__head"><h3>Historique des commandes</h3></div>
       ${detail.orders.length === 0
@@ -228,6 +236,124 @@ async function renderSupplierClientDetail(restaurantId) {
     row.addEventListener('click', () => {
       const id = Number(row.dataset.orderId);
       if (Number.isFinite(id)) showSupplierClientOrderDetail(restaurantId, id);
+    });
+  });
+
+  // Load the per-client catalog with override prices in parallel — keeps the
+  // primary drill-in (orders + favorites) on screen while overrides resolve.
+  _loadSupplierClientOverrides(restaurantId);
+}
+
+async function _loadSupplierClientOverrides(restaurantId) {
+  const body = document.getElementById('supplier-client-overrides-body');
+  if (!body) return;
+  let rows;
+  try {
+    rows = await API.getSupplierClientCatalog(restaurantId);
+  } catch (e) {
+    body.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+  if (!rows.length) {
+    body.innerHTML = `<p class="text-secondary text-sm" style="padding:var(--space-3) 0">Catalogue vide.</p>`;
+    return;
+  }
+
+  const fmtCurrency = (n) => formatCurrency(Number(n) || 0);
+  // Group by category for readability — same convention as the main catalog.
+  const cats = new Map();
+  for (const r of rows) {
+    const k = r.category || 'Sans catégorie';
+    if (!cats.has(k)) cats.set(k, []);
+    cats.get(k).push(r);
+  }
+
+  body.innerHTML = `
+    <div class="supplier-orders-table-wrap">
+      <table class="supplier-orders-table supplier-overrides-table">
+        <thead>
+          <tr>
+            <th>Produit</th>
+            <th>SKU</th>
+            <th>Unité</th>
+            <th style="text-align:right">Tarif standard HT</th>
+            <th style="text-align:right">Prix spécial HT</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Array.from(cats.entries()).map(([cat, items]) => `
+            <tr class="supplier-overrides-cat-row"><td colspan="6"><strong>${escapeHtml(cat)}</strong> <span class="text-tertiary text-sm">(${items.length})</span></td></tr>
+            ${items.map(r => `
+              <tr data-catalog-id="${r.id}">
+                <td>${escapeHtml(r.product_name)}</td>
+                <td class="text-mono text-tertiary">${escapeHtml(r.sku || '—')}</td>
+                <td>${escapeHtml(r.unit || '')}</td>
+                <td style="text-align:right" class="text-mono">${fmtCurrency(r.standard_price)}</td>
+                <td style="text-align:right">
+                  <input type="number" step="0.01" min="0" class="form-control supplier-override-input"
+                         value="${r.override_price != null ? Number(r.override_price).toFixed(2) : ''}"
+                         placeholder="—"
+                         data-catalog-id="${r.id}"
+                         data-original="${r.override_price != null ? r.override_price : ''}"
+                         style="width:100px;text-align:right;font-family:var(--font-mono)">
+                </td>
+                <td style="text-align:center">
+                  ${r.override_price != null
+                    ? `<button class="btn-icon supplier-override-clear" data-catalog-id="${r.id}" aria-label="Retirer le tarif spécial" title="Retirer">
+                         <i data-lucide="x" style="width:14px;height:14px"></i>
+                       </button>`
+                    : ''}
+                </td>
+              </tr>
+            `).join('')}
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+
+  // Wire each price input — debounce-on-blur so the row only fires when the
+  // user actually leaves the field (avoids spamming PUT on every keystroke).
+  body.querySelectorAll('.supplier-override-input').forEach(input => {
+    input.addEventListener('blur', async () => {
+      const catalogId = Number(input.dataset.catalogId);
+      const original = input.dataset.original;
+      const raw = input.value.trim();
+      if (raw === original) return; // no change
+      try {
+        if (raw === '') {
+          await API.clearSupplierClientPriceOverride(restaurantId, catalogId);
+          showToast('Tarif spécial retiré', 'success');
+        } else {
+          const num = parseFloat(raw);
+          if (!Number.isFinite(num) || num <= 0) {
+            showToast('Prix invalide', 'error');
+            input.value = original;
+            return;
+          }
+          await API.setSupplierClientPriceOverride(restaurantId, catalogId, num);
+          showToast('Tarif spécial mis à jour', 'success');
+        }
+        _loadSupplierClientOverrides(restaurantId);
+      } catch (e) {
+        showToast(e.message || 'Erreur de sauvegarde', 'error');
+        input.value = original;
+      }
+    });
+  });
+
+  body.querySelectorAll('.supplier-override-clear').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const catalogId = Number(btn.dataset.catalogId);
+      try {
+        await API.clearSupplierClientPriceOverride(restaurantId, catalogId);
+        showToast('Tarif spécial retiré', 'success');
+        _loadSupplierClientOverrides(restaurantId);
+      } catch (e) {
+        showToast(e.message || 'Erreur', 'error');
+      }
     });
   });
 }

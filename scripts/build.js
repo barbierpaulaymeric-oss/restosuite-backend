@@ -69,6 +69,7 @@ const JS_FILES = [
   'js/views/supplier-mercuriale-import.js',
   'js/views/supplier-dashboard.js',
   'js/views/supplier-clients.js',
+  'js/views/supplier-notifications.js',
   'js/views/supplier-delivery.js',
   'js/views/supplier-orders.js',
   'js/views/deliveries.js',

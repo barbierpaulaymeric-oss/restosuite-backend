@@ -30,7 +30,16 @@ if (!IS_TEST) {
 // brute-forcers unthrottled per-client.
 app.set('trust proxy', 1);
 
-app.use(compression());
+// Compression: skip application/pdf — Render nginx + global gzip can corrupt
+// streamed PDFs (blob() mishandles the doubly-encoded body). See
+// feedback_pdf_compression.md.
+app.use(compression({
+  filter: (req, res) => {
+    const ct = res.getHeader('Content-Type');
+    if (typeof ct === 'string' && ct.includes('application/pdf')) return false;
+    return compression.filter(req, res);
+  },
+}));
 
 // CORS: explicit allowlist in production + localhost whitelist in dev. Never echo
 // arbitrary origins while credentials:true — would leak auth to any hostile site.

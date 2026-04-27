@@ -126,5 +126,115 @@ async function renderSupplierDashboardTab() {
         }
       </section>
     </div>
+
+    <section class="supplier-dashboard-block" style="margin-top:var(--space-5)" id="supplier-stats-host">
+      <div class="supplier-dashboard-block__head">
+        <h3>Statistiques de vente</h3>
+        <span class="text-tertiary text-sm">Sur l'historique des commandes</span>
+      </div>
+      <div id="supplier-stats-body"><div class="loading"><div class="spinner"></div></div></div>
+    </section>
+  `;
+
+  // Stats load is deferred — keeps the dashboard interactive instantly while
+  // the bigger /stats query runs.
+  _loadSupplierStats();
+}
+
+async function _loadSupplierStats() {
+  const host = document.getElementById('supplier-stats-body');
+  if (!host) return;
+  let stats;
+  try {
+    stats = await API.getSupplierStats();
+  } catch (e) {
+    host.innerHTML = `<p class="text-secondary">Statistiques indisponibles : ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+
+  const fmt = (n) => formatCurrency(Number(n) || 0);
+  const FR_MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+  const monthLabel = (yyyymm) => {
+    const [y, m] = String(yyyymm).split('-');
+    return `${FR_MONTHS[Number(m) - 1] || m} ${String(y).slice(2)}`;
+  };
+
+  // CSS-based bar charts (no chart library — keeps the bundle small and CSP-clean).
+  const monthMax = stats.revenue_by_month.reduce((m, r) => Math.max(m, Number(r.revenue) || 0), 0) || 1;
+  const catMax = stats.revenue_by_category.reduce((m, r) => Math.max(m, Number(r.revenue) || 0), 0) || 1;
+
+  // Top products — colored category-style category-agnostic palette by index.
+  const PRODUCT_COLORS = ['#4A90D9', '#38A169', '#DD6B20', '#805AD5', '#319795', '#D69E2E', '#9C4221', '#C53030', '#319795', '#718096'];
+
+  if (!stats.top_products.length && !stats.revenue_by_month.length && !stats.revenue_by_category.length) {
+    host.innerHTML = `<p class="text-secondary" style="padding:var(--space-3) 0">Pas encore de données — les statistiques apparaîtront dès vos premières commandes.</p>`;
+    return;
+  }
+
+  host.innerHTML = `
+    <div class="supplier-stats-grid">
+      <div class="supplier-stats-block">
+        <h4 class="supplier-stats-title">Top 10 produits</h4>
+        ${stats.top_products.length === 0
+          ? `<p class="text-secondary text-sm">Aucun produit vendu.</p>`
+          : `<ul class="supplier-stats-bars">
+              ${stats.top_products.map((p, i) => {
+                const pct = (Number(p.revenue) || 0) / (Number(stats.top_products[0].revenue) || 1) * 100;
+                const color = PRODUCT_COLORS[i % PRODUCT_COLORS.length];
+                return `
+                  <li>
+                    <div class="supplier-stats-bar-row">
+                      <span class="supplier-stats-bar-label" title="${escapeHtml(p.product_name)}">${escapeHtml(p.product_name)}</span>
+                      <span class="supplier-stats-bar-value text-mono">${fmt(p.revenue)}</span>
+                    </div>
+                    <div class="supplier-stats-bar-track">
+                      <div class="supplier-stats-bar-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div>
+                    </div>
+                  </li>`;
+              }).join('')}
+            </ul>`
+        }
+      </div>
+
+      <div class="supplier-stats-block">
+        <h4 class="supplier-stats-title">CA par mois (12 derniers)</h4>
+        ${stats.revenue_by_month.length === 0
+          ? `<p class="text-secondary text-sm">Aucune commande sur les 12 derniers mois.</p>`
+          : `<div class="supplier-stats-month-bars">
+              ${stats.revenue_by_month.map(m => {
+                const h = (Number(m.revenue) || 0) / monthMax * 100;
+                return `
+                  <div class="supplier-stats-month-bar" title="${escapeHtml(monthLabel(m.month))} — ${fmt(m.revenue)} (${m.orders_count} cmd)">
+                    <div class="supplier-stats-month-bar__fill" style="height:${h.toFixed(1)}%"></div>
+                    <span class="supplier-stats-month-bar__label">${escapeHtml(monthLabel(m.month))}</span>
+                  </div>`;
+              }).join('')}
+            </div>`
+        }
+      </div>
+
+      <div class="supplier-stats-block">
+        <h4 class="supplier-stats-title">CA par catégorie</h4>
+        ${stats.revenue_by_category.length === 0
+          ? `<p class="text-secondary text-sm">Aucune catégorie avec des ventes.</p>`
+          : `<ul class="supplier-stats-bars">
+              ${stats.revenue_by_category.map((c, i) => {
+                const pct = (Number(c.revenue) || 0) / catMax * 100;
+                const color = PRODUCT_COLORS[i % PRODUCT_COLORS.length];
+                return `
+                  <li>
+                    <div class="supplier-stats-bar-row">
+                      <span class="supplier-stats-bar-label">${escapeHtml(c.category)}</span>
+                      <span class="supplier-stats-bar-value text-mono">${fmt(c.revenue)}</span>
+                    </div>
+                    <div class="supplier-stats-bar-track">
+                      <div class="supplier-stats-bar-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div>
+                    </div>
+                  </li>`;
+              }).join('')}
+            </ul>`
+        }
+      </div>
+    </div>
   `;
 }

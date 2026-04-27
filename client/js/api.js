@@ -558,6 +558,33 @@ const API = {
   markAllSupplierMyNotificationsRead() {
     return this.supplierRequest('/notifications/me/read-all', { method: 'PUT' });
   },
+  // ─── Supplier portal v3: historique / stats / price overrides ───
+  getSupplierHistorique({ from, to, restaurant_id } = {}) {
+    const qs = new URLSearchParams();
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+    if (restaurant_id) qs.set('restaurant_id', restaurant_id);
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return this.supplierRequest(`/historique${suffix}`);
+  },
+  getSupplierStats() {
+    return this.supplierRequest('/stats');
+  },
+  getSupplierClientCatalog(restaurantId) {
+    return this.supplierRequest(`/clients/${restaurantId}/catalog`);
+  },
+  setSupplierClientPriceOverride(restaurantId, catalogId, price, notes) {
+    return this.supplierRequest(`/clients/${restaurantId}/price-overrides/${catalogId}`, {
+      method: 'PUT',
+      body: { price, notes: notes || null },
+    });
+  },
+  clearSupplierClientPriceOverride(restaurantId, catalogId) {
+    return this.supplierRequest(`/clients/${restaurantId}/price-overrides/${catalogId}`, {
+      method: 'DELETE',
+    });
+  },
+
   // PDF download: fetch as blob (so the X-Supplier-Token header travels in the
   // request properly — `<a href>` can't carry custom headers and we don't want
   // the token in URL/referer logs). Caller hands the returned blob to a

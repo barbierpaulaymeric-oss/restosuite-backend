@@ -1162,6 +1162,199 @@ router.put('/notifications/me/read-all', requireSupplierAuth, (req, res) => {
 });
 
 // ═════════════════════════════════════════
+// HISTORIQUE — chronological order feed (replaces the audit-log "history" tab)
+// ═════════════════════════════════════════
+// Returns flat list of orders (newest first) with optional date-range and
+// client filters. The previous /history route stays mounted for backward compat
+// but the supplier portal client now reads from /historique. Both name and
+// purpose have changed enough to keep them separate.
+router.get('/historique', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const { from, to, restaurant_id } = req.query;
+
+  const params = [supplierId, rid];
+  let where = 'po.supplier_id = ? AND po.restaurant_id = ?';
+  if (restaurant_id) {
+    // Cross-tenant filter has no effect: the supplier_account is already
+    // tenant-bound. We still accept it for forward-compat with multi-tenant
+    // supplier accounts and silently coerce to the bound tenant.
+    if (Number(restaurant_id) !== rid) {
+      return res.json({ orders: [], totals: { count: 0, revenue_ht: 0 } });
+    }
+  }
+  if (from) { where += ' AND date(po.created_at) >= date(?)'; params.push(String(from)); }
+  if (to)   { where += ' AND date(po.created_at) <= date(?)'; params.push(String(to)); }
+
+  const orders = all(
+    `SELECT po.id, po.reference, po.status, po.total_amount, po.created_at, po.expected_delivery,
+            r.name AS restaurant_name
+       FROM purchase_orders po
+       JOIN restaurants r ON r.id = po.restaurant_id
+      WHERE ${where}
+      ORDER BY po.created_at DESC
+      LIMIT 500`,
+    params
+  );
+
+  const totals = get(
+    `SELECT COUNT(*) AS count, COALESCE(SUM(total_amount), 0) AS revenue_ht
+       FROM purchase_orders po
+      WHERE ${where}`,
+    params
+  );
+
+  res.json({ orders, totals });
+});
+
+// ═════════════════════════════════════════
+// STATS — top products, revenue by month, revenue by category
+// ═════════════════════════════════════════
+// Used by the supplier dashboard "Statistiques" panel. All three slices are
+// computed off purchase_orders + purchase_order_items, scoped to (supplier_id,
+// restaurant_id) so cross-tenant data never leaks.
+router.get('/stats', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+
+  // Top 10 by revenue contribution (total_price aggregated). Ties resolved by
+  // total quantity ordered, then product_name alphabetical.
+  const topProducts = all(
+    `SELECT poi.product_name,
+            SUM(poi.total_price) AS revenue,
+            SUM(poi.quantity)    AS quantity,
+            COUNT(DISTINCT po.id) AS times_ordered
+       FROM purchase_order_items poi
+       JOIN purchase_orders po ON po.id = poi.purchase_order_id
+      WHERE po.supplier_id = ? AND po.restaurant_id = ?
+   GROUP BY poi.product_name
+   ORDER BY revenue DESC, quantity DESC, poi.product_name ASC
+      LIMIT 10`,
+    [supplierId, rid]
+  );
+
+  // Revenue by month, last 12 months. Months with zero revenue are filled in
+  // client-side; here we only return the months that actually had orders.
+  const revenueByMonth = all(
+    `SELECT strftime('%Y-%m', created_at) AS month,
+            COALESCE(SUM(total_amount), 0) AS revenue,
+            COUNT(*) AS orders_count
+       FROM purchase_orders
+      WHERE supplier_id = ? AND restaurant_id = ?
+        AND created_at >= date('now', '-12 months')
+   GROUP BY month
+   ORDER BY month ASC`,
+    [supplierId, rid]
+  );
+
+  // Revenue by catalog category. We attempt a name-match between
+  // purchase_order_items.product_name and supplier_catalog.product_name
+  // (case-insensitive). Items with no catalog match fall under 'Autre'.
+  const revenueByCategory = all(
+    `SELECT COALESCE(sc.category, 'Autre') AS category,
+            COALESCE(SUM(poi.total_price), 0) AS revenue,
+            SUM(poi.quantity) AS quantity
+       FROM purchase_order_items poi
+       JOIN purchase_orders po ON po.id = poi.purchase_order_id
+       LEFT JOIN supplier_catalog sc
+              ON LOWER(sc.product_name) = LOWER(poi.product_name)
+             AND sc.supplier_id = po.supplier_id
+             AND sc.restaurant_id = po.restaurant_id
+      WHERE po.supplier_id = ? AND po.restaurant_id = ?
+   GROUP BY category
+   ORDER BY revenue DESC`,
+    [supplierId, rid]
+  );
+
+  res.json({ top_products: topProducts, revenue_by_month: revenueByMonth, revenue_by_category: revenueByCategory });
+});
+
+// ═════════════════════════════════════════
+// PRICE OVERRIDES per client (Grille tarifaire par client)
+// ═════════════════════════════════════════
+
+// GET — full catalog joined with the active override for this restaurant.
+router.get('/clients/:restaurantId/catalog', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const requestedRid = Number(req.params.restaurantId);
+  if (requestedRid !== rid) return res.status(404).json({ error: 'Restaurant introuvable' });
+
+  const rows = all(
+    `SELECT sc.id, sc.product_name, sc.category, sc.unit, sc.price AS standard_price,
+            sc.sku, sc.tva_rate, sc.packaging,
+            cpo.override_price, cpo.notes AS override_notes, cpo.updated_at AS override_updated_at
+       FROM supplier_catalog sc
+       LEFT JOIN client_price_overrides cpo
+              ON cpo.catalog_id = sc.id
+             AND cpo.supplier_id = ?
+             AND cpo.restaurant_id = ?
+      WHERE sc.supplier_id = ? AND sc.restaurant_id = ?
+   ORDER BY sc.category, sc.product_name`,
+    [supplierId, rid, supplierId, rid]
+  );
+  res.json(rows);
+});
+
+// PUT — upsert override price for a catalog item. body: { price, notes? }.
+// price === null clears the override.
+router.put('/clients/:restaurantId/price-overrides/:catalogId', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const requestedRid = Number(req.params.restaurantId);
+  if (requestedRid !== rid) return res.status(404).json({ error: 'Restaurant introuvable' });
+  const catalogId = Number(req.params.catalogId);
+
+  // Verify the catalog row belongs to the supplier+tenant.
+  const catalog = get(
+    'SELECT id FROM supplier_catalog WHERE id = ? AND supplier_id = ? AND restaurant_id = ?',
+    [catalogId, supplierId, rid]
+  );
+  if (!catalog) return res.status(404).json({ error: 'Produit introuvable' });
+
+  const { price, notes } = req.body || {};
+  if (price === null || price === undefined || price === '') {
+    run(
+      'DELETE FROM client_price_overrides WHERE supplier_id = ? AND restaurant_id = ? AND catalog_id = ?',
+      [supplierId, rid, catalogId]
+    );
+    return res.json({ success: true, cleared: true });
+  }
+  const numPrice = Number(price);
+  if (!Number.isFinite(numPrice) || numPrice <= 0) {
+    return res.status(400).json({ error: 'Prix invalide' });
+  }
+  // INSERT … ON CONFLICT relies on the UNIQUE(supplier_id, restaurant_id,
+  // catalog_id) created in the migration. Without the UNIQUE this would
+  // silently re-insert (see feedback_insert_or_replace_needs_unique.md).
+  run(
+    `INSERT INTO client_price_overrides
+       (supplier_id, restaurant_id, catalog_id, override_price, notes, updated_at)
+     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(supplier_id, restaurant_id, catalog_id) DO UPDATE SET
+       override_price = excluded.override_price,
+       notes          = excluded.notes,
+       updated_at     = CURRENT_TIMESTAMP`,
+    [supplierId, rid, catalogId, numPrice, notes || null]
+  );
+  res.json({ success: true, price: numPrice });
+});
+
+// DELETE — remove an override.
+router.delete('/clients/:restaurantId/price-overrides/:catalogId', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const requestedRid = Number(req.params.restaurantId);
+  if (requestedRid !== rid) return res.status(404).json({ error: 'Restaurant introuvable' });
+  const catalogId = Number(req.params.catalogId);
+  run(
+    'DELETE FROM client_price_overrides WHERE supplier_id = ? AND restaurant_id = ? AND catalog_id = ?',
+    [supplierId, rid, catalogId]
+  );
+  res.json({ success: true });
+});
+
+// ═════════════════════════════════════════
 // BL PDF EXPORT
 // ═════════════════════════════════════════
 // pdfkit-based bon de livraison. Header with supplier + restaurant blocks,
@@ -1187,13 +1380,28 @@ router.get('/delivery-notes/:id/pdf', requireSupplierAuth, (req, res) => {
     [id, rid]
   );
 
+  // Buffer the entire PDF in memory and send with explicit Content-Length
+  // instead of streaming. Streaming pdfkit through `compression()` + Render's
+  // nginx corrupted the response in prod (the browser's blob() saw a
+  // doubly-encoded body). For BLs (~30–60 KB) the memory cost is negligible.
+  // Defense-in-depth: app.js compression filter also skips application/pdf.
   const PDFDocument = require('pdfkit');
   const doc = new PDFDocument({ size: 'A4', margin: 42 });
-
-  res.setHeader('Content-Type', 'application/pdf');
   const safeName = String(supplierName || 'fournisseur').replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 40);
-  res.setHeader('Content-Disposition', `attachment; filename="BL-${safeName}-${id}.pdf"`);
-  doc.pipe(res);
+
+  const chunks = [];
+  doc.on('data', (c) => chunks.push(c));
+  doc.on('end', () => {
+    const buf = Buffer.concat(chunks);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', buf.length);
+    res.setHeader('Content-Disposition', `attachment; filename="BL-${safeName}-${id}.pdf"`);
+    res.end(buf);
+  });
+  doc.on('error', (e) => {
+    console.error('PDFKit BL error:', e);
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur génération PDF' });
+  });
 
   // Header
   doc.font('Helvetica-Bold').fontSize(16).text('Bon de livraison', { align: 'left' });

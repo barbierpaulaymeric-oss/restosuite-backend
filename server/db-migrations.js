@@ -1756,6 +1756,33 @@ try {
   console.warn('⚠️ Supplier portal v2 migration error:', e.message);
 }
 
+// ─── Supplier portal v3: per-client price overrides ───
+// One row per (supplier_id, restaurant_id, catalog_id) override. UNIQUE makes
+// the upsert from PUT /clients/:rid/price-overrides/:catalogId trivial via
+// INSERT … ON CONFLICT. No FK REFERENCES on supplier_id/restaurant_id/catalog_id
+// — matches the no-FK convention of cooling_logs/witness_meals so :memory:
+// test DBs don't choke (per feedback_fk_references_test_db.md).
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS client_price_overrides (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      supplier_id INTEGER NOT NULL,
+      restaurant_id INTEGER NOT NULL,
+      catalog_id INTEGER NOT NULL,
+      override_price REAL NOT NULL,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(supplier_id, restaurant_id, catalog_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_client_price_overrides_lookup
+      ON client_price_overrides(supplier_id, restaurant_id);
+  `);
+  console.log('✅ Migration: supplier-portal v3 (client_price_overrides) ready');
+} catch (e) {
+  console.warn('⚠️ Supplier portal v3 migration error:', e.message);
+}
+
 // ─── Alto AI personalization: preferences, learning, shortcuts ───
 // No FK REFERENCES (keeps :memory: test DB happy — matches cooling_logs convention)
 try {

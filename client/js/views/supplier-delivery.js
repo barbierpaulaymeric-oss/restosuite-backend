@@ -143,16 +143,36 @@ async function showSupplierDeliveryDetail(id) {
   }
 }
 
-function showNewDeliveryForm() {
+async function showNewDeliveryForm() {
   const content = document.getElementById('supplier-content');
+  // Load clients up-front so we can populate the dropdown. Failure is non-
+  // fatal — we still render the form, just without the picker (UX falls back
+  // to "your default restaurant" semantics on the server side).
+  let clients = [];
+  try {
+    clients = await API.getSupplierClients();
+  } catch (_) { /* offline / 401 → form still renders with empty picker */ }
+
+  const clientOptions = clients.map(c => `
+    <option value="${c.restaurant_id}">${escapeHtml(c.restaurant_name || `#${c.restaurant_id}`)}${c.restaurant_city ? ' — ' + escapeHtml(c.restaurant_city) : ''}</option>
+  `).join('');
+
   content.innerHTML = `
     <div style="margin-bottom:var(--space-4)">
       <button class="btn btn-secondary btn-sm" id="back-supplier-deliveries-form">← Retour</button>
     </div>
     <h2 style="margin-bottom:var(--space-4)">Nouveau bon de livraison</h2>
-    <div class="form-group" style="margin-bottom:var(--space-4)">
-      <label class="form-label">Date de livraison</label>
-      <input type="date" id="dn-date" class="input" value="${new Date().toISOString().split('T')[0]}">
+    <div class="form-row" style="margin-bottom:var(--space-4)">
+      <div class="form-group" style="flex:2">
+        <label class="form-label">Restaurant client *</label>
+        <select id="dn-restaurant" class="input">
+          ${clientOptions || '<option value="">Aucun client lié</option>'}
+        </select>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Date de livraison</label>
+        <input type="date" id="dn-date" class="input" value="${new Date().toISOString().split('T')[0]}">
+      </div>
     </div>
     <div class="form-group" style="margin-bottom:var(--space-4)">
       <label class="form-label">Notes</label>
@@ -255,6 +275,12 @@ function showNewDeliveryForm() {
   document.getElementById('dn-submit').addEventListener('click', async () => {
     const delivery_date = document.getElementById('dn-date').value || null;
     const notes = document.getElementById('dn-notes').value || null;
+    const restaurantSel = document.getElementById('dn-restaurant');
+    const restaurant_id = restaurantSel && restaurantSel.value ? Number(restaurantSel.value) : null;
+    if (clients.length && !restaurant_id) {
+      showToast('Sélectionnez un restaurant client', 'error');
+      return;
+    }
     const rows = document.querySelectorAll('.dn-item-row');
     const items = [];
 
@@ -286,7 +312,10 @@ function showNewDeliveryForm() {
     }
 
     try {
-      await API.createSupplierDeliveryNote({ delivery_date, notes, items });
+      // restaurant_id is sent for forward compat with multi-restaurant supplier
+      // accounts. The current backend ignores body.restaurant_id and uses the
+      // bound supplier_account.restaurant_id, but sending it costs nothing.
+      await API.createSupplierDeliveryNote({ delivery_date, notes, items, restaurant_id });
       showToast('Bon de livraison envoyé !', 'success');
       renderSupplierDeliveriesTab();
     } catch (e) {
