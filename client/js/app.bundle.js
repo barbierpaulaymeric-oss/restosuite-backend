@@ -615,6 +615,59 @@ const API = {
   saveSupplierMercuriale(items) {
     return this.supplierRequest("/save-mercuriale", { method: "POST", body: { items } });
   },
+  // ─── Supplier portal v2: dashboard, clients, supplier-side notifs, BL PDF ───
+  getSupplierDashboard() {
+    return this.supplierRequest("/dashboard");
+  },
+  getSupplierClients() {
+    return this.supplierRequest("/clients");
+  },
+  getSupplierClient(restaurantId) {
+    return this.supplierRequest(`/clients/${restaurantId}`);
+  },
+  getSupplierClientOrder(restaurantId, orderId) {
+    return this.supplierRequest(`/clients/${restaurantId}/orders/${orderId}`);
+  },
+  getSupplierMyNotifications() {
+    return this.supplierRequest("/notifications/me");
+  },
+  getSupplierMyUnreadCount() {
+    return this.supplierRequest("/notifications/me/unread-count");
+  },
+  markSupplierMyNotificationRead(id) {
+    return this.supplierRequest(`/notifications/me/${id}/read`, { method: "PUT" });
+  },
+  markAllSupplierMyNotificationsRead() {
+    return this.supplierRequest("/notifications/me/read-all", { method: "PUT" });
+  },
+  // PDF download: fetch as blob (so the X-Supplier-Token header travels in the
+  // request properly — `<a href>` can't carry custom headers and we don't want
+  // the token in URL/referer logs). Caller hands the returned blob to a
+  // temporary <a> + click() pattern.
+  async downloadSupplierDeliveryNotePdf(id) {
+    const token = getSupplierToken();
+    if (!token) throw new Error("Non connect\xE9");
+    const res = await fetch(this.base + `/supplier-portal/delivery-notes/${id}/pdf`, {
+      headers: { "X-Supplier-Token": token }
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        clearSupplierSession();
+        location.reload();
+      }
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || "Erreur t\xE9l\xE9chargement PDF");
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `BL-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1e3);
+  },
   // ─── Deliveries (restaurant side) ───
   getDeliveries(status) {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
@@ -18676,11 +18729,18 @@ function bootSupplierApp(session) {
         </button>
       </header>
       <nav class="supplier-nav">
-        <button class="supplier-nav__tab active" data-tab="catalog">
+        <button class="supplier-nav__tab active" data-tab="dashboard">
+          <i data-lucide="layout-dashboard" style="width:18px;height:18px"></i> Tableau de bord
+        </button>
+        <button class="supplier-nav__tab" data-tab="catalog">
           <i data-lucide="package" style="width:18px;height:18px"></i> Catalogue
+        </button>
+        <button class="supplier-nav__tab" data-tab="clients">
+          <i data-lucide="users" style="width:18px;height:18px"></i> Mes clients
         </button>
         <button class="supplier-nav__tab" data-tab="orders">
           <i data-lucide="clipboard-list" style="width:18px;height:18px"></i> Commandes
+          <span class="supplier-nav__badge" id="supplier-orders-badge" hidden>0</span>
         </button>
         <button class="supplier-nav__tab" data-tab="deliveries">
           <i data-lucide="truck" style="width:18px;height:18px"></i> Livraisons
@@ -18700,21 +18760,73 @@ function bootSupplierApp(session) {
   });
   document.querySelectorAll(".supplier-nav__tab").forEach((tab) => {
     tab.addEventListener("click", () => {
-      document.querySelectorAll(".supplier-nav__tab").forEach((t) => t.classList.remove("active"));
+      document.querySelectorAll(".supplier-nav__tab").forEach((t2) => t2.classList.remove("active"));
       tab.classList.add("active");
-      if (tab.dataset.tab === "catalog") renderSupplierCatalogTab();
-      else if (tab.dataset.tab === "orders") renderSupplierOrdersTab();
-      else if (tab.dataset.tab === "deliveries") renderSupplierDeliveriesTab();
+      const t = tab.dataset.tab;
+      if (t === "dashboard") renderSupplierDashboardTab();
+      else if (t === "catalog") renderSupplierCatalogTab();
+      else if (t === "clients") renderSupplierClientsTab();
+      else if (t === "orders") {
+        renderSupplierOrdersTab();
+        const badge = document.getElementById("supplier-orders-badge");
+        if (badge) {
+          badge.hidden = true;
+          badge.textContent = "0";
+        }
+        if (typeof API.markAllSupplierMyNotificationsRead === "function") {
+          API.markAllSupplierMyNotificationsRead().catch(() => {
+          });
+        }
+      } else if (t === "deliveries") renderSupplierDeliveriesTab();
       else renderSupplierHistoryTab();
     });
   });
-  renderSupplierCatalogTab();
+  renderSupplierDashboardTab();
+  refreshSupplierOrdersBadge();
+  setInterval(refreshSupplierOrdersBadge, 6e4);
+}
+function refreshSupplierOrdersBadge() {
+  if (typeof API.getSupplierMyUnreadCount !== "function") return;
+  API.getSupplierMyUnreadCount().then(({ count }) => {
+    const badge = document.getElementById("supplier-orders-badge");
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = String(count);
+      badge.hidden = false;
+    } else {
+      badge.hidden = true;
+    }
+  }).catch(() => {
+  });
+}
+let _supplierCatalogState = {
+  catalog: [],
+  search: "",
+  category: "all",
+  sortKey: "category",
+  sortDir: "asc"
+};
+function _ttcFromCatalogRow(p) {
+  const tva = p.tva_rate != null ? Number(p.tva_rate) : 5.5;
+  return Number(p.price) * (1 + tva / 100);
+}
+function _formatLastUpdate(catalog) {
+  if (!catalog.length) return "";
+  let max = null;
+  for (const p of catalog) {
+    if (!p.updated_at) continue;
+    if (!max || p.updated_at > max) max = p.updated_at;
+  }
+  if (!max) return "";
+  const d = new Date(max);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 async function renderSupplierCatalogTab() {
   const content = document.getElementById("supplier-content");
   if (!content) return;
   content.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
       <h2 style="margin:0;font-size:var(--text-xl)">Mon catalogue</h2>
       <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
         <button class="btn btn-secondary" id="btn-import-mercuriale">
@@ -18725,6 +18837,8 @@ async function renderSupplierCatalogTab() {
         </button>
       </div>
     </div>
+    <div id="supplier-catalog-toolbar"></div>
+    <div id="supplier-catalog-chips"></div>
     <div id="supplier-catalog-list"><div class="loading"><div class="spinner"></div></div></div>
   `;
   if (window.lucide) lucide.createIcons();
@@ -18736,92 +18850,264 @@ async function renderSupplierCatalogTab() {
   });
   try {
     const catalog = await API.getSupplierCatalog();
-    const listEl = document.getElementById("supplier-catalog-list");
-    if (catalog.length === 0) {
-      listEl.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon"><i data-lucide="package-open"></i></div>
-          <p>Votre catalogue est vide</p>
-          <p class="text-secondary text-sm">Ajoutez vos produits pour que le restaurant puisse voir vos tarifs</p>
-          <button class="btn btn-primary" onclick="showAddProductModal()" style="background:#4A90D9;border-color:#4A90D9">
-            <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter un produit
-          </button>
-        </div>
-      `;
-      if (window.lucide) lucide.createIcons();
-      return;
-    }
-    const categories = {};
-    catalog.forEach((p) => {
-      const cat = p.category || "Sans cat\xE9gorie";
-      if (!categories[cat]) categories[cat] = [];
-      categories[cat].push(p);
-    });
-    listEl.innerHTML = Object.entries(categories).map(([cat, products]) => `
-      <div class="supplier-category">
-        <h3 class="supplier-category__title">${escapeHtml(cat)}</h3>
-        ${products.map((p) => `
-          <div class="supplier-product-card ${!p.available ? "supplier-product-card--unavailable" : ""}" data-id="${p.id}">
-            <div class="supplier-product-card__info">
-              <span class="supplier-product-card__name">${escapeHtml(p.product_name)}</span>
-              <span class="supplier-product-card__unit">${escapeHtml(p.unit)}${p.min_order > 0 ? ` \xB7 Min: ${p.min_order}` : ""}</span>
-            </div>
-            <div class="supplier-product-card__actions">
-              <span class="supplier-product-card__price" data-id="${p.id}" data-price="${p.price}" title="Cliquer pour modifier">
-                ${formatCurrency(p.price)}
-              </span>
-              <label class="supplier-toggle" title="${p.available ? "Disponible" : "Indisponible"}">
-                <input type="checkbox" ${p.available ? "checked" : ""} data-toggle-id="${p.id}">
-                <span class="supplier-toggle__slider"></span>
-              </label>
-              <button class="btn-icon supplier-product-card__delete" aria-label="Supprimer le produit" data-delete-id="${p.id}" data-delete-name="${escapeHtml(p.product_name)}" title="Supprimer">
-                <i data-lucide="trash-2" style="width:16px;height:16px"></i>
-              </button>
-            </div>
-          </div>
-        `).join("")}
-      </div>
-    `).join("");
-    if (window.lucide) lucide.createIcons();
-    listEl.querySelectorAll(".supplier-product-card__price").forEach((priceEl) => {
-      priceEl.addEventListener("click", () => {
-        const id = priceEl.dataset.id;
-        const currentPrice = parseFloat(priceEl.dataset.price);
-        startInlinePriceEdit(priceEl, id, currentPrice);
-      });
-    });
-    listEl.querySelectorAll("[data-toggle-id]").forEach((toggle) => {
-      toggle.addEventListener("change", async () => {
-        const id = toggle.dataset.toggleId;
-        try {
-          await API.toggleSupplierProductAvailability(id, toggle.checked);
-          showToast(toggle.checked ? "Produit disponible" : "Produit indisponible", "success");
-          renderSupplierCatalogTab();
-        } catch (e) {
-          showToast(e.message, "error");
-          toggle.checked = !toggle.checked;
-        }
-      });
-    });
-    listEl.querySelectorAll("[data-delete-id]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const id = btn.dataset.deleteId;
-        const name = btn.dataset.deleteName;
-        showConfirmModal("Retirer le produit", `\xCAtes-vous s\xFBr de vouloir retirer "${name}" du catalogue ?`, async () => {
-          try {
-            await API.deleteSupplierProduct(id);
-            showToast("Produit retir\xE9", "success");
-            renderSupplierCatalogTab();
-          } catch (e) {
-            showToast(e.message, "error");
-          }
-        }, { confirmText: "Retirer", confirmClass: "btn btn-danger" });
-        return;
-      });
-    });
+    _supplierCatalogState.catalog = catalog;
+    _supplierCatalogState.search = "";
+    _supplierCatalogState.category = "all";
+    _renderSupplierCatalogToolbar();
+    _renderSupplierCatalogChips();
+    _renderSupplierCatalogList();
   } catch (e) {
     document.getElementById("supplier-catalog-list").innerHTML = `<p class="text-danger">Erreur: ${escapeHtml(e.message)}</p>`;
   }
+}
+function _renderSupplierCatalogToolbar() {
+  const host = document.getElementById("supplier-catalog-toolbar");
+  if (!host) return;
+  const lastUpdate = _formatLastUpdate(_supplierCatalogState.catalog);
+  host.innerHTML = `
+    <div class="supplier-catalog-toolbar">
+      <div style="position:relative;flex:1;min-width:200px">
+        <input type="search" id="supplier-catalog-search" class="form-control"
+               placeholder="Rechercher un produit, SKU\u2026"
+               value="${escapeHtml(_supplierCatalogState.search)}"
+               style="padding-left:34px">
+        <i data-lucide="search" style="width:16px;height:16px;position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-tertiary)" aria-hidden="true"></i>
+      </div>
+      <label class="supplier-catalog-sort">
+        <span class="text-secondary text-sm">Trier&nbsp;:</span>
+        <select class="form-control" id="supplier-catalog-sort">
+          <option value="category-asc"  ${_supplierCatalogState.sortKey === "category" && _supplierCatalogState.sortDir === "asc" ? "selected" : ""}>Cat\xE9gorie A\u2192Z</option>
+          <option value="name-asc"      ${_supplierCatalogState.sortKey === "name" && _supplierCatalogState.sortDir === "asc" ? "selected" : ""}>Nom A\u2192Z</option>
+          <option value="name-desc"     ${_supplierCatalogState.sortKey === "name" && _supplierCatalogState.sortDir === "desc" ? "selected" : ""}>Nom Z\u2192A</option>
+          <option value="price-asc"     ${_supplierCatalogState.sortKey === "price" && _supplierCatalogState.sortDir === "asc" ? "selected" : ""}>Prix croissant</option>
+          <option value="price-desc"    ${_supplierCatalogState.sortKey === "price" && _supplierCatalogState.sortDir === "desc" ? "selected" : ""}>Prix d\xE9croissant</option>
+          <option value="updated-desc"  ${_supplierCatalogState.sortKey === "updated" && _supplierCatalogState.sortDir === "desc" ? "selected" : ""}>R\xE9cemment modifi\xE9s</option>
+        </select>
+      </label>
+      ${lastUpdate ? `<span class="text-tertiary text-sm" style="white-space:nowrap">Derni\xE8re M\xE0J : ${lastUpdate}</span>` : ""}
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+  const search = document.getElementById("supplier-catalog-search");
+  if (search) {
+    search.addEventListener("input", () => {
+      _supplierCatalogState.search = search.value;
+      _renderSupplierCatalogList();
+    });
+  }
+  const sort = document.getElementById("supplier-catalog-sort");
+  if (sort) {
+    sort.addEventListener("change", () => {
+      const [k, d] = sort.value.split("-");
+      _supplierCatalogState.sortKey = k;
+      _supplierCatalogState.sortDir = d;
+      _renderSupplierCatalogList();
+    });
+  }
+}
+function _renderSupplierCatalogChips() {
+  const host = document.getElementById("supplier-catalog-chips");
+  if (!host) return;
+  const counts = /* @__PURE__ */ new Map();
+  for (const p of _supplierCatalogState.catalog) {
+    const key = p.category || "Sans cat\xE9gorie";
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const total = _supplierCatalogState.catalog.length;
+  const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  const chipHtml = (label, key, count, active) => `
+    <button type="button" class="supplier-cat-chip ${active ? "supplier-cat-chip--active" : ""}" data-cat="${escapeHtml(key)}">
+      ${escapeHtml(label)} <span class="supplier-cat-chip__count">${count}</span>
+    </button>`;
+  host.innerHTML = `
+    <div class="supplier-cat-chips">
+      ${chipHtml("Tout", "all", total, _supplierCatalogState.category === "all")}
+      ${sorted.map(([cat, n]) => chipHtml(cat, cat, n, _supplierCatalogState.category === cat)).join("")}
+    </div>
+  `;
+  host.querySelectorAll(".supplier-cat-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _supplierCatalogState.category = btn.dataset.cat;
+      _renderSupplierCatalogChips();
+      _renderSupplierCatalogList();
+    });
+  });
+}
+function _filterAndSortCatalog() {
+  const { catalog, search, category, sortKey, sortDir } = _supplierCatalogState;
+  const q = search.trim().toLowerCase();
+  let rows = catalog.filter((p) => {
+    if (category !== "all" && (p.category || "Sans cat\xE9gorie") !== category) return false;
+    if (!q) return true;
+    return (p.product_name || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q);
+  });
+  const cmp = (a, b, key) => {
+    if (key === "price") return (a.price || 0) - (b.price || 0);
+    if (key === "updated") return String(a.updated_at || "").localeCompare(String(b.updated_at || ""));
+    if (key === "name") return (a.product_name || "").localeCompare(b.product_name || "", "fr");
+    const c = (a.category || "").localeCompare(b.category || "", "fr");
+    return c !== 0 ? c : (a.product_name || "").localeCompare(b.product_name || "", "fr");
+  };
+  rows.sort((a, b) => cmp(a, b, sortKey) * (sortDir === "desc" ? -1 : 1));
+  return rows;
+}
+function _renderSupplierCatalogList() {
+  const listEl = document.getElementById("supplier-catalog-list");
+  if (!listEl) return;
+  const total = _supplierCatalogState.catalog.length;
+  if (total === 0) {
+    listEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon"><i data-lucide="package-open"></i></div>
+        <p>Votre catalogue est vide</p>
+        <p class="text-secondary text-sm">Ajoutez vos produits pour que le restaurant puisse voir vos tarifs</p>
+        <button class="btn btn-primary" onclick="showAddProductModal()" style="background:#4A90D9;border-color:#4A90D9">
+          <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter un produit
+        </button>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+  const rows = _filterAndSortCatalog();
+  if (rows.length === 0) {
+    listEl.innerHTML = `<p class="text-secondary" style="padding:var(--space-4);text-align:center">Aucun produit ne correspond \xE0 votre recherche.</p>`;
+    return;
+  }
+  const grouped = _supplierCatalogState.sortKey === "category";
+  if (grouped) {
+    const cats = /* @__PURE__ */ new Map();
+    for (const p of rows) {
+      const k = p.category || "Sans cat\xE9gorie";
+      if (!cats.has(k)) cats.set(k, []);
+      cats.get(k).push(p);
+    }
+    listEl.innerHTML = Array.from(cats.entries()).map(([cat, items]) => `
+      <div class="supplier-category">
+        <h3 class="supplier-category__title">${escapeHtml(cat)} <span class="text-tertiary text-sm">(${items.length})</span></h3>
+        ${items.map(_supplierProductCardHtml).join("")}
+      </div>
+    `).join("");
+  } else {
+    listEl.innerHTML = `<div class="supplier-category">${rows.map(_supplierProductCardHtml).join("")}</div>`;
+  }
+  if (window.lucide) lucide.createIcons();
+  _wireSupplierCatalogCardEvents(listEl);
+}
+function _supplierProductCardHtml(p) {
+  const tva = p.tva_rate != null ? Number(p.tva_rate) : 5.5;
+  const ttc = _ttcFromCatalogRow(p);
+  return `
+    <div class="supplier-product-card ${!p.available ? "supplier-product-card--unavailable" : ""}" data-id="${p.id}">
+      <div class="supplier-product-card__info">
+        <span class="supplier-product-card__name">${escapeHtml(p.product_name)}</span>
+        <span class="supplier-product-card__meta">
+          ${p.sku ? `<span class="supplier-product-card__sku" data-id="${p.id}" data-sku="${escapeHtml(p.sku)}" title="Cliquer pour modifier">${escapeHtml(p.sku)}</span>` : `<span class="supplier-product-card__sku supplier-product-card__sku--missing" data-id="${p.id}" data-sku="" title="Ajouter un SKU">+ SKU</span>`}
+          <span class="text-secondary">${escapeHtml(p.unit)}${p.min_order > 0 ? ` \xB7 Min : ${p.min_order}` : ""}</span>
+          ${p.packaging ? `<span class="text-tertiary text-sm">\xB7 ${escapeHtml(p.packaging)}</span>` : ""}
+        </span>
+      </div>
+      <div class="supplier-product-card__actions">
+        <span class="supplier-product-card__price-wrap">
+          <span class="supplier-product-card__price" data-id="${p.id}" data-price="${p.price}" title="Cliquer pour modifier">
+            ${formatCurrency(p.price)} HT
+          </span>
+          <span class="supplier-product-card__tva text-tertiary text-sm">
+            TVA ${tva}% \xB7 TTC ${formatCurrency(ttc)}
+          </span>
+        </span>
+        <label class="supplier-toggle" title="${p.available ? "Disponible" : "Indisponible"}">
+          <input type="checkbox" ${p.available ? "checked" : ""} data-toggle-id="${p.id}">
+          <span class="supplier-toggle__slider"></span>
+        </label>
+        <button class="btn-icon supplier-product-card__delete" aria-label="Supprimer le produit" data-delete-id="${p.id}" data-delete-name="${escapeHtml(p.product_name)}" title="Supprimer">
+          <i data-lucide="trash-2" style="width:16px;height:16px"></i>
+        </button>
+      </div>
+    </div>`;
+}
+function _wireSupplierCatalogCardEvents(listEl) {
+  listEl.querySelectorAll(".supplier-product-card__price").forEach((priceEl) => {
+    priceEl.addEventListener("click", () => {
+      const id = priceEl.dataset.id;
+      const currentPrice = parseFloat(priceEl.dataset.price);
+      startInlinePriceEdit(priceEl, id, currentPrice);
+    });
+  });
+  listEl.querySelectorAll(".supplier-product-card__sku").forEach((skuEl) => {
+    skuEl.addEventListener("click", () => {
+      const id = skuEl.dataset.id;
+      const currentSku = skuEl.dataset.sku || "";
+      _startInlineSkuEdit(skuEl, id, currentSku);
+    });
+  });
+  listEl.querySelectorAll("[data-toggle-id]").forEach((toggle) => {
+    toggle.addEventListener("change", async () => {
+      const id = toggle.dataset.toggleId;
+      try {
+        await API.toggleSupplierProductAvailability(id, toggle.checked);
+        showToast(toggle.checked ? "Produit disponible" : "Produit indisponible", "success");
+        renderSupplierCatalogTab();
+      } catch (e) {
+        showToast(e.message, "error");
+        toggle.checked = !toggle.checked;
+      }
+    });
+  });
+  listEl.querySelectorAll("[data-delete-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.deleteId;
+      const name = btn.dataset.deleteName;
+      showConfirmModal("Retirer le produit", `\xCAtes-vous s\xFBr de vouloir retirer "${name}" du catalogue ?`, async () => {
+        try {
+          await API.deleteSupplierProduct(id);
+          showToast("Produit retir\xE9", "success");
+          renderSupplierCatalogTab();
+        } catch (e) {
+          showToast(e.message, "error");
+        }
+      }, { confirmText: "Retirer", confirmClass: "btn btn-danger" });
+    });
+  });
+}
+function _startInlineSkuEdit(skuEl, id, currentSku) {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = currentSku;
+  input.placeholder = "Code article";
+  input.maxLength = 64;
+  input.className = "supplier-sku-input";
+  input.style.cssText = "min-width:120px;font-family:var(--font-mono);font-size:var(--text-sm);padding:2px 6px;border-radius:var(--radius-sm);border:2px solid #4A90D9;background:var(--bg-base);color:var(--text-primary)";
+  const originalHTML = skuEl.innerHTML;
+  skuEl.innerHTML = "";
+  skuEl.appendChild(input);
+  input.focus();
+  input.select();
+  async function saveSku() {
+    const newSku = input.value.trim();
+    if (newSku === currentSku) {
+      skuEl.innerHTML = originalHTML;
+      return;
+    }
+    try {
+      await API.updateSupplierProduct(id, { sku: newSku || null });
+      showToast(newSku ? "SKU mis \xE0 jour" : "SKU supprim\xE9", "success");
+      renderSupplierCatalogTab();
+    } catch (e) {
+      showToast(e.message, "error");
+      skuEl.innerHTML = originalHTML;
+    }
+  }
+  input.addEventListener("blur", saveSku);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      input.blur();
+    }
+    if (e.key === "Escape") {
+      skuEl.innerHTML = originalHTML;
+    }
+  });
 }
 function startInlinePriceEdit(priceEl, id, currentPrice) {
   const input = document.createElement("input");
@@ -18872,9 +19158,15 @@ function showAddProductModal() {
   overlay.innerHTML = `
     <div class="modal">
       <h2>Ajouter un produit</h2>
-      <div class="form-group">
-        <label>Nom du produit</label>
-        <input type="text" class="form-control" id="m-prod-name" placeholder="ex: Tomates bio">
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Nom du produit</label>
+          <input type="text" class="form-control" id="m-prod-name" placeholder="ex: Tomates bio">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>SKU (optionnel)</label>
+          <input type="text" class="form-control" id="m-prod-sku" placeholder="ex: MET-LEG-042" maxlength="64">
+        </div>
       </div>
       <div class="form-group">
         <label>Cat\xE9gorie</label>
@@ -18882,7 +19174,7 @@ function showAddProductModal() {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Prix (\u20AC)</label>
+          <label>Prix HT (\u20AC)</label>
           <input type="number" class="form-control" id="m-prod-price" step="0.01" min="0" placeholder="0.00"
                  style="font-family:var(--font-mono)">
         </div>
@@ -18896,12 +19188,30 @@ function showAddProductModal() {
             <option value="barquette">barquette</option>
             <option value="carton">carton</option>
             <option value="sac">sac</option>
+            <option value="bouteille">bouteille</option>
+            <option value="f\xFBt">f\xFBt</option>
+            <option value="lot">lot</option>
+            <option value="plateau">plateau</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>TVA (%)</label>
+          <select class="form-control" id="m-prod-tva">
+            <option value="5.5" selected>5,5 % (alimentaire)</option>
+            <option value="10">10 % (restauration)</option>
+            <option value="20">20 % (alcools, autres)</option>
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label>Commande minimum (optionnel)</label>
-        <input type="number" class="form-control" id="m-prod-min" step="0.1" min="0" value="0">
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Conditionnement (optionnel)</label>
+          <input type="text" class="form-control" id="m-prod-pkg" placeholder="ex: Carton 5 kg, Lot de 6, Barquette 500g" maxlength="80">
+        </div>
+        <div class="form-group">
+          <label>Commande min</label>
+          <input type="number" class="form-control" id="m-prod-min" step="0.1" min="0" value="0">
+        </div>
       </div>
       <div class="actions-row">
         <button class="btn btn-primary" id="m-prod-save" style="background:#4A90D9;border-color:#4A90D9">
@@ -18923,6 +19233,9 @@ function showAddProductModal() {
     const price = parseFloat(document.getElementById("m-prod-price").value);
     const unit = document.getElementById("m-prod-unit").value;
     const min_order = parseFloat(document.getElementById("m-prod-min").value) || 0;
+    const sku = document.getElementById("m-prod-sku").value.trim();
+    const packaging = document.getElementById("m-prod-pkg").value.trim();
+    const tva_rate = parseFloat(document.getElementById("m-prod-tva").value);
     if (!product_name) {
       showToast("Nom du produit requis", "error");
       return;
@@ -18932,7 +19245,16 @@ function showAddProductModal() {
       return;
     }
     try {
-      await API.addSupplierProduct({ product_name, category: category || null, price, unit, min_order });
+      await API.addSupplierProduct({
+        product_name,
+        category: category || null,
+        price,
+        unit,
+        min_order,
+        sku: sku || null,
+        tva_rate: Number.isFinite(tva_rate) ? tva_rate : 5.5,
+        packaging: packaging || null
+      });
       showToast("Produit ajout\xE9", "success");
       overlay.remove();
       renderSupplierCatalogTab();
@@ -19320,6 +19642,377 @@ function showSupplierMercurialeImport() {
   }
   renderDropzone();
 }
+async function renderSupplierDashboardTab() {
+  const content = document.getElementById("supplier-content");
+  if (!content) return;
+  content.innerHTML = `
+    <div style="margin-bottom:var(--space-4)">
+      <h2 style="margin:0;font-size:var(--text-xl)">Tableau de bord</h2>
+      <p class="text-secondary" style="margin:var(--space-1) 0 0">Vue d'ensemble de votre activit\xE9.</p>
+    </div>
+    <div id="supplier-dashboard-body">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+  `;
+  let data;
+  try {
+    data = await API.getSupplierDashboard();
+  } catch (e) {
+    document.getElementById("supplier-dashboard-body").innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+  const fmt = (n) => formatCurrency(Number(n) || 0);
+  const dt = (s) => {
+    if (!s) return "\u2014";
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
+  const statusPill = (status) => {
+    const map = {
+      "brouillon": { label: "Brouillon", cls: "pill--draft" },
+      "envoy\xE9e": { label: "Envoy\xE9e", cls: "pill--sent" },
+      "envoyee": { label: "Envoy\xE9e", cls: "pill--sent" },
+      "confirm\xE9e": { label: "Confirm\xE9e", cls: "pill--ok" },
+      "confirmee": { label: "Confirm\xE9e", cls: "pill--ok" },
+      "livr\xE9e": { label: "Livr\xE9e", cls: "pill--ok" },
+      "livree": { label: "Livr\xE9e", cls: "pill--ok" },
+      "annul\xE9e": { label: "Annul\xE9e", cls: "pill--cancel" },
+      "annulee": { label: "Annul\xE9e", cls: "pill--cancel" }
+    };
+    const m = map[status] || { label: status || "\u2014", cls: "pill--draft" };
+    return `<span class="supplier-pill ${m.cls}">${escapeHtml(m.label)}</span>`;
+  };
+  document.getElementById("supplier-dashboard-body").innerHTML = `
+    <div class="supplier-kpi-grid">
+      <div class="supplier-kpi-card">
+        <div class="supplier-kpi-card__label">CA total</div>
+        <div class="supplier-kpi-card__value">${fmt(data.revenue_total)}</div>
+        <div class="supplier-kpi-card__sub">Ce mois : ${fmt(data.revenue_this_month)}</div>
+      </div>
+      <div class="supplier-kpi-card">
+        <div class="supplier-kpi-card__label">Commandes</div>
+        <div class="supplier-kpi-card__value">${data.orders_total}</div>
+        <div class="supplier-kpi-card__sub">Ce mois : ${data.orders_this_month}</div>
+      </div>
+      <div class="supplier-kpi-card">
+        <div class="supplier-kpi-card__label">Clients actifs</div>
+        <div class="supplier-kpi-card__value">${data.active_clients}</div>
+        <div class="supplier-kpi-card__sub">Au cours des 30 derniers jours</div>
+      </div>
+      <div class="supplier-kpi-card supplier-kpi-card--alert">
+        <div class="supplier-kpi-card__label">\xC0 confirmer</div>
+        <div class="supplier-kpi-card__value">${data.pending_alerts.length}</div>
+        <div class="supplier-kpi-card__sub">Commandes en attente</div>
+      </div>
+    </div>
+
+    <div class="supplier-dashboard-grid">
+      <section class="supplier-dashboard-block">
+        <div class="supplier-dashboard-block__head">
+          <h3>Derni\xE8res commandes</h3>
+        </div>
+        ${data.recent_orders.length === 0 ? `<p class="text-secondary" style="padding:var(--space-3) 0">Aucune commande pour le moment.</p>` : `<ul class="supplier-dashboard-list">
+              ${data.recent_orders.map((o) => `
+                <li>
+                  <div class="supplier-dashboard-list__main">
+                    <strong>${escapeHtml(o.reference || "\u2014")}</strong>
+                    <span class="text-secondary text-sm">${escapeHtml(o.restaurant_name || "\u2014")}</span>
+                  </div>
+                  <div class="supplier-dashboard-list__side">
+                    ${statusPill(o.status)}
+                    <span class="text-mono">${fmt(o.total_amount)}</span>
+                    <span class="text-tertiary text-sm">${dt(o.created_at)}</span>
+                  </div>
+                </li>
+              `).join("")}
+            </ul>`}
+      </section>
+
+      <section class="supplier-dashboard-block">
+        <div class="supplier-dashboard-block__head">
+          <h3>Alertes \u2014 \xE0 confirmer</h3>
+        </div>
+        ${data.pending_alerts.length === 0 ? `<p class="text-secondary" style="padding:var(--space-3) 0">Tout est \xE0 jour. \u2713</p>` : `<ul class="supplier-dashboard-list">
+              ${data.pending_alerts.slice(0, 8).map((o) => `
+                <li>
+                  <div class="supplier-dashboard-list__main">
+                    <strong>${escapeHtml(o.reference || "\u2014")}</strong>
+                    <span class="text-secondary text-sm">${escapeHtml(o.restaurant_name || "\u2014")}</span>
+                  </div>
+                  <div class="supplier-dashboard-list__side">
+                    ${statusPill(o.status)}
+                    <span class="text-mono">${fmt(o.total_amount)}</span>
+                  </div>
+                </li>
+              `).join("")}
+            </ul>`}
+      </section>
+    </div>
+  `;
+}
+async function renderSupplierClientsTab() {
+  const content = document.getElementById("supplier-content");
+  if (!content) return;
+  content.innerHTML = `
+    <div style="margin-bottom:var(--space-4)">
+      <h2 style="margin:0;font-size:var(--text-xl)">Mes clients</h2>
+      <p class="text-secondary" style="margin:var(--space-1) 0 0">Restaurants qui commandent vos produits.</p>
+    </div>
+    <div id="supplier-clients-body">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+  `;
+  let clients;
+  try {
+    clients = await API.getSupplierClients();
+  } catch (e) {
+    document.getElementById("supplier-clients-body").innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+  const body = document.getElementById("supplier-clients-body");
+  const fmtCurrency = (n) => formatCurrency(Number(n) || 0);
+  const fmtDate2 = (s) => {
+    if (!s) return "\u2014";
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? "\u2014" : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
+  if (!clients.length) {
+    body.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon"><i data-lucide="users"></i></div>
+        <p>Aucun restaurant li\xE9 pour l'instant.</p>
+        <p class="text-secondary text-sm">Les restaurants appara\xEEtront ici d\xE8s qu'ils passeront leur premi\xE8re commande chez vous.</p>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+  body.innerHTML = `
+    <div class="supplier-clients-grid">
+      ${clients.map((c) => `
+        <button type="button" class="supplier-client-card" data-rid="${c.restaurant_id}">
+          <div class="supplier-client-card__head">
+            <div>
+              <div class="supplier-client-card__name">${escapeHtml(c.restaurant_name || "\u2014")}</div>
+              <div class="text-secondary text-sm">
+                ${c.restaurant_city ? escapeHtml(c.restaurant_city) : ""}
+                ${c.restaurant_phone ? ` \xB7 ${escapeHtml(c.restaurant_phone)}` : ""}
+              </div>
+            </div>
+            <div class="supplier-client-card__count">
+              <span class="supplier-client-card__count-num">${c.orders_count}</span>
+              <span class="text-tertiary text-sm">commande${c.orders_count > 1 ? "s" : ""}</span>
+            </div>
+          </div>
+          <div class="supplier-client-card__metrics">
+            <div>
+              <div class="text-tertiary text-sm">CA total</div>
+              <div class="supplier-client-card__metric-value">${fmtCurrency(c.total_revenue)}</div>
+            </div>
+            <div>
+              <div class="text-tertiary text-sm">Panier moyen</div>
+              <div class="supplier-client-card__metric-value">${fmtCurrency(c.avg_order_value)}</div>
+            </div>
+            <div>
+              <div class="text-tertiary text-sm">Derni\xE8re commande</div>
+              <div class="supplier-client-card__metric-value">${fmtDate2(c.last_order_at)}</div>
+            </div>
+          </div>
+        </button>
+      `).join("")}
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+  body.querySelectorAll(".supplier-client-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      const rid = Number(card.dataset.rid);
+      if (Number.isFinite(rid)) renderSupplierClientDetail(rid);
+    });
+  });
+}
+async function renderSupplierClientDetail(restaurantId) {
+  const content = document.getElementById("supplier-content");
+  if (!content) return;
+  content.innerHTML = `
+    <div style="margin-bottom:var(--space-3)">
+      <button class="btn btn-secondary btn-sm" id="supplier-client-back">
+        <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Retour
+      </button>
+    </div>
+    <div id="supplier-client-detail">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+  document.getElementById("supplier-client-back").addEventListener("click", renderSupplierClientsTab);
+  let detail;
+  try {
+    detail = await API.getSupplierClient(restaurantId);
+  } catch (e) {
+    document.getElementById("supplier-client-detail").innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+  const fmtCurrency = (n) => formatCurrency(Number(n) || 0);
+  const fmtDate2 = (s2) => {
+    if (!s2) return "\u2014";
+    const d = new Date(s2);
+    return Number.isNaN(d.getTime()) ? "\u2014" : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
+  const statusPill = (status) => {
+    const map = {
+      "brouillon": "pill--draft",
+      "envoy\xE9e": "pill--sent",
+      "envoyee": "pill--sent",
+      "confirm\xE9e": "pill--ok",
+      "confirmee": "pill--ok",
+      "livr\xE9e": "pill--ok",
+      "livree": "pill--ok",
+      "annul\xE9e": "pill--cancel",
+      "annulee": "pill--cancel"
+    };
+    return `<span class="supplier-pill ${map[status] || "pill--draft"}">${escapeHtml(status || "\u2014")}</span>`;
+  };
+  const r = detail.restaurant;
+  const s = detail.summary;
+  document.getElementById("supplier-client-detail").innerHTML = `
+    <div class="supplier-client-detail__head">
+      <div>
+        <h2 style="margin:0;font-size:var(--text-2xl)">${escapeHtml(r.name)}</h2>
+        <p class="text-secondary" style="margin:var(--space-1) 0 0">
+          ${[r.address, r.postal_code, r.city].filter(Boolean).map(escapeHtml).join(" \xB7 ") || "\u2014"}
+          ${r.phone ? ` \xB7 ${escapeHtml(r.phone)}` : ""}
+        </p>
+      </div>
+    </div>
+
+    <div class="supplier-kpi-grid" style="margin-top:var(--space-4)">
+      <div class="supplier-kpi-card">
+        <div class="supplier-kpi-card__label">CA total</div>
+        <div class="supplier-kpi-card__value">${fmtCurrency(s.total_revenue)}</div>
+      </div>
+      <div class="supplier-kpi-card">
+        <div class="supplier-kpi-card__label">Commandes</div>
+        <div class="supplier-kpi-card__value">${s.orders_count}</div>
+      </div>
+      <div class="supplier-kpi-card">
+        <div class="supplier-kpi-card__label">Panier moyen</div>
+        <div class="supplier-kpi-card__value">${fmtCurrency(s.avg_order_value)}</div>
+      </div>
+      <div class="supplier-kpi-card">
+        <div class="supplier-kpi-card__label">Fr\xE9quence</div>
+        <div class="supplier-kpi-card__value">${detail.frequency_days != null ? `${detail.frequency_days} j` : "\u2014"}</div>
+        <div class="supplier-kpi-card__sub">Derni\xE8re : ${fmtDate2(s.last_order_at)}</div>
+      </div>
+    </div>
+
+    <section class="supplier-dashboard-block" style="margin-top:var(--space-5)">
+      <div class="supplier-dashboard-block__head"><h3>Produits favoris</h3></div>
+      ${detail.favorites.length === 0 ? `<p class="text-secondary" style="padding:var(--space-3) 0">Aucun produit r\xE9current encore.</p>` : `<ul class="supplier-dashboard-list">
+            ${detail.favorites.map((f) => `
+              <li>
+                <div class="supplier-dashboard-list__main">
+                  <strong>${escapeHtml(f.product_name)}</strong>
+                  <span class="text-secondary text-sm">${f.times_ordered} commande${f.times_ordered > 1 ? "s" : ""} \xB7 ${f.total_quantity} u</span>
+                </div>
+                <div class="supplier-dashboard-list__side">
+                  <span class="text-mono">${fmtCurrency(f.total_spent)}</span>
+                </div>
+              </li>
+            `).join("")}
+          </ul>`}
+    </section>
+
+    <section class="supplier-dashboard-block" style="margin-top:var(--space-5)">
+      <div class="supplier-dashboard-block__head"><h3>Historique des commandes</h3></div>
+      ${detail.orders.length === 0 ? `<p class="text-secondary" style="padding:var(--space-3) 0">Aucune commande pour ce client.</p>` : `<div class="supplier-orders-table-wrap">
+            <table class="supplier-orders-table">
+              <thead>
+                <tr>
+                  <th>R\xE9f\xE9rence</th>
+                  <th>Date</th>
+                  <th>Statut</th>
+                  <th style="text-align:right">Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${detail.orders.map((o) => `
+                  <tr data-order-id="${o.id}">
+                    <td><strong>${escapeHtml(o.reference || `#${o.id}`)}</strong></td>
+                    <td>${fmtDate2(o.created_at)}</td>
+                    <td>${statusPill(o.status)}</td>
+                    <td style="text-align:right" class="text-mono">${fmtCurrency(o.total_amount)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>`}
+    </section>
+  `;
+  if (window.lucide) lucide.createIcons();
+  document.querySelectorAll(".supplier-orders-table tbody tr").forEach((row) => {
+    row.addEventListener("click", () => {
+      const id = Number(row.dataset.orderId);
+      if (Number.isFinite(id)) showSupplierClientOrderDetail(restaurantId, id);
+    });
+  });
+}
+async function showSupplierClientOrderDetail(restaurantId, orderId) {
+  let order;
+  try {
+    order = await API.getSupplierClientOrder(restaurantId, orderId);
+  } catch (e) {
+    showToast(e.message, "error");
+    return;
+  }
+  const fmtCurrency = (n) => formatCurrency(Number(n) || 0);
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:720px">
+      <h2>Commande ${escapeHtml(order.reference || `#${order.id}`)}</h2>
+      <p class="text-secondary" style="margin:0 0 var(--space-3)">
+        ${escapeHtml(order.restaurant_name || "")}
+        ${order.created_at ? ` \xB7 ${new Date(order.created_at).toLocaleString("fr-FR")}` : ""}
+      </p>
+      <div class="supplier-orders-table-wrap">
+        <table class="supplier-orders-table">
+          <thead>
+            <tr>
+              <th>Produit</th>
+              <th>Qt\xE9</th>
+              <th>Unit\xE9</th>
+              <th style="text-align:right">Prix unitaire</th>
+              <th style="text-align:right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(order.items || []).map((it) => `
+              <tr>
+                <td>${escapeHtml(it.product_name)}</td>
+                <td class="text-mono">${it.quantity}</td>
+                <td>${escapeHtml(it.unit || "")}</td>
+                <td style="text-align:right" class="text-mono">${fmtCurrency(it.unit_price)}</td>
+                <td style="text-align:right" class="text-mono">${fmtCurrency(it.total_price)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:var(--space-3);font-weight:600">
+        <span>Total HT</span>
+        <span class="text-mono">${fmtCurrency(order.total_amount)}</span>
+      </div>
+      <div class="actions-row">
+        <button class="btn btn-secondary" id="supplier-order-detail-close">Fermer</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector("#supplier-order-detail-close").onclick = () => overlay.remove();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+}
 async function renderSupplierDeliveriesTab() {
   const content = document.getElementById("supplier-content");
   if (!content) return;
@@ -19388,8 +20081,11 @@ async function showSupplierDeliveryDetail(id) {
     const d = await API.getSupplierDeliveryNote(id);
     const statusLabels = { pending: "\u{1F7E0} En attente", received: "\u{1F7E2} Re\xE7u", partial: "\u{1F7E1} Partiel", rejected: "\u{1F534} Refus\xE9" };
     content.innerHTML = `
-      <div style="margin-bottom:var(--space-4)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)">
         <button class="btn btn-secondary btn-sm" id="back-supplier-deliveries">\u2190 Retour</button>
+        <button class="btn btn-secondary btn-sm" id="supplier-bl-pdf">
+          <i data-lucide="download" style="width:16px;height:16px"></i> T\xE9l\xE9charger PDF
+        </button>
       </div>
       <h2>Bon #${d.id} \u2014 ${statusLabels[d.status] || d.status}</h2>
       ${d.delivery_date ? `<p class="text-secondary">Date livraison : ${d.delivery_date}</p>` : ""}
@@ -19427,6 +20123,20 @@ async function showSupplierDeliveryDetail(id) {
       ${d.total_amount ? `<p style="text-align:right;font-weight:600;margin-top:var(--space-3)">Total : ${d.total_amount.toFixed(2)} \u20AC</p>` : ""}
     `;
     document.getElementById("back-supplier-deliveries").addEventListener("click", renderSupplierDeliveriesTab);
+    const pdfBtn = document.getElementById("supplier-bl-pdf");
+    if (pdfBtn) {
+      if (window.lucide) lucide.createIcons();
+      pdfBtn.addEventListener("click", async () => {
+        pdfBtn.disabled = true;
+        try {
+          await API.downloadSupplierDeliveryNotePdf(id);
+        } catch (err) {
+          showToast(err.message || "Erreur t\xE9l\xE9chargement", "error");
+        } finally {
+          pdfBtn.disabled = false;
+        }
+      });
+    }
   } catch (e) {
     content.innerHTML = `<p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>`;
   }

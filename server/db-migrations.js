@@ -1716,6 +1716,46 @@ try {
   console.warn('⚠️ Phase 2 migration error:', e.message);
 }
 
+// ─── Supplier portal v2: SKU, TVA, packaging on supplier_catalog ───
+// Each ALTER is wrapped individually so a partial-state DB (one column added,
+// others not) heals on next boot. supplier_notifications is the supplier-side
+// counterpart of price_change_notifications (which is gérant-facing): when a
+// restaurant creates a purchase_order we drop a row here so the supplier's
+// "Commandes" tab shows an unread badge.
+try {
+  const supplierCatalogCols = db.prepare("PRAGMA table_info('supplier_catalog')").all().map(c => c.name);
+  if (!supplierCatalogCols.includes('sku')) {
+    db.exec("ALTER TABLE supplier_catalog ADD COLUMN sku TEXT");
+  }
+  if (!supplierCatalogCols.includes('tva_rate')) {
+    // 5.5% is the French reduced rate for foodstuffs — covers most catalog
+    // items. Beverages with alcohol get 20% explicitly via the seed/UI.
+    db.exec("ALTER TABLE supplier_catalog ADD COLUMN tva_rate REAL DEFAULT 5.5");
+  }
+  if (!supplierCatalogCols.includes('packaging')) {
+    db.exec("ALTER TABLE supplier_catalog ADD COLUMN packaging TEXT");
+  }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS supplier_notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      supplier_id INTEGER NOT NULL,
+      restaurant_id INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      order_id INTEGER,
+      message TEXT,
+      read INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_supplier_notifications_supplier_read
+      ON supplier_notifications(supplier_id, read);
+    CREATE INDEX IF NOT EXISTS idx_supplier_notifications_created
+      ON supplier_notifications(created_at);
+  `);
+  console.log('✅ Migration: supplier-portal v2 (sku, tva_rate, packaging, notifications) ready');
+} catch (e) {
+  console.warn('⚠️ Supplier portal v2 migration error:', e.message);
+}
+
 // ─── Alto AI personalization: preferences, learning, shortcuts ───
 // No FK REFERENCES (keeps :memory: test DB happy — matches cooling_logs convention)
 try {

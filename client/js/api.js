@@ -533,6 +533,57 @@ const API = {
     return this.supplierRequest('/save-mercuriale', { method: 'POST', body: { items } });
   },
 
+  // ─── Supplier portal v2: dashboard, clients, supplier-side notifs, BL PDF ───
+  getSupplierDashboard() {
+    return this.supplierRequest('/dashboard');
+  },
+  getSupplierClients() {
+    return this.supplierRequest('/clients');
+  },
+  getSupplierClient(restaurantId) {
+    return this.supplierRequest(`/clients/${restaurantId}`);
+  },
+  getSupplierClientOrder(restaurantId, orderId) {
+    return this.supplierRequest(`/clients/${restaurantId}/orders/${orderId}`);
+  },
+  getSupplierMyNotifications() {
+    return this.supplierRequest('/notifications/me');
+  },
+  getSupplierMyUnreadCount() {
+    return this.supplierRequest('/notifications/me/unread-count');
+  },
+  markSupplierMyNotificationRead(id) {
+    return this.supplierRequest(`/notifications/me/${id}/read`, { method: 'PUT' });
+  },
+  markAllSupplierMyNotificationsRead() {
+    return this.supplierRequest('/notifications/me/read-all', { method: 'PUT' });
+  },
+  // PDF download: fetch as blob (so the X-Supplier-Token header travels in the
+  // request properly — `<a href>` can't carry custom headers and we don't want
+  // the token in URL/referer logs). Caller hands the returned blob to a
+  // temporary <a> + click() pattern.
+  async downloadSupplierDeliveryNotePdf(id) {
+    const token = getSupplierToken();
+    if (!token) throw new Error('Non connecté');
+    const res = await fetch(this.base + `/supplier-portal/delivery-notes/${id}/pdf`, {
+      headers: { 'X-Supplier-Token': token },
+    });
+    if (!res.ok) {
+      if (res.status === 401) { clearSupplierSession(); location.reload(); }
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || 'Erreur téléchargement PDF');
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `BL-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
+
   // ─── Deliveries (restaurant side) ───
   getDeliveries(status) {
     const qs = status ? `?status=${encodeURIComponent(status)}` : '';

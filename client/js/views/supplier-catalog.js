@@ -10,7 +10,8 @@ function bootSupplierApp(session) {
   // Set supplier mode on body
   document.body.classList.add('supplier-mode');
 
-  // Render supplier shell
+  // Render supplier shell — six tabs, dashboard is the default landing.
+  // The Commandes tab carries an unread badge populated below.
   app.innerHTML = `
     <div class="supplier-shell">
       <header class="supplier-header">
@@ -26,11 +27,18 @@ function bootSupplierApp(session) {
         </button>
       </header>
       <nav class="supplier-nav">
-        <button class="supplier-nav__tab active" data-tab="catalog">
+        <button class="supplier-nav__tab active" data-tab="dashboard">
+          <i data-lucide="layout-dashboard" style="width:18px;height:18px"></i> Tableau de bord
+        </button>
+        <button class="supplier-nav__tab" data-tab="catalog">
           <i data-lucide="package" style="width:18px;height:18px"></i> Catalogue
+        </button>
+        <button class="supplier-nav__tab" data-tab="clients">
+          <i data-lucide="users" style="width:18px;height:18px"></i> Mes clients
         </button>
         <button class="supplier-nav__tab" data-tab="orders">
           <i data-lucide="clipboard-list" style="width:18px;height:18px"></i> Commandes
+          <span class="supplier-nav__badge" id="supplier-orders-badge" hidden>0</span>
         </button>
         <button class="supplier-nav__tab" data-tab="deliveries">
           <i data-lucide="truck" style="width:18px;height:18px"></i> Livraisons
@@ -56,14 +64,77 @@ function bootSupplierApp(session) {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.supplier-nav__tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
-      if (tab.dataset.tab === 'catalog') renderSupplierCatalogTab();
-      else if (tab.dataset.tab === 'orders') renderSupplierOrdersTab();
-      else if (tab.dataset.tab === 'deliveries') renderSupplierDeliveriesTab();
+      const t = tab.dataset.tab;
+      if (t === 'dashboard') renderSupplierDashboardTab();
+      else if (t === 'catalog') renderSupplierCatalogTab();
+      else if (t === 'clients') renderSupplierClientsTab();
+      else if (t === 'orders') {
+        renderSupplierOrdersTab();
+        // Mark all as read on tab open. Optimistic — UI clears badge first;
+        // background request can fail silently without bothering the supplier.
+        const badge = document.getElementById('supplier-orders-badge');
+        if (badge) { badge.hidden = true; badge.textContent = '0'; }
+        if (typeof API.markAllSupplierMyNotificationsRead === 'function') {
+          API.markAllSupplierMyNotificationsRead().catch(() => {});
+        }
+      }
+      else if (t === 'deliveries') renderSupplierDeliveriesTab();
       else renderSupplierHistoryTab();
     });
   });
 
-  renderSupplierCatalogTab();
+  // Initial: load dashboard + populate notification badge in parallel.
+  renderSupplierDashboardTab();
+  refreshSupplierOrdersBadge();
+  // Cheap auto-refresh every 60s while the portal is open. setInterval is
+  // intentionally not cleaned up — bootSupplierApp is only called once per
+  // session and a logout reloads the page, dropping the timer.
+  setInterval(refreshSupplierOrdersBadge, 60_000);
+}
+
+function refreshSupplierOrdersBadge() {
+  if (typeof API.getSupplierMyUnreadCount !== 'function') return;
+  API.getSupplierMyUnreadCount()
+    .then(({ count }) => {
+      const badge = document.getElementById('supplier-orders-badge');
+      if (!badge) return;
+      if (count > 0) {
+        badge.textContent = String(count);
+        badge.hidden = false;
+      } else {
+        badge.hidden = true;
+      }
+    })
+    .catch(() => { /* offline / 401 — silent */ });
+}
+
+// Catalog client-side state. We pull the full list once per render and do all
+// search/sort/filter operations in memory — supplier catalogs are small (≤200
+// rows for our biggest demo).
+let _supplierCatalogState = {
+  catalog: [],
+  search: '',
+  category: 'all',
+  sortKey: 'category',
+  sortDir: 'asc',
+};
+
+function _ttcFromCatalogRow(p) {
+  const tva = p.tva_rate != null ? Number(p.tva_rate) : 5.5;
+  return Number(p.price) * (1 + tva / 100);
+}
+
+function _formatLastUpdate(catalog) {
+  if (!catalog.length) return '';
+  let max = null;
+  for (const p of catalog) {
+    if (!p.updated_at) continue;
+    if (!max || p.updated_at > max) max = p.updated_at;
+  }
+  if (!max) return '';
+  const d = new Date(max);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 async function renderSupplierCatalogTab() {
@@ -71,7 +142,7 @@ async function renderSupplierCatalogTab() {
   if (!content) return;
 
   content.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
       <h2 style="margin:0;font-size:var(--text-xl)">Mon catalogue</h2>
       <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
         <button class="btn btn-secondary" id="btn-import-mercuriale">
@@ -82,6 +153,8 @@ async function renderSupplierCatalogTab() {
         </button>
       </div>
     </div>
+    <div id="supplier-catalog-toolbar"></div>
+    <div id="supplier-catalog-chips"></div>
     <div id="supplier-catalog-list"><div class="loading"><div class="spinner"></div></div></div>
   `;
   if (window.lucide) lucide.createIcons();
@@ -95,104 +168,280 @@ async function renderSupplierCatalogTab() {
 
   try {
     const catalog = await API.getSupplierCatalog();
-    const listEl = document.getElementById('supplier-catalog-list');
-
-    if (catalog.length === 0) {
-      listEl.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon"><i data-lucide="package-open"></i></div>
-          <p>Votre catalogue est vide</p>
-          <p class="text-secondary text-sm">Ajoutez vos produits pour que le restaurant puisse voir vos tarifs</p>
-          <button class="btn btn-primary" onclick="showAddProductModal()" style="background:#4A90D9;border-color:#4A90D9">
-            <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter un produit
-          </button>
-        </div>
-      `;
-      if (window.lucide) lucide.createIcons();
-      return;
-    }
-
-    // Group by category
-    const categories = {};
-    catalog.forEach(p => {
-      const cat = p.category || 'Sans catégorie';
-      if (!categories[cat]) categories[cat] = [];
-      categories[cat].push(p);
-    });
-
-    listEl.innerHTML = Object.entries(categories).map(([cat, products]) => `
-      <div class="supplier-category">
-        <h3 class="supplier-category__title">${escapeHtml(cat)}</h3>
-        ${products.map(p => `
-          <div class="supplier-product-card ${!p.available ? 'supplier-product-card--unavailable' : ''}" data-id="${p.id}">
-            <div class="supplier-product-card__info">
-              <span class="supplier-product-card__name">${escapeHtml(p.product_name)}</span>
-              <span class="supplier-product-card__unit">${escapeHtml(p.unit)}${p.min_order > 0 ? ` · Min: ${p.min_order}` : ''}</span>
-            </div>
-            <div class="supplier-product-card__actions">
-              <span class="supplier-product-card__price" data-id="${p.id}" data-price="${p.price}" title="Cliquer pour modifier">
-                ${formatCurrency(p.price)}
-              </span>
-              <label class="supplier-toggle" title="${p.available ? 'Disponible' : 'Indisponible'}">
-                <input type="checkbox" ${p.available ? 'checked' : ''} data-toggle-id="${p.id}">
-                <span class="supplier-toggle__slider"></span>
-              </label>
-              <button class="btn-icon supplier-product-card__delete" aria-label="Supprimer le produit" data-delete-id="${p.id}" data-delete-name="${escapeHtml(p.product_name)}" title="Supprimer">
-                <i data-lucide="trash-2" style="width:16px;height:16px"></i>
-              </button>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    `).join('');
-
-    if (window.lucide) lucide.createIcons();
-
-    // Inline price editing
-    listEl.querySelectorAll('.supplier-product-card__price').forEach(priceEl => {
-      priceEl.addEventListener('click', () => {
-        const id = priceEl.dataset.id;
-        const currentPrice = parseFloat(priceEl.dataset.price);
-        startInlinePriceEdit(priceEl, id, currentPrice);
-      });
-    });
-
-    // Availability toggles
-    listEl.querySelectorAll('[data-toggle-id]').forEach(toggle => {
-      toggle.addEventListener('change', async () => {
-        const id = toggle.dataset.toggleId;
-        try {
-          await API.toggleSupplierProductAvailability(id, toggle.checked);
-          showToast(toggle.checked ? 'Produit disponible' : 'Produit indisponible', 'success');
-          renderSupplierCatalogTab();
-        } catch (e) {
-          showToast(e.message, 'error');
-          toggle.checked = !toggle.checked;
-        }
-      });
-    });
-
-    // Delete buttons
-    listEl.querySelectorAll('[data-delete-id]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.deleteId;
-        const name = btn.dataset.deleteName;
-        showConfirmModal('Retirer le produit', `Êtes-vous sûr de vouloir retirer "${name}" du catalogue ?`, async () => {
-          try {
-            await API.deleteSupplierProduct(id);
-            showToast('Produit retiré', 'success');
-            renderSupplierCatalogTab();
-          } catch (e) {
-            showToast(e.message, 'error');
-          }
-        }, { confirmText: 'Retirer', confirmClass: 'btn btn-danger' });
-        return;
-      });
-    });
+    _supplierCatalogState.catalog = catalog;
+    _supplierCatalogState.search = '';
+    _supplierCatalogState.category = 'all';
+    _renderSupplierCatalogToolbar();
+    _renderSupplierCatalogChips();
+    _renderSupplierCatalogList();
   } catch (e) {
     document.getElementById('supplier-catalog-list').innerHTML =
       `<p class="text-danger">Erreur: ${escapeHtml(e.message)}</p>`;
   }
+}
+
+function _renderSupplierCatalogToolbar() {
+  const host = document.getElementById('supplier-catalog-toolbar');
+  if (!host) return;
+  const lastUpdate = _formatLastUpdate(_supplierCatalogState.catalog);
+  host.innerHTML = `
+    <div class="supplier-catalog-toolbar">
+      <div style="position:relative;flex:1;min-width:200px">
+        <input type="search" id="supplier-catalog-search" class="form-control"
+               placeholder="Rechercher un produit, SKU…"
+               value="${escapeHtml(_supplierCatalogState.search)}"
+               style="padding-left:34px">
+        <i data-lucide="search" style="width:16px;height:16px;position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-tertiary)" aria-hidden="true"></i>
+      </div>
+      <label class="supplier-catalog-sort">
+        <span class="text-secondary text-sm">Trier&nbsp;:</span>
+        <select class="form-control" id="supplier-catalog-sort">
+          <option value="category-asc"  ${_supplierCatalogState.sortKey === 'category' && _supplierCatalogState.sortDir === 'asc'  ? 'selected' : ''}>Catégorie A→Z</option>
+          <option value="name-asc"      ${_supplierCatalogState.sortKey === 'name'     && _supplierCatalogState.sortDir === 'asc'  ? 'selected' : ''}>Nom A→Z</option>
+          <option value="name-desc"     ${_supplierCatalogState.sortKey === 'name'     && _supplierCatalogState.sortDir === 'desc' ? 'selected' : ''}>Nom Z→A</option>
+          <option value="price-asc"     ${_supplierCatalogState.sortKey === 'price'    && _supplierCatalogState.sortDir === 'asc'  ? 'selected' : ''}>Prix croissant</option>
+          <option value="price-desc"    ${_supplierCatalogState.sortKey === 'price'    && _supplierCatalogState.sortDir === 'desc' ? 'selected' : ''}>Prix décroissant</option>
+          <option value="updated-desc"  ${_supplierCatalogState.sortKey === 'updated'  && _supplierCatalogState.sortDir === 'desc' ? 'selected' : ''}>Récemment modifiés</option>
+        </select>
+      </label>
+      ${lastUpdate ? `<span class="text-tertiary text-sm" style="white-space:nowrap">Dernière MàJ : ${lastUpdate}</span>` : ''}
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+
+  const search = document.getElementById('supplier-catalog-search');
+  if (search) {
+    search.addEventListener('input', () => {
+      _supplierCatalogState.search = search.value;
+      _renderSupplierCatalogList();
+    });
+  }
+  const sort = document.getElementById('supplier-catalog-sort');
+  if (sort) {
+    sort.addEventListener('change', () => {
+      const [k, d] = sort.value.split('-');
+      _supplierCatalogState.sortKey = k;
+      _supplierCatalogState.sortDir = d;
+      _renderSupplierCatalogList();
+    });
+  }
+}
+
+function _renderSupplierCatalogChips() {
+  const host = document.getElementById('supplier-catalog-chips');
+  if (!host) return;
+  const counts = new Map();
+  for (const p of _supplierCatalogState.catalog) {
+    const key = p.category || 'Sans catégorie';
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const total = _supplierCatalogState.catalog.length;
+  const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  const chipHtml = (label, key, count, active) => `
+    <button type="button" class="supplier-cat-chip ${active ? 'supplier-cat-chip--active' : ''}" data-cat="${escapeHtml(key)}">
+      ${escapeHtml(label)} <span class="supplier-cat-chip__count">${count}</span>
+    </button>`;
+  host.innerHTML = `
+    <div class="supplier-cat-chips">
+      ${chipHtml('Tout', 'all', total, _supplierCatalogState.category === 'all')}
+      ${sorted.map(([cat, n]) => chipHtml(cat, cat, n, _supplierCatalogState.category === cat)).join('')}
+    </div>
+  `;
+  host.querySelectorAll('.supplier-cat-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _supplierCatalogState.category = btn.dataset.cat;
+      _renderSupplierCatalogChips();
+      _renderSupplierCatalogList();
+    });
+  });
+}
+
+function _filterAndSortCatalog() {
+  const { catalog, search, category, sortKey, sortDir } = _supplierCatalogState;
+  const q = search.trim().toLowerCase();
+  let rows = catalog.filter(p => {
+    if (category !== 'all' && (p.category || 'Sans catégorie') !== category) return false;
+    if (!q) return true;
+    return (p.product_name || '').toLowerCase().includes(q)
+        || (p.sku || '').toLowerCase().includes(q)
+        || (p.category || '').toLowerCase().includes(q);
+  });
+  const cmp = (a, b, key) => {
+    if (key === 'price') return (a.price || 0) - (b.price || 0);
+    if (key === 'updated') return String(a.updated_at || '').localeCompare(String(b.updated_at || ''));
+    if (key === 'name') return (a.product_name || '').localeCompare(b.product_name || '', 'fr');
+    // category: primary by category, secondary by name (so a category sort
+    // still feels useful within the bucket).
+    const c = (a.category || '').localeCompare(b.category || '', 'fr');
+    return c !== 0 ? c : (a.product_name || '').localeCompare(b.product_name || '', 'fr');
+  };
+  rows.sort((a, b) => cmp(a, b, sortKey) * (sortDir === 'desc' ? -1 : 1));
+  return rows;
+}
+
+function _renderSupplierCatalogList() {
+  const listEl = document.getElementById('supplier-catalog-list');
+  if (!listEl) return;
+  const total = _supplierCatalogState.catalog.length;
+
+  if (total === 0) {
+    listEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon"><i data-lucide="package-open"></i></div>
+        <p>Votre catalogue est vide</p>
+        <p class="text-secondary text-sm">Ajoutez vos produits pour que le restaurant puisse voir vos tarifs</p>
+        <button class="btn btn-primary" onclick="showAddProductModal()" style="background:#4A90D9;border-color:#4A90D9">
+          <i data-lucide="plus" style="width:18px;height:18px"></i> Ajouter un produit
+        </button>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  const rows = _filterAndSortCatalog();
+  if (rows.length === 0) {
+    listEl.innerHTML = `<p class="text-secondary" style="padding:var(--space-4);text-align:center">Aucun produit ne correspond à votre recherche.</p>`;
+    return;
+  }
+
+  // Render as a grouped list (by category) when sortKey is 'category', else
+  // flat. Keeps the cards visually scannable in both modes.
+  const grouped = _supplierCatalogState.sortKey === 'category';
+  if (grouped) {
+    const cats = new Map();
+    for (const p of rows) {
+      const k = p.category || 'Sans catégorie';
+      if (!cats.has(k)) cats.set(k, []);
+      cats.get(k).push(p);
+    }
+    listEl.innerHTML = Array.from(cats.entries()).map(([cat, items]) => `
+      <div class="supplier-category">
+        <h3 class="supplier-category__title">${escapeHtml(cat)} <span class="text-tertiary text-sm">(${items.length})</span></h3>
+        ${items.map(_supplierProductCardHtml).join('')}
+      </div>
+    `).join('');
+  } else {
+    listEl.innerHTML = `<div class="supplier-category">${rows.map(_supplierProductCardHtml).join('')}</div>`;
+  }
+
+  if (window.lucide) lucide.createIcons();
+  _wireSupplierCatalogCardEvents(listEl);
+}
+
+function _supplierProductCardHtml(p) {
+  const tva = p.tva_rate != null ? Number(p.tva_rate) : 5.5;
+  const ttc = _ttcFromCatalogRow(p);
+  return `
+    <div class="supplier-product-card ${!p.available ? 'supplier-product-card--unavailable' : ''}" data-id="${p.id}">
+      <div class="supplier-product-card__info">
+        <span class="supplier-product-card__name">${escapeHtml(p.product_name)}</span>
+        <span class="supplier-product-card__meta">
+          ${p.sku ? `<span class="supplier-product-card__sku" data-id="${p.id}" data-sku="${escapeHtml(p.sku)}" title="Cliquer pour modifier">${escapeHtml(p.sku)}</span>` : `<span class="supplier-product-card__sku supplier-product-card__sku--missing" data-id="${p.id}" data-sku="" title="Ajouter un SKU">+ SKU</span>`}
+          <span class="text-secondary">${escapeHtml(p.unit)}${p.min_order > 0 ? ` · Min : ${p.min_order}` : ''}</span>
+          ${p.packaging ? `<span class="text-tertiary text-sm">· ${escapeHtml(p.packaging)}</span>` : ''}
+        </span>
+      </div>
+      <div class="supplier-product-card__actions">
+        <span class="supplier-product-card__price-wrap">
+          <span class="supplier-product-card__price" data-id="${p.id}" data-price="${p.price}" title="Cliquer pour modifier">
+            ${formatCurrency(p.price)} HT
+          </span>
+          <span class="supplier-product-card__tva text-tertiary text-sm">
+            TVA ${tva}% · TTC ${formatCurrency(ttc)}
+          </span>
+        </span>
+        <label class="supplier-toggle" title="${p.available ? 'Disponible' : 'Indisponible'}">
+          <input type="checkbox" ${p.available ? 'checked' : ''} data-toggle-id="${p.id}">
+          <span class="supplier-toggle__slider"></span>
+        </label>
+        <button class="btn-icon supplier-product-card__delete" aria-label="Supprimer le produit" data-delete-id="${p.id}" data-delete-name="${escapeHtml(p.product_name)}" title="Supprimer">
+          <i data-lucide="trash-2" style="width:16px;height:16px"></i>
+        </button>
+      </div>
+    </div>`;
+}
+
+function _wireSupplierCatalogCardEvents(listEl) {
+  // Inline price editing
+  listEl.querySelectorAll('.supplier-product-card__price').forEach(priceEl => {
+    priceEl.addEventListener('click', () => {
+      const id = priceEl.dataset.id;
+      const currentPrice = parseFloat(priceEl.dataset.price);
+      startInlinePriceEdit(priceEl, id, currentPrice);
+    });
+  });
+  // Inline SKU editing
+  listEl.querySelectorAll('.supplier-product-card__sku').forEach(skuEl => {
+    skuEl.addEventListener('click', () => {
+      const id = skuEl.dataset.id;
+      const currentSku = skuEl.dataset.sku || '';
+      _startInlineSkuEdit(skuEl, id, currentSku);
+    });
+  });
+  // Availability toggles
+  listEl.querySelectorAll('[data-toggle-id]').forEach(toggle => {
+    toggle.addEventListener('change', async () => {
+      const id = toggle.dataset.toggleId;
+      try {
+        await API.toggleSupplierProductAvailability(id, toggle.checked);
+        showToast(toggle.checked ? 'Produit disponible' : 'Produit indisponible', 'success');
+        renderSupplierCatalogTab();
+      } catch (e) {
+        showToast(e.message, 'error');
+        toggle.checked = !toggle.checked;
+      }
+    });
+  });
+  // Delete buttons
+  listEl.querySelectorAll('[data-delete-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.deleteId;
+      const name = btn.dataset.deleteName;
+      showConfirmModal('Retirer le produit', `Êtes-vous sûr de vouloir retirer "${name}" du catalogue ?`, async () => {
+        try {
+          await API.deleteSupplierProduct(id);
+          showToast('Produit retiré', 'success');
+          renderSupplierCatalogTab();
+        } catch (e) {
+          showToast(e.message, 'error');
+        }
+      }, { confirmText: 'Retirer', confirmClass: 'btn btn-danger' });
+    });
+  });
+}
+
+function _startInlineSkuEdit(skuEl, id, currentSku) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentSku;
+  input.placeholder = 'Code article';
+  input.maxLength = 64;
+  input.className = 'supplier-sku-input';
+  input.style.cssText = 'min-width:120px;font-family:var(--font-mono);font-size:var(--text-sm);padding:2px 6px;border-radius:var(--radius-sm);border:2px solid #4A90D9;background:var(--bg-base);color:var(--text-primary)';
+  const originalHTML = skuEl.innerHTML;
+  skuEl.innerHTML = '';
+  skuEl.appendChild(input);
+  input.focus();
+  input.select();
+
+  async function saveSku() {
+    const newSku = input.value.trim();
+    if (newSku === currentSku) { skuEl.innerHTML = originalHTML; return; }
+    try {
+      await API.updateSupplierProduct(id, { sku: newSku || null });
+      showToast(newSku ? 'SKU mis à jour' : 'SKU supprimé', 'success');
+      renderSupplierCatalogTab();
+    } catch (e) {
+      showToast(e.message, 'error');
+      skuEl.innerHTML = originalHTML;
+    }
+  }
+  input.addEventListener('blur', saveSku);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { skuEl.innerHTML = originalHTML; }
+  });
 }
 
 function startInlinePriceEdit(priceEl, id, currentPrice) {
@@ -243,9 +492,15 @@ function showAddProductModal() {
   overlay.innerHTML = `
     <div class="modal">
       <h2>Ajouter un produit</h2>
-      <div class="form-group">
-        <label>Nom du produit</label>
-        <input type="text" class="form-control" id="m-prod-name" placeholder="ex: Tomates bio">
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Nom du produit</label>
+          <input type="text" class="form-control" id="m-prod-name" placeholder="ex: Tomates bio">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>SKU (optionnel)</label>
+          <input type="text" class="form-control" id="m-prod-sku" placeholder="ex: MET-LEG-042" maxlength="64">
+        </div>
       </div>
       <div class="form-group">
         <label>Catégorie</label>
@@ -253,7 +508,7 @@ function showAddProductModal() {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Prix (€)</label>
+          <label>Prix HT (€)</label>
           <input type="number" class="form-control" id="m-prod-price" step="0.01" min="0" placeholder="0.00"
                  style="font-family:var(--font-mono)">
         </div>
@@ -267,12 +522,30 @@ function showAddProductModal() {
             <option value="barquette">barquette</option>
             <option value="carton">carton</option>
             <option value="sac">sac</option>
+            <option value="bouteille">bouteille</option>
+            <option value="fût">fût</option>
+            <option value="lot">lot</option>
+            <option value="plateau">plateau</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>TVA (%)</label>
+          <select class="form-control" id="m-prod-tva">
+            <option value="5.5" selected>5,5 % (alimentaire)</option>
+            <option value="10">10 % (restauration)</option>
+            <option value="20">20 % (alcools, autres)</option>
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label>Commande minimum (optionnel)</label>
-        <input type="number" class="form-control" id="m-prod-min" step="0.1" min="0" value="0">
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Conditionnement (optionnel)</label>
+          <input type="text" class="form-control" id="m-prod-pkg" placeholder="ex: Carton 5 kg, Lot de 6, Barquette 500g" maxlength="80">
+        </div>
+        <div class="form-group">
+          <label>Commande min</label>
+          <input type="number" class="form-control" id="m-prod-min" step="0.1" min="0" value="0">
+        </div>
       </div>
       <div class="actions-row">
         <button class="btn btn-primary" id="m-prod-save" style="background:#4A90D9;border-color:#4A90D9">
@@ -295,12 +568,24 @@ function showAddProductModal() {
     const price = parseFloat(document.getElementById('m-prod-price').value);
     const unit = document.getElementById('m-prod-unit').value;
     const min_order = parseFloat(document.getElementById('m-prod-min').value) || 0;
+    const sku = document.getElementById('m-prod-sku').value.trim();
+    const packaging = document.getElementById('m-prod-pkg').value.trim();
+    const tva_rate = parseFloat(document.getElementById('m-prod-tva').value);
 
     if (!product_name) { showToast('Nom du produit requis', 'error'); return; }
     if (isNaN(price) || price < 0) { showToast('Prix invalide', 'error'); return; }
 
     try {
-      await API.addSupplierProduct({ product_name, category: category || null, price, unit, min_order });
+      await API.addSupplierProduct({
+        product_name,
+        category: category || null,
+        price,
+        unit,
+        min_order,
+        sku: sku || null,
+        tva_rate: Number.isFinite(tva_rate) ? tva_rate : 5.5,
+        packaging: packaging || null,
+      });
       showToast('Produit ajouté', 'success');
       overlay.remove();
       renderSupplierCatalogTab();

@@ -5,6 +5,28 @@ const router = Router();
 
 router.use(requireAuth);
 
+// Drop a supplier-side notification when the restaurant creates an order. The
+// supplier portal /notifications/me endpoint reads from this table; the badge
+// on the Commandes tab shows unread count. Errors here are non-fatal — we
+// don't want a notifications failure to roll back the order itself.
+function notifySupplierOfOrder(orderId, supplierId, restaurantId, reference, totalAmount) {
+  try {
+    run(
+      `INSERT INTO supplier_notifications
+         (supplier_id, restaurant_id, type, order_id, message, read)
+       VALUES (?, ?, 'order_created', ?, ?, 0)`,
+      [
+        supplierId,
+        restaurantId,
+        orderId,
+        `Nouvelle commande ${reference} — ${(Number(totalAmount) || 0).toFixed(2)} €`,
+      ]
+    );
+  } catch (e) {
+    console.warn('supplier_notifications insert failed:', e.message);
+  }
+}
+
 // GET /api/purchase-orders — List all purchase orders
 router.get('/', (req, res) => {
   try {
@@ -287,6 +309,8 @@ router.post('/', (req, res) => {
           [poId, item.ingredient_id || null, item.product_name, item.quantity, item.unit || 'kg', item.unit_price, item.total_price, item.notes || null, rid]
         );
       }
+
+      notifySupplierOfOrder(poId, Number(supplier_id), rid, ref, Math.round(totalAmount * 100) / 100);
 
       return poId;
     });
@@ -594,6 +618,8 @@ router.post('/:id/clone', (req, res) => {
         'UPDATE purchase_orders SET total_amount = ? WHERE id = ? AND restaurant_id = ?',
         [totalResult.total || 0, newId, rid]
       );
+
+      notifySupplierOfOrder(newId, po.supplier_id, rid, ref, totalResult.total || 0);
 
       return newId;
     });

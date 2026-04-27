@@ -37,168 +37,173 @@ function section(title) { console.log(`\n▸ ${title}`); }
 const SUPPLIER_CATALOG_DATA = {
   // ~60 products across most categories — this is the supplier prospects log into
   // (demo-fournisseur@restosuite.fr) so the catalog has to look generously stocked.
+  // SKU convention: MET-<3-letter-cat>-<NNN>. tva_rate=5.5 for foodstuffs (default),
+  // 20 for alcohol — none here. packaging mirrors realistic French wholesale formats.
   'Metro Paris Nation': [
     // Viandes
-    { name: 'Entrecôte de bœuf',         category: 'Viandes', unit: 'kg', price: 18.90 },
-    { name: 'Filet de poulet',           category: 'Viandes', unit: 'kg', price: 8.50 },
-    { name: 'Côtes d\'agneau',           category: 'Viandes', unit: 'kg', price: 22.00 },
-    { name: 'Bavette d\'aloyau',         category: 'Viandes', unit: 'kg', price: 16.50 },
-    { name: 'Escalope de veau',          category: 'Viandes', unit: 'kg', price: 24.00 },
-    { name: 'Steak haché 15% MG',        category: 'Viandes', unit: 'kg', price: 9.80 },
-    { name: 'Magret de canard',          category: 'Viandes', unit: 'kg', price: 19.50 },
-    { name: 'Saucisse de Toulouse',      category: 'Viandes', unit: 'kg', price: 7.90 },
-    { name: 'Cuisses de poulet',         category: 'Viandes', unit: 'kg', price: 6.20 },
-    { name: 'Jarret de porc',            category: 'Viandes', unit: 'kg', price: 5.90 },
+    { sku: 'MET-VIA-001', name: 'Entrecôte de bœuf',     category: 'Viandes', unit: 'kg', price: 18.90, tva_rate: 5.5, packaging: 'Sous vide 2 pièces ~500g' },
+    { sku: 'MET-VIA-002', name: 'Filet de poulet',       category: 'Viandes', unit: 'kg', price: 8.50,  tva_rate: 5.5, packaging: 'Barquette 2.5 kg' },
+    { sku: 'MET-VIA-003', name: 'Côtes d\'agneau',       category: 'Viandes', unit: 'kg', price: 22.00, tva_rate: 5.5, packaging: 'Sous vide 1 kg' },
+    { sku: 'MET-VIA-004', name: 'Bavette d\'aloyau',     category: 'Viandes', unit: 'kg', price: 16.50, tva_rate: 5.5, packaging: 'Sous vide 1.5 kg' },
+    { sku: 'MET-VIA-005', name: 'Escalope de veau',      category: 'Viandes', unit: 'kg', price: 24.00, tva_rate: 5.5, packaging: 'Barquette 1 kg' },
+    { sku: 'MET-VIA-006', name: 'Steak haché 15% MG',    category: 'Viandes', unit: 'kg', price: 9.80,  tva_rate: 5.5, packaging: 'Carton 5 kg (50×100g)' },
+    { sku: 'MET-VIA-007', name: 'Magret de canard',      category: 'Viandes', unit: 'kg', price: 19.50, tva_rate: 5.5, packaging: 'Sous vide 2 pièces ~700g' },
+    { sku: 'MET-VIA-008', name: 'Saucisse de Toulouse',  category: 'Viandes', unit: 'kg', price: 7.90,  tva_rate: 5.5, packaging: 'Barquette 1 kg' },
+    { sku: 'MET-VIA-009', name: 'Cuisses de poulet',     category: 'Viandes', unit: 'kg', price: 6.20,  tva_rate: 5.5, packaging: 'Carton 5 kg' },
+    { sku: 'MET-VIA-010', name: 'Jarret de porc',        category: 'Viandes', unit: 'kg', price: 5.90,  tva_rate: 5.5, packaging: 'Sous vide ~1.2 kg' },
     // Charcuterie
-    { name: 'Lardons fumés',             category: 'Charcuterie', unit: 'kg', price: 6.50 },
-    { name: 'Jambon de Paris',           category: 'Charcuterie', unit: 'kg', price: 9.80 },
-    { name: 'Saucisson sec',             category: 'Charcuterie', unit: 'kg', price: 18.50 },
+    { sku: 'MET-CHA-001', name: 'Lardons fumés',         category: 'Charcuterie', unit: 'kg', price: 6.50,  tva_rate: 5.5, packaging: 'Sachet 1 kg' },
+    { sku: 'MET-CHA-002', name: 'Jambon de Paris',       category: 'Charcuterie', unit: 'kg', price: 9.80,  tva_rate: 5.5, packaging: 'Bloc sous vide ~2 kg' },
+    { sku: 'MET-CHA-003', name: 'Saucisson sec',         category: 'Charcuterie', unit: 'kg', price: 18.50, tva_rate: 5.5, packaging: 'Lot de 4 pièces ~250g' },
     // Poissons
-    { name: 'Filet de saumon',           category: 'Poissons', unit: 'kg', price: 19.00 },
-    { name: 'Cabillaud',                 category: 'Poissons', unit: 'kg', price: 15.50 },
-    { name: 'Crevettes roses cuites',    category: 'Poissons', unit: 'kg', price: 14.90 },
-    { name: 'Moules de bouchot',         category: 'Poissons', unit: 'kg', price: 4.50 },
-    { name: 'Bar de ligne',              category: 'Poissons', unit: 'kg', price: 28.00 },
-    { name: 'Thon rouge',                category: 'Poissons', unit: 'kg', price: 32.00 },
-    { name: 'Noix de Saint-Jacques',     category: 'Poissons', unit: 'kg', price: 38.00 },
-    { name: 'Gambas',                    category: 'Poissons', unit: 'kg', price: 22.00 },
+    { sku: 'MET-POI-001', name: 'Filet de saumon',       category: 'Poissons', unit: 'kg', price: 19.00, tva_rate: 5.5, packaging: 'Caisse 2 kg' },
+    { sku: 'MET-POI-002', name: 'Cabillaud',             category: 'Poissons', unit: 'kg', price: 15.50, tva_rate: 5.5, packaging: 'Caisse 3 kg sur glace' },
+    { sku: 'MET-POI-003', name: 'Crevettes roses cuites', category: 'Poissons', unit: 'kg', price: 14.90, tva_rate: 5.5, packaging: 'Sachet 1 kg' },
+    { sku: 'MET-POI-004', name: 'Moules de bouchot',     category: 'Poissons', unit: 'kg', price: 4.50,  tva_rate: 5.5, packaging: 'Sac 4 kg AOP' },
+    { sku: 'MET-POI-005', name: 'Bar de ligne',          category: 'Poissons', unit: 'kg', price: 28.00, tva_rate: 5.5, packaging: 'Pièce entière 0.6–1 kg' },
+    { sku: 'MET-POI-006', name: 'Thon rouge',            category: 'Poissons', unit: 'kg', price: 32.00, tva_rate: 5.5, packaging: 'Pavé sous vide 500g' },
+    { sku: 'MET-POI-007', name: 'Noix de Saint-Jacques', category: 'Poissons', unit: 'kg', price: 38.00, tva_rate: 5.5, packaging: 'Barquette 500g' },
+    { sku: 'MET-POI-008', name: 'Gambas',                category: 'Poissons', unit: 'kg', price: 22.00, tva_rate: 5.5, packaging: 'Boîte 2 kg surgelé' },
     // Légumes
-    { name: 'Pommes de terre',           category: 'Légumes', unit: 'kg', price: 1.20 },
-    { name: 'Carottes',                  category: 'Légumes', unit: 'kg', price: 1.50 },
-    { name: 'Oignons jaunes',            category: 'Légumes', unit: 'kg', price: 1.80 },
-    { name: 'Tomates grappe',            category: 'Légumes', unit: 'kg', price: 3.50 },
-    { name: 'Courgettes',                category: 'Légumes', unit: 'kg', price: 2.80 },
-    { name: 'Haricots verts',            category: 'Légumes', unit: 'kg', price: 4.90 },
-    { name: 'Champignons de Paris',      category: 'Légumes', unit: 'kg', price: 3.20 },
-    { name: 'Poireaux',                  category: 'Légumes', unit: 'kg', price: 2.50 },
-    { name: 'Épinards frais',            category: 'Légumes', unit: 'kg', price: 5.50 },
-    { name: 'Ail',                       category: 'Légumes', unit: 'kg', price: 6.00 },
+    { sku: 'MET-LEG-001', name: 'Pommes de terre',       category: 'Légumes', unit: 'kg', price: 1.20, tva_rate: 5.5, packaging: 'Sac 25 kg' },
+    { sku: 'MET-LEG-002', name: 'Carottes',              category: 'Légumes', unit: 'kg', price: 1.50, tva_rate: 5.5, packaging: 'Sac 10 kg' },
+    { sku: 'MET-LEG-003', name: 'Oignons jaunes',        category: 'Légumes', unit: 'kg', price: 1.80, tva_rate: 5.5, packaging: 'Filet 5 kg' },
+    { sku: 'MET-LEG-004', name: 'Tomates grappe',        category: 'Légumes', unit: 'kg', price: 3.50, tva_rate: 5.5, packaging: 'Cagette 6 kg' },
+    { sku: 'MET-LEG-005', name: 'Courgettes',            category: 'Légumes', unit: 'kg', price: 2.80, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
+    { sku: 'MET-LEG-006', name: 'Haricots verts',        category: 'Légumes', unit: 'kg', price: 4.90, tva_rate: 5.5, packaging: 'Cagette 3 kg' },
+    { sku: 'MET-LEG-007', name: 'Champignons de Paris',  category: 'Légumes', unit: 'kg', price: 3.20, tva_rate: 5.5, packaging: 'Barquette 500g' },
+    { sku: 'MET-LEG-008', name: 'Poireaux',              category: 'Légumes', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Botte 1 kg' },
+    { sku: 'MET-LEG-009', name: 'Épinards frais',        category: 'Légumes', unit: 'kg', price: 5.50, tva_rate: 5.5, packaging: 'Sachet 1 kg lavé' },
+    { sku: 'MET-LEG-010', name: 'Ail',                   category: 'Légumes', unit: 'kg', price: 6.00, tva_rate: 5.5, packaging: 'Filet 1 kg' },
     // Fruits
-    { name: 'Citrons',                   category: 'Fruits', unit: 'kg', price: 2.80 },
-    { name: 'Pommes Golden',             category: 'Fruits', unit: 'kg', price: 2.50 },
-    { name: 'Fraises',                   category: 'Fruits', unit: 'kg', price: 8.90 },
-    { name: 'Framboises',                category: 'Fruits', unit: 'kg', price: 18.00 },
+    { sku: 'MET-FRU-001', name: 'Citrons',               category: 'Fruits', unit: 'kg', price: 2.80, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
+    { sku: 'MET-FRU-002', name: 'Pommes Golden',         category: 'Fruits', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Cagette 7 kg' },
+    { sku: 'MET-FRU-003', name: 'Fraises',               category: 'Fruits', unit: 'kg', price: 8.90, tva_rate: 5.5, packaging: 'Barquette 500g x8' },
+    { sku: 'MET-FRU-004', name: 'Framboises',            category: 'Fruits', unit: 'kg', price: 18.00, tva_rate: 5.5, packaging: 'Barquette 125g x12' },
     // Produits laitiers
-    { name: 'Beurre doux',               category: 'Produits laitiers', unit: 'kg', price: 8.50 },
-    { name: 'Crème fraîche 35%',         category: 'Produits laitiers', unit: 'L',  price: 4.20 },
-    { name: 'Lait entier',               category: 'Produits laitiers', unit: 'L',  price: 1.10 },
-    { name: 'Parmesan Reggiano',         category: 'Produits laitiers', unit: 'kg', price: 22.00 },
-    { name: 'Gruyère râpé',              category: 'Produits laitiers', unit: 'kg', price: 9.50 },
-    { name: 'Mozzarella',                category: 'Produits laitiers', unit: 'kg', price: 8.00 },
-    { name: 'Œufs plein air x30',        category: 'Produits laitiers', unit: 'plateau', price: 8.50 },
+    { sku: 'MET-LAI-001', name: 'Beurre doux',           category: 'Produits laitiers', unit: 'kg', price: 8.50,  tva_rate: 5.5, packaging: 'Plaque 5 kg' },
+    { sku: 'MET-LAI-002', name: 'Crème fraîche 35%',     category: 'Produits laitiers', unit: 'L',  price: 4.20,  tva_rate: 5.5, packaging: 'Bidon 5 L' },
+    { sku: 'MET-LAI-003', name: 'Lait entier',           category: 'Produits laitiers', unit: 'L',  price: 1.10,  tva_rate: 5.5, packaging: 'Brique 1 L x12' },
+    { sku: 'MET-LAI-004', name: 'Parmesan Reggiano',     category: 'Produits laitiers', unit: 'kg', price: 22.00, tva_rate: 5.5, packaging: 'Pointe 1 kg sous vide' },
+    { sku: 'MET-LAI-005', name: 'Gruyère râpé',          category: 'Produits laitiers', unit: 'kg', price: 9.50,  tva_rate: 5.5, packaging: 'Sachet 1 kg' },
+    { sku: 'MET-LAI-006', name: 'Mozzarella',            category: 'Produits laitiers', unit: 'kg', price: 8.00,  tva_rate: 5.5, packaging: 'Boules 125g x10' },
+    { sku: 'MET-LAI-007', name: 'Œufs plein air x30',    category: 'Produits laitiers', unit: 'plateau', price: 8.50, tva_rate: 5.5, packaging: 'Plateau 30 œufs' },
     // Boulangerie
-    { name: 'Farine T55',                category: 'Boulangerie', unit: 'kg', price: 0.90 },
-    { name: 'Pain de mie tranché',       category: 'Boulangerie', unit: 'pièce', price: 2.80 },
-    { name: 'Brioche tranchée',          category: 'Boulangerie', unit: 'pièce', price: 4.20 },
+    { sku: 'MET-BLG-001', name: 'Farine T55',            category: 'Boulangerie', unit: 'kg', price: 0.90, tva_rate: 5.5, packaging: 'Sac 25 kg' },
+    { sku: 'MET-BLG-002', name: 'Pain de mie tranché',   category: 'Boulangerie', unit: 'pièce', price: 2.80, tva_rate: 5.5, packaging: 'Sachet 750g' },
+    { sku: 'MET-BLG-003', name: 'Brioche tranchée',      category: 'Boulangerie', unit: 'pièce', price: 4.20, tva_rate: 5.5, packaging: 'Sachet 500g' },
     // Huiles/Vinaigres
-    { name: 'Huile d\'olive vierge extra', category: 'Huiles/Vinaigres', unit: 'L', price: 6.50 },
-    { name: 'Vinaigre balsamique',       category: 'Huiles/Vinaigres', unit: 'L', price: 4.80 },
+    { sku: 'MET-HUI-001', name: 'Huile d\'olive vierge extra', category: 'Huiles/Vinaigres', unit: 'L', price: 6.50, tva_rate: 5.5, packaging: 'Bidon 5 L' },
+    { sku: 'MET-HUI-002', name: 'Vinaigre balsamique',   category: 'Huiles/Vinaigres', unit: 'L', price: 4.80, tva_rate: 5.5, packaging: 'Bidon 1 L' },
     // Condiments/Sauces
-    { name: 'Sel de Guérande',           category: 'Condiments/Sauces', unit: 'kg', price: 3.50 },
-    { name: 'Poivre noir moulu',         category: 'Condiments/Sauces', unit: 'kg', price: 28.00 },
-    { name: 'Moutarde de Dijon',         category: 'Condiments/Sauces', unit: 'kg', price: 3.20 },
-    { name: 'Concentré de tomate',       category: 'Condiments/Sauces', unit: 'kg', price: 2.80 },
-    { name: 'Fond de veau',              category: 'Condiments/Sauces', unit: 'L',  price: 12.00 },
-    { name: 'Bouillon de volaille',      category: 'Condiments/Sauces', unit: 'kg', price: 8.50 },
+    { sku: 'MET-CDM-001', name: 'Sel de Guérande',       category: 'Condiments/Sauces', unit: 'kg', price: 3.50,  tva_rate: 5.5, packaging: 'Sac 1 kg' },
+    { sku: 'MET-CDM-002', name: 'Poivre noir moulu',     category: 'Condiments/Sauces', unit: 'kg', price: 28.00, tva_rate: 5.5, packaging: 'Sachet 250g x4' },
+    { sku: 'MET-CDM-003', name: 'Moutarde de Dijon',     category: 'Condiments/Sauces', unit: 'kg', price: 3.20,  tva_rate: 5.5, packaging: 'Pot 1 kg' },
+    { sku: 'MET-CDM-004', name: 'Concentré de tomate',   category: 'Condiments/Sauces', unit: 'kg', price: 2.80,  tva_rate: 5.5, packaging: 'Boîte 5/1 (4.25 kg)' },
+    { sku: 'MET-CDM-005', name: 'Fond de veau',          category: 'Condiments/Sauces', unit: 'L',  price: 12.00, tva_rate: 5.5, packaging: 'Bidon 2 L' },
+    { sku: 'MET-CDM-006', name: 'Bouillon de volaille',  category: 'Condiments/Sauces', unit: 'kg', price: 8.50,  tva_rate: 5.5, packaging: 'Boîte poudre 1 kg' },
     // Épicerie sèche
-    { name: 'Sucre semoule',             category: 'Épicerie sèche', unit: 'kg', price: 1.10 },
-    { name: 'Pâtes penne',               category: 'Épicerie sèche', unit: 'kg', price: 1.50 },
-    { name: 'Riz basmati',               category: 'Épicerie sèche', unit: 'kg', price: 2.20 },
-    { name: 'Lentilles vertes',          category: 'Épicerie sèche', unit: 'kg', price: 3.50 },
+    { sku: 'MET-EPI-001', name: 'Sucre semoule',         category: 'Épicerie sèche', unit: 'kg', price: 1.10, tva_rate: 5.5, packaging: 'Sac 25 kg' },
+    { sku: 'MET-EPI-002', name: 'Pâtes penne',           category: 'Épicerie sèche', unit: 'kg', price: 1.50, tva_rate: 5.5, packaging: 'Carton 5 kg' },
+    { sku: 'MET-EPI-003', name: 'Riz basmati',           category: 'Épicerie sèche', unit: 'kg', price: 2.20, tva_rate: 5.5, packaging: 'Sac 5 kg' },
+    { sku: 'MET-EPI-004', name: 'Lentilles vertes',      category: 'Épicerie sèche', unit: 'kg', price: 3.50, tva_rate: 5.5, packaging: 'Sac 5 kg du Puy' },
     // Surgelés
-    { name: 'Frites tradition',          category: 'Surgelés', unit: 'kg', price: 2.50 },
-    { name: 'Petits pois',               category: 'Surgelés', unit: 'kg', price: 3.20 },
-    // Boissons
-    { name: 'Eau Évian 1.5L x6',         category: 'Boissons', unit: 'lot', price: 4.50 },
-    { name: 'Coca-Cola 33cl x24',        category: 'Boissons', unit: 'lot', price: 18.00 },
+    { sku: 'MET-SUR-001', name: 'Frites tradition',      category: 'Surgelés', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Carton 10 kg' },
+    { sku: 'MET-SUR-002', name: 'Petits pois',           category: 'Surgelés', unit: 'kg', price: 3.20, tva_rate: 5.5, packaging: 'Carton 2.5 kg' },
+    // Boissons (non-alcoolisées → TVA 5.5)
+    { sku: 'MET-BOI-001', name: 'Eau Évian 1.5L x6',     category: 'Boissons', unit: 'lot', price: 4.50,  tva_rate: 5.5, packaging: 'Pack de 6 bouteilles 1.5 L' },
+    { sku: 'MET-BOI-002', name: 'Coca-Cola 33cl x24',    category: 'Boissons', unit: 'lot', price: 18.00, tva_rate: 5.5, packaging: 'Pack de 24 canettes 33 cl' },
   ],
 
   // ~40 products: F&L specialist with slightly tighter prices on hero items and
   // a deeper bench (heritage tomatoes, herbs, exotic fruits) Metro doesn't carry.
+  // SKU convention: POM-<3-letter-cat>-<NNN>. All TVA 5.5 (frais alimentaire).
   'Pomona TerreAzur': [
     // Légumes
-    { name: 'Pommes de terre Bintje',     category: 'Légumes', unit: 'kg', price: 1.10 },
-    { name: 'Carottes nouvelles',         category: 'Légumes', unit: 'kg', price: 1.40 },
-    { name: 'Oignons rosés de Roscoff',   category: 'Légumes', unit: 'kg', price: 2.20 },
-    { name: 'Tomates anciennes',          category: 'Légumes', unit: 'kg', price: 4.80 },
-    { name: 'Courgettes vertes',          category: 'Légumes', unit: 'kg', price: 2.50 },
-    { name: 'Haricots verts extra-fins',  category: 'Légumes', unit: 'kg', price: 5.50 },
-    { name: 'Champignons de Paris bruns', category: 'Légumes', unit: 'kg', price: 3.50 },
-    { name: 'Poireaux nouveaux',          category: 'Légumes', unit: 'kg', price: 2.20 },
-    { name: 'Épinards branches',          category: 'Légumes', unit: 'kg', price: 5.00 },
-    { name: 'Ail rose de Lautrec',        category: 'Légumes', unit: 'kg', price: 8.00 },
-    { name: 'Endives belges',             category: 'Légumes', unit: 'kg', price: 2.80 },
-    { name: 'Artichauts violets',         category: 'Légumes', unit: 'pièce', price: 2.50 },
-    { name: 'Asperges vertes',            category: 'Légumes', unit: 'kg', price: 9.50 },
-    { name: 'Aubergines',                 category: 'Légumes', unit: 'kg', price: 2.40 },
-    { name: 'Poivrons rouges',            category: 'Légumes', unit: 'kg', price: 3.20 },
-    { name: 'Fenouil',                    category: 'Légumes', unit: 'kg', price: 3.00 },
-    { name: 'Radis roses (botte)',        category: 'Légumes', unit: 'botte', price: 1.20 },
-    { name: 'Salade laitue batavia',      category: 'Légumes', unit: 'pièce', price: 1.10 },
-    { name: 'Roquette',                   category: 'Légumes', unit: 'kg', price: 8.50 },
-    { name: 'Mâche',                      category: 'Légumes', unit: 'kg', price: 12.00 },
+    { sku: 'POM-LEG-001', name: 'Pommes de terre Bintje',    category: 'Légumes', unit: 'kg', price: 1.10, tva_rate: 5.5, packaging: 'Sac 25 kg' },
+    { sku: 'POM-LEG-002', name: 'Carottes nouvelles',        category: 'Légumes', unit: 'kg', price: 1.40, tva_rate: 5.5, packaging: 'Cagette 10 kg' },
+    { sku: 'POM-LEG-003', name: 'Oignons rosés de Roscoff',  category: 'Légumes', unit: 'kg', price: 2.20, tva_rate: 5.5, packaging: 'Filet 5 kg AOP' },
+    { sku: 'POM-LEG-004', name: 'Tomates anciennes',         category: 'Légumes', unit: 'kg', price: 4.80, tva_rate: 5.5, packaging: 'Cagette 4 kg variétés' },
+    { sku: 'POM-LEG-005', name: 'Courgettes vertes',         category: 'Légumes', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
+    { sku: 'POM-LEG-006', name: 'Haricots verts extra-fins', category: 'Légumes', unit: 'kg', price: 5.50, tva_rate: 5.5, packaging: 'Cagette 3 kg' },
+    { sku: 'POM-LEG-007', name: 'Champignons de Paris bruns', category: 'Légumes', unit: 'kg', price: 3.50, tva_rate: 5.5, packaging: 'Barquette 500g' },
+    { sku: 'POM-LEG-008', name: 'Poireaux nouveaux',         category: 'Légumes', unit: 'kg', price: 2.20, tva_rate: 5.5, packaging: 'Botte 1 kg' },
+    { sku: 'POM-LEG-009', name: 'Épinards branches',         category: 'Légumes', unit: 'kg', price: 5.00, tva_rate: 5.5, packaging: 'Sachet 1 kg' },
+    { sku: 'POM-LEG-010', name: 'Ail rose de Lautrec',       category: 'Légumes', unit: 'kg', price: 8.00, tva_rate: 5.5, packaging: 'Tresse 1 kg IGP' },
+    { sku: 'POM-LEG-011', name: 'Endives belges',            category: 'Légumes', unit: 'kg', price: 2.80, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
+    { sku: 'POM-LEG-012', name: 'Artichauts violets',        category: 'Légumes', unit: 'pièce', price: 2.50, tva_rate: 5.5, packaging: 'Cagette 12 pièces' },
+    { sku: 'POM-LEG-013', name: 'Asperges vertes',           category: 'Légumes', unit: 'kg', price: 9.50, tva_rate: 5.5, packaging: 'Botte 500g' },
+    { sku: 'POM-LEG-014', name: 'Aubergines',                category: 'Légumes', unit: 'kg', price: 2.40, tva_rate: 5.5, packaging: 'Cagette 6 kg' },
+    { sku: 'POM-LEG-015', name: 'Poivrons rouges',           category: 'Légumes', unit: 'kg', price: 3.20, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
+    { sku: 'POM-LEG-016', name: 'Fenouil',                   category: 'Légumes', unit: 'kg', price: 3.00, tva_rate: 5.5, packaging: 'Cagette 8 kg' },
+    { sku: 'POM-LEG-017', name: 'Radis roses (botte)',       category: 'Légumes', unit: 'botte', price: 1.20, tva_rate: 5.5, packaging: 'Botte 250g' },
+    { sku: 'POM-LEG-018', name: 'Salade laitue batavia',     category: 'Légumes', unit: 'pièce', price: 1.10, tva_rate: 5.5, packaging: 'Pièce ~400g' },
+    { sku: 'POM-LEG-019', name: 'Roquette',                  category: 'Légumes', unit: 'kg', price: 8.50, tva_rate: 5.5, packaging: 'Sachet 500g lavé' },
+    { sku: 'POM-LEG-020', name: 'Mâche',                     category: 'Légumes', unit: 'kg', price: 12.00, tva_rate: 5.5, packaging: 'Sachet 250g lavé' },
     // Herbes (catégorisées Légumes par le catégoriseur)
-    { name: 'Persil plat (botte)',        category: 'Légumes', unit: 'botte', price: 0.80 },
-    { name: 'Basilic frais (botte)',      category: 'Légumes', unit: 'botte', price: 1.20 },
-    { name: 'Coriandre (botte)',          category: 'Légumes', unit: 'botte', price: 1.00 },
-    { name: 'Menthe fraîche (botte)',     category: 'Légumes', unit: 'botte', price: 1.20 },
-    { name: 'Thym frais (botte)',         category: 'Légumes', unit: 'botte', price: 1.50 },
+    { sku: 'POM-HER-001', name: 'Persil plat (botte)',       category: 'Légumes', unit: 'botte', price: 0.80, tva_rate: 5.5, packaging: 'Botte ~80g' },
+    { sku: 'POM-HER-002', name: 'Basilic frais (botte)',     category: 'Légumes', unit: 'botte', price: 1.20, tva_rate: 5.5, packaging: 'Botte ~50g' },
+    { sku: 'POM-HER-003', name: 'Coriandre (botte)',         category: 'Légumes', unit: 'botte', price: 1.00, tva_rate: 5.5, packaging: 'Botte ~80g' },
+    { sku: 'POM-HER-004', name: 'Menthe fraîche (botte)',    category: 'Légumes', unit: 'botte', price: 1.20, tva_rate: 5.5, packaging: 'Botte ~50g' },
+    { sku: 'POM-HER-005', name: 'Thym frais (botte)',        category: 'Légumes', unit: 'botte', price: 1.50, tva_rate: 5.5, packaging: 'Botte ~30g' },
     // Fruits
-    { name: 'Citrons primofiori',         category: 'Fruits', unit: 'kg', price: 2.50 },
-    { name: 'Pommes Granny Smith',        category: 'Fruits', unit: 'kg', price: 2.80 },
-    { name: 'Pommes Pink Lady',           category: 'Fruits', unit: 'kg', price: 3.50 },
-    { name: 'Fraises gariguette',         category: 'Fruits', unit: 'kg', price: 9.50 },
-    { name: 'Framboises',                 category: 'Fruits', unit: 'kg', price: 17.50 },
-    { name: 'Mangues',                    category: 'Fruits', unit: 'kg', price: 4.20 },
-    { name: 'Ananas Victoria',            category: 'Fruits', unit: 'pièce', price: 2.80 },
-    { name: 'Bananes',                    category: 'Fruits', unit: 'kg', price: 1.80 },
-    { name: 'Oranges sanguines',          category: 'Fruits', unit: 'kg', price: 2.90 },
-    { name: 'Kiwis',                      category: 'Fruits', unit: 'kg', price: 3.50 },
-    { name: 'Pamplemousses roses',        category: 'Fruits', unit: 'kg', price: 2.20 },
-    { name: 'Poires Williams',            category: 'Fruits', unit: 'kg', price: 3.20 },
-    { name: 'Cerises',                    category: 'Fruits', unit: 'kg', price: 12.00 },
-    { name: 'Abricots',                   category: 'Fruits', unit: 'kg', price: 5.80 },
-    { name: 'Melons charentais',          category: 'Fruits', unit: 'pièce', price: 3.50 },
+    { sku: 'POM-FRU-001', name: 'Citrons primofiori',        category: 'Fruits', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
+    { sku: 'POM-FRU-002', name: 'Pommes Granny Smith',       category: 'Fruits', unit: 'kg', price: 2.80, tva_rate: 5.5, packaging: 'Cagette 7 kg' },
+    { sku: 'POM-FRU-003', name: 'Pommes Pink Lady',          category: 'Fruits', unit: 'kg', price: 3.50, tva_rate: 5.5, packaging: 'Cagette 6 kg' },
+    { sku: 'POM-FRU-004', name: 'Fraises gariguette',        category: 'Fruits', unit: 'kg', price: 9.50, tva_rate: 5.5, packaging: 'Barquette 500g x6' },
+    { sku: 'POM-FRU-005', name: 'Framboises',                category: 'Fruits', unit: 'kg', price: 17.50, tva_rate: 5.5, packaging: 'Barquette 125g x12' },
+    { sku: 'POM-FRU-006', name: 'Mangues',                   category: 'Fruits', unit: 'kg', price: 4.20, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
+    { sku: 'POM-FRU-007', name: 'Ananas Victoria',           category: 'Fruits', unit: 'pièce', price: 2.80, tva_rate: 5.5, packaging: 'Cagette 8 pièces' },
+    { sku: 'POM-FRU-008', name: 'Bananes',                   category: 'Fruits', unit: 'kg', price: 1.80, tva_rate: 5.5, packaging: 'Carton 18 kg' },
+    { sku: 'POM-FRU-009', name: 'Oranges sanguines',         category: 'Fruits', unit: 'kg', price: 2.90, tva_rate: 5.5, packaging: 'Cagette 10 kg' },
+    { sku: 'POM-FRU-010', name: 'Kiwis',                     category: 'Fruits', unit: 'kg', price: 3.50, tva_rate: 5.5, packaging: 'Plateau 3 kg' },
+    { sku: 'POM-FRU-011', name: 'Pamplemousses roses',       category: 'Fruits', unit: 'kg', price: 2.20, tva_rate: 5.5, packaging: 'Cagette 9 kg' },
+    { sku: 'POM-FRU-012', name: 'Poires Williams',           category: 'Fruits', unit: 'kg', price: 3.20, tva_rate: 5.5, packaging: 'Cagette 6 kg' },
+    { sku: 'POM-FRU-013', name: 'Cerises',                   category: 'Fruits', unit: 'kg', price: 12.00, tva_rate: 5.5, packaging: 'Barquette 500g x10' },
+    { sku: 'POM-FRU-014', name: 'Abricots',                  category: 'Fruits', unit: 'kg', price: 5.80, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
+    { sku: 'POM-FRU-015', name: 'Melons charentais',         category: 'Fruits', unit: 'pièce', price: 3.50, tva_rate: 5.5, packaging: 'Cagette 8 pièces' },
   ],
 
   // ~30 products: drinks-only wholesaler. Bottles ('bouteille'), kegs ('fût')
   // and packs ('lot') are all real units the brasserie buyer will see — we
   // intentionally don't normalize to per-litre prices here.
+  // SKU convention: FRB-<3-letter-type>-<NNN> (VIN/BIE/SOF/SPI). Alcoholic
+  // drinks → TVA 20%; non-alcoholic softs/eaux/jus → TVA 5.5%.
   'France Boissons': [
-    // Vins
-    { name: 'Côtes du Rhône rouge 75cl',     category: 'Boissons', unit: 'bouteille', price: 5.50 },
-    { name: 'Bordeaux supérieur 75cl',       category: 'Boissons', unit: 'bouteille', price: 7.20 },
-    { name: 'Bourgogne aligoté 75cl',        category: 'Boissons', unit: 'bouteille', price: 9.80 },
-    { name: 'Sancerre blanc 75cl',           category: 'Boissons', unit: 'bouteille', price: 13.50 },
-    { name: 'Côtes de Provence rosé 75cl',   category: 'Boissons', unit: 'bouteille', price: 6.80 },
-    { name: 'Champagne brut 75cl',           category: 'Boissons', unit: 'bouteille', price: 22.00 },
-    { name: 'Crémant d\'Alsace 75cl',        category: 'Boissons', unit: 'bouteille', price: 11.50 },
-    { name: 'Pouilly-Fumé 75cl',             category: 'Boissons', unit: 'bouteille', price: 16.00 },
-    // Bières
-    { name: 'Heineken fût 30L',              category: 'Boissons', unit: 'fût', price: 95.00 },
-    { name: 'Stella Artois fût 30L',         category: 'Boissons', unit: 'fût', price: 88.00 },
-    { name: 'Leffe Blonde fût 20L',          category: 'Boissons', unit: 'fût', price: 78.00 },
-    { name: '1664 33cl x24',                 category: 'Boissons', unit: 'lot', price: 22.00 },
-    { name: 'Carlsberg 33cl x24',            category: 'Boissons', unit: 'lot', price: 19.50 },
-    { name: 'Guinness 50cl x12',             category: 'Boissons', unit: 'lot', price: 28.00 },
-    // Soft drinks + eaux
-    { name: 'Coca-Cola 33cl x24',            category: 'Boissons', unit: 'lot', price: 17.50 },
-    { name: 'Coca-Cola Zero 33cl x24',       category: 'Boissons', unit: 'lot', price: 17.50 },
-    { name: 'Orangina 33cl x24',             category: 'Boissons', unit: 'lot', price: 18.00 },
-    { name: 'Schweppes Tonic 25cl x24',      category: 'Boissons', unit: 'lot', price: 19.50 },
-    { name: 'Perrier 33cl x24',              category: 'Boissons', unit: 'lot', price: 16.50 },
-    { name: 'Eau Vittel 1L x12',             category: 'Boissons', unit: 'lot', price: 8.50 },
-    { name: 'Jus d\'orange Tropicana 1L x6', category: 'Boissons', unit: 'lot', price: 14.50 },
-    { name: 'Limonade artisanale 33cl x12',  category: 'Boissons', unit: 'lot', price: 12.00 },
-    // Spiritueux
-    { name: 'Whisky JB 70cl',                category: 'Boissons', unit: 'bouteille', price: 18.50 },
-    { name: 'Vodka Smirnoff 70cl',           category: 'Boissons', unit: 'bouteille', price: 16.00 },
-    { name: 'Gin Bombay Sapphire 70cl',      category: 'Boissons', unit: 'bouteille', price: 24.00 },
-    { name: 'Rhum Bacardi 70cl',             category: 'Boissons', unit: 'bouteille', price: 17.50 },
-    { name: 'Cognac Hennessy VS 70cl',       category: 'Boissons', unit: 'bouteille', price: 38.00 },
-    { name: 'Pastis Ricard 1L',              category: 'Boissons', unit: 'bouteille', price: 18.50 },
-    { name: 'Liqueur Cointreau 70cl',        category: 'Boissons', unit: 'bouteille', price: 22.00 },
-    { name: 'Martini Bianco 1L',             category: 'Boissons', unit: 'bouteille', price: 12.50 },
+    // Vins (TVA 20% — alcohol)
+    { sku: 'FRB-VIN-001', name: 'Côtes du Rhône rouge 75cl',   category: 'Boissons', unit: 'bouteille', price: 5.50,  tva_rate: 20, packaging: 'Carton 6 bouteilles' },
+    { sku: 'FRB-VIN-002', name: 'Bordeaux supérieur 75cl',     category: 'Boissons', unit: 'bouteille', price: 7.20,  tva_rate: 20, packaging: 'Carton 6 bouteilles' },
+    { sku: 'FRB-VIN-003', name: 'Bourgogne aligoté 75cl',      category: 'Boissons', unit: 'bouteille', price: 9.80,  tva_rate: 20, packaging: 'Carton 6 bouteilles' },
+    { sku: 'FRB-VIN-004', name: 'Sancerre blanc 75cl',         category: 'Boissons', unit: 'bouteille', price: 13.50, tva_rate: 20, packaging: 'Carton 6 bouteilles' },
+    { sku: 'FRB-VIN-005', name: 'Côtes de Provence rosé 75cl', category: 'Boissons', unit: 'bouteille', price: 6.80,  tva_rate: 20, packaging: 'Carton 6 bouteilles' },
+    { sku: 'FRB-VIN-006', name: 'Champagne brut 75cl',         category: 'Boissons', unit: 'bouteille', price: 22.00, tva_rate: 20, packaging: 'Carton 6 bouteilles' },
+    { sku: 'FRB-VIN-007', name: 'Crémant d\'Alsace 75cl',      category: 'Boissons', unit: 'bouteille', price: 11.50, tva_rate: 20, packaging: 'Carton 6 bouteilles' },
+    { sku: 'FRB-VIN-008', name: 'Pouilly-Fumé 75cl',           category: 'Boissons', unit: 'bouteille', price: 16.00, tva_rate: 20, packaging: 'Carton 6 bouteilles' },
+    // Bières (TVA 20% — alcohol)
+    { sku: 'FRB-BIE-001', name: 'Heineken fût 30L',            category: 'Boissons', unit: 'fût', price: 95.00, tva_rate: 20, packaging: 'Fût 30 L' },
+    { sku: 'FRB-BIE-002', name: 'Stella Artois fût 30L',       category: 'Boissons', unit: 'fût', price: 88.00, tva_rate: 20, packaging: 'Fût 30 L' },
+    { sku: 'FRB-BIE-003', name: 'Leffe Blonde fût 20L',        category: 'Boissons', unit: 'fût', price: 78.00, tva_rate: 20, packaging: 'Fût 20 L' },
+    { sku: 'FRB-BIE-004', name: '1664 33cl x24',               category: 'Boissons', unit: 'lot', price: 22.00, tva_rate: 20, packaging: 'Pack 24 canettes 33 cl' },
+    { sku: 'FRB-BIE-005', name: 'Carlsberg 33cl x24',          category: 'Boissons', unit: 'lot', price: 19.50, tva_rate: 20, packaging: 'Pack 24 canettes 33 cl' },
+    { sku: 'FRB-BIE-006', name: 'Guinness 50cl x12',           category: 'Boissons', unit: 'lot', price: 28.00, tva_rate: 20, packaging: 'Pack 12 canettes 50 cl' },
+    // Soft drinks + eaux (TVA 5.5 — non-alcoholic)
+    { sku: 'FRB-SOF-001', name: 'Coca-Cola 33cl x24',          category: 'Boissons', unit: 'lot', price: 17.50, tva_rate: 5.5, packaging: 'Pack 24 canettes 33 cl' },
+    { sku: 'FRB-SOF-002', name: 'Coca-Cola Zero 33cl x24',     category: 'Boissons', unit: 'lot', price: 17.50, tva_rate: 5.5, packaging: 'Pack 24 canettes 33 cl' },
+    { sku: 'FRB-SOF-003', name: 'Orangina 33cl x24',           category: 'Boissons', unit: 'lot', price: 18.00, tva_rate: 5.5, packaging: 'Pack 24 canettes 33 cl' },
+    { sku: 'FRB-SOF-004', name: 'Schweppes Tonic 25cl x24',    category: 'Boissons', unit: 'lot', price: 19.50, tva_rate: 5.5, packaging: 'Pack 24 bouteilles 25 cl' },
+    { sku: 'FRB-SOF-005', name: 'Perrier 33cl x24',            category: 'Boissons', unit: 'lot', price: 16.50, tva_rate: 5.5, packaging: 'Pack 24 bouteilles 33 cl' },
+    { sku: 'FRB-SOF-006', name: 'Eau Vittel 1L x12',           category: 'Boissons', unit: 'lot', price: 8.50,  tva_rate: 5.5, packaging: 'Pack 12 bouteilles 1 L' },
+    { sku: 'FRB-SOF-007', name: 'Jus d\'orange Tropicana 1L x6', category: 'Boissons', unit: 'lot', price: 14.50, tva_rate: 5.5, packaging: 'Pack 6 briques 1 L' },
+    { sku: 'FRB-SOF-008', name: 'Limonade artisanale 33cl x12', category: 'Boissons', unit: 'lot', price: 12.00, tva_rate: 5.5, packaging: 'Pack 12 bouteilles 33 cl' },
+    // Spiritueux (TVA 20% — alcohol)
+    { sku: 'FRB-SPI-001', name: 'Whisky JB 70cl',              category: 'Boissons', unit: 'bouteille', price: 18.50, tva_rate: 20, packaging: 'Bouteille 70 cl' },
+    { sku: 'FRB-SPI-002', name: 'Vodka Smirnoff 70cl',         category: 'Boissons', unit: 'bouteille', price: 16.00, tva_rate: 20, packaging: 'Bouteille 70 cl' },
+    { sku: 'FRB-SPI-003', name: 'Gin Bombay Sapphire 70cl',    category: 'Boissons', unit: 'bouteille', price: 24.00, tva_rate: 20, packaging: 'Bouteille 70 cl' },
+    { sku: 'FRB-SPI-004', name: 'Rhum Bacardi 70cl',           category: 'Boissons', unit: 'bouteille', price: 17.50, tva_rate: 20, packaging: 'Bouteille 70 cl' },
+    { sku: 'FRB-SPI-005', name: 'Cognac Hennessy VS 70cl',     category: 'Boissons', unit: 'bouteille', price: 38.00, tva_rate: 20, packaging: 'Bouteille 70 cl' },
+    { sku: 'FRB-SPI-006', name: 'Pastis Ricard 1L',            category: 'Boissons', unit: 'bouteille', price: 18.50, tva_rate: 20, packaging: 'Bouteille 1 L' },
+    { sku: 'FRB-SPI-007', name: 'Liqueur Cointreau 70cl',      category: 'Boissons', unit: 'bouteille', price: 22.00, tva_rate: 20, packaging: 'Bouteille 70 cl' },
+    { sku: 'FRB-SPI-008', name: 'Martini Bianco 1L',           category: 'Boissons', unit: 'bouteille', price: 12.50, tva_rate: 20, packaging: 'Bouteille 1 L' },
   ],
 };
 
@@ -212,8 +217,9 @@ function ensureSupplierCatalogs() {
   let totalInserted = 0;
   let touchedSuppliers = 0;
   const insertCatalog = db.prepare(
-    `INSERT INTO supplier_catalog (supplier_id, product_name, category, unit, price, restaurant_id)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO supplier_catalog
+       (supplier_id, product_name, category, unit, price, sku, tva_rate, packaging, restaurant_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const [supplierName, products] of Object.entries(SUPPLIER_CATALOG_DATA)) {
     const supplier = get(
@@ -227,7 +233,13 @@ function ensureSupplierCatalogs() {
         [supplier.id, RID]
       );
       for (const p of products) {
-        insertCatalog.run(supplier.id, p.name, p.category, p.unit, p.price, RID);
+        insertCatalog.run(
+          supplier.id, p.name, p.category, p.unit, p.price,
+          p.sku || null,
+          p.tva_rate != null ? p.tva_rate : 5.5,
+          p.packaging || null,
+          RID
+        );
       }
     });
     tx();

@@ -408,14 +408,22 @@ router.get('/catalog', requireSupplierAuth, (req, res) => {
 // POST /catalog — Add product to catalog
 router.post('/catalog', requireSupplierAuth, (req, res) => {
   const rid = req.supplierAccount.restaurant_id;
-  const { product_name, category, unit, price, min_order } = req.body;
+  const { product_name, category, unit, price, min_order, sku, tva_rate, packaging } = req.body;
   if (!product_name || !unit || price == null) {
     return res.status(400).json({ error: 'product_name, unit et price requis' });
   }
 
   const result = run(
-    'INSERT INTO supplier_catalog (restaurant_id, supplier_id, product_name, category, unit, price, min_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [rid, req.supplierAccount.supplier_id, product_name, category || null, unit, price, min_order || 0]
+    `INSERT INTO supplier_catalog
+       (restaurant_id, supplier_id, product_name, category, unit, price, min_order, sku, tva_rate, packaging)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      rid, req.supplierAccount.supplier_id, product_name, category || null, unit, price,
+      min_order || 0, sku || null,
+      // 5.5% covers food by default; UI can override for alcohol (20%) etc.
+      tva_rate != null ? Number(tva_rate) : 5.5,
+      packaging || null,
+    ]
   );
 
   // Create notification for new product
@@ -437,20 +445,27 @@ router.put('/catalog/:id', requireSupplierAuth, (req, res) => {
     return res.status(404).json({ error: 'Produit introuvable' });
   }
 
-  const { product_name, category, unit, price, min_order } = req.body;
+  const { product_name, category, unit, price, min_order, sku, tva_rate, packaging } = req.body;
   const newPrice = price != null ? price : item.price;
   const oldPrice = item.price;
 
   run(
-    'UPDATE supplier_catalog SET product_name = ?, category = ?, unit = ?, price = ?, min_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?',
+    `UPDATE supplier_catalog SET
+       product_name = ?, category = ?, unit = ?, price = ?, min_order = ?,
+       sku = ?, tva_rate = ?, packaging = ?,
+       updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND restaurant_id = ?`,
     [
       product_name || item.product_name,
       category !== undefined ? category : item.category,
       unit || item.unit,
       newPrice,
       min_order != null ? min_order : item.min_order,
+      sku !== undefined ? (sku || null) : item.sku,
+      tva_rate != null ? Number(tva_rate) : (item.tva_rate != null ? item.tva_rate : 5.5),
+      packaging !== undefined ? (packaging || null) : item.packaging,
       id,
-      rid
+      rid,
     ]
   );
 
@@ -688,7 +703,15 @@ async function extractFromPdfWithGemini(filePath, mimeType) {
 
   const prompt = `Extrais TOUS les produits listés dans cette mercuriale fournisseur (liste de prix professionnelle).
 Retourne un JSON strict de la forme :
-{ "items": [ { "name": "<libellé du produit>", "category": "<catégorie si visible, sinon null>", "unit": "<kg|L|pièce|carton|sac|etc.>", "price": <nombre, prix unitaire HT en euros> } ] }
+{ "items": [ {
+  "name": "<libellé du produit>",
+  "category": "<catégorie si visible, sinon null>",
+  "unit": "<kg|L|pièce|carton|sac|etc.>",
+  "price": <nombre, prix unitaire HT en euros>,
+  "sku": "<code article / référence si visible, sinon null>",
+  "packaging": "<conditionnement si visible (ex: 'Carton 5kg', 'Lot de 6'), sinon null>",
+  "tva_rate": <taux TVA en pourcentage si visible, sinon null. 5.5 pour denrées alimentaires, 20 pour alcools.>
+} ] }
 Règles :
 - Inclus chaque ligne produit, même les sous-rubriques.
 - Si le prix est absent, ignore la ligne.
@@ -741,17 +764,24 @@ Règles :
 }
 
 // Tag each item as 'new' or 'update' against the supplier's existing catalog.
-// Match is case-insensitive on product_name within (supplier_id, restaurant_id).
+// Match is case-insensitive on product_name within (supplier_id, restaurant_id),
+// or by SKU when the import provides one — SKU is the more reliable key when
+// the supplier renames a product but keeps the code.
 function annotateAgainstCatalog(items, supplierId, restaurantId) {
   if (!items.length) return items;
   const existing = all(
-    'SELECT id, product_name, price FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ?',
+    'SELECT id, product_name, price, sku FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ?',
     [supplierId, restaurantId]
   );
   const byName = new Map();
-  for (const row of existing) byName.set(row.product_name.toLowerCase(), row);
+  const bySku = new Map();
+  for (const row of existing) {
+    byName.set(row.product_name.toLowerCase(), row);
+    if (row.sku) bySku.set(row.sku.toLowerCase(), row);
+  }
   return items.map(it => {
-    const m = byName.get(it.name.toLowerCase());
+    const matchedBySku = it.sku ? bySku.get(it.sku.toLowerCase()) : null;
+    const m = matchedBySku || byName.get(it.name.toLowerCase());
     if (m) {
       return {
         ...it,
@@ -828,16 +858,27 @@ router.post('/save-mercuriale', requireSupplierAuth, express.json({ limit: '5mb'
 
   const tx = db.transaction(() => {
     for (const it of cleaned) {
-      const existing = get(
-        'SELECT id, price FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(product_name) = LOWER(?)',
-        [supplierId, rid, it.name]
-      );
+      // Match priority: SKU first (stable across renames), then case-insensitive name.
+      let existing = null;
+      if (it.sku) {
+        existing = get(
+          'SELECT id, price FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(sku) = LOWER(?)',
+          [supplierId, rid, it.sku]
+        );
+      }
+      if (!existing) {
+        existing = get(
+          'SELECT id, price FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(product_name) = LOWER(?)',
+          [supplierId, rid, it.name]
+        );
+      }
       if (existing) {
         run(
           `UPDATE supplier_catalog
-              SET product_name = ?, category = ?, unit = ?, price = ?, updated_at = CURRENT_TIMESTAMP
+              SET product_name = ?, category = ?, unit = ?, price = ?,
+                  sku = ?, tva_rate = ?, packaging = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND restaurant_id = ?`,
-          [it.name, it.category, it.unit, it.price, existing.id, rid]
+          [it.name, it.category, it.unit, it.price, it.sku, it.tva_rate, it.packaging, existing.id, rid]
         );
         if (existing.price !== it.price) {
           run(
@@ -848,8 +889,10 @@ router.post('/save-mercuriale', requireSupplierAuth, express.json({ limit: '5mb'
         updated++;
       } else {
         run(
-          'INSERT INTO supplier_catalog (restaurant_id, supplier_id, product_name, category, unit, price) VALUES (?, ?, ?, ?, ?, ?)',
-          [rid, supplierId, it.name, it.category, it.unit, it.price]
+          `INSERT INTO supplier_catalog
+             (restaurant_id, supplier_id, product_name, category, unit, price, sku, tva_rate, packaging)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [rid, supplierId, it.name, it.category, it.unit, it.price, it.sku, it.tva_rate, it.packaging]
         );
         run(
           'INSERT INTO price_change_notifications (restaurant_id, supplier_id, product_name, old_price, new_price, change_type) VALUES (?, ?, ?, NULL, ?, ?)',
@@ -868,6 +911,380 @@ router.post('/save-mercuriale', requireSupplierAuth, express.json({ limit: '5mb'
   }
 
   res.status(201).json({ success: true, created, updated, total: created + updated });
+});
+
+// ═════════════════════════════════════════
+// DASHBOARD (supplier side)
+// ═════════════════════════════════════════
+// Landing screen after login. Five widgets: revenue total, order counts (this
+// month / lifetime), active clients (≥1 order in last 30 days), 5 most recent
+// orders, and pending-confirmation alerts (status='brouillon' or 'envoyée').
+router.get('/dashboard', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+
+  // The supplier portal is currently restaurant-scoped (one supplier_account
+  // belongs to ONE restaurant) — the restaurant_id filter both keeps the
+  // tenant isolation guarantee AND limits the figures to the data the
+  // supplier can see in /orders.
+  const totals = get(
+    `SELECT
+       COALESCE(SUM(total_amount), 0)               AS revenue_total,
+       COUNT(*)                                     AS orders_total,
+       COALESCE(SUM(CASE WHEN strftime('%Y-%m', created_at) = strftime('%Y-%m','now') THEN 1 ELSE 0 END), 0) AS orders_this_month,
+       COALESCE(SUM(CASE WHEN strftime('%Y-%m', created_at) = strftime('%Y-%m','now') THEN total_amount ELSE 0 END), 0) AS revenue_this_month
+     FROM purchase_orders
+     WHERE supplier_id = ? AND restaurant_id = ?`,
+    [supplierId, rid]
+  );
+
+  const activeClients = get(
+    `SELECT COUNT(DISTINCT restaurant_id) AS c
+       FROM purchase_orders
+      WHERE supplier_id = ? AND restaurant_id = ?
+        AND created_at >= datetime('now', '-30 days')`,
+    [supplierId, rid]
+  );
+
+  const recentOrders = all(
+    `SELECT po.id, po.reference, po.status, po.total_amount, po.created_at,
+            r.name AS restaurant_name
+       FROM purchase_orders po
+       JOIN restaurants r ON r.id = po.restaurant_id
+      WHERE po.supplier_id = ? AND po.restaurant_id = ?
+      ORDER BY po.created_at DESC
+      LIMIT 5`,
+    [supplierId, rid]
+  );
+
+  // 'brouillon' = restaurant draft, 'envoyée' = sent and waiting for supplier
+  // confirmation. Both are alert candidates from the supplier's POV.
+  const pendingAlerts = all(
+    `SELECT po.id, po.reference, po.status, po.total_amount, po.created_at,
+            r.name AS restaurant_name
+       FROM purchase_orders po
+       JOIN restaurants r ON r.id = po.restaurant_id
+      WHERE po.supplier_id = ? AND po.restaurant_id = ?
+        AND po.status IN ('brouillon', 'envoyée', 'envoyee')
+      ORDER BY po.created_at DESC
+      LIMIT 20`,
+    [supplierId, rid]
+  );
+
+  res.json({
+    revenue_total: totals.revenue_total,
+    revenue_this_month: totals.revenue_this_month,
+    orders_total: totals.orders_total,
+    orders_this_month: totals.orders_this_month,
+    active_clients: activeClients.c,
+    recent_orders: recentOrders,
+    pending_alerts: pendingAlerts,
+  });
+});
+
+// ═════════════════════════════════════════
+// CLIENTS (mes restaurants)
+// ═════════════════════════════════════════
+
+router.get('/clients', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+
+  // Aggregate per restaurant: orders count, last order date, average order
+  // value, and total revenue. Restricted to the supplier's tenant (rid) — a
+  // future multi-restaurant supplier_account model would relax this.
+  const clients = all(
+    `SELECT r.id          AS restaurant_id,
+            r.name        AS restaurant_name,
+            r.city        AS restaurant_city,
+            r.phone       AS restaurant_phone,
+            COUNT(po.id)  AS orders_count,
+            MAX(po.created_at) AS last_order_at,
+            COALESCE(SUM(po.total_amount), 0)                  AS total_revenue,
+            COALESCE(AVG(po.total_amount), 0)                  AS avg_order_value
+       FROM restaurants r
+       LEFT JOIN purchase_orders po
+              ON po.restaurant_id = r.id AND po.supplier_id = ?
+      WHERE r.id = ?
+   GROUP BY r.id
+   ORDER BY orders_count DESC, r.name ASC`,
+    [supplierId, rid]
+  );
+
+  res.json(clients);
+});
+
+router.get('/clients/:restaurantId', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const requestedRid = Number(req.params.restaurantId);
+  // Suppliers can only inspect THEIR restaurant's drill-in. Cross-tenant
+  // access returns 404 (not 403) to hide existence.
+  if (requestedRid !== rid) return res.status(404).json({ error: 'Restaurant introuvable' });
+
+  const restaurant = get('SELECT id, name, city, phone, address FROM restaurants WHERE id = ?', [rid]);
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant introuvable' });
+
+  const orders = all(
+    `SELECT po.id, po.reference, po.status, po.total_amount, po.created_at, po.expected_delivery
+       FROM purchase_orders po
+      WHERE po.supplier_id = ? AND po.restaurant_id = ?
+      ORDER BY po.created_at DESC
+      LIMIT 50`,
+    [supplierId, rid]
+  );
+
+  // "Favorite products" = top 5 by quantity ordered across this client's
+  // history with this supplier. Joined back to purchase_order_items.
+  const favorites = all(
+    `SELECT poi.product_name,
+            SUM(poi.quantity)    AS total_quantity,
+            COUNT(DISTINCT po.id) AS times_ordered,
+            COALESCE(SUM(poi.total_price), 0) AS total_spent
+       FROM purchase_order_items poi
+       JOIN purchase_orders po ON po.id = poi.purchase_order_id
+      WHERE po.supplier_id = ? AND po.restaurant_id = ?
+   GROUP BY poi.product_name
+   ORDER BY total_quantity DESC
+      LIMIT 5`,
+    [supplierId, rid]
+  );
+
+  // Order frequency = average days between consecutive orders. SQLite has no
+  // window functions in older versions but better-sqlite3 ships modern SQLite,
+  // so LAG works. Fall back gracefully when there are <2 orders.
+  let frequencyDays = null;
+  if (orders.length >= 2) {
+    const first = new Date(orders[orders.length - 1].created_at).getTime();
+    const last = new Date(orders[0].created_at).getTime();
+    if (Number.isFinite(first) && Number.isFinite(last) && last > first) {
+      frequencyDays = Math.round((last - first) / (1000 * 60 * 60 * 24) / (orders.length - 1));
+    }
+  }
+
+  const totals = get(
+    `SELECT COUNT(*)                          AS orders_count,
+            COALESCE(SUM(total_amount), 0)    AS total_revenue,
+            COALESCE(AVG(total_amount), 0)    AS avg_order_value,
+            MAX(created_at)                   AS last_order_at
+       FROM purchase_orders
+      WHERE supplier_id = ? AND restaurant_id = ?`,
+    [supplierId, rid]
+  );
+
+  res.json({
+    restaurant,
+    orders,
+    favorites,
+    frequency_days: frequencyDays,
+    summary: totals,
+  });
+});
+
+router.get('/clients/:restaurantId/orders/:orderId', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const requestedRid = Number(req.params.restaurantId);
+  const orderId = Number(req.params.orderId);
+  if (requestedRid !== rid) return res.status(404).json({ error: 'Commande introuvable' });
+
+  const order = get(
+    `SELECT po.*, r.name AS restaurant_name
+       FROM purchase_orders po
+       JOIN restaurants r ON r.id = po.restaurant_id
+      WHERE po.id = ? AND po.supplier_id = ? AND po.restaurant_id = ?`,
+    [orderId, supplierId, rid]
+  );
+  if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+
+  const items = all(
+    `SELECT id, product_name, quantity, unit, unit_price, total_price, notes
+       FROM purchase_order_items
+      WHERE purchase_order_id = ? AND restaurant_id = ?`,
+    [orderId, rid]
+  );
+  res.json({ ...order, items });
+});
+
+// ═════════════════════════════════════════
+// SUPPLIER NOTIFICATIONS (commande créée, etc.)
+// ═════════════════════════════════════════
+// Mirrors price_change_notifications but for the supplier-facing side. The
+// /notifications/* path on this router is already used by the gérant view
+// (price changes), so the supplier-side endpoints live under /notifications/me/
+// to avoid collision and keep auth middleware split.
+
+router.get('/notifications/me', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const notifs = all(
+    `SELECT sn.*, r.name AS restaurant_name
+       FROM supplier_notifications sn
+       LEFT JOIN restaurants r ON r.id = sn.restaurant_id
+      WHERE sn.supplier_id = ? AND sn.restaurant_id = ?
+      ORDER BY sn.created_at DESC
+      LIMIT 100`,
+    [supplierId, rid]
+  );
+  res.json(notifs);
+});
+
+router.get('/notifications/me/unread-count', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const row = get(
+    'SELECT COUNT(*) AS c FROM supplier_notifications WHERE supplier_id = ? AND restaurant_id = ? AND read = 0',
+    [supplierId, rid]
+  );
+  res.json({ count: row.c });
+});
+
+router.put('/notifications/me/:id/read', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  const id = Number(req.params.id);
+  const result = run(
+    'UPDATE supplier_notifications SET read = 1 WHERE id = ? AND supplier_id = ? AND restaurant_id = ?',
+    [id, supplierId, rid]
+  );
+  if (result.changes === 0) return res.status(404).json({ error: 'Notification introuvable' });
+  res.json({ success: true });
+});
+
+router.put('/notifications/me/read-all', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const rid = req.supplierAccount.restaurant_id;
+  run(
+    'UPDATE supplier_notifications SET read = 1 WHERE supplier_id = ? AND restaurant_id = ? AND read = 0',
+    [supplierId, rid]
+  );
+  res.json({ success: true });
+});
+
+// ═════════════════════════════════════════
+// BL PDF EXPORT
+// ═════════════════════════════════════════
+// pdfkit-based bon de livraison. Header with supplier + restaurant blocks,
+// items table with batch/DLC/temperature, signature lines at the bottom.
+// Returns a streamed application/pdf — never buffer the whole PDF in memory.
+router.get('/delivery-notes/:id/pdf', requireSupplierAuth, (req, res) => {
+  const supplierId = req.supplierAccount.supplier_id;
+  const supplierName = req.supplierAccount.supplier_name;
+  const rid = req.supplierAccount.restaurant_id;
+  const id = Number(req.params.id);
+
+  const note = get(
+    'SELECT * FROM delivery_notes WHERE id = ? AND supplier_id = ? AND restaurant_id = ?',
+    [id, supplierId, rid]
+  );
+  if (!note) return res.status(404).json({ error: 'Bon de livraison introuvable' });
+
+  const restaurant = get('SELECT name, address, city, postal_code, phone FROM restaurants WHERE id = ?', [rid]) || {};
+  const items = all(
+    `SELECT product_name, quantity, unit, price_per_unit, batch_number, dlc, temperature_required, origin, notes
+       FROM delivery_note_items
+      WHERE delivery_note_id = ? AND restaurant_id = ?`,
+    [id, rid]
+  );
+
+  const PDFDocument = require('pdfkit');
+  const doc = new PDFDocument({ size: 'A4', margin: 42 });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  const safeName = String(supplierName || 'fournisseur').replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 40);
+  res.setHeader('Content-Disposition', `attachment; filename="BL-${safeName}-${id}.pdf"`);
+  doc.pipe(res);
+
+  // Header
+  doc.font('Helvetica-Bold').fontSize(16).text('Bon de livraison', { align: 'left' });
+  doc.font('Helvetica').fontSize(10).fillColor('#555')
+    .text(`Référence #${id}`, { align: 'left' });
+  doc.moveDown(0.5);
+
+  // Two-column meta: supplier (left) + restaurant (right)
+  const metaY = doc.y;
+  const colW = (doc.page.width - 84) / 2;
+  doc.fillColor('#000').font('Helvetica-Bold').fontSize(10).text('Fournisseur', 42, metaY);
+  doc.font('Helvetica').fontSize(10).text(supplierName || '—', 42, metaY + 14, { width: colW });
+
+  doc.font('Helvetica-Bold').fontSize(10).text('Client (restaurant)', 42 + colW, metaY);
+  doc.font('Helvetica').fontSize(10)
+    .text(restaurant.name || '—', 42 + colW, metaY + 14, { width: colW });
+  if (restaurant.address || restaurant.city) {
+    doc.text(`${restaurant.address || ''} ${restaurant.postal_code || ''} ${restaurant.city || ''}`.trim(), 42 + colW, doc.y, { width: colW });
+  }
+  if (restaurant.phone) doc.text(`Tél : ${restaurant.phone}`, 42 + colW, doc.y, { width: colW });
+
+  doc.y = metaY + 60;
+  doc.moveTo(42, doc.y).lineTo(doc.page.width - 42, doc.y).strokeColor('#000').stroke();
+  doc.moveDown(0.5);
+
+  // Date row
+  doc.font('Helvetica-Bold').fontSize(10).text('Date de livraison : ', { continued: true });
+  doc.font('Helvetica').text(note.delivery_date || new Date(note.created_at).toLocaleDateString('fr-FR'));
+  if (note.notes) {
+    doc.font('Helvetica-Bold').text('Notes : ', { continued: true }).font('Helvetica').text(String(note.notes));
+  }
+  doc.moveDown(0.5);
+
+  // Items table
+  const tableY = doc.y + 4;
+  const cols = [
+    { label: 'Produit',     x: 42,  w: 175 },
+    { label: 'Qté',         x: 220, w: 40,  align: 'right' },
+    { label: 'Unité',       x: 262, w: 40 },
+    { label: 'Lot',         x: 305, w: 70 },
+    { label: 'DLC',         x: 378, w: 60 },
+    { label: 'T° requise',  x: 440, w: 55 },
+    { label: 'P.U. HT',     x: 498, w: 55, align: 'right' },
+  ];
+
+  doc.font('Helvetica-Bold').fontSize(9).fillColor('#000');
+  for (const c of cols) {
+    doc.text(c.label, c.x, tableY, { width: c.w, align: c.align || 'left' });
+  }
+  doc.moveTo(42, tableY + 14).lineTo(doc.page.width - 42, tableY + 14).strokeColor('#888').stroke();
+  let rowY = tableY + 18;
+
+  doc.font('Helvetica').fontSize(9);
+  for (const it of items) {
+    if (rowY > doc.page.height - 120) {
+      doc.addPage();
+      rowY = 42;
+    }
+    const tempStr = it.temperature_required != null ? `${it.temperature_required}°C` : '';
+    const dlcStr = it.dlc ? new Date(it.dlc).toLocaleDateString('fr-FR') : '';
+    const priceStr = it.price_per_unit != null ? `${Number(it.price_per_unit).toFixed(2)} €` : '';
+    doc.fillColor('#000');
+    doc.text(String(it.product_name || ''), cols[0].x, rowY, { width: cols[0].w });
+    doc.text(String(it.quantity ?? ''),     cols[1].x, rowY, { width: cols[1].w, align: 'right' });
+    doc.text(String(it.unit || ''),         cols[2].x, rowY, { width: cols[2].w });
+    doc.text(String(it.batch_number || ''), cols[3].x, rowY, { width: cols[3].w });
+    doc.text(dlcStr,                        cols[4].x, rowY, { width: cols[4].w });
+    doc.text(tempStr,                       cols[5].x, rowY, { width: cols[5].w });
+    doc.text(priceStr,                      cols[6].x, rowY, { width: cols[6].w, align: 'right' });
+    rowY += 16;
+  }
+
+  // Total + signatures
+  if (rowY > doc.page.height - 140) {
+    doc.addPage();
+    rowY = 42;
+  }
+  rowY += 10;
+  doc.moveTo(42, rowY).lineTo(doc.page.width - 42, rowY).strokeColor('#000').stroke();
+  rowY += 8;
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#000')
+    .text(`Total HT : ${(note.total_amount || 0).toFixed(2)} €`, 42, rowY, { align: 'right', width: doc.page.width - 84 });
+
+  rowY += 50;
+  const sigW = (doc.page.width - 84 - 30) / 2;
+  doc.font('Helvetica-Bold').fontSize(9).text('Signature livreur', 42, rowY);
+  doc.moveTo(42, rowY + 36).lineTo(42 + sigW, rowY + 36).strokeColor('#000').stroke();
+  doc.font('Helvetica-Bold').fontSize(9).text('Signature client (restaurant)', 42 + sigW + 30, rowY);
+  doc.moveTo(42 + sigW + 30, rowY + 36).lineTo(doc.page.width - 42, rowY + 36).strokeColor('#000').stroke();
+
+  doc.end();
 });
 
 module.exports = router;

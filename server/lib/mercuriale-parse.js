@@ -21,17 +21,28 @@ const { categorize } = require('./mercuriale-categorize');
 const MAX_ITEMS = 2000; // hard cap so a runaway sheet can't spike memory
 
 // Keyword variants per logical column. Lowercase, accent-stripped at compare time.
+// Order in COLUMN_KEYWORDS doesn't matter — findHeader() iterates each cell against
+// every key. Order DOES matter inside a key list when one keyword is a prefix of
+// another (e.g. "ref" vs "reference") since we use substring matching.
 const COLUMN_KEYWORDS = {
+  // SKU/code first because "reference" can be in either name or sku columns —
+  // "code" / "sku" are more specific so we win the tie.
+  sku: [
+    'sku', 'code article', 'code', 'ref article', 'ref.', 'ref ', 'code produit',
+  ],
   name: [
     'produit', 'designation', 'libelle', 'nom',
-    'article', 'description', 'name', 'item', 'reference',
+    'article', 'description', 'name', 'item',
   ],
   price: [
     'prix', 'tarif', 'price', 'cout', 'pu ht', 'pu', 'p.u.',
     'prix unitaire', 'unit price', 'prix ht',
   ],
   unit: [
-    'unite', 'unit', 'cond', 'conditionnement', 'um', 'u.m.',
+    'unite', 'unit', 'um', 'u.m.',
+  ],
+  packaging: [
+    'cond', 'conditionnement', 'packaging', 'colis', 'lot',
   ],
   category: [
     'categorie', 'category', 'famille', 'rayon', 'groupe',
@@ -61,22 +72,34 @@ function parsePrice(raw) {
 
 // Locate the header row + column mapping in a [row][col] matrix. Scans up to
 // the first 20 rows so we tolerate cover sheets or branding banners above the
-// actual table.
+// actual table. SKU is checked before name/category because some sheets label
+// the SKU column "reference" — without the priority pass it would steal the
+// name column.
 function findHeader(rows) {
   const limit = Math.min(20, rows.length);
   for (let r = 0; r < limit; r++) {
     const row = rows[r] || [];
-    let nameCol = -1, priceCol = -1, unitCol = -1, categoryCol = -1;
+    let skuCol = -1, nameCol = -1, priceCol = -1, unitCol = -1, packagingCol = -1, categoryCol = -1;
+    // First pass: claim SKU column (greedy on the more specific keyword set).
     for (let c = 0; c < row.length; c++) {
+      const text = row[c];
+      if (text == null || String(text).trim() === '') continue;
+      if (skuCol < 0 && isHeaderCell(text, COLUMN_KEYWORDS.sku)) { skuCol = c; }
+    }
+    // Second pass: assign the remaining logical columns, skipping the one
+    // already taken by SKU.
+    for (let c = 0; c < row.length; c++) {
+      if (c === skuCol) continue;
       const text = row[c];
       if (text == null || String(text).trim() === '') continue;
       if (nameCol < 0 && isHeaderCell(text, COLUMN_KEYWORDS.name)) nameCol = c;
       else if (priceCol < 0 && isHeaderCell(text, COLUMN_KEYWORDS.price)) priceCol = c;
       else if (unitCol < 0 && isHeaderCell(text, COLUMN_KEYWORDS.unit)) unitCol = c;
+      else if (packagingCol < 0 && isHeaderCell(text, COLUMN_KEYWORDS.packaging)) packagingCol = c;
       else if (categoryCol < 0 && isHeaderCell(text, COLUMN_KEYWORDS.category)) categoryCol = c;
     }
     if (nameCol >= 0 && priceCol >= 0) {
-      return { headerRow: r, nameCol, priceCol, unitCol, categoryCol };
+      return { headerRow: r, skuCol, nameCol, priceCol, unitCol, packagingCol, categoryCol };
     }
   }
   return null;
@@ -112,8 +135,21 @@ function parseXlsxBuffer(buffer) {
       ? String(row[header.categoryCol] == null ? '' : row[header.categoryCol]).trim()
       : '';
     const category = categorize(name, rawCategory);
+    const sku = header.skuCol >= 0
+      ? String(row[header.skuCol] == null ? '' : row[header.skuCol]).trim().slice(0, 64) || null
+      : null;
+    const packaging = header.packagingCol >= 0
+      ? String(row[header.packagingCol] == null ? '' : row[header.packagingCol]).trim().slice(0, 80) || null
+      : null;
 
-    items.push({ name: name.slice(0, 200), category, unit: unit.slice(0, 40), price });
+    items.push({
+      name: name.slice(0, 200),
+      category,
+      unit: unit.slice(0, 40),
+      price,
+      sku,
+      packaging,
+    });
   }
   return items;
 }
@@ -136,11 +172,19 @@ function normalizeItems(rawItems) {
     const unit = String(raw.unit || 'kg').trim() || 'kg';
     const supplied = String(raw.category || '').trim();
     const category = categorize(name, supplied);
+    const skuRaw = raw.sku == null ? '' : String(raw.sku).trim();
+    const packagingRaw = raw.packaging == null ? '' : String(raw.packaging).trim();
+    // tva_rate has to be a sane number. NaN, negative, > 100 → fall back to 5.5.
+    let tva = raw.tva_rate != null ? Number(raw.tva_rate) : 5.5;
+    if (!Number.isFinite(tva) || tva < 0 || tva > 100) tva = 5.5;
     out.push({
       name: name.slice(0, 200),
       category,
       unit: unit.slice(0, 40),
       price,
+      sku: skuRaw ? skuRaw.slice(0, 64) : null,
+      packaging: packagingRaw ? packagingRaw.slice(0, 80) : null,
+      tva_rate: tva,
     });
     if (out.length >= MAX_ITEMS) break;
   }

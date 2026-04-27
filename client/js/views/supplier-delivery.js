@@ -81,8 +81,11 @@ async function showSupplierDeliveryDetail(id) {
     const statusLabels = { pending: '🟠 En attente', received: '🟢 Reçu', partial: '🟡 Partiel', rejected: '🔴 Refusé' };
 
     content.innerHTML = `
-      <div style="margin-bottom:var(--space-4)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)">
         <button class="btn btn-secondary btn-sm" id="back-supplier-deliveries">← Retour</button>
+        <button class="btn btn-secondary btn-sm" id="supplier-bl-pdf">
+          <i data-lucide="download" style="width:16px;height:16px"></i> Télécharger PDF
+        </button>
       </div>
       <h2>Bon #${d.id} — ${statusLabels[d.status] || d.status}</h2>
       ${d.delivery_date ? `<p class="text-secondary">Date livraison : ${d.delivery_date}</p>` : ''}
@@ -121,6 +124,20 @@ async function showSupplierDeliveryDetail(id) {
     `;
 
     document.getElementById('back-supplier-deliveries').addEventListener('click', renderSupplierDeliveriesTab);
+    const pdfBtn = document.getElementById('supplier-bl-pdf');
+    if (pdfBtn) {
+      if (window.lucide) lucide.createIcons();
+      pdfBtn.addEventListener('click', async () => {
+        pdfBtn.disabled = true;
+        try {
+          await API.downloadSupplierDeliveryNotePdf(id);
+        } catch (err) {
+          showToast(err.message || 'Erreur téléchargement', 'error');
+        } finally {
+          pdfBtn.disabled = false;
+        }
+      });
+    }
   } catch (e) {
     content.innerHTML = `<p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>`;
   }
