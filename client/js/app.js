@@ -52,7 +52,7 @@ const NAV_GROUPS = {
       // /suppliers (just the suppliers list, no orders). Two clicks to reach
       // the orders dashboard. Route now points straight at /orders, which
       // already shows orders + has a "Fournisseurs" button to drill back.
-      { label: 'Commandes fournisseurs', route: '/orders',    icon: 'clipboard-pen',  roles: ['gerant'],              minPlan: 'essential' },
+      { label: 'Commandes',              route: '/orders',    icon: 'clipboard-pen',  roles: ['gerant'],              minPlan: 'essential' },
       { label: 'Fournisseurs',          route: '/suppliers',  icon: 'truck',         roles: ['gerant'],              minPlan: 'essential' },
       { label: 'Livraisons',             route: '/deliveries',icon: 'package-check',  roles: ['gerant','cuisinier'], minPlan: 'essential' },
       { label: 'Messages',               route: '/messages',  icon: 'message-square', roles: ['gerant','cuisinier'], minPlan: 'essential', badgeKey: 'messages' },
