@@ -50,14 +50,22 @@ async function renderSupplierOrdersTab() {
       const expected = o.expected_delivery
         ? new Date(o.expected_delivery).toLocaleDateString('fr-FR')
         : null;
+      // Cards now surface the client restaurant name up-front so the supplier
+      // can scan their queue without opening each order. The /orders endpoint
+      // returns restaurant_name (joined in v5) — display alongside the ref.
       return `
         <div class="card supplier-order-card" data-id="${o.id}" style="padding:var(--space-4);margin-bottom:var(--space-3);border-left:4px solid ${s.color};border-radius:var(--radius-lg);background:var(--bg-elevated);cursor:pointer">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <strong>${escapeHtml(o.reference || `Commande #${o.id}`)}</strong>
-              <span class="text-secondary text-sm" style="margin-left:var(--space-2)">${escapeHtml(created)}</span>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3)">
+            <div style="min-width:0">
+              <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+                <strong>${escapeHtml(o.reference || `Commande #${o.id}`)}</strong>
+                <span class="text-secondary text-sm">${escapeHtml(created)}</span>
+              </div>
+              ${o.restaurant_name
+                ? `<div class="supplier-order-card__client" style="margin-top:4px;font-size:var(--text-sm);color:#1B2A4A;font-weight:500"><i data-lucide="utensils-crossed" style="width:14px;height:14px;margin-right:4px;vertical-align:-2px"></i>${escapeHtml(o.restaurant_name)}</div>`
+                : ''}
             </div>
-            <span class="badge" style="background:${s.color};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md)">
+            <span class="badge" style="background:${s.color};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md);white-space:nowrap;flex-shrink:0">
               ${escapeHtml(s.label)}
             </span>
           </div>
@@ -68,6 +76,7 @@ async function renderSupplierOrdersTab() {
         </div>
       `;
     }).join('');
+    if (window.lucide) lucide.createIcons();
 
     list.querySelectorAll('.supplier-order-card').forEach(card => {
       card.addEventListener('click', () => showSupplierOrderDetail(Number(card.dataset.id)));

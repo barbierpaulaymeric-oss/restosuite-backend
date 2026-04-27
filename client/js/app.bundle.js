@@ -69,6 +69,9 @@ const API = {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Email ou mot de passe incorrect");
       }
+      if (options && options.noRedirectOn401) {
+        throw new Error("401");
+      }
       localStorage.removeItem("restosuite_token");
       localStorage.removeItem("restosuite_account");
       try {
@@ -552,7 +555,7 @@ const API = {
     return fetch(this.base + "/supplier-portal" + path, config).then(async (r) => {
       if (!r.ok) {
         const err = await r.json().catch(() => ({ error: r.statusText }));
-        if (r.status === 401) {
+        if (r.status === 401 && !options.noRedirectOn401) {
           clearSupplierSession();
           try {
             localStorage.removeItem("restosuite_token");
@@ -604,8 +607,9 @@ const API = {
   getSupplierOrder(id) {
     return this.supplierRequest(`/orders/${id}`);
   },
+  // Background-poll variants — see comment on getMessageUnreadCount.
   getSupplierOrdersPendingCount() {
-    return this.supplierRequest("/orders/pending-count");
+    return this.supplierRequest("/orders/pending-count", { noRedirectOn401: true });
   },
   confirmSupplierOrder(id, reason) {
     return this.supplierRequest(`/orders/${id}/confirm`, { method: "PUT", body: { reason: reason || null } });
@@ -652,8 +656,9 @@ const API = {
     if (related.related_id != null) body.related_id = related.related_id;
     return this.request(`/messages/conversations/${supplierId}`, { method: "POST", body });
   },
+  // Background-poll variant: a transient 401 on the ticker shouldn't reload the page.
   getMessageUnreadCount() {
-    return this.request("/messages/unread-count");
+    return this.request("/messages/unread-count", { noRedirectOn401: true });
   },
   // ─── Messages — supplier side (X-Supplier-Token) ───
   getSupplierMessageConversations() {
@@ -669,7 +674,7 @@ const API = {
     return this.supplierRequest(`/messages/conversations/${restaurantId}`, { method: "POST", body });
   },
   getSupplierMessageUnreadCount() {
-    return this.supplierRequest("/messages/unread-count");
+    return this.supplierRequest("/messages/unread-count", { noRedirectOn401: true });
   },
   // ─── Supplier Mercuriale Import (supplier side) ───
   // The upload uses multipart/form-data so we don't go through supplierRequest
@@ -715,7 +720,7 @@ const API = {
     return this.supplierRequest("/notifications/me");
   },
   getSupplierMyUnreadCount() {
-    return this.supplierRequest("/notifications/me/unread-count");
+    return this.supplierRequest("/notifications/me/unread-count", { noRedirectOn401: true });
   },
   markSupplierMyNotificationRead(id) {
     return this.supplierRequest(`/notifications/me/${id}/read`, { method: "PUT" });
@@ -5046,10 +5051,10 @@ async function renderHACCPTemperatures() {
               </tbody>
             </table>
           </div>
-          <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-3)">
-            <button class="btn btn-secondary" id="btn-batch-cancel">Annuler</button>
-            <button class="btn btn-accent" id="btn-batch-submit">
-              <i data-lucide="save" style="width:16px;height:16px;margin-right:4px" aria-hidden="true"></i>
+          <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-3);position:sticky;bottom:8px;z-index:10;background:var(--bg-elevated);padding:var(--space-2) 0;border-top:1px solid var(--border-subtle, var(--border-default))">
+            <button class="btn btn-secondary" id="btn-batch-cancel" style="min-height:48px;padding:0 var(--space-4)">Annuler</button>
+            <button class="btn btn-accent" id="btn-batch-submit" style="min-height:48px;min-width:200px;padding:0 var(--space-5);font-size:var(--text-base);font-weight:600">
+              <i data-lucide="save" style="width:18px;height:18px;margin-right:6px" aria-hidden="true"></i>
               Enregistrer tout
             </button>
           </div>
@@ -5198,7 +5203,8 @@ function setupTemperatureEvents(zones) {
       return;
     }
     batchSubmit.disabled = true;
-    batchSubmit.textContent = "Enregistrement\u2026";
+    batchSubmit.innerHTML = '<i data-lucide="loader-2" class="spin" style="width:18px;height:18px;margin-right:6px" aria-hidden="true"></i>Enregistrement\u2026';
+    if (window.lucide) lucide.createIcons({ nodes: [batchSubmit] });
     let errors = 0;
     for (const entry of toSave) {
       try {
@@ -5211,7 +5217,7 @@ function setupTemperatureEvents(zones) {
       }
     }
     batchSubmit.disabled = false;
-    batchSubmit.innerHTML = '<i data-lucide="save" style="width:16px;height:16px;margin-right:4px"></i>Enregistrer tout';
+    batchSubmit.innerHTML = '<i data-lucide="save" style="width:18px;height:18px;margin-right:6px"></i>Enregistrer tout';
     if (window.lucide) lucide.createIcons({ nodes: [batchSubmit] });
     if (errors > 0) {
       showToast(`${errors} relev\xE9(s) non enregistr\xE9(s)`, "error");
@@ -20156,10 +20162,15 @@ async function renderSupplierDashboardTab() {
   };
   document.getElementById("supplier-dashboard-body").innerHTML = `
     <div class="supplier-kpi-grid">
-      <div class="supplier-kpi-card">
-        <div class="supplier-kpi-card__label">CA total</div>
+      <div class="supplier-kpi-card" title="Revenus issus des commandes confirm\xE9es et livr\xE9es (statuts confirm\xE9e + livr\xE9e). Hors brouillons, commandes envoy\xE9es non confirm\xE9es, refus\xE9es et annul\xE9es.">
+        <div class="supplier-kpi-card__label">CA confirm\xE9</div>
         <div class="supplier-kpi-card__value">${fmt(data.revenue_total)}</div>
         <div class="supplier-kpi-card__sub">Ce mois : ${fmt(data.revenue_this_month)}</div>
+      </div>
+      <div class="supplier-kpi-card" title="Total tous statuts confondus (inclut brouillons et commandes en attente de confirmation). Vue align\xE9e avec l'historique.">
+        <div class="supplier-kpi-card__label">CA total (tous statuts)</div>
+        <div class="supplier-kpi-card__value">${fmt(data.revenue_total_all)}</div>
+        <div class="supplier-kpi-card__sub">Ce mois : ${fmt(data.revenue_this_month_all)}</div>
       </div>
       <div class="supplier-kpi-card">
         <div class="supplier-kpi-card__label">Commandes</div>
@@ -21337,12 +21348,15 @@ async function renderSupplierOrdersTab() {
       const expected = o.expected_delivery ? new Date(o.expected_delivery).toLocaleDateString("fr-FR") : null;
       return `
         <div class="card supplier-order-card" data-id="${o.id}" style="padding:var(--space-4);margin-bottom:var(--space-3);border-left:4px solid ${s.color};border-radius:var(--radius-lg);background:var(--bg-elevated);cursor:pointer">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <strong>${escapeHtml(o.reference || `Commande #${o.id}`)}</strong>
-              <span class="text-secondary text-sm" style="margin-left:var(--space-2)">${escapeHtml(created)}</span>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3)">
+            <div style="min-width:0">
+              <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+                <strong>${escapeHtml(o.reference || `Commande #${o.id}`)}</strong>
+                <span class="text-secondary text-sm">${escapeHtml(created)}</span>
+              </div>
+              ${o.restaurant_name ? `<div class="supplier-order-card__client" style="margin-top:4px;font-size:var(--text-sm);color:#1B2A4A;font-weight:500"><i data-lucide="utensils-crossed" style="width:14px;height:14px;margin-right:4px;vertical-align:-2px"></i>${escapeHtml(o.restaurant_name)}</div>` : ""}
             </div>
-            <span class="badge" style="background:${s.color};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md)">
+            <span class="badge" style="background:${s.color};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md);white-space:nowrap;flex-shrink:0">
               ${escapeHtml(s.label)}
             </span>
           </div>
@@ -21353,6 +21367,7 @@ async function renderSupplierOrdersTab() {
         </div>
       `;
     }).join("");
+    if (window.lucide) lucide.createIcons();
     list.querySelectorAll(".supplier-order-card").forEach((card) => {
       card.addEventListener("click", () => showSupplierOrderDetail(Number(card.dataset.id)));
     });

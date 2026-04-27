@@ -75,6 +75,14 @@ const API = {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Email ou mot de passe incorrect');
       }
+      // Background polls (badge counters, message unread, etc.) opt out of the
+      // hard reload path: a transient 401 on a 60s ticker shouldn't yank the
+      // user mid-navigation. The caller still gets a thrown error to swallow.
+      // We do NOT clear sessions here either — the next genuine user action
+      // will hit the same 401 and trigger the proper cleanup.
+      if (options && options.noRedirectOn401) {
+        throw new Error('401');
+      }
       // JWT expired or invalid — force re-login.
       // We clear BOTH the restaurant token AND any leftover supplier session
       // before reloading. Without the symmetric clear, app.js init's
@@ -468,7 +476,7 @@ const API = {
     return fetch(this.base + '/supplier-portal' + path, config).then(async r => {
       if (!r.ok) {
         const err = await r.json().catch(() => ({ error: r.statusText }));
-        if (r.status === 401) {
+        if (r.status === 401 && !options.noRedirectOn401) {
           // Symmetric cleanup with the restaurant 401 path: clear BOTH
           // session types so a leftover restaurant token can't flip the
           // boot to the gérant SPA after reload. See
@@ -520,8 +528,9 @@ const API = {
   getSupplierOrder(id) {
     return this.supplierRequest(`/orders/${id}`);
   },
+  // Background-poll variants — see comment on getMessageUnreadCount.
   getSupplierOrdersPendingCount() {
-    return this.supplierRequest('/orders/pending-count');
+    return this.supplierRequest('/orders/pending-count', { noRedirectOn401: true });
   },
   confirmSupplierOrder(id, reason) {
     return this.supplierRequest(`/orders/${id}/confirm`, { method: 'PUT', body: { reason: reason || null } });
@@ -562,7 +571,8 @@ const API = {
     if (related.related_id != null) body.related_id = related.related_id;
     return this.request(`/messages/conversations/${supplierId}`, { method: 'POST', body });
   },
-  getMessageUnreadCount() { return this.request('/messages/unread-count'); },
+  // Background-poll variant: a transient 401 on the ticker shouldn't reload the page.
+  getMessageUnreadCount() { return this.request('/messages/unread-count', { noRedirectOn401: true }); },
 
   // ─── Messages — supplier side (X-Supplier-Token) ───
   getSupplierMessageConversations() { return this.supplierRequest('/messages/conversations'); },
@@ -573,7 +583,7 @@ const API = {
     if (related.related_id != null) body.related_id = related.related_id;
     return this.supplierRequest(`/messages/conversations/${restaurantId}`, { method: 'POST', body });
   },
-  getSupplierMessageUnreadCount() { return this.supplierRequest('/messages/unread-count'); },
+  getSupplierMessageUnreadCount() { return this.supplierRequest('/messages/unread-count', { noRedirectOn401: true }); },
 
   // ─── Supplier Mercuriale Import (supplier side) ───
   // The upload uses multipart/form-data so we don't go through supplierRequest
@@ -620,7 +630,7 @@ const API = {
     return this.supplierRequest('/notifications/me');
   },
   getSupplierMyUnreadCount() {
-    return this.supplierRequest('/notifications/me/unread-count');
+    return this.supplierRequest('/notifications/me/unread-count', { noRedirectOn401: true });
   },
   markSupplierMyNotificationRead(id) {
     return this.supplierRequest(`/notifications/me/${id}/read`, { method: 'PUT' });

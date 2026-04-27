@@ -92,4 +92,19 @@ describe('Dashboard CA total reacts to status transitions', () => {
     let r2 = await request(app).get('/api/supplier-portal/dashboard').set('X-Supplier-Token', s.token);
     expect(r2.body.revenue_total).toBe(200);
   });
+
+  it('exposes both revenue_total (confirmed) and revenue_total_all (every status)', async () => {
+    const s = createSupplierSession();
+    seedOrder(s, { total: 100, status: 'livrée' });     // counts in both
+    seedOrder(s, { total: 200, status: 'envoyée' });    // only in revenue_total_all
+    seedOrder(s, { total: 50,  status: 'brouillon' });  // only in revenue_total_all
+    seedOrder(s, { total: 30,  status: 'refusée' });    // only in revenue_total_all
+    const res = await request(app)
+      .get('/api/supplier-portal/dashboard')
+      .set('X-Supplier-Token', s.token);
+    expect(res.body.revenue_total).toBe(100);
+    expect(res.body.revenue_total_all).toBe(380);
+    // revenue_this_month_all also surfaces.
+    expect(typeof res.body.revenue_this_month_all).toBe('number');
+  });
 });

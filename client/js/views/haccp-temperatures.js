@@ -68,10 +68,10 @@ async function renderHACCPTemperatures() {
               </tbody>
             </table>
           </div>
-          <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-3)">
-            <button class="btn btn-secondary" id="btn-batch-cancel">Annuler</button>
-            <button class="btn btn-accent" id="btn-batch-submit">
-              <i data-lucide="save" style="width:16px;height:16px;margin-right:4px" aria-hidden="true"></i>
+          <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-3);position:sticky;bottom:8px;z-index:10;background:var(--bg-elevated);padding:var(--space-2) 0;border-top:1px solid var(--border-subtle, var(--border-default))">
+            <button class="btn btn-secondary" id="btn-batch-cancel" style="min-height:48px;padding:0 var(--space-4)">Annuler</button>
+            <button class="btn btn-accent" id="btn-batch-submit" style="min-height:48px;min-width:200px;padding:0 var(--space-5);font-size:var(--text-base);font-weight:600">
+              <i data-lucide="save" style="width:18px;height:18px;margin-right:6px" aria-hidden="true"></i>
               Enregistrer tout
             </button>
           </div>
@@ -220,7 +220,9 @@ function setupTemperatureEvents(zones) {
     });
     if (!toSave.length) { showToast('Saisissez au moins une température', 'error'); return; }
 
-    batchSubmit.disabled = true; batchSubmit.textContent = 'Enregistrement…';
+    batchSubmit.disabled = true;
+    batchSubmit.innerHTML = '<i data-lucide="loader-2" class="spin" style="width:18px;height:18px;margin-right:6px" aria-hidden="true"></i>Enregistrement…';
+    if (window.lucide) lucide.createIcons({ nodes: [batchSubmit] });
     let errors = 0;
     for (const entry of toSave) {
       try {
@@ -232,7 +234,7 @@ function setupTemperatureEvents(zones) {
     }
 
     batchSubmit.disabled = false;
-    batchSubmit.innerHTML = '<i data-lucide="save" style="width:16px;height:16px;margin-right:4px"></i>Enregistrer tout';
+    batchSubmit.innerHTML = '<i data-lucide="save" style="width:18px;height:18px;margin-right:6px"></i>Enregistrer tout';
     if (window.lucide) lucide.createIcons({ nodes: [batchSubmit] });
 
     if (errors > 0) {

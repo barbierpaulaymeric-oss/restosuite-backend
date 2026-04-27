@@ -7341,6 +7341,9 @@ body.tour-active { overflow: hidden; }
   color: #FFF;
 }
 
+/* Lucide loader-2 spinner — used inline on buttons during async work */
+.spin { animation: spin 1s linear infinite; transform-origin: center; }
+
 /* Restaurant nav badge (Messages item in the sidebar) */
 .nav-badge {
   display: inline-flex;

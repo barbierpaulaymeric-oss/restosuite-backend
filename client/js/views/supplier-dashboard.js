@@ -56,10 +56,15 @@ async function renderSupplierDashboardTab() {
 
   document.getElementById('supplier-dashboard-body').innerHTML = `
     <div class="supplier-kpi-grid">
-      <div class="supplier-kpi-card">
-        <div class="supplier-kpi-card__label">CA total</div>
+      <div class="supplier-kpi-card" title="Revenus issus des commandes confirmées et livrées (statuts confirmée + livrée). Hors brouillons, commandes envoyées non confirmées, refusées et annulées.">
+        <div class="supplier-kpi-card__label">CA confirmé</div>
         <div class="supplier-kpi-card__value">${fmt(data.revenue_total)}</div>
         <div class="supplier-kpi-card__sub">Ce mois : ${fmt(data.revenue_this_month)}</div>
+      </div>
+      <div class="supplier-kpi-card" title="Total tous statuts confondus (inclut brouillons et commandes en attente de confirmation). Vue alignée avec l'historique.">
+        <div class="supplier-kpi-card__label">CA total (tous statuts)</div>
+        <div class="supplier-kpi-card__value">${fmt(data.revenue_total_all)}</div>
+        <div class="supplier-kpi-card__sub">Ce mois : ${fmt(data.revenue_this_month_all)}</div>
       </div>
       <div class="supplier-kpi-card">
         <div class="supplier-kpi-card__label">Commandes</div>
