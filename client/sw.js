@@ -1,10 +1,12 @@
-// Bumped 2026-04-27: forces a fresh fetch of the bundled SPA on every client.
-// activate() below deletes any cache whose name doesn't match this AND
-// broadcasts a "sw-update" message to any open client tab so they auto-
-// reload (without this, an already-loaded tab keeps running the old JS in
-// memory until the user manually reloads — which looked like "the fix
-// isn't deployed" in production bug reports).
-const CACHE_NAME = 'restosuite-v4';
+// Bumped 2026-04-28: 5th iteration of the "restaurant name on supplier
+// order cards" fix. Each prior bump (v2 → v3 → v4) didn't fully kick a
+// subset of returning sessions: the page-side reload listener used a
+// sessionStorage flag that, once set, blocked any FURTHER sw-update
+// broadcasts in the same tab session — so a user who had already
+// auto-reloaded for v3 wouldn't reload for v4. The activate() handler now
+// also broadcasts a versioned reset so the page clears its flag before
+// reading it, guaranteeing every NEW cache name gets exactly one reload.
+const CACHE_NAME = 'restosuite-v5';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

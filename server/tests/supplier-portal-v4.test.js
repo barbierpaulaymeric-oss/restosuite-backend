@@ -55,6 +55,29 @@ function seedOrder(s, opts = {}) {
   return orderId;
 }
 
+// ─── /orders (list) ─────────────────────────────────────────────────────────
+// Recurring "restaurant_name doesn't show on order cards" bug. Lock the
+// response shape so a future SQL refactor can't drop the column silently.
+describe('GET /api/supplier-portal/orders (list)', () => {
+  it('returns restaurant_name AND restaurant_id on every row', async () => {
+    const s = createSupplierSession();
+    seedOrder(s, { status: 'envoyée' });
+    seedOrder(s, { status: 'confirmée' });
+    const res = await request(app)
+      .get('/api/supplier-portal/orders')
+      .set('X-Supplier-Token', s.token);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThanOrEqual(2);
+    for (const row of res.body) {
+      expect(row).toHaveProperty('restaurant_name');
+      expect(typeof row.restaurant_name).toBe('string');
+      expect(row.restaurant_name.length).toBeGreaterThan(0);
+      expect(row).toHaveProperty('restaurant_id', s.restaurant_id);
+    }
+  });
+});
+
 // ─── /orders/pending-count ──────────────────────────────────────────────────
 
 describe('GET /api/supplier-portal/orders/pending-count', () => {

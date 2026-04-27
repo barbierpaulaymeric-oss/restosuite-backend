@@ -644,11 +644,16 @@ const API = {
     setTimeout(() => URL.revokeObjectURL(url), 1e3);
   },
   // ─── Messages — restaurant side (gérant JWT) ───
+  // GET endpoints opt out of the global 401-redirect path: a transient 401
+  // here had been triggering a full session wipe + reload on the user's first
+  // navigation to /messages (recurring bug, 4 test rounds). The view's catch
+  // block surfaces an inline "Réessayer" UI; any genuinely expired session
+  // will still be caught the next time the user touches a non-silent route.
   getMessageConversations() {
-    return this.request("/messages/conversations");
+    return this.request("/messages/conversations", { noRedirectOn401: true });
   },
   getMessageThread(supplierId) {
-    return this.request(`/messages/conversations/${supplierId}`);
+    return this.request(`/messages/conversations/${supplierId}`, { noRedirectOn401: true });
   },
   sendMessage(supplierId, message, related = {}) {
     const body = { message };
@@ -21391,6 +21396,7 @@ async function renderSupplierOrdersTab() {
       const s = SUPPLIER_ORDER_STATUS[o.status] || { label: o.status, color: "#666" };
       const created = o.created_at ? new Date(o.created_at).toLocaleDateString("fr-FR") : "";
       const expected = o.expected_delivery ? new Date(o.expected_delivery).toLocaleDateString("fr-FR") : null;
+      const clientLabel = o.restaurant_name || (o.restaurant_id ? `Restaurant #${o.restaurant_id}` : "Client");
       return `
         <div class="card supplier-order-card" data-id="${o.id}" style="padding:var(--space-4);margin-bottom:var(--space-3);border-left:4px solid ${s.color};border-radius:var(--radius-lg);background:var(--bg-elevated);cursor:pointer">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3)">
@@ -21399,7 +21405,7 @@ async function renderSupplierOrdersTab() {
                 <strong>${escapeHtml(o.reference || `Commande #${o.id}`)}</strong>
                 <span class="text-secondary text-sm">${escapeHtml(created)}</span>
               </div>
-              ${o.restaurant_name ? `<div class="supplier-order-card__client" style="margin-top:4px;font-size:var(--text-sm);color:#1B2A4A;font-weight:500"><i data-lucide="utensils-crossed" style="width:14px;height:14px;margin-right:4px;vertical-align:-2px"></i>${escapeHtml(o.restaurant_name)}</div>` : ""}
+              <div class="supplier-order-card__client" style="margin-top:4px;font-size:var(--text-sm);color:#1B2A4A;font-weight:500"><i data-lucide="utensils-crossed" style="width:14px;height:14px;margin-right:4px;vertical-align:-2px"></i>${escapeHtml(clientLabel)}</div>
             </div>
             <span class="badge" style="background:${s.color};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md);white-space:nowrap;flex-shrink:0">
               ${escapeHtml(s.label)}
@@ -21627,7 +21633,25 @@ async function renderMessagesConversations() {
   try {
     convs = await API.getMessageConversations();
   } catch (e) {
-    document.getElementById("msg-conv-list").innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+    const msg = String(e && e.message || "");
+    const host = document.getElementById("msg-conv-list");
+    if (msg === "401") {
+      host.innerHTML = `
+        <div class="empty-state" role="alert">
+          <div class="empty-icon"><i data-lucide="refresh-cw"></i></div>
+          <p>Impossible de charger les conversations.</p>
+          <p class="text-secondary text-sm">Si le probl\xE8me persiste, retournez \xE0 l'accueil et revenez sur Messages.</p>
+          <div class="actions-row" style="justify-content:center;gap:var(--space-3);margin-top:var(--space-3)">
+            <button class="btn btn-primary" id="msg-retry-btn">R\xE9essayer</button>
+            <a href="#/" class="btn btn-secondary">Retour</a>
+          </div>
+        </div>`;
+      if (window.lucide) lucide.createIcons();
+      const retry = document.getElementById("msg-retry-btn");
+      if (retry) retry.addEventListener("click", () => renderMessagesConversations());
+      return;
+    }
+    host.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(msg)}</p>`;
     return;
   }
   refreshMessagesNavBadge();
@@ -21730,7 +21754,17 @@ async function renderMessagesThread(supplierId) {
     try {
       data = await API.getMessageThread(supplierId);
     } catch (e) {
-      document.getElementById("msg-thread-body").innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
+      const msg = String(e && e.message || "");
+      const body = document.getElementById("msg-thread-body");
+      if (msg === "401") {
+        body.innerHTML = `
+          <div class="empty-state" role="alert" style="padding:var(--space-5)">
+            <p>Impossible de charger la conversation.</p>
+            <a href="#/messages" class="btn btn-secondary" style="margin-top:var(--space-3)">Retour aux conversations</a>
+          </div>`;
+        return;
+      }
+      body.innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(msg)}</p>`;
       return;
     }
     const titleEl = document.getElementById("msg-thread-title");

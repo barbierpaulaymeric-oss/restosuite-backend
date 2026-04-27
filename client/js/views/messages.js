@@ -34,8 +34,31 @@ async function renderMessagesConversations() {
   try {
     convs = await API.getMessageConversations();
   } catch (e) {
-    document.getElementById('msg-conv-list').innerHTML =
-      `<p class="text-danger">Erreur : ${escapeHtml(e.message)}</p>`;
+    // 401 here used to trigger the global cleanup-and-reload via api.js,
+    // logging the user out on their FIRST navigation to /messages even
+    // though every other route worked fine (4-round recurring bug).
+    // getMessageConversations now opts out of that path; surface a
+    // recoverable UI instead so the user can retry without losing their
+    // session.
+    const msg = String(e && e.message || '');
+    const host = document.getElementById('msg-conv-list');
+    if (msg === '401') {
+      host.innerHTML = `
+        <div class="empty-state" role="alert">
+          <div class="empty-icon"><i data-lucide="refresh-cw"></i></div>
+          <p>Impossible de charger les conversations.</p>
+          <p class="text-secondary text-sm">Si le problème persiste, retournez à l'accueil et revenez sur Messages.</p>
+          <div class="actions-row" style="justify-content:center;gap:var(--space-3);margin-top:var(--space-3)">
+            <button class="btn btn-primary" id="msg-retry-btn">Réessayer</button>
+            <a href="#/" class="btn btn-secondary">Retour</a>
+          </div>
+        </div>`;
+      if (window.lucide) lucide.createIcons();
+      const retry = document.getElementById('msg-retry-btn');
+      if (retry) retry.addEventListener('click', () => renderMessagesConversations());
+      return;
+    }
+    host.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(msg)}</p>`;
     return;
   }
   // Refresh the nav badge once we hit this view (we may have just marked a
@@ -156,8 +179,20 @@ async function renderMessagesThread(supplierId) {
     try {
       data = await API.getMessageThread(supplierId);
     } catch (e) {
-      document.getElementById('msg-thread-body').innerHTML =
-        `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
+      // Same recoverable-401 pattern as renderMessagesConversations — never
+      // auto-logout from a thread page. The poller (15s setInterval) keeps
+      // retrying so a transient blip self-heals without UI churn.
+      const msg = String(e && e.message || '');
+      const body = document.getElementById('msg-thread-body');
+      if (msg === '401') {
+        body.innerHTML = `
+          <div class="empty-state" role="alert" style="padding:var(--space-5)">
+            <p>Impossible de charger la conversation.</p>
+            <a href="#/messages" class="btn btn-secondary" style="margin-top:var(--space-3)">Retour aux conversations</a>
+          </div>`;
+        return;
+      }
+      body.innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(msg)}</p>`;
       return;
     }
     const titleEl = document.getElementById('msg-thread-title');

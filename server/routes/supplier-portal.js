@@ -686,18 +686,24 @@ router.get('/delivery-notes/:id', requireSupplierAuth, (req, res) => {
 // ═════════════════════════════════════════
 
 // GET /orders — List purchase orders across the supplier's identity tenants.
+// Returns BOTH r.name AS restaurant_name AND po.restaurant_id so the client
+// can fall back to the numeric id when the JOIN somehow returns a null name
+// (the card UI used to silently drop the client label in that case — 5×
+// recurring bug report). The id is non-sensitive (the supplier already has
+// scoped access to this tenant via getSupplierIdentities).
 router.get('/orders', requireSupplierAuth, (req, res) => {
   const identities = getSupplierIdentities(req.supplierAccount);
-  const w = identityWhereClause(identities);
+  const w = identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'po');
   const orders = all(
     `SELECT po.id, po.reference, po.status, po.total_amount, po.expected_delivery,
-            po.notes, po.created_at, r.name AS restaurant_name
+            po.notes, po.created_at, po.restaurant_id,
+            r.name AS restaurant_name
        FROM purchase_orders po
        JOIN restaurants r ON r.id = po.restaurant_id
-      WHERE ${identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'po').sql}
+      WHERE ${w.sql}
       ORDER BY po.created_at DESC
       LIMIT 100`,
-    identityWhereClause(identities, 'supplier_id', 'restaurant_id', 'po').params
+    w.params
   );
   res.json(orders);
 });

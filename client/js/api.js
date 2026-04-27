@@ -563,8 +563,13 @@ const API = {
   },
 
   // ─── Messages — restaurant side (gérant JWT) ───
-  getMessageConversations() { return this.request('/messages/conversations'); },
-  getMessageThread(supplierId) { return this.request(`/messages/conversations/${supplierId}`); },
+  // GET endpoints opt out of the global 401-redirect path: a transient 401
+  // here had been triggering a full session wipe + reload on the user's first
+  // navigation to /messages (recurring bug, 4 test rounds). The view's catch
+  // block surfaces an inline "Réessayer" UI; any genuinely expired session
+  // will still be caught the next time the user touches a non-silent route.
+  getMessageConversations() { return this.request('/messages/conversations', { noRedirectOn401: true }); },
+  getMessageThread(supplierId) { return this.request(`/messages/conversations/${supplierId}`, { noRedirectOn401: true }); },
   sendMessage(supplierId, message, related = {}) {
     const body = { message };
     if (related.related_to) body.related_to = related.related_to;

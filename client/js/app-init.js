@@ -64,9 +64,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // messages until the next session-storage gap.
     navigator.serviceWorker.addEventListener('message', function(event) {
       if (event && event.data && event.data.type === 'sw-update') {
+        // Per-cache-name flag (was: per-session, which blocked reloads for
+        // every SW bump after the first one in a long-lived tab — that's
+        // why "restaurant names on order cards" stayed broken across
+        // v3/v4 deploys for returning users). Each new CACHE_NAME now
+        // forces exactly one reload.
+        var key = '_sw_update_reloaded_' + (event.data.cache || 'unknown');
         try {
-          if (sessionStorage.getItem('_sw_update_reloaded') === '1') return;
-          sessionStorage.setItem('_sw_update_reloaded', '1');
+          if (sessionStorage.getItem(key) === '1') return;
+          sessionStorage.setItem(key, '1');
         } catch (e) { /* incognito etc. — fall through to reload anyway */ }
         // Defer briefly so any in-flight click handler completes.
         setTimeout(function() { window.location.reload(); }, 50);
