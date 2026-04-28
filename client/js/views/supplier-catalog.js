@@ -15,7 +15,7 @@ function bootSupplierApp(session) {
   app.innerHTML = `
     <div class="supplier-shell">
       <header class="supplier-header">
-        <div class="supplier-header__left">
+        <div class="supplier-header__left" id="supplier-brand" role="button" tabindex="0" aria-label="Retour au tableau de bord" style="cursor:pointer">
           <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto; margin-right: 8px;">
           <div>
             <span class="supplier-header__title">Portail Fournisseur</span>
@@ -64,6 +64,21 @@ function bootSupplierApp(session) {
     document.body.classList.remove('supplier-mode');
     location.reload();
   });
+
+  // Brand → dashboard tab (matches restaurant-side nav-brand behaviour).
+  const brand = document.getElementById('supplier-brand');
+  if (brand) {
+    const goDashboard = () => {
+      document.querySelectorAll('.supplier-nav__tab').forEach(t => t.classList.remove('active'));
+      const dashTab = document.querySelector('.supplier-nav__tab[data-tab="dashboard"]');
+      if (dashTab) dashTab.classList.add('active');
+      renderSupplierDashboardTab();
+    };
+    brand.addEventListener('click', goDashboard);
+    brand.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goDashboard(); }
+    });
+  }
 
   // Tab navigation
   document.querySelectorAll('.supplier-nav__tab').forEach(tab => {

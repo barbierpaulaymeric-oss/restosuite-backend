@@ -162,15 +162,20 @@ async function _renderSupplierMessageThread(restaurantId, context) {
   document.getElementById('supplier-msg-back').addEventListener('click', renderSupplierMessagesTab);
 
   async function loadThread() {
+    // 15s poller can fire after the supplier closes the thread — guard every
+    // DOM lookup so a missing host stops the render rather than throwing
+    // TypeError on null.innerHTML.
     let data;
     try {
       data = await API.getSupplierMessageThread(restaurantId);
     } catch (e) {
-      document.getElementById('supplier-msg-body').innerHTML =
-        `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
+      const body = document.getElementById('supplier-msg-body');
+      if (!body) return;
+      body.innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
       return;
     }
     const titleEl = document.getElementById('supplier-msg-title');
+    if (!titleEl || !document.getElementById('supplier-msg-body')) return;
     titleEl.innerHTML = `
       <strong>${escapeHtml(data.restaurant.name || '—')}</strong>
       ${data.restaurant.city ? `<span class="text-secondary text-sm">· ${escapeHtml(data.restaurant.city)}</span>` : ''}

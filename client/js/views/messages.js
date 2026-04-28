@@ -192,6 +192,9 @@ async function renderMessagesThread(supplierId) {
   } catch (_) { /* url parsing edge case — ignore */ }
 
   async function loadThread() {
+    // The 15s poller can fire after the user has navigated away — bail if the
+    // thread DOM is gone. Without these guards the poll throws TypeError on
+    // null.innerHTML and pollutes the error log.
     let data;
     try {
       data = await API.getMessageThread(supplierId);
@@ -201,6 +204,7 @@ async function renderMessagesThread(supplierId) {
       // retrying so a transient blip self-heals without UI churn.
       const msg = String(e && e.message || '');
       const body = document.getElementById('msg-thread-body');
+      if (!body) return;
       if (msg === '401') {
         body.innerHTML = `
           <div class="empty-state" role="alert" style="padding:var(--space-5)">
@@ -213,6 +217,7 @@ async function renderMessagesThread(supplierId) {
       return;
     }
     const titleEl = document.getElementById('msg-thread-title');
+    if (!titleEl || !document.getElementById('msg-thread-body')) return;
     titleEl.innerHTML = `
       <strong>${escapeHtml(data.supplier.name || '—')}</strong>
       ${data.supplier.contact_name ? `<span class="text-secondary text-sm">· ${escapeHtml(data.supplier.contact_name)}</span>` : ''}

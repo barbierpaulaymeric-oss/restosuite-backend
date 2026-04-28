@@ -1418,7 +1418,7 @@ async function renderDashboard() {
   const app = document.getElementById("app");
   const perms = getPermissions();
   const account = getAccount();
-  const greeting = getGreeting(account ? account.name : "Chef");
+  const greeting = getGreeting(_dashboardDisplayName(account));
   const todayDate = formatFrenchDate(/* @__PURE__ */ new Date());
   app.innerHTML = `
     <header id="dashboard-greeting" role="banner" style="margin-bottom:var(--space-4)">
@@ -1759,6 +1759,28 @@ function getGreeting(name) {
   if (hour < 12) return `Bonjour ${name} \u{1F44B}`;
   if (hour < 17) return `Bon apr\xE8s-midi ${name} \u2600\uFE0F`;
   return `Bonsoir ${name} \u{1F319}`;
+}
+function _dashboardDisplayName(account) {
+  if (!account) return "Chef";
+  if (account.name) return account.name;
+  const composite = [account.first_name, account.last_name].filter(Boolean).join(" ").trim();
+  if (composite) return composite;
+  if (typeof API !== "undefined" && typeof API.getMe === "function") {
+    API.getMe().then((result) => {
+      const fresh = result && result.account;
+      if (!fresh) return;
+      try {
+        localStorage.setItem("restosuite_account", JSON.stringify(fresh));
+      } catch (e) {
+      }
+      const fresher = fresh.name || [fresh.first_name, fresh.last_name].filter(Boolean).join(" ").trim();
+      if (!fresher) return;
+      const headerH2 = document.querySelector("#dashboard-greeting h2");
+      if (headerH2) headerH2.textContent = getGreeting(fresher);
+    }).catch(() => {
+    });
+  }
+  return "Chef";
 }
 function formatFrenchDate(date) {
   const days = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -18901,7 +18923,7 @@ function bootSupplierApp(session) {
   app.innerHTML = `
     <div class="supplier-shell">
       <header class="supplier-header">
-        <div class="supplier-header__left">
+        <div class="supplier-header__left" id="supplier-brand" role="button" tabindex="0" aria-label="Retour au tableau de bord" style="cursor:pointer">
           <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto; margin-right: 8px;">
           <div>
             <span class="supplier-header__title">Portail Fournisseur</span>
@@ -18948,6 +18970,22 @@ function bootSupplierApp(session) {
     document.body.classList.remove("supplier-mode");
     location.reload();
   });
+  const brand = document.getElementById("supplier-brand");
+  if (brand) {
+    const goDashboard = () => {
+      document.querySelectorAll(".supplier-nav__tab").forEach((t) => t.classList.remove("active"));
+      const dashTab = document.querySelector('.supplier-nav__tab[data-tab="dashboard"]');
+      if (dashTab) dashTab.classList.add("active");
+      renderSupplierDashboardTab();
+    };
+    brand.addEventListener("click", goDashboard);
+    brand.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        goDashboard();
+      }
+    });
+  }
   document.querySelectorAll(".supplier-nav__tab").forEach((tab) => {
     tab.addEventListener("click", () => {
       document.querySelectorAll(".supplier-nav__tab").forEach((t2) => t2.classList.remove("active"));
@@ -20969,10 +21007,13 @@ async function _renderSupplierMessageThread(restaurantId, context) {
     try {
       data = await API.getSupplierMessageThread(restaurantId);
     } catch (e) {
-      document.getElementById("supplier-msg-body").innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
+      const body = document.getElementById("supplier-msg-body");
+      if (!body) return;
+      body.innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
       return;
     }
     const titleEl = document.getElementById("supplier-msg-title");
+    if (!titleEl || !document.getElementById("supplier-msg-body")) return;
     titleEl.innerHTML = `
       <strong>${escapeHtml(data.restaurant.name || "\u2014")}</strong>
       ${data.restaurant.city ? `<span class="text-secondary text-sm">\xB7 ${escapeHtml(data.restaurant.city)}</span>` : ""}
@@ -21073,14 +21114,17 @@ async function loadSupplierDeliveries() {
     const statusLabels = { pending: "En attente", received: "Re\xE7u", partial: "Partiel", rejected: "Refus\xE9" };
     list.innerHTML = notes.map((n) => `
       <div class="card supplier-delivery-card" data-id="${n.id}" style="padding:var(--space-4);margin-bottom:var(--space-3);border-left:4px solid ${statusColors[n.status] || "#666"};border-radius:var(--radius-lg);background:var(--bg-elevated);cursor:pointer">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <strong>Bon #${n.id}</strong>
-            <span class="text-secondary text-sm" style="margin-left:var(--space-2)">
-              ${n.delivery_date || new Date(n.created_at).toLocaleDateString("fr-FR")}
-            </span>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3)">
+          <div style="min-width:0">
+            <h3 style="font-size:var(--text-base);font-weight:600;margin:0 0 2px 0">${escapeHtml(n.restaurant_name || "\u2014")}</h3>
+            <div>
+              <strong>Bon #${n.id}</strong>
+              <span class="text-secondary text-sm" style="margin-left:var(--space-2)">
+                ${n.delivery_date || new Date(n.created_at).toLocaleDateString("fr-FR")}
+              </span>
+            </div>
           </div>
-          <span class="badge" style="background:${statusColors[n.status]};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md)">
+          <span class="badge" style="background:${statusColors[n.status]};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md);flex-shrink:0">
             ${statusLabels[n.status] || n.status}
           </span>
         </div>
@@ -21814,6 +21858,7 @@ async function renderMessagesThread(supplierId) {
     } catch (e) {
       const msg = String(e && e.message || "");
       const body = document.getElementById("msg-thread-body");
+      if (!body) return;
       if (msg === "401") {
         body.innerHTML = `
           <div class="empty-state" role="alert" style="padding:var(--space-5)">
@@ -21826,6 +21871,7 @@ async function renderMessagesThread(supplierId) {
       return;
     }
     const titleEl = document.getElementById("msg-thread-title");
+    if (!titleEl || !document.getElementById("msg-thread-body")) return;
     titleEl.innerHTML = `
       <strong>${escapeHtml(data.supplier.name || "\u2014")}</strong>
       ${data.supplier.contact_name ? `<span class="text-secondary text-sm">\xB7 ${escapeHtml(data.supplier.contact_name)}</span>` : ""}

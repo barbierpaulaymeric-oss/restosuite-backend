@@ -62,14 +62,17 @@ async function loadSupplierDeliveries() {
 
     list.innerHTML = notes.map(n => `
       <div class="card supplier-delivery-card" data-id="${n.id}" style="padding:var(--space-4);margin-bottom:var(--space-3);border-left:4px solid ${statusColors[n.status] || '#666'};border-radius:var(--radius-lg);background:var(--bg-elevated);cursor:pointer">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <strong>Bon #${n.id}</strong>
-            <span class="text-secondary text-sm" style="margin-left:var(--space-2)">
-              ${n.delivery_date || new Date(n.created_at).toLocaleDateString('fr-FR')}
-            </span>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3)">
+          <div style="min-width:0">
+            <h3 style="font-size:var(--text-base);font-weight:600;margin:0 0 2px 0">${escapeHtml(n.restaurant_name || '—')}</h3>
+            <div>
+              <strong>Bon #${n.id}</strong>
+              <span class="text-secondary text-sm" style="margin-left:var(--space-2)">
+                ${n.delivery_date || new Date(n.created_at).toLocaleDateString('fr-FR')}
+              </span>
+            </div>
           </div>
-          <span class="badge" style="background:${statusColors[n.status]};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md)">
+          <span class="badge" style="background:${statusColors[n.status]};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md);flex-shrink:0">
             ${statusLabels[n.status] || n.status}
           </span>
         </div>

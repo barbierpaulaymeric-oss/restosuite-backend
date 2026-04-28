@@ -1,9 +1,7 @@
-// Bumped 2026-04-28 (v8): force a clean cache refresh for clients still
-// holding the pre-a4f3028 bundle whose cached 401 responses kept surfacing
-// as intermittent "session drops" on Pilotage/analytics. v7 shipped the
-// server fix; v8 evicts any v7 cache entries that captured a stale 401
-// during the transition window.
-const CACHE_NAME = 'restosuite-v8';
+// Bumped 2026-04-28 (v9): ship 4 client fixes — supplier portal logo click,
+// loadThread null-guard against the 15s poller firing post-unmount, restaurant
+// name on supplier delivery cards, and dashboard greeting fallback chain.
+const CACHE_NAME = 'restosuite-v9';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

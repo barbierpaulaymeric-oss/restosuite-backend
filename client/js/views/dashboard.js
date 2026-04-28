@@ -98,7 +98,7 @@ async function renderDashboard() {
   const app = document.getElementById('app');
   const perms = getPermissions();
   const account = getAccount();
-  const greeting = getGreeting(account ? account.name : 'Chef');
+  const greeting = getGreeting(_dashboardDisplayName(account));
   const todayDate = formatFrenchDate(new Date());
 
   app.innerHTML = `
@@ -490,6 +490,33 @@ function getGreeting(name) {
   if (hour < 12) return `Bonjour ${name} 👋`;
   if (hour < 17) return `Bon après-midi ${name} ☀️`;
   return `Bonsoir ${name} 🌙`;
+}
+
+// Resolve the best display name we have. Older login flows wrote partial
+// account shapes that lacked `name` (only first_name/last_name) — without a
+// fallback chain the greeting collapses to "Bonjour Chef" on every return-nav
+// for those sessions. If everything is missing we kick off /auth/me to
+// repopulate localStorage and patch the rendered greeting in place.
+function _dashboardDisplayName(account) {
+  if (!account) return 'Chef';
+  if (account.name) return account.name;
+  const composite = [account.first_name, account.last_name].filter(Boolean).join(' ').trim();
+  if (composite) return composite;
+  // Stale localStorage — refresh in the background and update the H2 once we
+  // have a real name. Same pattern as feedback_role_check_refresh_localstorage.
+  if (typeof API !== 'undefined' && typeof API.getMe === 'function') {
+    API.getMe().then(result => {
+      const fresh = result && result.account;
+      if (!fresh) return;
+      try { localStorage.setItem('restosuite_account', JSON.stringify(fresh)); } catch {}
+      const fresher = fresh.name
+        || [fresh.first_name, fresh.last_name].filter(Boolean).join(' ').trim();
+      if (!fresher) return;
+      const headerH2 = document.querySelector('#dashboard-greeting h2');
+      if (headerH2) headerH2.textContent = getGreeting(fresher);
+    }).catch(() => { /* leave the 'Chef' fallback in place */ });
+  }
+  return 'Chef';
 }
 
 function formatFrenchDate(date) {
