@@ -1,8 +1,12 @@
-// Bumped 2026-04-28 (v6): ships the restaurant-side regression sweep
-// (Commandes 401-logout, Messages reliable Réessayer, Pilotage stale-
-// localStorage refresh). v5's per-cache-name reload guard already lets
-// returning users pick this up on next visit without a manual reload.
-const CACHE_NAME = 'restosuite-v6';
+// Bumped 2026-04-28 (v7): pairs the d97f7bf client-side workarounds with
+// the server-side root cause fix. server/index.js's soft JWT decoder only
+// read Bearer headers, so cookie-only browser sessions 401'd "Token requis"
+// on every gated route (/orders, /analytics, /recipes, /purchase-orders).
+// The fix consolidates the soft decoder into server/lib/soft-auth.js (used
+// by both app.js and index.js) and adds the cookie path. This SW bump
+// forces returning clients to fetch the bundle that pairs with the fixed
+// server.
+const CACHE_NAME = 'restosuite-v7';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

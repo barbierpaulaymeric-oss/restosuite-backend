@@ -201,29 +201,10 @@ if (!IS_TEST) {
   app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
 }
 
-// ─── Soft JWT decode (populates req.user without enforcing auth) ──
-// Reads the token from either the Authorization header (API/tests) or the
-// HttpOnly `jwt` cookie (browser clients). Failures are silent — requireAuth
-// and requireActiveOrTrial still enforce their own rules.
-{
-  const _jwt = require('jsonwebtoken');
-  const { parseCookies } = require('./lib/cookie');
-  app.use((req, res, next) => {
-    const _jwtSecret = process.env.JWT_SECRET;
-    let token = null;
-    const auth = req.headers.authorization;
-    if (auth && auth.startsWith('Bearer ')) {
-      token = auth.split(' ')[1];
-    } else {
-      const cookies = parseCookies(req.headers.cookie || '');
-      if (cookies.jwt) token = cookies.jwt;
-    }
-    if (token && _jwtSecret) {
-      try { req.user = _jwt.verify(token, _jwtSecret); } catch {}
-    }
-    next();
-  });
-}
+// Soft JWT decode — Bearer header OR `jwt` HttpOnly cookie → req.user.
+// Shared with index.js so prod and tests agree on which transports populate
+// req.user before requireActiveOrTrial runs.
+app.use(require('./lib/soft-auth').softAuth);
 
 // ─── CSRF: enforced for cookie-authenticated mutating requests ───
 // Bearer-authed calls (API/tests) bypass this — see server/lib/csrf.js.

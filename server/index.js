@@ -203,19 +203,11 @@ app.get('/manifest.json', (req, res) => {
 // Static files from client directory (but skip index.html for root)
 app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
 
-// ─── Soft JWT decode (populates req.user without enforcing auth) ──
-// requireAuth inside each route module remains the authoritative auth check.
-{
-  const _jwt = require('jsonwebtoken');
-  app.use((req, res, next) => {
-    const auth = req.headers.authorization;
-    const _jwtSecret = process.env.JWT_SECRET;
-    if (auth && auth.startsWith('Bearer ') && _jwtSecret) {
-      try { req.user = _jwt.verify(auth.split(' ')[1], _jwtSecret); } catch {}
-    }
-    next();
-  });
-}
+// Soft JWT decode — Bearer header OR `jwt` HttpOnly cookie → req.user.
+// Required so requireActiveOrTrial below sees req.user from cookie-only
+// browser sessions; otherwise every gated route 401s "Token requis"
+// (the actual root cause behind the d97f7bf "Commandes/Pilotage 401" cascade).
+app.use(require('./lib/soft-auth').softAuth);
 
 // ─── Access Gating ───────────────────────────────────────────────────────────
 // Single paid plan model: active trial = full access; expired trial = GET/HEAD only;
