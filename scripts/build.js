@@ -56,6 +56,7 @@ const JS_FILES = [
   'js/views/traceability-downstream.js',
   'js/views/fabrication-diagrams.js',
   'js/views/pms-export.js',
+  'js/views/exports.js',
   'js/views/orders.js',
   'js/views/service.js',
   'js/views/kitchen.js',

@@ -1,9 +1,11 @@
-// Bumped 2026-04-28 (v14): covers (couverts) tracking — orders.covers +
-// service_sessions.total_covers, GET /api/analytics/covers with
-// food_cost_per_cover, covers input in service cart, covers KPI on
-// dashboard + pilotage, total_covers tile in service recap.
-// (v13 shipped RGPD export +12 tables + /waste-analytics view.)
-const CACHE_NAME = 'restosuite-v14';
+// Bumped 2026-04-28 (v15): accountant-friendly monthly exports
+// (/api/exports/* + #/exports view under new "Gestion" nav group;
+// bundle now includes js/views/exports.js). v14 shipped covers
+// (couverts) tracking — orders.covers + service_sessions.total_covers,
+// /api/analytics/covers with food_cost_per_cover, covers KPI in service
+// + dashboard + pilotage. (v13 shipped RGPD export +12 tables and
+// /waste-analytics view.)
+const CACHE_NAME = 'restosuite-v15';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

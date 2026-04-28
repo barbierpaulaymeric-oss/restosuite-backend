@@ -97,6 +97,12 @@ const NAV_GROUPS = {
       { label: 'Export PMS complet', route: '/pms/export', icon: 'file-text', roles: ['gerant'] },
     ]
   },
+  gestion: {
+    label: 'Gestion',
+    items: [
+      { label: 'Exports comptables', route: '/exports', icon: 'file-spreadsheet', roles: ['gerant'] },
+    ]
+  },
 };
 
 const ROUTE_TO_GROUP = {
@@ -118,6 +124,7 @@ const ROUTE_TO_GROUP = {
   '/traceability/downstream': 'haccp',
   '/fabrication-diagrams': 'documents',
   '/pms/export': 'documents',
+  '/exports': 'gestion',
   '/haccp': 'haccp',
   '/haccp/ma-journee': 'haccp',
   '/haccp/temperatures': 'haccp',
@@ -400,6 +407,7 @@ function registerRoutes() {
   Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
   Router.add(/^\/fabrication-diagrams$/, renderFabricationDiagrams);
   Router.add(/^\/pms\/export$/, renderPMSExport);
+  Router.add(/^\/exports$/, renderExports);
   Router.add(/^\/docs$/, () => { location.hash = '#/fabrication-diagrams'; });
   Router.add(/^\/admin$/, renderAdmin);
 }
