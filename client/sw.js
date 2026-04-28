@@ -1,9 +1,10 @@
-// Bumped 2026-04-28 (v8): force a clean cache refresh for clients still
-// holding the pre-a4f3028 bundle whose cached 401 responses kept surfacing
-// as intermittent "session drops" on Pilotage/analytics. v7 shipped the
-// server fix; v8 evicts any v7 cache entries that captured a stale 401
-// during the transition window.
-const CACHE_NAME = 'restosuite-v9';
+// Bumped 2026-04-28 (v10): ship server-side restaurant_name JOIN for the
+// supplier delivery-notes endpoint (frontend conditional alone was a no-op
+// because the API never returned the field), refresh /auth/me when the
+// dashboard greeting falls back to "Bonjour Chef", and add null guards in
+// messages.js loadThread() so a thread closed mid-poll doesn't throw a
+// TypeError on innerHTML.
+const CACHE_NAME = 'restosuite-v10';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

@@ -201,6 +201,7 @@ async function renderMessagesThread(supplierId) {
       // retrying so a transient blip self-heals without UI churn.
       const msg = String(e && e.message || '');
       const body = document.getElementById('msg-thread-body');
+      if (!body) return; // route changed mid-poll
       if (msg === '401') {
         body.innerHTML = `
           <div class="empty-state" role="alert" style="padding:var(--space-5)">
@@ -213,11 +214,15 @@ async function renderMessagesThread(supplierId) {
       return;
     }
     const titleEl = document.getElementById('msg-thread-title');
-    titleEl.innerHTML = `
-      <strong>${escapeHtml(data.supplier.name || '—')}</strong>
-      ${data.supplier.contact_name ? `<span class="text-secondary text-sm">· ${escapeHtml(data.supplier.contact_name)}</span>` : ''}
-    `;
-    _renderMessageBubbles('msg-thread-body', data.messages, 'restaurant');
+    if (titleEl) {
+      titleEl.innerHTML = `
+        <strong>${escapeHtml(data.supplier.name || '—')}</strong>
+        ${data.supplier.contact_name ? `<span class="text-secondary text-sm">· ${escapeHtml(data.supplier.contact_name)}</span>` : ''}
+      `;
+    }
+    if (document.getElementById('msg-thread-body')) {
+      _renderMessageBubbles('msg-thread-body', data.messages, 'restaurant');
+    }
     refreshMessagesNavBadge();
   }
 

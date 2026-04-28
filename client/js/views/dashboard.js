@@ -97,7 +97,20 @@ function renderNavGuide() {
 async function renderDashboard() {
   const app = document.getElementById('app');
   const perms = getPermissions();
-  const account = getAccount();
+  let account = getAccount();
+  // Stale localStorage may lack `name` (older login flows wrote partial shapes
+  // — see analytics.js:22-31 for the same pattern). Refresh /auth/me once
+  // before computing the greeting so we don't show "Bonjour Chef" to a
+  // logged-in user on return navigation.
+  if (account && !account.name && typeof API !== 'undefined' && typeof API.getMe === 'function') {
+    try {
+      const me = await API.getMe();
+      if (me && me.account) {
+        account = { ...account, ...me.account };
+        try { localStorage.setItem('restosuite_account', JSON.stringify(account)); } catch {}
+      }
+    } catch (_) { /* silent — fall back to 'Chef' */ }
+  }
   const userName = (account && account.name) || 'Chef';
   const greeting = getGreeting(userName);
   const todayDate = formatFrenchDate(new Date());

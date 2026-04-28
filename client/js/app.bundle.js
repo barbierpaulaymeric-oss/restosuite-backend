@@ -1417,7 +1417,20 @@ function renderNavGuide() {
 async function renderDashboard() {
   const app = document.getElementById("app");
   const perms = getPermissions();
-  const account = getAccount();
+  let account = getAccount();
+  if (account && !account.name && typeof API !== "undefined" && typeof API.getMe === "function") {
+    try {
+      const me = await API.getMe();
+      if (me && me.account) {
+        account = __spreadValues(__spreadValues({}, account), me.account);
+        try {
+          localStorage.setItem("restosuite_account", JSON.stringify(account));
+        } catch (e) {
+        }
+      }
+    } catch (_) {
+    }
+  }
   const userName = account && account.name || "Chef";
   const greeting = getGreeting(userName);
   const todayDate = formatFrenchDate(/* @__PURE__ */ new Date());
@@ -21128,6 +21141,7 @@ async function showSupplierDeliveryDetail(id) {
         </button>
       </div>
       <h2>Bon #${d.id} \u2014 ${statusLabels[d.status] || d.status}</h2>
+      ${d.restaurant_name ? `<p class="text-secondary"><i data-lucide="store" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>${escapeHtml(d.restaurant_name)}${d.restaurant_city ? " \u2014 " + escapeHtml(d.restaurant_city) : ""}</p>` : ""}
       ${d.delivery_date ? `<p class="text-secondary">Date livraison : ${d.delivery_date}</p>` : ""}
       ${d.notes ? `<p class="text-secondary">\u{1F4DD} ${escapeHtml(d.notes)}</p>` : ""}
       <div style="overflow-x:auto;margin-top:var(--space-4)">
@@ -21832,6 +21846,7 @@ async function renderMessagesThread(supplierId) {
     } catch (e) {
       const msg = String(e && e.message || "");
       const body = document.getElementById("msg-thread-body");
+      if (!body) return;
       if (msg === "401") {
         body.innerHTML = `
           <div class="empty-state" role="alert" style="padding:var(--space-5)">
@@ -21844,11 +21859,15 @@ async function renderMessagesThread(supplierId) {
       return;
     }
     const titleEl = document.getElementById("msg-thread-title");
-    titleEl.innerHTML = `
-      <strong>${escapeHtml(data.supplier.name || "\u2014")}</strong>
-      ${data.supplier.contact_name ? `<span class="text-secondary text-sm">\xB7 ${escapeHtml(data.supplier.contact_name)}</span>` : ""}
-    `;
-    _renderMessageBubbles("msg-thread-body", data.messages, "restaurant");
+    if (titleEl) {
+      titleEl.innerHTML = `
+        <strong>${escapeHtml(data.supplier.name || "\u2014")}</strong>
+        ${data.supplier.contact_name ? `<span class="text-secondary text-sm">\xB7 ${escapeHtml(data.supplier.contact_name)}</span>` : ""}
+      `;
+    }
+    if (document.getElementById("msg-thread-body")) {
+      _renderMessageBubbles("msg-thread-body", data.messages, "restaurant");
+    }
     refreshMessagesNavBadge();
   }
   await loadThread();

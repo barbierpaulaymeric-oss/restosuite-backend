@@ -105,6 +105,7 @@ async function showSupplierDeliveryDetail(id) {
         </button>
       </div>
       <h2>Bon #${d.id} — ${statusLabels[d.status] || d.status}</h2>
+      ${d.restaurant_name ? `<p class="text-secondary"><i data-lucide="store" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>${escapeHtml(d.restaurant_name)}${d.restaurant_city ? ' — ' + escapeHtml(d.restaurant_city) : ''}</p>` : ''}
       ${d.delivery_date ? `<p class="text-secondary">Date livraison : ${d.delivery_date}</p>` : ''}
       ${d.notes ? `<p class="text-secondary">📝 ${escapeHtml(d.notes)}</p>` : ''}
       <div style="overflow-x:auto;margin-top:var(--space-4)">
