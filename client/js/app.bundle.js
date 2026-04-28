@@ -17846,6 +17846,13 @@ function _persistRestaurantLogin(token, account) {
   } catch (e) {
   }
 }
+const _DEMO_EMAILS = /* @__PURE__ */ new Set([
+  "demo@restosuite.fr",
+  "demo-fournisseur@restosuite.fr"
+]);
+function _isDemoEmail(email) {
+  return !!email && _DEMO_EMAILS.has(String(email).trim().toLowerCase());
+}
 const AVATAR_COLORS = [
   "#E8722A",
   "#2D8B55",
@@ -17954,7 +17961,8 @@ class LoginView {
   // ─── Restaurant Login (unified — owner pwd OR staff pwd via /smart-login) ───
   renderRestaurant(app) {
     const stored = typeof getAccount === "function" ? getAccount() : null;
-    const prefill = this.prefillEmail || stored && stored.email || localStorage.getItem("restosuite_last_email") || "";
+    const rawPrefill = this.prefillEmail || stored && stored.email || localStorage.getItem("restosuite_last_email") || "";
+    const prefill = _isDemoEmail(rawPrefill) ? "" : rawPrefill;
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-content" style="max-width:400px">

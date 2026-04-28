@@ -1,15 +1,37 @@
 #!/usr/bin/env node
 'use strict';
 // ═══════════════════════════════════════════════════════════════════════════
-// Demo seed — populates the DB with realistic French brasserie data so the
-// product can be explored without hand-entering anything.
+// Demo seed — DEV / SALES ONLY. Populates the DB with realistic French
+// brasserie data (3 demo restaurants, fake supplier accounts, fake orders,
+// fake messages, fake delivery notes) so the product can be explored without
+// hand-entering anything.
 //
-//   node server/seed-demo.js
+//   FAKE ACCOUNTS CREATED (NEVER ship these to real users):
+//     • Gérant:     demo@restosuite.fr            / Demo2026!
+//     • Fournisseur: demo-fournisseur@restosuite.fr / Demo2026!  (PIN 1111)
+//     • Extra restos: Le Bistrot de Marie, Sakura
+//
+//   Run manually:
+//     node server/seed-demo.js
+//     SEED_DEMO=true node server/seed-demo.js   # required if NODE_ENV=production
 //
 // Idempotent: re-running is a no-op once the demo owner exists. Everything is
-// scoped to restaurant_id = 1. Never wire this into server boot — it's a
-// developer/sales tool only.
+// scoped to restaurant_id = 1. Never wire this into server boot.
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ─── Production guard ──────────────────────────────────────────────────────
+// Refuses to touch a production DB by default. Real users must never see
+// "Chez Laurent" / "demo@restosuite.fr" in their account list. To run against
+// a prod-shaped environment intentionally (e.g. seeding a staging Render
+// instance), set SEED_DEMO=true.
+if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO !== 'true') {
+  console.error('✗ Refusing to seed demo data: NODE_ENV=production.');
+  console.error('  This script creates fake restaurants and supplier accounts');
+  console.error('  (demo@restosuite.fr, Chez Laurent, etc.) — never run it');
+  console.error('  against a real production database.');
+  console.error('  Override with SEED_DEMO=true if you really mean it.');
+  process.exit(1);
+}
 
 const bcrypt = require('bcryptjs');
 const { db, get, run, all } = require('./db');

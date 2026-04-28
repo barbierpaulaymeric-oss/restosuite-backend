@@ -15,6 +15,17 @@ function _persistRestaurantLogin(token, account) {
   try { sessionStorage.removeItem('restosuite_supplier_session'); } catch {}
 }
 
+// Demo accounts seeded by server/seed-demo.js — never pre-fill these on the
+// login form (a real prospect on Alfred's demo laptop would see "demo@…"
+// otherwise, since the prefill is dynamic from localStorage).
+const _DEMO_EMAILS = new Set([
+  'demo@restosuite.fr',
+  'demo-fournisseur@restosuite.fr',
+]);
+function _isDemoEmail(email) {
+  return !!email && _DEMO_EMAILS.has(String(email).trim().toLowerCase());
+}
+
 const AVATAR_COLORS = [
   '#E8722A', '#2D8B55', '#4A90D9', '#D93025', '#E5A100',
   '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316'
@@ -122,8 +133,11 @@ class LoginView {
     // Pre-fill with the last known restaurant email so returning users skip a
     // round of typing. This is pulled from the stored account (if they logged
     // out and are coming back) — strictly cosmetic, server still re-authenticates.
+    // Demo emails are filtered so prospects never see "demo@restosuite.fr"
+    // pre-filled when Alfred shows the app from his own laptop.
     const stored = (typeof getAccount === 'function') ? getAccount() : null;
-    const prefill = this.prefillEmail || (stored && stored.email) || localStorage.getItem('restosuite_last_email') || '';
+    const rawPrefill = this.prefillEmail || (stored && stored.email) || localStorage.getItem('restosuite_last_email') || '';
+    const prefill = _isDemoEmail(rawPrefill) ? '' : rawPrefill;
 
     app.innerHTML = `
       <div class="login-screen">
