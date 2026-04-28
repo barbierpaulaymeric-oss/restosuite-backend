@@ -59,6 +59,19 @@ function bootSupplierApp(session) {
 
   if (window.lucide) lucide.createIcons();
 
+  // Logo click → navigate back to Tableau de bord (same as restaurant-side
+  // nav-brand handler in app.js — commit ed50cd8).
+  const logoEl = document.querySelector('.supplier-header__left');
+  if (logoEl) {
+    logoEl.style.cursor = 'pointer';
+    logoEl.addEventListener('click', () => {
+      document.querySelectorAll('.supplier-nav__tab').forEach(t => t.classList.remove('active'));
+      const dashTab = document.querySelector('.supplier-nav__tab[data-tab="dashboard"]');
+      if (dashTab) dashTab.classList.add('active');
+      renderSupplierDashboardTab();
+    });
+  }
+
   document.getElementById('supplier-logout').addEventListener('click', () => {
     clearSupplierSession();
     document.body.classList.remove('supplier-mode');

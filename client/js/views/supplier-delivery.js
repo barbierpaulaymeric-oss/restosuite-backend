@@ -73,7 +73,10 @@ async function loadSupplierDeliveries() {
             ${statusLabels[n.status] || n.status}
           </span>
         </div>
-        <div class="text-secondary text-sm" style="margin-top:var(--space-2)">
+        ${n.restaurant_name ? `<div class="text-secondary text-sm" style="margin-top:var(--space-1)">
+          <i data-lucide="store" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>${escapeHtml(n.restaurant_name)}
+        </div>` : ''}
+        <div class="text-secondary text-sm" style="margin-top:var(--space-1)">
           ${n.item_count} produit${n.item_count > 1 ? 's' : ''}
           ${n.total_amount ? ` — ${n.total_amount.toFixed(2)} €` : ''}
         </div>

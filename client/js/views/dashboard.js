@@ -98,7 +98,8 @@ async function renderDashboard() {
   const app = document.getElementById('app');
   const perms = getPermissions();
   const account = getAccount();
-  const greeting = getGreeting(account ? account.name : 'Chef');
+  const userName = (account && account.name) || 'Chef';
+  const greeting = getGreeting(userName);
   const todayDate = formatFrenchDate(new Date());
 
   app.innerHTML = `

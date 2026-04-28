@@ -166,17 +166,21 @@ async function _renderSupplierMessageThread(restaurantId, context) {
     try {
       data = await API.getSupplierMessageThread(restaurantId);
     } catch (e) {
-      document.getElementById('supplier-msg-body').innerHTML =
+      const errBody = document.getElementById('supplier-msg-body');
+      if (errBody) errBody.innerHTML =
         `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
       return;
     }
     const titleEl = document.getElementById('supplier-msg-title');
-    titleEl.innerHTML = `
-      <strong>${escapeHtml(data.restaurant.name || '—')}</strong>
-      ${data.restaurant.city ? `<span class="text-secondary text-sm">· ${escapeHtml(data.restaurant.city)}</span>` : ''}
-    `;
+    if (titleEl) {
+      titleEl.innerHTML = `
+        <strong>${escapeHtml(data.restaurant.name || '—')}</strong>
+        ${data.restaurant.city ? `<span class="text-secondary text-sm">· ${escapeHtml(data.restaurant.city)}</span>` : ''}
+      `;
+    }
     // mySide='supplier' so own bubbles align right.
-    _renderMessageBubbles('supplier-msg-body', data.messages, 'supplier');
+    const msgBody = document.getElementById('supplier-msg-body');
+    if (msgBody) _renderMessageBubbles('supplier-msg-body', data.messages, 'supplier');
     refreshSupplierMessagesNavBadge();
   }
   await loadThread();

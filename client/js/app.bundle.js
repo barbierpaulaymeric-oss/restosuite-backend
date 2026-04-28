@@ -1418,7 +1418,8 @@ async function renderDashboard() {
   const app = document.getElementById("app");
   const perms = getPermissions();
   const account = getAccount();
-  const greeting = getGreeting(account ? account.name : "Chef");
+  const userName = account && account.name || "Chef";
+  const greeting = getGreeting(userName);
   const todayDate = formatFrenchDate(/* @__PURE__ */ new Date());
   app.innerHTML = `
     <header id="dashboard-greeting" role="banner" style="margin-bottom:var(--space-4)">
@@ -18943,6 +18944,16 @@ function bootSupplierApp(session) {
     </div>
   `;
   if (window.lucide) lucide.createIcons();
+  const logoEl = document.querySelector(".supplier-header__left");
+  if (logoEl) {
+    logoEl.style.cursor = "pointer";
+    logoEl.addEventListener("click", () => {
+      document.querySelectorAll(".supplier-nav__tab").forEach((t) => t.classList.remove("active"));
+      const dashTab = document.querySelector('.supplier-nav__tab[data-tab="dashboard"]');
+      if (dashTab) dashTab.classList.add("active");
+      renderSupplierDashboardTab();
+    });
+  }
   document.getElementById("supplier-logout").addEventListener("click", () => {
     clearSupplierSession();
     document.body.classList.remove("supplier-mode");
@@ -20969,15 +20980,19 @@ async function _renderSupplierMessageThread(restaurantId, context) {
     try {
       data = await API.getSupplierMessageThread(restaurantId);
     } catch (e) {
-      document.getElementById("supplier-msg-body").innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
+      const errBody = document.getElementById("supplier-msg-body");
+      if (errBody) errBody.innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
       return;
     }
     const titleEl = document.getElementById("supplier-msg-title");
-    titleEl.innerHTML = `
-      <strong>${escapeHtml(data.restaurant.name || "\u2014")}</strong>
-      ${data.restaurant.city ? `<span class="text-secondary text-sm">\xB7 ${escapeHtml(data.restaurant.city)}</span>` : ""}
-    `;
-    _renderMessageBubbles("supplier-msg-body", data.messages, "supplier");
+    if (titleEl) {
+      titleEl.innerHTML = `
+        <strong>${escapeHtml(data.restaurant.name || "\u2014")}</strong>
+        ${data.restaurant.city ? `<span class="text-secondary text-sm">\xB7 ${escapeHtml(data.restaurant.city)}</span>` : ""}
+      `;
+    }
+    const msgBody = document.getElementById("supplier-msg-body");
+    if (msgBody) _renderMessageBubbles("supplier-msg-body", data.messages, "supplier");
     refreshSupplierMessagesNavBadge();
   }
   await loadThread();
@@ -21084,7 +21099,10 @@ async function loadSupplierDeliveries() {
             ${statusLabels[n.status] || n.status}
           </span>
         </div>
-        <div class="text-secondary text-sm" style="margin-top:var(--space-2)">
+        ${n.restaurant_name ? `<div class="text-secondary text-sm" style="margin-top:var(--space-1)">
+          <i data-lucide="store" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>${escapeHtml(n.restaurant_name)}
+        </div>` : ""}
+        <div class="text-secondary text-sm" style="margin-top:var(--space-1)">
           ${n.item_count} produit${n.item_count > 1 ? "s" : ""}
           ${n.total_amount ? ` \u2014 ${n.total_amount.toFixed(2)} \u20AC` : ""}
         </div>

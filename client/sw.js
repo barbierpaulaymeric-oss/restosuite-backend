@@ -3,7 +3,7 @@
 // as intermittent "session drops" on Pilotage/analytics. v7 shipped the
 // server fix; v8 evicts any v7 cache entries that captured a stale 401
 // during the transition window.
-const CACHE_NAME = 'restosuite-v8';
+const CACHE_NAME = 'restosuite-v9';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
