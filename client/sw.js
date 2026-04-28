@@ -1,9 +1,9 @@
-// Bumped 2026-04-28 (v13): RGPD export adds 12 tables (orders,
-// purchase_orders, delivery_notes + items, haccp hazard/ccp/decision,
-// training_records, allergen_management_plan, stock_movements) and
-// new Pilotage > Pertes & gaspillage view (/waste-analytics) backed
-// by GET /api/analytics/waste.
-const CACHE_NAME = 'restosuite-v13';
+// Bumped 2026-04-28 (v14): covers (couverts) tracking — orders.covers +
+// service_sessions.total_covers, GET /api/analytics/covers with
+// food_cost_per_cover, covers input in service cart, covers KPI on
+// dashboard + pilotage, total_covers tile in service recap.
+// (v13 shipped RGPD export +12 tables + /waste-analytics view.)
+const CACHE_NAME = 'restosuite-v14';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

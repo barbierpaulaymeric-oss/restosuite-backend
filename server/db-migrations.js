@@ -1909,6 +1909,22 @@ try {
   console.warn('⚠️ audit_log migration error:', e.message);
 }
 
+// ─── Migration: covers (couverts) tracking on orders + service_sessions ───
+try {
+  const orderCols = all("PRAGMA table_info(orders)");
+  if (!orderCols.some(c => c.name === 'covers')) {
+    db.exec("ALTER TABLE orders ADD COLUMN covers INTEGER");
+    console.log('✅ Migration: added covers to orders');
+  }
+  const sessCols = all("PRAGMA table_info(service_sessions)");
+  if (!sessCols.some(c => c.name === 'total_covers')) {
+    db.exec("ALTER TABLE service_sessions ADD COLUMN total_covers INTEGER DEFAULT 0");
+    console.log('✅ Migration: added total_covers to service_sessions');
+  }
+} catch (e) {
+  console.error('Migration covers error:', e.message);
+}
+
 }
 
 module.exports = { runMigrations };

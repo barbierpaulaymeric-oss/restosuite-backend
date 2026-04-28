@@ -1064,4 +1064,168 @@ router.get('/menu-engineering', (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// GET /api/analytics/covers — Covers (couverts) tracking & food cost per cover
+// ═══════════════════════════════════════════
+router.get('/covers', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365);
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+    const sinceDate = since.split('T')[0];
+
+    // Order/cover totals
+    const totalsRow = get(`
+      SELECT
+        COALESCE(SUM(covers), 0) as total_covers,
+        COUNT(*) as total_orders,
+        COALESCE(SUM(total_cost), 0) as total_revenue
+      FROM orders
+      WHERE restaurant_id = ? AND created_at >= ? AND status != 'annulé'
+    `, [rid, since]);
+
+    // Food cost per recipe (cost per portion) — same costing pattern as /food-cost
+    const recipeCosts = all(`
+      SELECT r.id, COALESCE(r.portions, 1) as portions,
+        COALESCE((
+          SELECT SUM(
+            ri.gross_quantity * COALESCE(
+              (SELECT sp.price / CASE WHEN LOWER(sp.unit) = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
+               FROM supplier_prices sp WHERE sp.ingredient_id = ri.ingredient_id AND sp.restaurant_id = ? ORDER BY sp.price ASC LIMIT 1),
+              (SELECT i.price_per_unit / CASE WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'kg' THEN 1000 WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'l' THEN 1000 ELSE 1 END
+               FROM ingredients i WHERE i.id = ri.ingredient_id AND i.restaurant_id = ?),
+              0
+            )
+          )
+          FROM recipe_ingredients ri WHERE ri.recipe_id = r.id AND ri.restaurant_id = ?
+        ), 0) as total_cost
+      FROM recipes r
+      WHERE r.restaurant_id = ?
+    `, [rid, rid, rid, rid]);
+
+    const costPerPortion = {};
+    for (const r of recipeCosts) {
+      costPerPortion[r.id] = (r.total_cost || 0) / Math.max(r.portions, 1);
+    }
+
+    // Aggregate food cost across order_items
+    const itemRows = all(`
+      SELECT oi.recipe_id, oi.quantity
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id AND o.restaurant_id = ?
+      WHERE oi.restaurant_id = ?
+        AND o.created_at >= ?
+        AND o.status != 'annulé'
+        AND oi.status != 'annulé'
+    `, [rid, rid, since]);
+
+    let totalFoodCostRaw = 0;
+    for (const it of itemRows) {
+      const cpp = costPerPortion[it.recipe_id] || 0;
+      totalFoodCostRaw += cpp * (it.quantity || 0);
+    }
+
+    const totalCovers = totalsRow?.total_covers || 0;
+    const totalOrders = totalsRow?.total_orders || 0;
+    const totalFoodCost = Math.round(totalFoodCostRaw * 100) / 100;
+    const totalRevenue = Math.round((totalsRow?.total_revenue || 0) * 100) / 100;
+    const foodCostPerCover = totalCovers > 0 ? Math.round((totalFoodCost / totalCovers) * 100) / 100 : 0;
+    const revenuePerCover = totalCovers > 0 ? Math.round((totalRevenue / totalCovers) * 100) / 100 : 0;
+    const avgCoversPerOrder = totalOrders > 0 ? Math.round((totalCovers / totalOrders) * 10) / 10 : 0;
+
+    // Per-day timeseries
+    const perDay = all(`
+      SELECT date(created_at) as date,
+             COALESCE(SUM(covers), 0) as covers,
+             COUNT(*) as orders,
+             COALESCE(SUM(total_cost), 0) as revenue
+      FROM orders
+      WHERE restaurant_id = ? AND date(created_at) >= ? AND status != 'annulé'
+      GROUP BY date(created_at)
+      ORDER BY date(created_at) ASC
+    `, [rid, sinceDate]);
+
+    // Per-week timeseries (ISO week)
+    const perWeek = all(`
+      SELECT strftime('%Y-W%W', created_at) as week,
+             COALESCE(SUM(covers), 0) as covers,
+             COUNT(*) as orders,
+             COALESCE(SUM(total_cost), 0) as revenue
+      FROM orders
+      WHERE restaurant_id = ? AND date(created_at) >= ? AND status != 'annulé'
+      GROUP BY strftime('%Y-W%W', created_at)
+      ORDER BY week ASC
+    `, [rid, sinceDate]);
+
+    // Per-service (recent service sessions)
+    const perService = all(`
+      SELECT id, started_at, ended_at, total_covers, total_orders, total_revenue, status
+      FROM service_sessions
+      WHERE restaurant_id = ? AND started_at >= ?
+      ORDER BY started_at DESC
+      LIMIT 50
+    `, [rid, since]);
+
+    const completedServices = perService.filter(s => s.status === 'stopped' && s.total_covers > 0);
+    const avgCoversPerService = completedServices.length > 0
+      ? Math.round((completedServices.reduce((s, x) => s + (x.total_covers || 0), 0) / completedServices.length) * 10) / 10
+      : 0;
+
+    // Daily averages
+    const daysWithData = perDay.length;
+    const avgCoversPerDay = daysWithData > 0
+      ? Math.round((totalCovers / daysWithData) * 10) / 10
+      : 0;
+
+    // Trend: compare second half vs first half of period
+    let trendPct = 0;
+    if (perDay.length >= 4) {
+      const mid = Math.floor(perDay.length / 2);
+      const firstHalf = perDay.slice(0, mid).reduce((s, d) => s + (d.covers || 0), 0);
+      const secondHalf = perDay.slice(mid).reduce((s, d) => s + (d.covers || 0), 0);
+      if (firstHalf > 0) {
+        trendPct = Math.round(((secondHalf - firstHalf) / firstHalf) * 1000) / 10;
+      }
+    }
+
+    res.json({
+      period_days: days,
+      total_covers: totalCovers,
+      total_orders: totalOrders,
+      total_food_cost: totalFoodCost,
+      total_revenue: totalRevenue,
+      food_cost_per_cover: foodCostPerCover,
+      revenue_per_cover: revenuePerCover,
+      avg_covers_per_order: avgCoversPerOrder,
+      avg_covers_per_day: avgCoversPerDay,
+      avg_covers_per_service: avgCoversPerService,
+      trend_pct: trendPct,
+      per_day: perDay.map(d => ({
+        date: d.date,
+        covers: d.covers || 0,
+        orders: d.orders || 0,
+        revenue: Math.round((d.revenue || 0) * 100) / 100
+      })),
+      per_week: perWeek.map(w => ({
+        week: w.week,
+        covers: w.covers || 0,
+        orders: w.orders || 0,
+        revenue: Math.round((w.revenue || 0) * 100) / 100
+      })),
+      per_service: perService.map(s => ({
+        id: s.id,
+        started_at: s.started_at,
+        ended_at: s.ended_at,
+        total_covers: s.total_covers || 0,
+        total_orders: s.total_orders || 0,
+        total_revenue: Math.round((s.total_revenue || 0) * 100) / 100,
+        status: s.status
+      }))
+    });
+  } catch (e) {
+    console.error('Analytics covers error:', e);
+    res.status(500).json({ error: 'Erreur calcul couverts' });
+  }
+});
+
 module.exports = router;

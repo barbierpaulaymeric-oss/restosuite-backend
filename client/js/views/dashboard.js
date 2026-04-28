@@ -539,6 +539,15 @@ function renderDailySummary(recipes, perms) {
     `;
   }
 
+  // Covers KPI (last 30 days) — populated async
+  html += `
+    <a href="#/analytics" role="group" aria-label="Couverts servis 30 derniers jours" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-accent)';this.style.boxShadow='0 0 0 2px var(--color-accent-light)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''" id="dashboard-covers-tile">
+      <div id="dashboard-covers-value" style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">—</div>
+      <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Couverts (30j)</div>
+      <div id="dashboard-covers-detail" style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:2px">&nbsp;</div>
+    </a>
+  `;
+
   // Daily tip
   const dailyTip = getDailyTip();
   const tipEl = document.getElementById('daily-tip-container');
@@ -557,6 +566,25 @@ function renderDailySummary(recipes, perms) {
   }
 
   summaryEl.innerHTML = html;
+
+  // Populate covers KPI asynchronously so it doesn't block the rest
+  if (typeof API !== 'undefined' && typeof API.getAnalyticsCovers === 'function') {
+    API.getAnalyticsCovers(30).then(c => {
+      const valEl = document.getElementById('dashboard-covers-value');
+      const detEl = document.getElementById('dashboard-covers-detail');
+      if (valEl) valEl.textContent = (c?.total_covers || 0).toString();
+      if (detEl) {
+        if (c && c.food_cost_per_cover != null && c.total_covers > 0) {
+          detEl.textContent = `${formatCurrency(c.food_cost_per_cover)} food cost / cv`;
+        } else {
+          detEl.textContent = 'Saisissez les couverts en service';
+        }
+      }
+    }).catch(() => {
+      const valEl = document.getElementById('dashboard-covers-value');
+      if (valEl) valEl.textContent = '—';
+    });
+  }
 }
 
 function getDailyTip() {

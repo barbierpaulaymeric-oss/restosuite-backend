@@ -825,6 +825,9 @@ const API = {
   getAnalyticsWaste(days = 84) {
     return this.request(`/analytics/waste?days=${encodeURIComponent(days)}`);
   },
+  getAnalyticsCovers(days = 30) {
+    return this.request(`/analytics/covers?days=${days}`);
+  },
   // ─── Orders ───
   getOrders(status) {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
@@ -2204,6 +2207,13 @@ function renderDailySummary(recipes, perms) {
       </a>
     `;
   }
+  html += `
+    <a href="#/analytics" role="group" aria-label="Couverts servis 30 derniers jours" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-accent)';this.style.boxShadow='0 0 0 2px var(--color-accent-light)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''" id="dashboard-covers-tile">
+      <div id="dashboard-covers-value" style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">\u2014</div>
+      <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Couverts (30j)</div>
+      <div id="dashboard-covers-detail" style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:2px">&nbsp;</div>
+    </a>
+  `;
   const dailyTip = getDailyTip();
   const tipEl = document.getElementById("daily-tip-container");
   if (tipEl) {
@@ -2220,6 +2230,23 @@ function renderDailySummary(recipes, perms) {
     `;
   }
   summaryEl.innerHTML = html;
+  if (typeof API !== "undefined" && typeof API.getAnalyticsCovers === "function") {
+    API.getAnalyticsCovers(30).then((c) => {
+      const valEl = document.getElementById("dashboard-covers-value");
+      const detEl = document.getElementById("dashboard-covers-detail");
+      if (valEl) valEl.textContent = ((c == null ? void 0 : c.total_covers) || 0).toString();
+      if (detEl) {
+        if (c && c.food_cost_per_cover != null && c.total_covers > 0) {
+          detEl.textContent = `${formatCurrency(c.food_cost_per_cover)} food cost / cv`;
+        } else {
+          detEl.textContent = "Saisissez les couverts en service";
+        }
+      }
+    }).catch(() => {
+      const valEl = document.getElementById("dashboard-covers-value");
+      if (valEl) valEl.textContent = "\u2014";
+    });
+  }
 }
 function getDailyTip() {
   const tips = [
@@ -15622,6 +15649,7 @@ function _svcRenderServiceUI(app, tableCount) {
         <div class="svc-header__center" id="svc-metrics-bar">
           <div class="svc-metric"><span class="svc-metric__val" id="svc-m-time">--:--</span><span class="svc-metric__label">Dur\xE9e</span></div>
           <div class="svc-metric"><span class="svc-metric__val" id="svc-m-orders">0</span><span class="svc-metric__label">Commandes</span></div>
+          <div class="svc-metric"><span class="svc-metric__val" id="svc-m-covers">0</span><span class="svc-metric__label">Couverts</span></div>
           <div class="svc-metric"><span class="svc-metric__val" id="svc-m-pending">0</span><span class="svc-metric__label">En cours</span></div>
           <div class="svc-metric"><span class="svc-metric__val" id="svc-m-avg">0min</span><span class="svc-metric__label">Moy. ticket</span></div>
         </div>
@@ -15662,6 +15690,10 @@ function _svcRenderServiceUI(app, tableCount) {
               <div class="svc-cart-panel" id="svc-cart-panel">
                 <h3 class="svc-section-subtitle">Commande en cours</h3>
                 <div id="svc-cart-items"></div>
+                <div class="svc-cart-covers" style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) 0">
+                  <label for="svc-order-covers" style="font-size:var(--text-sm);color:var(--text-secondary);flex:1">\u{1F465} Couverts</label>
+                  <input type="number" class="form-control" id="svc-order-covers" min="0" max="999" step="1" placeholder="\u2014" style="max-width:100px;text-align:center" data-ui="custom">
+                </div>
                 <div class="svc-cart-notes">
                   <textarea class="form-control svc-notes-input" id="svc-order-notes" rows="2" placeholder="Notes (allergies, demandes sp\xE9ciales...)" data-ui="custom"></textarea>
                 </div>
@@ -15759,6 +15791,10 @@ function _svcShowRecap(recap) {
             <div style="font-size:var(--text-sm);color:var(--text-secondary)">Commandes</div>
           </div>
           <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);text-align:center">
+            <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recap.total_covers || 0}</div>
+            <div style="font-size:var(--text-sm);color:var(--text-secondary)">Couverts</div>
+          </div>
+          <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);text-align:center">
             <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recap.total_items || 0}</div>
             <div style="font-size:var(--text-sm);color:var(--text-secondary)">Plats servis</div>
           </div>
@@ -15766,14 +15802,18 @@ function _svcShowRecap(recap) {
             <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${formatCurrency(recap.total_revenue || 0)}</div>
             <div style="font-size:var(--text-sm);color:var(--text-secondary)">Chiffre d'affaires</div>
           </div>
-          <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);text-align:center">
-            <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${duration}</div>
-            <div style="font-size:var(--text-sm);color:var(--text-secondary)">Dur\xE9e</div>
-          </div>
         </div>
 
         <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-5)">
           <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)">Performance</h3>
+          <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--border-light)">
+            <span style="color:var(--text-secondary);font-size:var(--text-sm)">Dur\xE9e du service</span>
+            <span style="font-weight:600">${duration}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--border-light)">
+            <span style="color:var(--text-secondary);font-size:var(--text-sm)">Ticket moyen</span>
+            <span style="font-weight:600">${recap.total_covers > 0 ? formatCurrency((recap.total_revenue || 0) / recap.total_covers) + " / couvert" : "\u2014"}</span>
+          </div>
           <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--border-light)">
             <span style="color:var(--text-secondary);font-size:var(--text-sm)">Temps moyen par commande</span>
             <span style="font-weight:600">${recap.avg_ticket_time_min || 0} min</span>
@@ -15804,13 +15844,17 @@ function _svcUpdateServiceMetrics() {
   const elapsed = now - started;
   const el = document.getElementById("svc-m-time");
   if (el) el.textContent = _svcFormatDuration(elapsed);
-  const totalOrders = _serviceState.allOrders.filter((o) => o.status !== "annul\xE9").length;
+  const sessionOrders = _serviceState.allOrders.filter((o) => o.status !== "annul\xE9");
+  const totalOrders = sessionOrders.length;
+  const totalCovers = sessionOrders.reduce((s, o) => s + (o.covers || 0), 0);
   const pending = _serviceState.allOrders.filter((o) => ["envoy\xE9", "en_cours"].includes(o.status)).length;
   const completed = _serviceState.allOrders.filter((o) => o.status === "termin\xE9");
   const ordersEl = document.getElementById("svc-m-orders");
+  const coversEl = document.getElementById("svc-m-covers");
   const pendingEl = document.getElementById("svc-m-pending");
   const avgEl = document.getElementById("svc-m-avg");
   if (ordersEl) ordersEl.textContent = totalOrders;
+  if (coversEl) coversEl.textContent = totalCovers;
   if (pendingEl) {
     pendingEl.textContent = pending;
     pendingEl.style.color = pending > 5 ? "var(--color-danger)" : pending > 2 ? "var(--color-warning)" : "";
@@ -16035,7 +16079,7 @@ function _svcStatusIcon(status) {
   }
 }
 function _svcSelectTable(tableNum) {
-  var _a;
+  var _a, _b;
   _serviceState.selectedTable = tableNum;
   const tableCount = Object.keys(_serviceState.tables).length;
   _svcRenderTables(tableCount);
@@ -16060,6 +16104,8 @@ function _svcSelectTable(tableNum) {
   }
   const notesEl = document.getElementById("svc-order-notes");
   if (notesEl) notesEl.value = ((_a = td.currentDraft) == null ? void 0 : _a.notes) || "";
+  const coversEl = document.getElementById("svc-order-covers");
+  if (coversEl) coversEl.value = ((_b = td.currentDraft) == null ? void 0 : _b.covers) != null ? td.currentDraft.covers : "";
   _svcRenderCart();
   _svcRenderTableOrders();
   if (window.innerWidth < 768) {
@@ -16164,7 +16210,7 @@ function _svcRenderCart() {
   totalEl.textContent = `Total : ${formatCurrency(total)}`;
 }
 async function _svcSaveOrder(sendImmediately) {
-  var _a, _b, _c;
+  var _a, _b, _c, _d;
   const tn = _serviceState.selectedTable;
   if (!tn) return;
   const draft = _serviceState.tables[tn]._localDraft || [];
@@ -16173,17 +16219,21 @@ async function _svcSaveOrder(sendImmediately) {
     return;
   }
   const notes = ((_b = (_a = document.getElementById("svc-order-notes")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim()) || null;
+  const coversRaw = (_c = document.getElementById("svc-order-covers")) == null ? void 0 : _c.value;
+  const coversNum = coversRaw !== void 0 && coversRaw !== null && coversRaw !== "" ? parseInt(coversRaw, 10) : null;
+  const covers = Number.isInteger(coversNum) && coversNum >= 0 && coversNum <= 999 ? coversNum : null;
   const td = _serviceState.tables[tn];
   try {
     if (td.currentDraft) await API.cancelOrder(td.currentDraft.id);
     const order = await API.createOrder({
       table_number: tn,
       notes,
+      covers,
       items: draft.map((i) => ({ recipe_id: i.recipe_id, quantity: i.quantity, notes: i.notes || null }))
     });
     if (sendImmediately) {
       const result = await API.sendOrder(order.id);
-      if (((_c = result.warnings) == null ? void 0 : _c.length) > 0) showToast(`\u26A0\uFE0F Stock insuffisant pour ${result.warnings.length} ingr\xE9dient(s)`, "info");
+      if (((_d = result.warnings) == null ? void 0 : _d.length) > 0) showToast(`\u26A0\uFE0F Stock insuffisant pour ${result.warnings.length} ingr\xE9dient(s)`, "info");
       showToast(`Table ${tn} \u2014 Commande envoy\xE9e en cuisine !`, "success");
       _serviceState.tables[tn]._localDraft = [];
     } else {
@@ -16541,7 +16591,7 @@ async function renderAnalytics() {
     </div>
   `;
   try {
-    const [kpis, foodCost, stockData, pricesData, haccpData, insightsData, varianceSummary, dailyAlerts, stockAlerts, availability] = await Promise.all([
+    const [kpis, foodCost, stockData, pricesData, haccpData, insightsData, varianceSummary, dailyAlerts, stockAlerts, availability, coversData] = await Promise.all([
       API.getAnalyticsKPIs(),
       API.getAnalyticsFoodCost(),
       API.getAnalyticsStock(),
@@ -16551,9 +16601,10 @@ async function renderAnalytics() {
       API.getVarianceSummary().catch(() => ({ total_loss_value: 0, total_purchase_value: 0, loss_ratio_pct: 0, ingredients_with_losses: 0, health: "good" })),
       API.request("/alerts/daily-summary").catch(() => null),
       API.getStockAlerts().catch(() => []),
-      API.getRecipeAvailability().catch(() => null)
+      API.getRecipeAvailability().catch(() => null),
+      API.getAnalyticsCovers(30).catch(() => null)
     ]);
-    renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpData, insightsData, varianceSummary, dailyAlerts, stockAlerts, availability);
+    renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpData, insightsData, varianceSummary, dailyAlerts, stockAlerts, availability, coversData);
   } catch (e) {
     console.error("Pilotage error:", e);
     app.innerHTML = `
@@ -16569,7 +16620,7 @@ async function renderAnalytics() {
     `;
   }
 }
-function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpData, insightsData, variance, alerts, stockAlerts, availability) {
+function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpData, insightsData, variance, alerts, stockAlerts, availability, coversData) {
   const app = document.getElementById("app");
   let healthScore = 100;
   const issues = [];
@@ -16735,6 +16786,56 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
   }).join("")}
       </div>
     </section>
+
+    <!-- \u2550\u2550\u2550 Section Couverts \u2550\u2550\u2550 -->
+    ${coversData ? `
+    <section class="analytics-section anim-fadeIn" style="--delay:5">
+      <h2><i data-lucide="users" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Couverts (30j)</h2>
+      <div class="analytics-kpis" style="margin-bottom:var(--space-4)">
+        <div class="kpi-card">
+          <div class="kpi-icon"><i data-lucide="users" style="width:28px;height:28px"></i></div>
+          <div class="kpi-value font-mono">${coversData.total_covers || 0}</div>
+          <div class="kpi-label">Total couverts</div>
+          <div class="kpi-detail">${coversData.avg_covers_per_day || 0} / jour</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><i data-lucide="utensils-crossed" style="width:28px;height:28px"></i></div>
+          <div class="kpi-value font-mono">${formatCurrency(coversData.food_cost_per_cover || 0)}</div>
+          <div class="kpi-label">Food cost / couvert</div>
+          <div class="kpi-detail">${coversData.total_food_cost ? formatCurrency(coversData.total_food_cost) + " total" : "\u2014"}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><i data-lucide="banknote" style="width:28px;height:28px"></i></div>
+          <div class="kpi-value font-mono">${formatCurrency(coversData.revenue_per_cover || 0)}</div>
+          <div class="kpi-label">CA / couvert</div>
+          <div class="kpi-detail">${coversData.avg_covers_per_service || 0} / service</div>
+        </div>
+        <div class="kpi-card ${coversData.trend_pct > 0 ? "kpi--success" : coversData.trend_pct < -10 ? "kpi--danger" : ""}">
+          <div class="kpi-icon"><i data-lucide="${coversData.trend_pct >= 0 ? "trending-up" : "trending-down"}" style="width:28px;height:28px"></i></div>
+          <div class="kpi-value font-mono">${coversData.trend_pct > 0 ? "+" : ""}${coversData.trend_pct}%</div>
+          <div class="kpi-label">Tendance</div>
+          <div class="kpi-detail">vs d\xE9but de p\xE9riode</div>
+        </div>
+      </div>
+      ${(coversData.per_day || []).length > 0 ? `
+      <h3 style="font-size:var(--text-sm);margin-bottom:var(--space-2)">Couverts par jour (30 derniers jours)</h3>
+      <div class="css-chart-h">
+        ${(() => {
+    const maxC = Math.max(...coversData.per_day.map((d) => d.covers || 0), 1);
+    return coversData.per_day.slice(-15).map((d) => `
+            <div class="bar-h-row">
+              <span class="bar-h-label">${escapeHtml(new Date(d.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }))}</span>
+              <div class="bar-h-track">
+                <div class="bar-h-fill" style="width:${(d.covers || 0) / maxC * 100}%"></div>
+              </div>
+              <span class="bar-h-val font-mono">${d.covers || 0}</span>
+            </div>
+          `).join("");
+  })()}
+      </div>
+      ` : `<p class="text-secondary text-sm">Aucun couvert enregistr\xE9 sur la p\xE9riode. Saisissez le nombre de couverts \xE0 l'envoi des commandes pour suivre cet indicateur.</p>`}
+    </section>
+    ` : ""}
 
     <!-- \u2550\u2550\u2550 Section Stock \u2550\u2550\u2550 -->
     <section class="analytics-section anim-fadeIn" style="--delay:5">

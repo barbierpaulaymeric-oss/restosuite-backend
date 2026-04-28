@@ -725,6 +725,7 @@ const API = {
   getAnalyticsWaste(days = 84) {
     return this.request(`/analytics/waste?days=${encodeURIComponent(days)}`);
   },
+  getAnalyticsCovers(days = 30) { return this.request(`/analytics/covers?days=${days}`); },
 
   // ─── Orders ───
   getOrders(status) {

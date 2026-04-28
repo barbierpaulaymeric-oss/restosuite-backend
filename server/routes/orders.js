@@ -61,11 +61,20 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   try {
     const rid = req.user.restaurant_id;
-    const { table_number, items, notes } = req.body;
+    const { table_number, items, notes, covers } = req.body;
 
     if (!table_number) return res.status(400).json({ error: 'table_number requis' });
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Au moins un item requis' });
+    }
+
+    let coversValue = null;
+    if (covers !== undefined && covers !== null && covers !== '') {
+      const n = Number(covers);
+      if (!Number.isInteger(n) || n < 0 || n > 999) {
+        return res.status(400).json({ error: 'covers doit être un entier entre 0 et 999' });
+      }
+      coversValue = n;
     }
 
     // Validate items have required fields
@@ -91,8 +100,8 @@ router.post('/', (req, res) => {
       }
 
       const orderInfo = run(
-        'INSERT INTO orders (table_number, notes, total_cost, restaurant_id) VALUES (?, ?, ?, ?)',
-        [table_number, notes || null, Math.round(totalCost * 100) / 100, rid]
+        'INSERT INTO orders (table_number, notes, total_cost, covers, restaurant_id) VALUES (?, ?, ?, ?, ?)',
+        [table_number, notes || null, Math.round(totalCost * 100) / 100, coversValue, rid]
       );
       const orderId = orderInfo.lastInsertRowid;
 
@@ -116,6 +125,7 @@ router.post('/', (req, res) => {
     `, [rid, orderId, rid]);
     res.status(201).json({ ...order, items: orderItems });
   } catch (e) {
+    console.error('POST /api/orders error:', e);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -151,7 +161,7 @@ const ITEM_STATUS_TRANSITIONS = {
 router.put('/:id', (req, res) => {
   const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
-  const { status, notes } = req.body;
+  const { status, notes, covers } = req.body;
   const order = get('SELECT * FROM orders WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (!order) return res.status(404).json({ error: 'Commande introuvable' });
 
@@ -170,6 +180,17 @@ router.put('/:id', (req, res) => {
   }
   if (notes !== undefined) {
     run('UPDATE orders SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?', [notes, id, rid]);
+  }
+  if (covers !== undefined) {
+    let coversValue = null;
+    if (covers !== null && covers !== '') {
+      const n = Number(covers);
+      if (!Number.isInteger(n) || n < 0 || n > 999) {
+        return res.status(400).json({ error: 'covers doit être un entier entre 0 et 999' });
+      }
+      coversValue = n;
+    }
+    run('UPDATE orders SET covers = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?', [coversValue, id, rid]);
   }
 
   const updated = get('SELECT * FROM orders WHERE id = ? AND restaurant_id = ?', [id, rid]);

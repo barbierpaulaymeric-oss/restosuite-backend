@@ -131,7 +131,7 @@ router.post('/stop', requireAuth, (req, res) => {
 
     // Calculate recap metrics from orders during this session
     const sessionOrders = all(
-      `SELECT o.id, o.created_at, o.updated_at, o.total_cost, o.status,
+      `SELECT o.id, o.created_at, o.updated_at, o.total_cost, o.status, o.covers,
               (SELECT COUNT(*) FROM order_items WHERE order_id = o.id AND restaurant_id = ?) as item_count
        FROM orders o
        WHERE o.restaurant_id = ? AND o.created_at >= ? AND o.status != 'annulé'`,
@@ -141,6 +141,7 @@ router.post('/stop', requireAuth, (req, res) => {
     const totalOrders = sessionOrders.length;
     const totalItems = sessionOrders.reduce((sum, o) => sum + (o.item_count || 0), 0);
     const totalRevenue = sessionOrders.reduce((sum, o) => sum + (o.total_cost || 0), 0);
+    const totalCovers = sessionOrders.reduce((sum, o) => sum + (o.covers || 0), 0);
 
     // Avg ticket time: from creation to last update (completion)
     const completedOrders = sessionOrders.filter(o => o.status === 'terminé');
@@ -173,11 +174,12 @@ router.post('/stop', requireAuth, (req, res) => {
            total_orders = ?,
            total_items = ?,
            total_revenue = ?,
+           total_covers = ?,
            avg_ticket_time_min = ?,
            peak_hour = ?,
            status = 'stopped'
        WHERE id = ? AND restaurant_id = ?`,
-      [totalOrders, totalItems, totalRevenue, avgTicketTimeMin, peakHour, activeSession.id, account.restaurant_id]
+      [totalOrders, totalItems, totalRevenue, totalCovers, avgTicketTimeMin, peakHour, activeSession.id, account.restaurant_id]
     );
 
     const updatedSession = get(
@@ -194,6 +196,7 @@ router.post('/stop', requireAuth, (req, res) => {
         total_orders: updatedSession.total_orders,
         total_items: updatedSession.total_items,
         total_revenue: updatedSession.total_revenue,
+        total_covers: updatedSession.total_covers,
         avg_ticket_time_min: updatedSession.avg_ticket_time_min,
         peak_hour: updatedSession.peak_hour,
         status: updatedSession.status
@@ -286,6 +289,7 @@ router.get('/recap/:id', requireAuth, (req, res) => {
         total_orders: session.total_orders,
         total_items: session.total_items,
         total_revenue: session.total_revenue,
+        total_covers: session.total_covers,
         avg_ticket_time_min: session.avg_ticket_time_min,
         peak_hour: session.peak_hour,
         status: session.status,

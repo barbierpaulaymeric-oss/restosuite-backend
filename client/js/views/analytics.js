@@ -63,7 +63,7 @@ async function renderAnalytics() {
 
   try {
     // Load all data in parallel — analytics + health
-    const [kpis, foodCost, stockData, pricesData, haccpData, insightsData, varianceSummary, dailyAlerts, stockAlerts, availability] = await Promise.all([
+    const [kpis, foodCost, stockData, pricesData, haccpData, insightsData, varianceSummary, dailyAlerts, stockAlerts, availability, coversData] = await Promise.all([
       API.getAnalyticsKPIs(),
       API.getAnalyticsFoodCost(),
       API.getAnalyticsStock(),
@@ -73,10 +73,11 @@ async function renderAnalytics() {
       API.getVarianceSummary().catch(() => ({ total_loss_value: 0, total_purchase_value: 0, loss_ratio_pct: 0, ingredients_with_losses: 0, health: 'good' })),
       API.request('/alerts/daily-summary').catch(() => null),
       API.getStockAlerts().catch(() => []),
-      API.getRecipeAvailability().catch(() => null)
+      API.getRecipeAvailability().catch(() => null),
+      API.getAnalyticsCovers(30).catch(() => null)
     ]);
 
-    renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpData, insightsData, varianceSummary, dailyAlerts, stockAlerts, availability);
+    renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpData, insightsData, varianceSummary, dailyAlerts, stockAlerts, availability, coversData);
   } catch (e) {
     console.error('Pilotage error:', e);
     app.innerHTML = `
@@ -93,7 +94,7 @@ async function renderAnalytics() {
   }
 }
 
-function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpData, insightsData, variance, alerts, stockAlerts, availability) {
+function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpData, insightsData, variance, alerts, stockAlerts, availability, coversData) {
   const app = document.getElementById('app');
 
   // ─── Health score calculation ───
@@ -279,6 +280,56 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
         }
       </div>
     </section>
+
+    <!-- ═══ Section Couverts ═══ -->
+    ${coversData ? `
+    <section class="analytics-section anim-fadeIn" style="--delay:5">
+      <h2><i data-lucide="users" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Couverts (30j)</h2>
+      <div class="analytics-kpis" style="margin-bottom:var(--space-4)">
+        <div class="kpi-card">
+          <div class="kpi-icon"><i data-lucide="users" style="width:28px;height:28px"></i></div>
+          <div class="kpi-value font-mono">${coversData.total_covers || 0}</div>
+          <div class="kpi-label">Total couverts</div>
+          <div class="kpi-detail">${coversData.avg_covers_per_day || 0} / jour</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><i data-lucide="utensils-crossed" style="width:28px;height:28px"></i></div>
+          <div class="kpi-value font-mono">${formatCurrency(coversData.food_cost_per_cover || 0)}</div>
+          <div class="kpi-label">Food cost / couvert</div>
+          <div class="kpi-detail">${coversData.total_food_cost ? formatCurrency(coversData.total_food_cost) + ' total' : '—'}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><i data-lucide="banknote" style="width:28px;height:28px"></i></div>
+          <div class="kpi-value font-mono">${formatCurrency(coversData.revenue_per_cover || 0)}</div>
+          <div class="kpi-label">CA / couvert</div>
+          <div class="kpi-detail">${coversData.avg_covers_per_service || 0} / service</div>
+        </div>
+        <div class="kpi-card ${coversData.trend_pct > 0 ? 'kpi--success' : coversData.trend_pct < -10 ? 'kpi--danger' : ''}">
+          <div class="kpi-icon"><i data-lucide="${coversData.trend_pct >= 0 ? 'trending-up' : 'trending-down'}" style="width:28px;height:28px"></i></div>
+          <div class="kpi-value font-mono">${coversData.trend_pct > 0 ? '+' : ''}${coversData.trend_pct}%</div>
+          <div class="kpi-label">Tendance</div>
+          <div class="kpi-detail">vs début de période</div>
+        </div>
+      </div>
+      ${(coversData.per_day || []).length > 0 ? `
+      <h3 style="font-size:var(--text-sm);margin-bottom:var(--space-2)">Couverts par jour (30 derniers jours)</h3>
+      <div class="css-chart-h">
+        ${(() => {
+          const maxC = Math.max(...coversData.per_day.map(d => d.covers || 0), 1);
+          return coversData.per_day.slice(-15).map(d => `
+            <div class="bar-h-row">
+              <span class="bar-h-label">${escapeHtml(new Date(d.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }))}</span>
+              <div class="bar-h-track">
+                <div class="bar-h-fill" style="width:${((d.covers || 0) / maxC) * 100}%"></div>
+              </div>
+              <span class="bar-h-val font-mono">${d.covers || 0}</span>
+            </div>
+          `).join('');
+        })()}
+      </div>
+      ` : '<p class="text-secondary text-sm">Aucun couvert enregistré sur la période. Saisissez le nombre de couverts à l\'envoi des commandes pour suivre cet indicateur.</p>'}
+    </section>
+    ` : ''}
 
     <!-- ═══ Section Stock ═══ -->
     <section class="analytics-section anim-fadeIn" style="--delay:5">

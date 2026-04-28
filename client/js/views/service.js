@@ -154,6 +154,7 @@ function _svcRenderServiceUI(app, tableCount) {
         <div class="svc-header__center" id="svc-metrics-bar">
           <div class="svc-metric"><span class="svc-metric__val" id="svc-m-time">--:--</span><span class="svc-metric__label">Durée</span></div>
           <div class="svc-metric"><span class="svc-metric__val" id="svc-m-orders">0</span><span class="svc-metric__label">Commandes</span></div>
+          <div class="svc-metric"><span class="svc-metric__val" id="svc-m-covers">0</span><span class="svc-metric__label">Couverts</span></div>
           <div class="svc-metric"><span class="svc-metric__val" id="svc-m-pending">0</span><span class="svc-metric__label">En cours</span></div>
           <div class="svc-metric"><span class="svc-metric__val" id="svc-m-avg">0min</span><span class="svc-metric__label">Moy. ticket</span></div>
         </div>
@@ -194,6 +195,10 @@ function _svcRenderServiceUI(app, tableCount) {
               <div class="svc-cart-panel" id="svc-cart-panel">
                 <h3 class="svc-section-subtitle">Commande en cours</h3>
                 <div id="svc-cart-items"></div>
+                <div class="svc-cart-covers" style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) 0">
+                  <label for="svc-order-covers" style="font-size:var(--text-sm);color:var(--text-secondary);flex:1">👥 Couverts</label>
+                  <input type="number" class="form-control" id="svc-order-covers" min="0" max="999" step="1" placeholder="—" style="max-width:100px;text-align:center" data-ui="custom">
+                </div>
                 <div class="svc-cart-notes">
                   <textarea class="form-control svc-notes-input" id="svc-order-notes" rows="2" placeholder="Notes (allergies, demandes spéciales...)" data-ui="custom"></textarea>
                 </div>
@@ -308,6 +313,10 @@ function _svcShowRecap(recap) {
             <div style="font-size:var(--text-sm);color:var(--text-secondary)">Commandes</div>
           </div>
           <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);text-align:center">
+            <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recap.total_covers || 0}</div>
+            <div style="font-size:var(--text-sm);color:var(--text-secondary)">Couverts</div>
+          </div>
+          <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);text-align:center">
             <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recap.total_items || 0}</div>
             <div style="font-size:var(--text-sm);color:var(--text-secondary)">Plats servis</div>
           </div>
@@ -315,14 +324,18 @@ function _svcShowRecap(recap) {
             <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${formatCurrency(recap.total_revenue || 0)}</div>
             <div style="font-size:var(--text-sm);color:var(--text-secondary)">Chiffre d'affaires</div>
           </div>
-          <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);text-align:center">
-            <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${duration}</div>
-            <div style="font-size:var(--text-sm);color:var(--text-secondary)">Durée</div>
-          </div>
         </div>
 
         <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-5)">
           <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)">Performance</h3>
+          <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--border-light)">
+            <span style="color:var(--text-secondary);font-size:var(--text-sm)">Durée du service</span>
+            <span style="font-weight:600">${duration}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--border-light)">
+            <span style="color:var(--text-secondary);font-size:var(--text-sm)">Ticket moyen</span>
+            <span style="font-weight:600">${recap.total_covers > 0 ? formatCurrency((recap.total_revenue || 0) / recap.total_covers) + ' / couvert' : '—'}</span>
+          </div>
           <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--border-light)">
             <span style="color:var(--text-secondary);font-size:var(--text-sm)">Temps moyen par commande</span>
             <span style="font-weight:600">${recap.avg_ticket_time_min || 0} min</span>
@@ -358,15 +371,19 @@ function _svcUpdateServiceMetrics() {
   if (el) el.textContent = _svcFormatDuration(elapsed);
 
   // Count orders
-  const totalOrders = _serviceState.allOrders.filter(o => o.status !== 'annulé').length;
+  const sessionOrders = _serviceState.allOrders.filter(o => o.status !== 'annulé');
+  const totalOrders = sessionOrders.length;
+  const totalCovers = sessionOrders.reduce((s, o) => s + (o.covers || 0), 0);
   const pending = _serviceState.allOrders.filter(o => ['envoyé', 'en_cours'].includes(o.status)).length;
   const completed = _serviceState.allOrders.filter(o => o.status === 'terminé');
 
   const ordersEl = document.getElementById('svc-m-orders');
+  const coversEl = document.getElementById('svc-m-covers');
   const pendingEl = document.getElementById('svc-m-pending');
   const avgEl = document.getElementById('svc-m-avg');
 
   if (ordersEl) ordersEl.textContent = totalOrders;
+  if (coversEl) coversEl.textContent = totalCovers;
   if (pendingEl) {
     pendingEl.textContent = pending;
     pendingEl.style.color = pending > 5 ? 'var(--color-danger)' : pending > 2 ? 'var(--color-warning)' : '';
@@ -631,6 +648,9 @@ function _svcSelectTable(tableNum) {
   const notesEl = document.getElementById('svc-order-notes');
   if (notesEl) notesEl.value = td.currentDraft?.notes || '';
 
+  const coversEl = document.getElementById('svc-order-covers');
+  if (coversEl) coversEl.value = (td.currentDraft?.covers != null) ? td.currentDraft.covers : '';
+
   _svcRenderCart();
   _svcRenderTableOrders();
 
@@ -750,6 +770,9 @@ async function _svcSaveOrder(sendImmediately) {
   if (draft.length === 0) { showToast('Ajoutez au moins un plat', 'error'); return; }
 
   const notes = document.getElementById('svc-order-notes')?.value?.trim() || null;
+  const coversRaw = document.getElementById('svc-order-covers')?.value;
+  const coversNum = (coversRaw !== undefined && coversRaw !== null && coversRaw !== '') ? parseInt(coversRaw, 10) : null;
+  const covers = (Number.isInteger(coversNum) && coversNum >= 0 && coversNum <= 999) ? coversNum : null;
   const td = _serviceState.tables[tn];
 
   try {
@@ -758,6 +781,7 @@ async function _svcSaveOrder(sendImmediately) {
     const order = await API.createOrder({
       table_number: tn,
       notes,
+      covers,
       items: draft.map(i => ({ recipe_id: i.recipe_id, quantity: i.quantity, notes: i.notes || null }))
     });
 
