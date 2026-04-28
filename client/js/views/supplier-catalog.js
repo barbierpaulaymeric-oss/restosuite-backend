@@ -16,7 +16,9 @@ function bootSupplierApp(session) {
     <div class="supplier-shell">
       <header class="supplier-header">
         <div class="supplier-header__left">
-          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto; margin-right: 8px;">
+          <button type="button" id="supplier-brand" class="supplier-brand-btn" aria-label="Tableau de bord" title="Tableau de bord" style="background:none;border:none;padding:0;margin-right:8px;cursor:pointer;display:flex;align-items:center">
+            <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto;">
+          </button>
           <div>
             <span class="supplier-header__title">Portail Fournisseur</span>
             <span class="supplier-header__name">${escapeHtml(session.supplier_name || session.name)}</span>
@@ -64,6 +66,17 @@ function bootSupplierApp(session) {
     document.body.classList.remove('supplier-mode');
     location.reload();
   });
+
+  // Logo click → land on supplier dashboard tab.
+  const brandBtn = document.getElementById('supplier-brand');
+  if (brandBtn) {
+    brandBtn.addEventListener('click', () => {
+      document.querySelectorAll('.supplier-nav__tab').forEach(t => t.classList.remove('active'));
+      const dashTab = document.querySelector('.supplier-nav__tab[data-tab="dashboard"]');
+      if (dashTab) dashTab.classList.add('active');
+      renderSupplierDashboardTab();
+    });
+  }
 
   // Tab navigation
   document.querySelectorAll('.supplier-nav__tab').forEach(tab => {

@@ -201,6 +201,7 @@ async function renderMessagesThread(supplierId) {
       // retrying so a transient blip self-heals without UI churn.
       const msg = String(e && e.message || '');
       const body = document.getElementById('msg-thread-body');
+      if (!body) return; // poller fired after the user navigated away
       if (msg === '401') {
         body.innerHTML = `
           <div class="empty-state" role="alert" style="padding:var(--space-5)">
@@ -213,6 +214,7 @@ async function renderMessagesThread(supplierId) {
       return;
     }
     const titleEl = document.getElementById('msg-thread-title');
+    if (!titleEl) return; // DOM gone — view was unmounted while the request was in flight
     titleEl.innerHTML = `
       <strong>${escapeHtml(data.supplier.name || '—')}</strong>
       ${data.supplier.contact_name ? `<span class="text-secondary text-sm">· ${escapeHtml(data.supplier.contact_name)}</span>` : ''}

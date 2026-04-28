@@ -97,8 +97,23 @@ function renderNavGuide() {
 async function renderDashboard() {
   const app = document.getElementById('app');
   const perms = getPermissions();
-  const account = getAccount();
-  const greeting = getGreeting(account ? account.name : 'Chef');
+  let account = getAccount();
+
+  // Stale-localStorage refresh: older login flows wrote partial account
+  // shapes that survived across logins (no `name`), so the greeting fell
+  // back to "Bonjour Chef" on return navigation. Pull the canonical shape
+  // from /auth/me when the cached copy is missing the name.
+  if (!account || !account.name) {
+    try {
+      const me = await API.getMe();
+      if (me && me.account) {
+        try { localStorage.setItem('restosuite_account', JSON.stringify(me.account)); } catch {}
+        account = me.account;
+      }
+    } catch (_) { /* /auth/me handles its own 401 cleanup */ }
+  }
+
+  const greeting = getGreeting(account && account.name ? account.name : 'Chef');
   const todayDate = formatFrenchDate(new Date());
 
   app.innerHTML = `

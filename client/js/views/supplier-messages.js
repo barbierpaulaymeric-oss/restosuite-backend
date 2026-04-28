@@ -166,11 +166,13 @@ async function _renderSupplierMessageThread(restaurantId, context) {
     try {
       data = await API.getSupplierMessageThread(restaurantId);
     } catch (e) {
-      document.getElementById('supplier-msg-body').innerHTML =
-        `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
+      const body = document.getElementById('supplier-msg-body');
+      if (!body) return; // poller fired after tab switch — drop silently
+      body.innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
       return;
     }
     const titleEl = document.getElementById('supplier-msg-title');
+    if (!titleEl) return; // view unmounted while request was in flight
     titleEl.innerHTML = `
       <strong>${escapeHtml(data.restaurant.name || '—')}</strong>
       ${data.restaurant.city ? `<span class="text-secondary text-sm">· ${escapeHtml(data.restaurant.city)}</span>` : ''}

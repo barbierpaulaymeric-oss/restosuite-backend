@@ -1417,8 +1417,21 @@ function renderNavGuide() {
 async function renderDashboard() {
   const app = document.getElementById("app");
   const perms = getPermissions();
-  const account = getAccount();
-  const greeting = getGreeting(account ? account.name : "Chef");
+  let account = getAccount();
+  if (!account || !account.name) {
+    try {
+      const me = await API.getMe();
+      if (me && me.account) {
+        try {
+          localStorage.setItem("restosuite_account", JSON.stringify(me.account));
+        } catch (e) {
+        }
+        account = me.account;
+      }
+    } catch (_) {
+    }
+  }
+  const greeting = getGreeting(account && account.name ? account.name : "Chef");
   const todayDate = formatFrenchDate(/* @__PURE__ */ new Date());
   app.innerHTML = `
     <header id="dashboard-greeting" role="banner" style="margin-bottom:var(--space-4)">
@@ -18902,7 +18915,9 @@ function bootSupplierApp(session) {
     <div class="supplier-shell">
       <header class="supplier-header">
         <div class="supplier-header__left">
-          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto; margin-right: 8px;">
+          <button type="button" id="supplier-brand" class="supplier-brand-btn" aria-label="Tableau de bord" title="Tableau de bord" style="background:none;border:none;padding:0;margin-right:8px;cursor:pointer;display:flex;align-items:center">
+            <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto;">
+          </button>
           <div>
             <span class="supplier-header__title">Portail Fournisseur</span>
             <span class="supplier-header__name">${escapeHtml(session.supplier_name || session.name)}</span>
@@ -18948,6 +18963,15 @@ function bootSupplierApp(session) {
     document.body.classList.remove("supplier-mode");
     location.reload();
   });
+  const brandBtn = document.getElementById("supplier-brand");
+  if (brandBtn) {
+    brandBtn.addEventListener("click", () => {
+      document.querySelectorAll(".supplier-nav__tab").forEach((t) => t.classList.remove("active"));
+      const dashTab = document.querySelector('.supplier-nav__tab[data-tab="dashboard"]');
+      if (dashTab) dashTab.classList.add("active");
+      renderSupplierDashboardTab();
+    });
+  }
   document.querySelectorAll(".supplier-nav__tab").forEach((tab) => {
     tab.addEventListener("click", () => {
       document.querySelectorAll(".supplier-nav__tab").forEach((t2) => t2.classList.remove("active"));
@@ -20969,10 +20993,13 @@ async function _renderSupplierMessageThread(restaurantId, context) {
     try {
       data = await API.getSupplierMessageThread(restaurantId);
     } catch (e) {
-      document.getElementById("supplier-msg-body").innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
+      const body = document.getElementById("supplier-msg-body");
+      if (!body) return;
+      body.innerHTML = `<p class="text-danger" style="padding:var(--space-4)">Erreur : ${escapeHtml(e.message)}</p>`;
       return;
     }
     const titleEl = document.getElementById("supplier-msg-title");
+    if (!titleEl) return;
     titleEl.innerHTML = `
       <strong>${escapeHtml(data.restaurant.name || "\u2014")}</strong>
       ${data.restaurant.city ? `<span class="text-secondary text-sm">\xB7 ${escapeHtml(data.restaurant.city)}</span>` : ""}
@@ -21073,14 +21100,15 @@ async function loadSupplierDeliveries() {
     const statusLabels = { pending: "En attente", received: "Re\xE7u", partial: "Partiel", rejected: "Refus\xE9" };
     list.innerHTML = notes.map((n) => `
       <div class="card supplier-delivery-card" data-id="${n.id}" style="padding:var(--space-4);margin-bottom:var(--space-3);border-left:4px solid ${statusColors[n.status] || "#666"};border-radius:var(--radius-lg);background:var(--bg-elevated);cursor:pointer">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-2)">
+          <div style="min-width:0;flex:1">
             <strong>Bon #${n.id}</strong>
             <span class="text-secondary text-sm" style="margin-left:var(--space-2)">
               ${n.delivery_date || new Date(n.created_at).toLocaleDateString("fr-FR")}
             </span>
+            ${n.restaurant_name ? `<div style="margin-top:2px;font-size:var(--text-sm);color:var(--text-primary);font-weight:500">\u{1F3EA} ${escapeHtml(n.restaurant_name)}</div>` : ""}
           </div>
-          <span class="badge" style="background:${statusColors[n.status]};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md)">
+          <span class="badge" style="background:${statusColors[n.status]};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md);flex-shrink:0">
             ${statusLabels[n.status] || n.status}
           </span>
         </div>
@@ -21814,6 +21842,7 @@ async function renderMessagesThread(supplierId) {
     } catch (e) {
       const msg = String(e && e.message || "");
       const body = document.getElementById("msg-thread-body");
+      if (!body) return;
       if (msg === "401") {
         body.innerHTML = `
           <div class="empty-state" role="alert" style="padding:var(--space-5)">
@@ -21826,6 +21855,7 @@ async function renderMessagesThread(supplierId) {
       return;
     }
     const titleEl = document.getElementById("msg-thread-title");
+    if (!titleEl) return;
     titleEl.innerHTML = `
       <strong>${escapeHtml(data.supplier.name || "\u2014")}</strong>
       ${data.supplier.contact_name ? `<span class="text-secondary text-sm">\xB7 ${escapeHtml(data.supplier.contact_name)}</span>` : ""}

@@ -660,8 +660,10 @@ router.get('/delivery-notes', requireSupplierAuth, (req, res) => {
   const rid = req.supplierAccount.restaurant_id;
   const notes = all(`
     SELECT dn.*,
+           r.name AS restaurant_name,
            (SELECT COUNT(*) FROM delivery_note_items WHERE delivery_note_id = dn.id AND restaurant_id = ?) as item_count
     FROM delivery_notes dn
+    LEFT JOIN restaurants r ON r.id = dn.restaurant_id
     WHERE dn.supplier_id = ? AND dn.restaurant_id = ?
     ORDER BY dn.created_at DESC
   `, [rid, supplierId, rid]);
