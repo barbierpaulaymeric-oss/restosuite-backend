@@ -97,7 +97,7 @@ function showReheatingModal() {
       <p class="text-secondary text-sm" style="margin-bottom:16px">Complétez quand +63°C est atteint.</p>
       <div class="form-group">
         <label>Produit *</label>
-        <input type="text" class="form-control" id="reheat-product" placeholder="ex: Bœuf bourguignon" autofocus>
+        <input type="text" class="form-control" id="reheat-product" placeholder="ex: Bœuf bourguignon" autofocus data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -106,12 +106,12 @@ function showReheatingModal() {
         </div>
         <div class="form-group">
           <label>T° initiale (°C) *</label>
-          <input type="number" step="0.1" class="form-control" id="reheat-temp" placeholder="ex: 4" inputmode="decimal">
+          <input type="number" step="0.1" class="form-control" id="reheat-temp" placeholder="ex: 4" inputmode="decimal" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="reheat-notes" placeholder="ex: Bain-marie">
+        <input type="text" class="form-control" id="reheat-notes" placeholder="ex: Bain-marie" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="reheat-cancel">Annuler</button>
@@ -161,7 +161,7 @@ function showReheatingUpdateModal(id, productName) {
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="reheat-u-notes">
+        <input type="text" class="form-control" id="reheat-u-notes" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="reheat-u-cancel">Annuler</button>

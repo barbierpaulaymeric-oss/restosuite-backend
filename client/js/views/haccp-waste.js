@@ -141,7 +141,7 @@ function showWasteModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Type de déchet *</label>
-          <select class="form-control" id="wst-type">
+          <select class="form-control" id="wst-type" data-ui="custom">
             <option value="alimentaire" ${(!record || record.waste_type === 'alimentaire') ? 'selected' : ''}>🍃 Alimentaire</option>
             <option value="emballage" ${record?.waste_type === 'emballage' ? 'selected' : ''}>📦 Emballage</option>
             <option value="huile" ${record?.waste_type === 'huile' ? 'selected' : ''}>🛢️ Huile</option>
@@ -151,7 +151,7 @@ function showWasteModal(record = null) {
         </div>
         <div class="form-group">
           <label>Fréquence de collecte</label>
-          <select class="form-control" id="wst-freq">
+          <select class="form-control" id="wst-freq" data-ui="custom">
             <option value="quotidienne" ${record?.collection_frequency === 'quotidienne' ? 'selected' : ''}>Quotidienne</option>
             <option value="hebdomadaire" ${(!record || record.collection_frequency === 'hebdomadaire') ? 'selected' : ''}>Hebdomadaire</option>
             <option value="bimestrielle" ${record?.collection_frequency === 'bimestrielle' ? 'selected' : ''}>Bimestrielle</option>
@@ -162,11 +162,11 @@ function showWasteModal(record = null) {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Prestataire</label>
-          <input type="text" class="form-control" id="wst-provider" value="${escapeHtml(record?.collection_provider || '')}" placeholder="ex: Veolia, Paprec Group" autofocus>
+          <input type="text" class="form-control" id="wst-provider" value="${escapeHtml(record?.collection_provider || '')}" placeholder="ex: Veolia, Paprec Group" autofocus data-ui="custom">
         </div>
         <div class="form-group">
           <label>Réf. contrat</label>
-          <input type="text" class="form-control" id="wst-contract" value="${escapeHtml(record?.contract_ref || '')}" placeholder="ex: VEO-2026-C088">
+          <input type="text" class="form-control" id="wst-contract" value="${escapeHtml(record?.contract_ref || '')}" placeholder="ex: VEO-2026-C088" data-ui="custom">
         </div>
       </div>
       <div class="form-row">
@@ -181,7 +181,7 @@ function showWasteModal(record = null) {
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <textarea class="form-control" id="wst-notes" rows="2" placeholder="ex: Bac vert 240L — déchets organiques">${escapeHtml(record?.notes || '')}</textarea>
+        <textarea class="form-control" id="wst-notes" rows="2" placeholder="ex: Bac vert 240L — déchets organiques" data-ui="custom">${escapeHtml(record?.notes || '')}</textarea>
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="wst-cancel">Annuler</button>

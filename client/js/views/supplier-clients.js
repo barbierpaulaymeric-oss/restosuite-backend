@@ -296,7 +296,7 @@ async function _loadSupplierClientOverrides(restaurantId) {
                          placeholder="—"
                          data-catalog-id="${r.id}"
                          data-original="${r.override_price != null ? r.override_price : ''}"
-                         style="width:100px;text-align:right;font-family:var(--font-mono)">
+                         style="width:100px;text-align:right;font-family:var(--font-mono)" data-ui="custom">
                 </td>
                 <td style="text-align:center">
                   ${r.override_price != null

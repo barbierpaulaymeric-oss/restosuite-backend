@@ -103,25 +103,25 @@ function showNCModal() {
       <h2><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Déclarer une non-conformité</h2>
       <div class="form-group">
         <label>Titre *</label>
-        <input type="text" class="form-control" id="nc-title" placeholder="ex: Température frigo hors norme" autofocus>
+        <input type="text" class="form-control" id="nc-title" placeholder="ex: Température frigo hors norme" autofocus data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Catégorie</label>
-          <select class="form-control" id="nc-category">
+          <select class="form-control" id="nc-category" data-ui="custom">
             ${Object.entries(NC_CATEGORIES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
           <label>Sévérité</label>
-          <select class="form-control" id="nc-severity">
+          <select class="form-control" id="nc-severity" data-ui="custom">
             ${Object.entries(NC_SEVERITIES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}
           </select>
         </div>
       </div>
       <div class="form-group">
         <label>Description</label>
-        <textarea class="form-control" id="nc-description" rows="3" placeholder="Décrivez la non-conformité..."></textarea>
+        <textarea class="form-control" id="nc-description" rows="3" placeholder="Décrivez la non-conformité..." data-ui="custom"></textarea>
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="nc-cancel">Annuler</button>
@@ -164,7 +164,7 @@ function showNCResolveModal(id, title) {
       <h2><i data-lucide="check-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Résoudre — ${escapeHtml(title)}</h2>
       <div class="form-group">
         <label>Action corrective *</label>
-        <textarea class="form-control" id="nc-corrective" rows="4" placeholder="Décrivez l'action corrective mise en place..." autofocus></textarea>
+        <textarea class="form-control" id="nc-corrective" rows="4" placeholder="Décrivez l'action corrective mise en place..." autofocus data-ui="custom"></textarea>
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="nc-r-cancel">Annuler</button>

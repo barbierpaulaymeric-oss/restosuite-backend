@@ -15,7 +15,7 @@ async function renderIngredients() {
     </div>
     <div class="search-bar">
       <span class="search-icon"><i data-lucide="search"></i></span>
-      <input type="text" id="ing-search" placeholder="Rechercher un ingrédient..." autocomplete="off">
+      <input type="text" id="ing-search" placeholder="Rechercher un ingrédient..." autocomplete="off" data-ui="custom">
     </div>
     <div id="ing-list"><div class="loading"><div class="spinner"></div></div></div>
   `;
@@ -92,12 +92,12 @@ function showIngredientModal(ingredient = null) {
       <h2>${isEdit ? 'Modifier l\'ingrédient' : 'Nouvel ingrédient'}</h2>
       <div class="form-group">
         <label>Nom</label>
-        <input type="text" class="form-control" id="m-ing-name" value="${escapeHtml(ingredient?.name || '')}">
+        <input type="text" class="form-control" id="m-ing-name" value="${escapeHtml(ingredient?.name || '')}" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Catégorie</label>
-          <select class="form-control" id="m-ing-cat">
+          <select class="form-control" id="m-ing-cat" data-ui="custom">
             <option value="">—</option>
             ${['viande','poisson','légume','féculent','produit laitier','épice','condiment','autre'].map(c =>
               `<option value="${c}" ${ingredient?.category === c ? 'selected' : ''}>${c}</option>`
@@ -106,7 +106,7 @@ function showIngredientModal(ingredient = null) {
         </div>
         <div class="form-group">
           <label>Unité par défaut</label>
-          <select class="form-control" id="m-ing-unit">
+          <select class="form-control" id="m-ing-unit" data-ui="custom">
             ${['g','kg','cl','l','pièce','botte'].map(u =>
               `<option value="${u}" ${ingredient?.default_unit === u ? 'selected' : ''}>${u}</option>`
             ).join('')}
@@ -116,7 +116,7 @@ function showIngredientModal(ingredient = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Perte (%)</label>
-          <input type="number" class="form-control" id="m-ing-waste" value="${ingredient?.waste_percent || 0}" min="0" max="100" step="0.5">
+          <input type="number" class="form-control" id="m-ing-waste" value="${ingredient?.waste_percent || 0}" min="0" max="100" step="0.5" data-ui="custom">
         </div>
         <div class="form-group" style="grid-column:1/-1">
           <label>Allergènes INCO</label>
@@ -129,11 +129,11 @@ function showIngredientModal(ingredient = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Prix unitaire (€)</label>
-          <input type="number" class="form-control" id="m-ing-price" value="${ingredient?.price_per_unit || ''}" min="0" step="0.1" placeholder="ex: 4.50€/kg">
+          <input type="number" class="form-control" id="m-ing-price" value="${ingredient?.price_per_unit || ''}" min="0" step="0.1" placeholder="ex: 4.50€/kg" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Unité de prix</label>
-          <select class="form-control" id="m-ing-price-unit">
+          <select class="form-control" id="m-ing-price-unit" data-ui="custom">
             ${['kg','l','pièce','botte'].map(u =>
               `<option value="${u}" ${(ingredient?.price_unit || 'kg') === u ? 'selected' : ''}>${u}</option>`
             ).join('')}
@@ -344,7 +344,7 @@ function getAllergenCheckboxes(currentValue) {
   return INCO_ALLERGENS.map(a => {
     const checked = current.includes(a.name.toLowerCase()) || current.includes(a.code) ? 'checked' : '';
     return `<label style="display:flex;align-items:center;gap:4px;font-size:var(--text-sm);cursor:pointer;padding:4px 6px;border-radius:6px;background:var(--bg-card);border:1px solid var(--border-color)">
-      <input type="checkbox" class="allergen-cb" value="${a.code}" data-name="${a.name}" ${checked} style="margin:0">
+      <input type="checkbox" class="allergen-cb" value="${a.code}" data-name="${a.name}" ${checked} style="margin:0" data-ui="custom">
       <span>${a.icon} ${a.name}</span>
     </label>`;
   }).join('');

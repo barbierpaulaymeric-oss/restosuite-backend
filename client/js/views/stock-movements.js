@@ -19,7 +19,7 @@ async function renderStockMovements() {
     </div>
 
     <div class="movements-filters" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5);flex-wrap:wrap">
-      <select id="mv-type-filter" class="input" style="min-width:140px">
+      <select id="mv-type-filter" class="input" style="min-width:140px" data-ui="custom">
         <option value="">Tous les types</option>
         <option value="reception">📥 Réception</option>
         <option value="consumption">📤 Consommation</option>

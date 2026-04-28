@@ -90,7 +90,7 @@ function showNewFryerModal() {
       <h2><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Ajouter une friteuse</h2>
       <div class="form-group">
         <label>Nom *</label>
-        <input type="text" class="form-control" id="fryer-name-input" placeholder="ex: Friteuse 1, Grande friteuse" autofocus>
+        <input type="text" class="form-control" id="fryer-name-input" placeholder="ex: Friteuse 1, Grande friteuse" autofocus data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="fryer-cancel">Annuler</button>
@@ -135,13 +135,13 @@ function showFryerCheckModal(fryerId, fryerName, actionType) {
         <label>Valeur (% composés polaires) *</label>
         <input type="number" step="0.1" min="0" max="100" class="form-control" id="fryer-polar-val"
                placeholder="ex: 18.5" inputmode="decimal" autofocus
-               style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)">
+               style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)" data-ui="custom">
         <p class="text-secondary text-sm">Seuil légal : 25%</p>
       </div>
       ` : ''}
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="fryer-check-notes" placeholder="Observations">
+        <input type="text" class="form-control" id="fryer-check-notes" placeholder="Observations" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="fryer-check-cancel">Annuler</button>

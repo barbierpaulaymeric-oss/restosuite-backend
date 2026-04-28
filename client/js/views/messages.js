@@ -154,7 +154,7 @@ async function renderMessagesThread(supplierId) {
       <footer class="msg-thread__composer">
         <textarea id="msg-thread-input" class="msg-thread__input"
                   placeholder="Écrivez votre message…"
-                  rows="2" maxlength="2000"></textarea>
+                  rows="2" maxlength="2000" data-ui="custom"></textarea>
         <button class="msg-thread__send" id="msg-thread-send" aria-label="Envoyer">
           <i data-lucide="send" style="width:18px;height:18px"></i>
         </button>

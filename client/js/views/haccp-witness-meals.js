@@ -258,7 +258,7 @@ function showWitnessMealModal(record = null) {
         </div>
         <div class="form-group">
           <label>Type de repas *</label>
-          <select class="form-control" id="wm-type">
+          <select class="form-control" id="wm-type" data-ui="custom">
             <option value="petit_dejeuner" ${record?.meal_type === 'petit_dejeuner' ? 'selected' : ''}>Petit-déjeuner</option>
             <option value="dejeuner"       ${(!record || record.meal_type === 'dejeuner') ? 'selected' : ''}>Déjeuner</option>
             <option value="diner"          ${record?.meal_type === 'diner' ? 'selected' : ''}>Dîner</option>
@@ -268,7 +268,7 @@ function showWitnessMealModal(record = null) {
         </div>
         <div class="form-group">
           <label>Mode de service</label>
-          <select class="form-control" id="wm-service">
+          <select class="form-control" id="wm-service" data-ui="custom">
             <option value="" ${!record?.service_type ? 'selected' : ''}>—</option>
             <option value="sur_place" ${record?.service_type === 'sur_place' ? 'selected' : ''}>Sur place</option>
             <option value="livraison" ${record?.service_type === 'livraison' ? 'selected' : ''}>Livraison</option>
@@ -281,15 +281,15 @@ function showWitnessMealModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>T° stockage (°C) *</label>
-          <input type="number" step="0.1" min="-2" max="10" class="form-control" id="wm-temp" value="${record?.storage_temperature ?? '2'}" placeholder="0 à 3 °C">
+          <input type="number" step="0.1" min="-2" max="10" class="form-control" id="wm-temp" value="${record?.storage_temperature ?? '2'}" placeholder="0 à 3 °C" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Emplacement frigo</label>
-          <input type="text" class="form-control" id="wm-loc" value="${escapeHtml(record?.storage_location || '')}" placeholder="ex: Chambre froide plats témoins">
+          <input type="text" class="form-control" id="wm-loc" value="${escapeHtml(record?.storage_location || '')}" placeholder="ex: Chambre froide plats témoins" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Opérateur</label>
-          <input type="text" class="form-control" id="wm-op" value="${escapeHtml(record?.operator || '')}" placeholder="Prénom NOM">
+          <input type="text" class="form-control" id="wm-op" value="${escapeHtml(record?.operator || '')}" placeholder="Prénom NOM" data-ui="custom">
         </div>
       </div>
 
@@ -303,7 +303,7 @@ function showWitnessMealModal(record = null) {
 
       <div class="form-group">
         <label>Notes</label>
-        <textarea class="form-control" id="wm-notes" rows="2" placeholder="ex: Buffet de midi, 180 couverts">${escapeHtml(record?.notes || '')}</textarea>
+        <textarea class="form-control" id="wm-notes" rows="2" placeholder="ex: Buffet de midi, 180 couverts" data-ui="custom">${escapeHtml(record?.notes || '')}</textarea>
       </div>
 
       ${isEdit ? `
@@ -314,7 +314,7 @@ function showWitnessMealModal(record = null) {
         </div>
         <div class="form-group">
           <label>Éliminé par</label>
-          <input type="text" class="form-control" id="wm-disposed-by" value="${escapeHtml(record?.disposed_by || '')}" placeholder="Prénom NOM">
+          <input type="text" class="form-control" id="wm-disposed-by" value="${escapeHtml(record?.disposed_by || '')}" placeholder="Prénom NOM" data-ui="custom">
         </div>
       </div>
       ` : ''}
@@ -340,9 +340,9 @@ function showWitnessMealModal(record = null) {
   function renderSamples() {
     samplesList.innerHTML = sampleState.map((s, i) => `
       <div class="form-row" style="margin-bottom:6px">
-        <input type="text" class="form-control" data-i="${i}" data-k="name"     placeholder="Nom du plat"   value="${escapeHtml(s.name || '')}" style="flex:2">
-        <input type="text" class="form-control" data-i="${i}" data-k="quantity" placeholder="Quantité (≥100g)" value="${escapeHtml(s.quantity || '')}" style="flex:1">
-        <input type="text" class="form-control" data-i="${i}" data-k="location" placeholder="Emplacement"    value="${escapeHtml(s.location || '')}" style="flex:1">
+        <input type="text" class="form-control" data-i="${i}" data-k="name"     placeholder="Nom du plat"   value="${escapeHtml(s.name || '')}" style="flex:2" data-ui="custom">
+        <input type="text" class="form-control" data-i="${i}" data-k="quantity" placeholder="Quantité (≥100g)" value="${escapeHtml(s.quantity || '')}" style="flex:1" data-ui="custom">
+        <input type="text" class="form-control" data-i="${i}" data-k="location" placeholder="Emplacement"    value="${escapeHtml(s.location || '')}" style="flex:1" data-ui="custom">
         <button type="button" class="btn btn-ghost btn-sm" data-rm="${i}" style="color:var(--color-danger)"><i data-lucide="x" style="width:14px;height:14px"></i></button>
       </div>
     `).join('');

@@ -152,7 +152,7 @@ async function renderDashboard() {
     <div class="search-bar" role="search">
       <label for="recipe-search" class="visually-hidden">Rechercher une fiche</label>
       <span class="search-icon" aria-hidden="true"><i data-lucide="search"></i></span>
-      <input type="search" id="recipe-search" placeholder="Rechercher une fiche..." autocomplete="off" aria-label="Rechercher une fiche">
+      <input type="search" id="recipe-search" placeholder="Rechercher une fiche..." autocomplete="off" aria-label="Rechercher une fiche" data-ui="custom">
     </div>
     <div class="recipe-type-filters" role="tablist" aria-label="Filtrer par type de fiche" style="display:flex;gap:8px;margin-bottom:16px;overflow-x:auto">
       <button class="haccp-subnav__link active" role="tab" aria-selected="true" data-type="">Tous</button>

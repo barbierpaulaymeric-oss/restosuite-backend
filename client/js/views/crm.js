@@ -60,7 +60,7 @@ function renderCrmCustomers(customers) {
   content.innerHTML = `
     <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-3);align-items:center">
       <label for="crm-search" class="visually-hidden">Rechercher un client</label>
-      <input type="search" class="input" id="crm-search" placeholder="Rechercher un client…" aria-label="Rechercher un client" style="flex:1" oninput="searchCrmCustomers()">
+      <input type="search" class="input" id="crm-search" placeholder="Rechercher un client…" aria-label="Rechercher un client" style="flex:1" oninput="searchCrmCustomers()" data-ui="custom">
       <button class="btn btn-primary btn-sm" onclick="showAddCustomer()" aria-label="Ajouter un nouveau client">
         <i data-lucide="user-plus" style="width:16px;height:16px" aria-hidden="true"></i> Ajouter
       </button>
@@ -127,16 +127,16 @@ function showAddCustomer() {
       <div class="modal-body">
         <div class="form-group">
           <label class="label">Nom *</label>
-          <input type="text" class="input" id="cust-name" placeholder="Nom complet">
+          <input type="text" class="input" id="cust-name" placeholder="Nom complet" data-ui="custom">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           <div class="form-group">
             <label class="label">Email</label>
-            <input type="email" class="input" id="cust-email" placeholder="email@exemple.com">
+            <input type="email" class="input" id="cust-email" placeholder="email@exemple.com" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="label">Téléphone</label>
-            <input type="tel" class="input" id="cust-phone" placeholder="06 12 34 56 78">
+            <input type="tel" class="input" id="cust-phone" placeholder="06 12 34 56 78" data-ui="custom">
           </div>
         </div>
         <div class="form-group">
@@ -145,7 +145,7 @@ function showAddCustomer() {
         </div>
         <div class="form-group">
           <label class="label">Notes</label>
-          <textarea class="input" id="cust-notes" rows="2" placeholder="Préférences, allergies, table préférée…"></textarea>
+          <textarea class="input" id="cust-notes" rows="2" placeholder="Préférences, allergies, table préférée…" data-ui="custom"></textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -365,20 +365,20 @@ function showAddReward() {
       <div class="modal-body">
         <div class="form-group">
           <label class="label">Nom *</label>
-          <input type="text" class="input" id="reward-name" placeholder="Ex: Dessert offert">
+          <input type="text" class="input" id="reward-name" placeholder="Ex: Dessert offert" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="label">Description</label>
-          <input type="text" class="input" id="reward-desc" placeholder="Détails de la récompense">
+          <input type="text" class="input" id="reward-desc" placeholder="Détails de la récompense" data-ui="custom">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           <div class="form-group">
             <label class="label">Points nécessaires *</label>
-            <input type="number" class="input" id="reward-points" value="100" min="1">
+            <input type="number" class="input" id="reward-points" value="100" min="1" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="label">Type</label>
-            <select class="input" id="reward-type">
+            <select class="input" id="reward-type" data-ui="custom">
               <option value="discount">Réduction</option>
               <option value="free_item">Produit offert</option>
               <option value="percentage">% de réduction</option>

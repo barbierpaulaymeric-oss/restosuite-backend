@@ -226,12 +226,12 @@ function _renderSupplierCatalogToolbar() {
         <input type="search" id="supplier-catalog-search" class="form-control"
                placeholder="Rechercher un produit, SKU…"
                value="${escapeHtml(_supplierCatalogState.search)}"
-               style="padding-left:34px">
+               style="padding-left:34px" data-ui="custom">
         <i data-lucide="search" style="width:16px;height:16px;position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-tertiary)" aria-hidden="true"></i>
       </div>
       <label class="supplier-catalog-sort">
         <span class="text-secondary text-sm">Trier&nbsp;:</span>
-        <select class="form-control" id="supplier-catalog-sort">
+        <select class="form-control" id="supplier-catalog-sort" data-ui="custom">
           <option value="category-asc"  ${_supplierCatalogState.sortKey === 'category' && _supplierCatalogState.sortDir === 'asc'  ? 'selected' : ''}>Catégorie A→Z</option>
           <option value="name-asc"      ${_supplierCatalogState.sortKey === 'name'     && _supplierCatalogState.sortDir === 'asc'  ? 'selected' : ''}>Nom A→Z</option>
           <option value="name-desc"     ${_supplierCatalogState.sortKey === 'name'     && _supplierCatalogState.sortDir === 'desc' ? 'selected' : ''}>Nom Z→A</option>
@@ -476,31 +476,31 @@ function showEditProductModal(product) {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Nom du produit</label>
-          <input type="text" class="form-control" id="me-name" value="${escapeHtml(product.product_name || '')}">
+          <input type="text" class="form-control" id="me-name" value="${escapeHtml(product.product_name || '')}" data-ui="custom">
         </div>
         <div class="form-group" style="flex:1">
           <label>SKU</label>
-          <input type="text" class="form-control" id="me-sku" value="${escapeHtml(product.sku || '')}" placeholder="ex: MET-LEG-042" maxlength="64">
+          <input type="text" class="form-control" id="me-sku" value="${escapeHtml(product.sku || '')}" placeholder="ex: MET-LEG-042" maxlength="64" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Catégorie</label>
-        <input type="text" class="form-control" id="me-category" value="${escapeHtml(product.category || '')}">
+        <input type="text" class="form-control" id="me-category" value="${escapeHtml(product.category || '')}" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Prix HT (€)</label>
-          <input type="number" class="form-control" id="me-price" step="0.01" min="0" value="${Number(product.price || 0).toFixed(2)}" style="font-family:var(--font-mono)">
+          <input type="number" class="form-control" id="me-price" step="0.01" min="0" value="${Number(product.price || 0).toFixed(2)}" style="font-family:var(--font-mono)" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Unité</label>
-          <select class="form-control" id="me-unit">
+          <select class="form-control" id="me-unit" data-ui="custom">
             ${UNIT_OPTS.map(u => `<option value="${escapeHtml(u)}" ${u === product.unit ? 'selected' : ''}>${escapeHtml(u)}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
           <label>TVA (%)</label>
-          <select class="form-control" id="me-tva">
+          <select class="form-control" id="me-tva" data-ui="custom">
             ${TVA_OPTS.sort((a, b) => a - b).map(t => `<option value="${t}" ${t === tvaCurrent ? 'selected' : ''}>${t} %</option>`).join('')}
           </select>
         </div>
@@ -508,11 +508,11 @@ function showEditProductModal(product) {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Conditionnement</label>
-          <input type="text" class="form-control" id="me-pkg" value="${escapeHtml(product.packaging || '')}" placeholder="ex: Carton 5 kg" maxlength="80">
+          <input type="text" class="form-control" id="me-pkg" value="${escapeHtml(product.packaging || '')}" placeholder="ex: Carton 5 kg" maxlength="80" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Commande min</label>
-          <input type="number" class="form-control" id="me-min" step="0.1" min="0" value="${Number(product.min_order || 0)}">
+          <input type="number" class="form-control" id="me-min" step="0.1" min="0" value="${Number(product.min_order || 0)}" data-ui="custom">
         </div>
       </div>
       <div class="actions-row">
@@ -696,26 +696,26 @@ function showAddProductModal() {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Nom du produit</label>
-          <input type="text" class="form-control" id="m-prod-name" placeholder="ex: Tomates bio">
+          <input type="text" class="form-control" id="m-prod-name" placeholder="ex: Tomates bio" data-ui="custom">
         </div>
         <div class="form-group" style="flex:1">
           <label>SKU (optionnel)</label>
-          <input type="text" class="form-control" id="m-prod-sku" placeholder="ex: MET-LEG-042" maxlength="64">
+          <input type="text" class="form-control" id="m-prod-sku" placeholder="ex: MET-LEG-042" maxlength="64" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Catégorie</label>
-        <input type="text" class="form-control" id="m-prod-category" placeholder="ex: Légumes, Viandes, Crèmerie...">
+        <input type="text" class="form-control" id="m-prod-category" placeholder="ex: Légumes, Viandes, Crèmerie..." data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Prix HT (€)</label>
           <input type="number" class="form-control" id="m-prod-price" step="0.01" min="0" placeholder="0.00"
-                 style="font-family:var(--font-mono)">
+                 style="font-family:var(--font-mono)" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Unité</label>
-          <select class="form-control" id="m-prod-unit">
+          <select class="form-control" id="m-prod-unit" data-ui="custom">
             <option value="kg">kg</option>
             <option value="L">L</option>
             <option value="pièce">pièce</option>
@@ -731,7 +731,7 @@ function showAddProductModal() {
         </div>
         <div class="form-group">
           <label>TVA (%)</label>
-          <select class="form-control" id="m-prod-tva">
+          <select class="form-control" id="m-prod-tva" data-ui="custom">
             <option value="5.5" selected>5,5 % (alimentaire)</option>
             <option value="10">10 % (restauration)</option>
             <option value="20">20 % (alcools, autres)</option>
@@ -741,11 +741,11 @@ function showAddProductModal() {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Conditionnement (optionnel)</label>
-          <input type="text" class="form-control" id="m-prod-pkg" placeholder="ex: Carton 5 kg, Lot de 6, Barquette 500g" maxlength="80">
+          <input type="text" class="form-control" id="m-prod-pkg" placeholder="ex: Carton 5 kg, Lot de 6, Barquette 500g" maxlength="80" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Commande min</label>
-          <input type="number" class="form-control" id="m-prod-min" step="0.1" min="0" value="0">
+          <input type="number" class="form-control" id="m-prod-min" step="0.1" min="0" value="0" data-ui="custom">
         </div>
       </div>
       <div class="actions-row">
@@ -852,7 +852,7 @@ async function renderSupplierHistoryTab() {
       </label>
       <label>
         <span class="text-secondary text-sm">Client</span>
-        <select id="historique-restaurant" class="form-control">
+        <select id="historique-restaurant" class="form-control" data-ui="custom">
           <option value="">Tous</option>
         </select>
       </label>
@@ -860,7 +860,7 @@ async function renderSupplierHistoryTab() {
         <span class="text-secondary text-sm">Référence</span>
         <input type="search" id="historique-q" class="form-control"
                placeholder="ex: DEMO-PO-005"
-               value="${escapeHtml(_historiqueState.q || '')}">
+               value="${escapeHtml(_historiqueState.q || '')}" data-ui="custom">
       </label>
       <div class="historique-totals" id="historique-totals"></div>
     </div>

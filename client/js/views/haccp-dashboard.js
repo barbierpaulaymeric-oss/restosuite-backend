@@ -196,11 +196,11 @@ function showTemperatureModal(zoneId, zoneName, minTemp, maxTemp) {
         <input type="number" step="0.1" class="form-control haccp-temp-input" id="modal-temp"
                placeholder="ex: 3.5" inputmode="decimal" autofocus required
                aria-required="true"
-               style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)">
+               style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)" data-ui="custom">
       </div>
       <div class="form-group">
         <label for="modal-notes">Notes (optionnel)</label>
-        <input type="text" class="form-control" id="modal-notes" placeholder="ex: porte restée ouverte">
+        <input type="text" class="form-control" id="modal-notes" placeholder="ex: porte restée ouverte" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="modal-cancel" aria-label="Annuler et fermer">Annuler</button>

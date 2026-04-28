@@ -44,7 +44,7 @@ async function renderStockDashboard() {
     </nav>
     <div class="search-bar" role="search" style="margin-bottom:var(--space-5)">
       <label for="stock-search" class="visually-hidden">Rechercher un ingrédient</label>
-      <input type="search" id="stock-search" placeholder="Rechercher un ingrédient..." class="input" aria-label="Rechercher un ingrédient" style="width:100%">
+      <input type="search" id="stock-search" placeholder="Rechercher un ingrédient..." class="input" aria-label="Rechercher un ingrédient" style="width:100%" data-ui="custom">
     </div>
     <div id="stock-alerts-section" role="region" aria-live="polite" aria-label="Alertes stock"></div>
     <div id="stock-content" role="region" aria-label="Liste du stock" aria-live="polite">
@@ -227,7 +227,7 @@ async function showInventoryModal() {
       <h2 id="inv-modal-title" style="margin-bottom:var(--space-4)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Inventaire</h2>
       <div class="form-group" style="margin-bottom:var(--space-4)">
         <label class="form-label" for="inv-ingredient">Ingrédient</label>
-        <select id="inv-ingredient" class="input" aria-required="true">
+        <select id="inv-ingredient" class="input" aria-required="true" data-ui="custom">
           <option value="">— Sélectionner —</option>
           ${ingredients.map(i => `<option value="${i.id}" data-unit="${escapeHtml(i.default_unit || 'kg')}">${escapeHtml(i.name)}</option>`).join('')}
         </select>
@@ -235,9 +235,9 @@ async function showInventoryModal() {
       <div class="form-group" style="margin-bottom:var(--space-4)">
         <label class="form-label" for="inv-qty">Quantité réelle</label>
         <div style="display:flex;gap:var(--space-2)">
-          <input type="number" id="inv-qty" class="input" step="0.01" min="0" placeholder="0" aria-required="true" style="flex:1">
+          <input type="number" id="inv-qty" class="input" step="0.01" min="0" placeholder="0" aria-required="true" style="flex:1" data-ui="custom">
           <label for="inv-unit" class="visually-hidden">Unité</label>
-          <input type="text" id="inv-unit" class="input" value="kg" style="width:80px" readonly aria-label="Unité">
+          <input type="text" id="inv-unit" class="input" value="kg" style="width:80px" readonly aria-label="Unité" data-ui="custom">
         </div>
       </div>
       <div style="display:flex;gap:var(--space-3);justify-content:flex-end">

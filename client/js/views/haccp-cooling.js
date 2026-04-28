@@ -103,7 +103,7 @@ function showCoolingModal() {
       <p class="text-secondary text-sm" style="margin-bottom:16px">Enregistrez le début. Complétez les temps de passage ultérieurement.</p>
       <div class="form-group">
         <label>Produit *</label>
-        <input type="text" class="form-control" id="cool-product" placeholder="ex: Blanquette de veau" autofocus>
+        <input type="text" class="form-control" id="cool-product" placeholder="ex: Blanquette de veau" autofocus data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -112,12 +112,12 @@ function showCoolingModal() {
         </div>
         <div class="form-group">
           <label>T° initiale (°C) *</label>
-          <input type="number" step="0.1" class="form-control" id="cool-temp" placeholder="ex: 85" inputmode="decimal">
+          <input type="number" step="0.1" class="form-control" id="cool-temp" placeholder="ex: 85" inputmode="decimal" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="cool-notes" placeholder="ex: Cellule de refroidissement n°1">
+        <input type="text" class="form-control" id="cool-notes" placeholder="ex: Cellule de refroidissement n°1" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="cool-cancel">Annuler</button>
@@ -171,7 +171,7 @@ function showCoolingUpdateModal(id, productName) {
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="cool-u-notes">
+        <input type="text" class="form-control" id="cool-u-notes" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="cool-u-cancel">Annuler</button>

@@ -195,7 +195,7 @@ function _svcRenderServiceUI(app, tableCount) {
                 <h3 class="svc-section-subtitle">Commande en cours</h3>
                 <div id="svc-cart-items"></div>
                 <div class="svc-cart-notes">
-                  <textarea class="form-control svc-notes-input" id="svc-order-notes" rows="2" placeholder="Notes (allergies, demandes spéciales...)"></textarea>
+                  <textarea class="form-control svc-notes-input" id="svc-order-notes" rows="2" placeholder="Notes (allergies, demandes spéciales...)" data-ui="custom"></textarea>
                 </div>
                 <div class="svc-cart-total" id="svc-cart-total">Total : 0,00 €</div>
                 <div class="svc-cart-actions">

@@ -190,7 +190,7 @@ async function showCookingModal(editId = null) {
 
       <div class="form-group">
         <label>Type de produit (préréglage T° cible)</label>
-        <select class="form-control" id="cook-preset">
+        <select class="form-control" id="cook-preset" data-ui="custom">
           <option value="">— Choisir un préréglage —</option>
           ${presetOptions}
         </select>
@@ -201,7 +201,7 @@ async function showCookingModal(editId = null) {
         <input type="text" class="form-control" id="cook-product"
                list="cook-product-list"
                placeholder="ex: Poulet rôti — tapez pour voir vos fiches" autofocus
-               value="${existingRecord ? escapeHtml(existingRecord.product_name) : ''}">
+               value="${existingRecord ? escapeHtml(existingRecord.product_name) : ''}" data-ui="custom">
         <datalist id="cook-product-list">${recipeOptions}</datalist>
       </div>
 
@@ -215,7 +215,7 @@ async function showCookingModal(editId = null) {
           <label>N° de lot</label>
           <input type="text" class="form-control" id="cook-batch"
                  placeholder="optionnel"
-                 value="${existingRecord && existingRecord.batch_number ? escapeHtml(existingRecord.batch_number) : ''}">
+                 value="${existingRecord && existingRecord.batch_number ? escapeHtml(existingRecord.batch_number) : ''}" data-ui="custom">
         </div>
       </div>
 
@@ -237,13 +237,13 @@ async function showCookingModal(editId = null) {
           <label>T° cible (°C) *</label>
           <input type="number" step="0.1" class="form-control" id="cook-target"
                  inputmode="decimal"
-                 value="${existingRecord ? existingRecord.target_temperature : '63'}">
+                 value="${existingRecord ? existingRecord.target_temperature : '63'}" data-ui="custom">
         </div>
         <div class="form-group">
           <label>T° mesurée à cœur (°C) *</label>
           <input type="number" step="0.1" class="form-control" id="cook-measured"
                  inputmode="decimal" placeholder="ex: 72.5"
-                 value="${existingRecord ? existingRecord.measured_temperature : ''}">
+                 value="${existingRecord ? existingRecord.measured_temperature : ''}" data-ui="custom">
         </div>
       </div>
 
@@ -251,7 +251,7 @@ async function showCookingModal(editId = null) {
 
       <div class="form-group" id="cook-corrective-group" style="display:none">
         <label>Action corrective *</label>
-        <select class="form-control" id="cook-corrective-select">
+        <select class="form-control" id="cook-corrective-select" data-ui="custom">
           <option value="">— Choisir —</option>
           <option value="Prolongation de la cuisson jusqu'à atteinte de la T° cible">Prolongation de la cuisson</option>
           <option value="Produit jeté (non-conformité critique)">Produit jeté</option>
@@ -264,13 +264,13 @@ async function showCookingModal(editId = null) {
         <label>Opérateur</label>
         <input type="text" class="form-control" id="cook-operator"
                placeholder="Qui a effectué la cuisson"
-               value="${existingRecord && existingRecord.operator ? escapeHtml(existingRecord.operator) : ''}">
+               value="${existingRecord && existingRecord.operator ? escapeHtml(existingRecord.operator) : ''}" data-ui="custom">
       </div>
 
       <div class="form-group">
         <label>Notes</label>
         <input type="text" class="form-control" id="cook-notes"
-               value="${existingRecord && existingRecord.notes ? escapeHtml(existingRecord.notes) : ''}">
+               value="${existingRecord && existingRecord.notes ? escapeHtml(existingRecord.notes) : ''}" data-ui="custom">
       </div>
 
       <div class="actions-row" style="justify-content:flex-end">

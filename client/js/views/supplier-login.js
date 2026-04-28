@@ -32,12 +32,12 @@ function renderSupplierLogin() {
             <div class="form-group">
               <label>Email</label>
               <input type="email" class="form-control" id="supplier-email"
-                     placeholder="contact@fournisseur.fr" autocomplete="email">
+                     placeholder="contact@fournisseur.fr" autocomplete="email" data-ui="custom">
             </div>
             <div class="form-group">
               <label>Mot de passe</label>
               <input type="password" class="form-control" id="supplier-password"
-                     placeholder="••••••••" autocomplete="current-password">
+                     placeholder="••••••••" autocomplete="current-password" data-ui="custom">
             </div>
             <div id="supplier-login-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3);text-align:center"></div>
             <button class="btn btn-primary" id="supplier-login-btn" style="width:100%;padding:14px;font-size:var(--text-lg);background:#4A90D9;border-color:#4A90D9">

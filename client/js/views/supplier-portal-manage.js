@@ -206,7 +206,7 @@ async function showInviteSupplierModal() {
       </p>
       <div class="form-group">
         <label>Fournisseur</label>
-        <select class="form-control" id="m-invite-supplier">
+        <select class="form-control" id="m-invite-supplier" data-ui="custom">
           <option value="">— Choisir —</option>
           ${availableSuppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
         </select>
@@ -215,7 +215,7 @@ async function showInviteSupplierModal() {
         <label>Code PIN à communiquer</label>
         <input type="text" class="form-control" id="m-invite-pin" value="${randomPin}"
                style="font-family:var(--font-mono);font-size:var(--text-xl);text-align:center;letter-spacing:0.3em"
-               maxlength="6" inputmode="numeric">
+               maxlength="6" inputmode="numeric" data-ui="custom">
         <small class="text-secondary">Communiquez ce code au fournisseur par téléphone ou email</small>
       </div>
       <div class="actions-row">

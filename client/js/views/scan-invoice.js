@@ -137,7 +137,7 @@ function renderScanResults(data) {
       <td style="padding:8px 4px">${escapeHtml(item.product_name || '—')}</td>
       <td style="text-align:center;padding:8px 4px">
         <input type="number" value="${item.quantity || ''}" data-idx="${i}" data-field="quantity" 
-               style="width:60px;text-align:center;background:var(--color-bg);border:1px solid var(--color-border);border-radius:4px;padding:4px;color:inherit">
+               style="width:60px;text-align:center;background:var(--color-bg);border:1px solid var(--color-border);border-radius:4px;padding:4px;color:inherit" data-ui="custom">
       </td>
       <td style="padding:8px 4px">${escapeHtml(item.unit || '—')}</td>
       <td style="text-align:right;padding:8px 4px">${item.unit_price != null ? item.unit_price.toFixed(2) + '€' : '—'}</td>

@@ -52,7 +52,19 @@
     if (sel.disabled) trigger.disabled = true;
     if (sel.id) {
       const lbl = document.querySelector(`label[for="${sel.id}"]`);
-      if (lbl) trigger.setAttribute('aria-labelledby', lbl.id || (lbl.id = uid('ui-lbl')));
+      if (lbl) {
+        trigger.setAttribute('aria-labelledby', lbl.id || (lbl.id = uid('ui-lbl')));
+        // Native labels focus the (now-hidden) <select>. Forward focus
+        // to the visible trigger button instead.
+        lbl.addEventListener('click', (e) => {
+          // Only intercept direct clicks on the label itself, not on
+          // anything else that might bubble up (rare for selects).
+          if (e.target === lbl) {
+            e.preventDefault();
+            trigger.focus();
+          }
+        });
+      }
     }
     if (sel.getAttribute('aria-label')) trigger.setAttribute('aria-label', sel.getAttribute('aria-label'));
     if (sel.required) trigger.setAttribute('aria-required', 'true');
@@ -440,6 +452,7 @@
   // Public API
   const UI = {
     enhance: (root) => enhance(root || document.body),
+    enhanceAll: () => enhance(document.body),
     select: enhanceSelect,
     numberInput: enhanceNumber,
     textInput: enhanceTextInput,

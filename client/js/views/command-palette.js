@@ -56,7 +56,7 @@ function openCommandPalette() {
           class="command-palette-input"
           placeholder="Rechercher une action..."
           autocomplete="off"
-        >
+         data-ui="custom">
       </div>
       <div class="command-palette-list" id="command-palette-list">
         ${renderCommandGroups(_commands)}

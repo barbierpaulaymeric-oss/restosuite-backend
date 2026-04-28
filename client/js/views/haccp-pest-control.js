@@ -153,11 +153,11 @@ function showPestControlModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Prestataire</label>
-          <input type="text" class="form-control" id="pc-provider" value="${escapeHtml(record?.provider_name || '')}" placeholder="ex: Anticimex Pro" autofocus>
+          <input type="text" class="form-control" id="pc-provider" value="${escapeHtml(record?.provider_name || '')}" placeholder="ex: Anticimex Pro" autofocus data-ui="custom">
         </div>
         <div class="form-group">
           <label>Réf. contrat</label>
-          <input type="text" class="form-control" id="pc-contract" value="${escapeHtml(record?.contract_ref || '')}" placeholder="ex: ANTI-2026-0042">
+          <input type="text" class="form-control" id="pc-contract" value="${escapeHtml(record?.contract_ref || '')}" placeholder="ex: ANTI-2026-0042" data-ui="custom">
         </div>
       </div>
       <div class="form-row">
@@ -172,20 +172,20 @@ function showPestControlModal(record = null) {
       </div>
       <div class="form-group">
         <label>Constats</label>
-        <textarea class="form-control" id="pc-findings" rows="2" placeholder="ex: RAS — aucune trace d'infestation">${escapeHtml(record?.findings || '')}</textarea>
+        <textarea class="form-control" id="pc-findings" rows="2" placeholder="ex: RAS — aucune trace d'infestation" data-ui="custom">${escapeHtml(record?.findings || '')}</textarea>
       </div>
       <div class="form-group">
         <label>Actions effectuées</label>
-        <textarea class="form-control" id="pc-actions" rows="2" placeholder="ex: Vérification et renouvellement des appâts">${escapeHtml(record?.actions_taken || '')}</textarea>
+        <textarea class="form-control" id="pc-actions" rows="2" placeholder="ex: Vérification et renouvellement des appâts" data-ui="custom">${escapeHtml(record?.actions_taken || '')}</textarea>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Nombre de stations d'appât</label>
-          <input type="number" min="0" class="form-control" id="pc-baits" value="${record?.bait_stations_count ?? ''}" placeholder="ex: 8">
+          <input type="number" min="0" class="form-control" id="pc-baits" value="${record?.bait_stations_count ?? ''}" placeholder="ex: 8" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Statut</label>
-          <select class="form-control" id="pc-status">
+          <select class="form-control" id="pc-status" data-ui="custom">
             <option value="conforme" ${(!record || record.status === 'conforme') ? 'selected' : ''}>Conforme</option>
             <option value="non-conforme" ${record?.status === 'non-conforme' ? 'selected' : ''}>Non conforme</option>
             <option value="action-requise" ${record?.status === 'action-requise' ? 'selected' : ''}>Action requise</option>
@@ -194,7 +194,7 @@ function showPestControlModal(record = null) {
       </div>
       <div class="form-group">
         <label>Référence rapport</label>
-        <input type="text" class="form-control" id="pc-report" value="${escapeHtml(record?.report_ref || '')}" placeholder="ex: RPT-2026-Q1">
+        <input type="text" class="form-control" id="pc-report" value="${escapeHtml(record?.report_ref || '')}" placeholder="ex: RPT-2026-Q1" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="pc-cancel">Annuler</button>

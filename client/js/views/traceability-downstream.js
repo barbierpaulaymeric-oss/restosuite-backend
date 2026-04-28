@@ -94,11 +94,11 @@ function tdModalHtml(item) {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
             <div class="form-group" style="grid-column:1/-1">
               <label class="form-label">Produit <span style="color:var(--color-danger)">*</span></label>
-              <input type="text" class="form-control" id="td-product-name" value="${escapeHtml(v.product_name || '')}" placeholder="Ex: Blanquette de veau" required>
+              <input type="text" class="form-control" id="td-product-name" value="${escapeHtml(v.product_name || '')}" placeholder="Ex: Blanquette de veau" required data-ui="custom">
             </div>
             <div class="form-group">
               <label class="form-label">N° de lot</label>
-              <input type="text" class="form-control" id="td-batch-number" value="${escapeHtml(v.batch_number || '')}" placeholder="Ex: BV-2026-04-13-001">
+              <input type="text" class="form-control" id="td-batch-number" value="${escapeHtml(v.batch_number || '')}" placeholder="Ex: BV-2026-04-13-001" data-ui="custom">
             </div>
             <div class="form-group">
               <label class="form-label">Date de fabrication</label>
@@ -106,7 +106,7 @@ function tdModalHtml(item) {
             </div>
             <div class="form-group">
               <label class="form-label">Type de destination</label>
-              <select class="form-control" id="td-destination-type">
+              <select class="form-control" id="td-destination-type" data-ui="custom">
                 <option value="">— Choisir —</option>
                 <option value="salle" ${v.destination_type === 'salle' ? 'selected' : ''}>Salle</option>
                 <option value="livraison" ${v.destination_type === 'livraison' ? 'selected' : ''}>Livraison</option>
@@ -116,15 +116,15 @@ function tdModalHtml(item) {
             </div>
             <div class="form-group">
               <label class="form-label">Nom de la destination</label>
-              <input type="text" class="form-control" id="td-destination-name" value="${escapeHtml(v.destination_name || '')}" placeholder="Ex: Salle principale">
+              <input type="text" class="form-control" id="td-destination-name" value="${escapeHtml(v.destination_name || '')}" placeholder="Ex: Salle principale" data-ui="custom">
             </div>
             <div class="form-group">
               <label class="form-label">Quantité</label>
-              <input type="number" class="form-control" id="td-quantity" value="${v.quantity != null ? v.quantity : ''}" step="0.1" min="0" placeholder="0.0">
+              <input type="number" class="form-control" id="td-quantity" value="${v.quantity != null ? v.quantity : ''}" step="0.1" min="0" placeholder="0.0" data-ui="custom">
             </div>
             <div class="form-group">
               <label class="form-label">Unité</label>
-              <select class="form-control" id="td-unit">
+              <select class="form-control" id="td-unit" data-ui="custom">
                 <option value="kg" ${(v.unit || 'kg') === 'kg' ? 'selected' : ''}>kg</option>
                 <option value="L" ${v.unit === 'L' ? 'selected' : ''}>L</option>
                 <option value="portion" ${v.unit === 'portion' ? 'selected' : ''}>portion(s)</option>
@@ -142,15 +142,15 @@ function tdModalHtml(item) {
             </div>
             <div class="form-group">
               <label class="form-label">Température au départ (°C)</label>
-              <input type="number" class="form-control" id="td-temperature" value="${v.temperature_at_dispatch != null ? v.temperature_at_dispatch : ''}" step="0.1" placeholder="Ex: 4.0">
+              <input type="number" class="form-control" id="td-temperature" value="${v.temperature_at_dispatch != null ? v.temperature_at_dispatch : ''}" step="0.1" placeholder="Ex: 4.0" data-ui="custom">
             </div>
             <div class="form-group">
               <label class="form-label">Responsable</label>
-              <input type="text" class="form-control" id="td-responsible" value="${escapeHtml(v.responsible_person || '')}" placeholder="Ex: Marie Dupont">
+              <input type="text" class="form-control" id="td-responsible" value="${escapeHtml(v.responsible_person || '')}" placeholder="Ex: Marie Dupont" data-ui="custom">
             </div>
             <div class="form-group" style="grid-column:1/-1">
               <label class="form-label">Notes</label>
-              <textarea class="form-control" id="td-notes" rows="3" placeholder="Observations, remarques...">${escapeHtml(v.notes || '')}</textarea>
+              <textarea class="form-control" id="td-notes" rows="3" placeholder="Observations, remarques..." data-ui="custom">${escapeHtml(v.notes || '')}</textarea>
             </div>
           </div>
         </div>
@@ -234,7 +234,7 @@ async function renderTraceabilityDownstream() {
             <strong style="font-size:0.9rem">Recherche par numéro de lot</strong>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
-            <input type="text" class="form-control" id="td-search-batch" placeholder="Ex: BV-2026-04-13-001" value="${escapeHtml(searchHighlightBatch || '')}" style="max-width:320px">
+            <input type="text" class="form-control" id="td-search-batch" placeholder="Ex: BV-2026-04-13-001" value="${escapeHtml(searchHighlightBatch || '')}" style="max-width:320px" data-ui="custom">
             <button class="btn btn-primary" id="td-search-btn">
               <i data-lucide="search" style="width:15px;height:15px"></i> Rechercher
             </button>
@@ -250,7 +250,7 @@ async function renderTraceabilityDownstream() {
         <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-4);align-items:flex-end">
           <div class="form-group" style="margin:0;min-width:180px">
             <label class="form-label" style="margin-bottom:4px">Destination</label>
-            <select class="form-control" id="td-filter-dest" style="font-size:0.85rem">
+            <select class="form-control" id="td-filter-dest" style="font-size:0.85rem" data-ui="custom">
               <option value="">Tous types</option>
               <option value="salle">Salle</option>
               <option value="livraison">Livraison</option>
@@ -260,7 +260,7 @@ async function renderTraceabilityDownstream() {
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label" style="margin-bottom:4px">Produit</label>
-            <input type="text" class="form-control" id="td-filter-product" placeholder="Nom du produit" style="font-size:0.85rem;max-width:220px">
+            <input type="text" class="form-control" id="td-filter-product" placeholder="Nom du produit" style="font-size:0.85rem;max-width:220px" data-ui="custom">
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label" style="margin-bottom:4px">Du</label>

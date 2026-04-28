@@ -148,11 +148,11 @@ function showMaintenanceModal(record = null) {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Nom de l'équipement *</label>
-          <input type="text" class="form-control" id="maint-name" value="${escapeHtml(record?.equipment_name || '')}" placeholder="ex: Chambre froide positive" autofocus>
+          <input type="text" class="form-control" id="maint-name" value="${escapeHtml(record?.equipment_name || '')}" placeholder="ex: Chambre froide positive" autofocus data-ui="custom">
         </div>
         <div class="form-group">
           <label>Type</label>
-          <select class="form-control" id="maint-type">
+          <select class="form-control" id="maint-type" data-ui="custom">
             <option value="froid" ${record?.equipment_type === 'froid' ? 'selected' : ''}>❄️ Froid</option>
             <option value="cuisson" ${record?.equipment_type === 'cuisson' ? 'selected' : ''}>🔥 Cuisson</option>
             <option value="ventilation" ${record?.equipment_type === 'ventilation' ? 'selected' : ''}>💨 Ventilation</option>
@@ -163,7 +163,7 @@ function showMaintenanceModal(record = null) {
       </div>
       <div class="form-group">
         <label>Emplacement</label>
-        <input type="text" class="form-control" id="maint-location" value="${escapeHtml(record?.location || '')}" placeholder="ex: Cuisine, Réserve, Salle...">
+        <input type="text" class="form-control" id="maint-location" value="${escapeHtml(record?.location || '')}" placeholder="ex: Cuisine, Réserve, Salle..." data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -178,14 +178,14 @@ function showMaintenanceModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Type de maintenance</label>
-          <select class="form-control" id="maint-mtype">
+          <select class="form-control" id="maint-mtype" data-ui="custom">
             <option value="préventive" ${(!record || record.maintenance_type === 'préventive') ? 'selected' : ''}>Préventive</option>
             <option value="corrective" ${record?.maintenance_type === 'corrective' ? 'selected' : ''}>Corrective</option>
           </select>
         </div>
         <div class="form-group">
           <label>Statut</label>
-          <select class="form-control" id="maint-status">
+          <select class="form-control" id="maint-status" data-ui="custom">
             <option value="à_jour" ${record?.status === 'à_jour' ? 'selected' : ''}>À jour</option>
             <option value="planifié" ${(!record || record.status === 'planifié') ? 'selected' : ''}>Planifié</option>
             <option value="en_retard" ${record?.status === 'en_retard' ? 'selected' : ''}>En retard</option>
@@ -195,16 +195,16 @@ function showMaintenanceModal(record = null) {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Prestataire</label>
-          <input type="text" class="form-control" id="maint-provider" value="${escapeHtml(record?.provider || '')}" placeholder="ex: FrigoTech SARL">
+          <input type="text" class="form-control" id="maint-provider" value="${escapeHtml(record?.provider || '')}" placeholder="ex: FrigoTech SARL" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Coût (€)</label>
-          <input type="number" min="0" step="0.01" class="form-control" id="maint-cost" value="${record?.cost ?? ''}" placeholder="ex: 280">
+          <input type="number" min="0" step="0.01" class="form-control" id="maint-cost" value="${record?.cost ?? ''}" placeholder="ex: 280" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="maint-notes" value="${escapeHtml(record?.notes || '')}" placeholder="">
+        <input type="text" class="form-control" id="maint-notes" value="${escapeHtml(record?.notes || '')}" placeholder="" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="maint-cancel">Annuler</button>

@@ -54,7 +54,7 @@ async function renderTeam(tab) {
         </div>
         <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-3)">Ce mot de passe est partagé avec votre staff pour accéder au restaurant. Chaque membre crée ensuite son propre PIN personnel.</p>
         <div style="display:flex;gap:var(--space-2);align-items:center">
-          <input type="password" class="form-control" id="staff-password-input" placeholder="Nouveau mot de passe" autocomplete="new-password" style="max-width:280px">
+          <input type="password" class="form-control" id="staff-password-input" placeholder="Nouveau mot de passe" autocomplete="new-password" style="max-width:280px" data-ui="custom">
           <button class="btn btn-ghost" id="staff-password-toggle" style="padding:8px" title="Afficher/masquer">
             <i data-lucide="eye" style="width:18px;height:18px" id="staff-password-eye"></i>
           </button>
@@ -415,17 +415,17 @@ function showAddMemberModal() {
       <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-4)">Le membre créera son propre code PIN lors de sa première connexion.</p>
       <div class="form-group">
         <label>Nom</label>
-        <input type="text" class="form-control" id="m-member-name" placeholder="Prénom ou surnom" autocomplete="off">
+        <input type="text" class="form-control" id="m-member-name" placeholder="Prénom ou surnom" autocomplete="off" data-ui="custom">
       </div>
       <div class="form-group">
         <label>Rôle</label>
         <div style="display:flex;gap:var(--space-2)">
-          <select class="form-control" id="m-member-role" style="flex:1">
+          <select class="form-control" id="m-member-role" style="flex:1" data-ui="custom">
             <option value="cuisinier">👨‍🍳 Cuisinier — cuisine + stock + HACCP</option>
             <option value="salle">🍽️ Salle — service + commandes</option>
             <option value="__custom__">✏️ Personnalisé…</option>
           </select>
-          <input type="text" class="form-control" id="m-member-custom-role" placeholder="Ex: Pâtissier" style="flex:1;display:none">
+          <input type="text" class="form-control" id="m-member-custom-role" placeholder="Ex: Pâtissier" style="flex:1;display:none" data-ui="custom">
         </div>
       </div>
       <div id="m-member-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
@@ -489,7 +489,7 @@ function showEditMemberModal(member) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
         <div class="form-group">
           <label>Nom</label>
-          <input type="text" class="form-control" id="m-edit-name" value="${escapeHtml(member.name)}" autocomplete="off">
+          <input type="text" class="form-control" id="m-edit-name" value="${escapeHtml(member.name)}" autocomplete="off" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Date d'embauche</label>
@@ -500,7 +500,7 @@ function showEditMemberModal(member) {
       <div class="form-group">
         <label>Rôle</label>
         <div style="display:flex;gap:var(--space-2)">
-          <select class="form-control" id="m-edit-role" style="flex:1">
+          <select class="form-control" id="m-edit-role" style="flex:1" data-ui="custom">
             <option value="cuisinier" ${member.role === 'cuisinier' ? 'selected' : ''}>👨‍🍳 Cuisinier</option>
             <option value="salle" ${member.role === 'salle' ? 'selected' : ''}>🍽️ Salle</option>
             <option value="serveur" ${member.role === 'serveur' ? 'selected' : ''}>🍽️ Serveur</option>
@@ -508,7 +508,7 @@ function showEditMemberModal(member) {
           </select>
           <input type="text" class="form-control" id="m-edit-custom-role" placeholder="Ex: Pâtissier"
                  value="${escapeHtml(isCustomRole ? member.role : '')}"
-                 style="flex:1;${isCustomRole ? '' : 'display:none'}">
+                 style="flex:1;${isCustomRole ? '' : 'display:none'}" data-ui="custom">
         </div>
       </div>
 
@@ -517,7 +517,7 @@ function showEditMemberModal(member) {
         <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
           ${TEAM_ZONES.map(z => `
             <label style="display:flex;align-items:center;gap:6px;font-size:var(--text-sm);cursor:pointer;background:var(--bg-secondary);padding:5px 10px;border-radius:var(--radius-md)">
-              <input type="checkbox" class="m-edit-zone" value="${escapeHtml(z)}" ${memberZones.includes(z) ? 'checked' : ''} style="width:14px;height:14px">
+              <input type="checkbox" class="m-edit-zone" value="${escapeHtml(z)}" ${memberZones.includes(z) ? 'checked' : ''} style="width:14px;height:14px" data-ui="custom">
               ${escapeHtml(z)}
             </label>
           `).join('')}
@@ -529,7 +529,7 @@ function showEditMemberModal(member) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           ${TEAM_SKILLS.map(s => `
             <label style="display:flex;align-items:center;gap:6px;font-size:var(--text-sm);cursor:pointer">
-              <input type="checkbox" class="m-edit-skill" value="${escapeHtml(s)}" ${memberSkills.includes(s) ? 'checked' : ''} style="width:14px;height:14px">
+              <input type="checkbox" class="m-edit-skill" value="${escapeHtml(s)}" ${memberSkills.includes(s) ? 'checked' : ''} style="width:14px;height:14px" data-ui="custom">
               ${escapeHtml(s)}
             </label>
           `).join('')}
@@ -538,7 +538,7 @@ function showEditMemberModal(member) {
 
       <div class="form-group">
         <label>Notes de formation <span style="color:var(--text-tertiary);font-weight:400">(certifications, formations suivies, à planifier…)</span></label>
-        <textarea class="form-control" id="m-edit-training" rows="3" placeholder="Ex: HACCP niveau 1 — 01/2026&#10;Formation sécurité alimentaire à planifier">${escapeHtml(member.training_notes || '')}</textarea>
+        <textarea class="form-control" id="m-edit-training" rows="3" placeholder="Ex: HACCP niveau 1 — 01/2026&#10;Formation sécurité alimentaire à planifier" data-ui="custom">${escapeHtml(member.training_notes || '')}</textarea>
       </div>
 
       <div id="m-edit-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
@@ -714,7 +714,7 @@ function showDeleteAccountModal() {
       <div class="form-group">
         <label style="font-weight:600">Tapez <span style="color:var(--color-danger);font-family:var(--font-mono)">SUPPRIMER</span> pour confirmer</label>
         <input type="text" class="form-control" id="m-delete-confirm" placeholder="SUPPRIMER" autocomplete="off"
-               style="font-family:var(--font-mono);text-align:center;font-size:var(--text-lg);letter-spacing:0.1em">
+               style="font-family:var(--font-mono);text-align:center;font-size:var(--text-lg);letter-spacing:0.1em" data-ui="custom">
       </div>
       <div id="m-delete-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
       <div class="actions-row">

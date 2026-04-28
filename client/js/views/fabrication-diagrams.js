@@ -127,18 +127,18 @@ function showDiagramModal(diagram) {
       <div class="form-row" style="align-items:center;margin-bottom:var(--space-2)">
         <span style="font-weight:600;min-width:28px;color:var(--text-tertiary)">${i + 1}.</span>
         <div class="form-group" style="flex:2;margin-bottom:0">
-          <input type="text" class="form-control etape-nom" placeholder="Nom de l'étape *" value="${escapeHtml(e.nom || '')}">
+          <input type="text" class="form-control etape-nom" placeholder="Nom de l'étape *" value="${escapeHtml(e.nom || '')}" data-ui="custom">
         </div>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;white-space:nowrap">
-          <input type="checkbox" class="etape-ccp" ${e.ccp ? 'checked' : ''}> CCP
+          <input type="checkbox" class="etape-ccp" ${e.ccp ? 'checked' : ''} data-ui="custom"> CCP
         </label>
         <button class="btn btn-ghost btn-sm btn-remove-etape" ${etapesList.length <= 1 ? 'disabled' : ''} style="padding:4px 8px;color:var(--color-danger)">✕</button>
       </div>
       <div class="form-group" style="margin-bottom:var(--space-2)">
-        <input type="text" class="form-control etape-desc" placeholder="Description de l'étape" value="${escapeHtml(e.description || '')}">
+        <input type="text" class="form-control etape-desc" placeholder="Description de l'étape" value="${escapeHtml(e.description || '')}" data-ui="custom">
       </div>
       <div class="form-group" style="margin-bottom:0">
-        <input type="text" class="form-control etape-pm" placeholder="Point de maîtrise / limite critique" value="${escapeHtml(e.point_maitrise || '')}">
+        <input type="text" class="form-control etape-pm" placeholder="Point de maîtrise / limite critique" value="${escapeHtml(e.point_maitrise || '')}" data-ui="custom">
       </div>
     </div>
   `).join('');
@@ -149,11 +149,11 @@ function showDiagramModal(diagram) {
 
       <div class="form-group">
         <label>Nom du diagramme *</label>
-        <input type="text" class="form-control" id="diag-nom" value="${isEdit ? escapeHtml(diagram.nom) : ''}" placeholder="ex: Service restaurant — liaison chaude">
+        <input type="text" class="form-control" id="diag-nom" value="${isEdit ? escapeHtml(diagram.nom) : ''}" placeholder="ex: Service restaurant — liaison chaude" data-ui="custom">
       </div>
       <div class="form-group">
         <label>Description</label>
-        <textarea class="form-control" id="diag-desc" rows="2" placeholder="Description du diagramme...">${isEdit ? escapeHtml(diagram.description || '') : ''}</textarea>
+        <textarea class="form-control" id="diag-desc" rows="2" placeholder="Description du diagramme..." data-ui="custom">${isEdit ? escapeHtml(diagram.description || '') : ''}</textarea>
       </div>
 
       <div style="margin-bottom:var(--space-3)">

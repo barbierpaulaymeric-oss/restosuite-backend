@@ -146,16 +146,16 @@ function showTrainingModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Employé *</label>
-          <input type="text" class="form-control" id="tr-employee" value="${escapeHtml(record?.employee_name || '')}" placeholder="ex: Marie Dupont" autofocus>
+          <input type="text" class="form-control" id="tr-employee" value="${escapeHtml(record?.employee_name || '')}" placeholder="ex: Marie Dupont" autofocus data-ui="custom">
         </div>
         <div class="form-group">
           <label>Formateur</label>
-          <input type="text" class="form-control" id="tr-trainer" value="${escapeHtml(record?.trainer || '')}" placeholder="ex: AFPA Formation">
+          <input type="text" class="form-control" id="tr-trainer" value="${escapeHtml(record?.trainer || '')}" placeholder="ex: AFPA Formation" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Sujet de formation *</label>
-        <input type="text" class="form-control" id="tr-topic" value="${escapeHtml(record?.training_topic || '')}" placeholder="ex: Hygiène alimentaire HACCP">
+        <input type="text" class="form-control" id="tr-topic" value="${escapeHtml(record?.training_topic || '')}" placeholder="ex: Hygiène alimentaire HACCP" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -170,11 +170,11 @@ function showTrainingModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Durée (heures)</label>
-          <input type="number" step="0.5" min="0" class="form-control" id="tr-duration" value="${record?.duration_hours || ''}" placeholder="ex: 14">
+          <input type="number" step="0.5" min="0" class="form-control" id="tr-duration" value="${record?.duration_hours || ''}" placeholder="ex: 14" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Statut</label>
-          <select class="form-control" id="tr-status">
+          <select class="form-control" id="tr-status" data-ui="custom">
             <option value="planifié" ${(!record || record.status === 'planifié') ? 'selected' : ''}>Planifié</option>
             <option value="réalisé" ${record?.status === 'réalisé' ? 'selected' : ''}>Réalisé</option>
             <option value="expiré" ${record?.status === 'expiré' ? 'selected' : ''}>Expiré</option>
@@ -183,11 +183,11 @@ function showTrainingModal(record = null) {
       </div>
       <div class="form-group">
         <label>Référence certificat</label>
-        <input type="text" class="form-control" id="tr-cert" value="${escapeHtml(record?.certificate_ref || '')}" placeholder="ex: HACCP-2026-001">
+        <input type="text" class="form-control" id="tr-cert" value="${escapeHtml(record?.certificate_ref || '')}" placeholder="ex: HACCP-2026-001" data-ui="custom">
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="tr-notes" value="${escapeHtml(record?.notes || '')}" placeholder="">
+        <input type="text" class="form-control" id="tr-notes" value="${escapeHtml(record?.notes || '')}" placeholder="" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="tr-cancel">Annuler</button>

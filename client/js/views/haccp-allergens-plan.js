@@ -140,14 +140,14 @@ function openAllergenPlanModal(id) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label class="form-label">Présent dans le menu</label>
-          <select name="presence_in_menu" class="form-control">
+          <select name="presence_in_menu" class="form-control" data-ui="custom">
             <option value="1" ${item.presence_in_menu ? 'selected' : ''}>Oui</option>
             <option value="0" ${!item.presence_in_menu ? 'selected' : ''}>Non</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Niveau de risque</label>
-          <select name="risk_level" class="form-control">
+          <select name="risk_level" class="form-control" data-ui="custom">
             <option value="élevé"  ${item.risk_level === 'élevé'  ? 'selected' : ''}>Élevé</option>
             <option value="moyen"  ${item.risk_level === 'moyen'  ? 'selected' : ''}>Moyen</option>
             <option value="faible" ${item.risk_level === 'faible' ? 'selected' : ''}>Faible</option>
@@ -156,20 +156,20 @@ function openAllergenPlanModal(id) {
       </div>
       <div class="form-group">
         <label class="form-label">Risque de contamination croisée</label>
-        <textarea name="cross_contamination_risk" class="form-control" rows="2">${escapeHtml(item.cross_contamination_risk || '')}</textarea>
+        <textarea name="cross_contamination_risk" class="form-control" rows="2" data-ui="custom">${escapeHtml(item.cross_contamination_risk || '')}</textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Mesures préventives</label>
-        <textarea name="preventive_measures" class="form-control" rows="3">${escapeHtml(item.preventive_measures || '')}</textarea>
+        <textarea name="preventive_measures" class="form-control" rows="3" data-ui="custom">${escapeHtml(item.preventive_measures || '')}</textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Procédure de nettoyage</label>
-        <textarea name="cleaning_procedure" class="form-control" rows="2">${escapeHtml(item.cleaning_procedure || '')}</textarea>
+        <textarea name="cleaning_procedure" class="form-control" rows="2" data-ui="custom">${escapeHtml(item.cleaning_procedure || '')}</textarea>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label class="form-label">Méthode d'affichage</label>
-          <input type="text" name="display_method" class="form-control" value="${escapeHtml(item.display_method || '')}" placeholder="Carte, ardoise, oral...">
+          <input type="text" name="display_method" class="form-control" value="${escapeHtml(item.display_method || '')}" placeholder="Carte, ardoise, oral..." data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label">Date de révision</label>
@@ -178,11 +178,11 @@ function openAllergenPlanModal(id) {
       </div>
       <div class="form-group">
         <label class="form-label">Référence formation</label>
-        <input type="text" name="staff_training_ref" class="form-control" value="${escapeHtml(item.staff_training_ref || '')}">
+        <input type="text" name="staff_training_ref" class="form-control" value="${escapeHtml(item.staff_training_ref || '')}" data-ui="custom">
       </div>
       <div class="form-group">
         <label class="form-label">Notes</label>
-        <textarea name="notes" class="form-control" rows="2">${escapeHtml(item.notes || '')}</textarea>
+        <textarea name="notes" class="form-control" rows="2" data-ui="custom">${escapeHtml(item.notes || '')}</textarea>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button type="button" class="btn btn-secondary" onclick="closeAllergenPlanModal()">Annuler</button>

@@ -259,7 +259,7 @@ async function renderNewOrder() {
       <div class="section-title" id="section-ingredients">Produits du fournisseur</div>
       <div id="ingredients-list" role="region" aria-labelledby="section-ingredients">
         <label for="ingredient-search" class="visually-hidden">Rechercher un produit</label>
-        <input type="search" class="form-control" id="ingredient-search" placeholder="Rechercher un produit..." style="margin-bottom:12px" aria-label="Rechercher un produit" disabled>
+        <input type="search" class="form-control" id="ingredient-search" placeholder="Rechercher un produit..." style="margin-bottom:12px" aria-label="Rechercher un produit" disabled data-ui="custom">
         <div id="ingredients-filtered" role="list" aria-label="Produits disponibles" aria-live="polite" style="max-height:300px;overflow-y:auto;border:1px solid var(--border-color);border-radius:4px">
           <p class="text-muted" style="padding:16px;text-align:center;margin:0">Sélectionnez un fournisseur pour voir les produits disponibles.</p>
         </div>
@@ -428,13 +428,13 @@ function updatePOItemsDisplay() {
             <tr style="border-bottom:1px solid var(--border-color)">
               <td style="padding:8px">${escapeHtml(item.name)}</td>
               <td style="padding:8px;text-align:right">
-                <input type="number" class="form-control" style="max-width:80px" value="${item.quantity}" min="1" onchange="updatePOItemQuantity(${idx}, this.value)">
+                <input type="number" class="form-control" style="max-width:80px" value="${item.quantity}" min="1" onchange="updatePOItemQuantity(${idx}, this.value)" data-ui="custom">
               </td>
               <td style="padding:8px;text-align:right">
-                <input type="text" class="form-control" style="max-width:80px" value="${escapeHtml(item.unit)}" onchange="updatePOItemUnit(${idx}, this.value)">
+                <input type="text" class="form-control" style="max-width:80px" value="${escapeHtml(item.unit)}" onchange="updatePOItemUnit(${idx}, this.value)" data-ui="custom">
               </td>
               <td style="padding:8px;text-align:right">
-                <input type="number" class="form-control" style="max-width:100px" step="0.01" value="${item.unit_price || ''}" placeholder="0.00" onchange="updatePOItemPrice(${idx}, this.value)">
+                <input type="number" class="form-control" style="max-width:100px" step="0.01" value="${item.unit_price || ''}" placeholder="0.00" onchange="updatePOItemPrice(${idx}, this.value)" data-ui="custom">
               </td>
               <td style="padding:8px;text-align:right;font-weight:600">${formatCurrency(lineTotal)}</td>
               <td style="padding:8px;text-align:center">

@@ -83,21 +83,21 @@ function showSupplierModal(supplier = null) {
       <h2>${isEdit ? 'Modifier le fournisseur' : 'Nouveau fournisseur'}</h2>
       <div class="form-group">
         <label>Nom</label>
-        <input type="text" class="form-control" id="m-sup-name" value="${escapeHtml(supplier?.name || '')}">
+        <input type="text" class="form-control" id="m-sup-name" value="${escapeHtml(supplier?.name || '')}" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Contact</label>
-          <input type="text" class="form-control" id="m-sup-contact" value="${escapeHtml(supplier?.contact || '')}">
+          <input type="text" class="form-control" id="m-sup-contact" value="${escapeHtml(supplier?.contact || '')}" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Téléphone</label>
-          <input type="tel" class="form-control" id="m-sup-phone" value="${escapeHtml(supplier?.phone || '')}">
+          <input type="tel" class="form-control" id="m-sup-phone" value="${escapeHtml(supplier?.phone || '')}" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Email</label>
-        <input type="email" class="form-control" id="m-sup-email" value="${escapeHtml(supplier?.email || '')}">
+        <input type="email" class="form-control" id="m-sup-email" value="${escapeHtml(supplier?.email || '')}" data-ui="custom">
       </div>
       <div class="form-group">
         <label>Qualité (1-5)</label>
@@ -108,7 +108,7 @@ function showSupplierModal(supplier = null) {
       </div>
       <div class="form-group">
         <label>Notes qualité</label>
-        <textarea class="form-control" id="m-sup-notes" rows="2">${escapeHtml(supplier?.quality_notes || '')}</textarea>
+        <textarea class="form-control" id="m-sup-notes" rows="2" data-ui="custom">${escapeHtml(supplier?.quality_notes || '')}</textarea>
       </div>
       <div class="actions-row">
         <button class="btn btn-primary" id="m-sup-save">

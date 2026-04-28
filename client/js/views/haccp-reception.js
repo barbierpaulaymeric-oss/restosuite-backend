@@ -47,14 +47,14 @@ async function renderHACCPReception() {
         <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-4)">
           <div class="form-group">
             <label class="form-label" for="rec-supplier">Fournisseur</label>
-            <select id="rec-supplier" class="input" aria-required="true">
+            <select id="rec-supplier" class="input" aria-required="true" data-ui="custom">
               <option value="">— Sélectionner —</option>
               ${suppliers.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">
             <label class="form-label" for="rec-bl">N° bon de livraison</label>
-            <input type="text" id="rec-bl" class="input" placeholder="BL-2024-001" autocomplete="off">
+            <input type="text" id="rec-bl" class="input" placeholder="BL-2024-001" autocomplete="off" data-ui="custom">
           </div>
         </div>
 
@@ -70,7 +70,7 @@ async function renderHACCPReception() {
 
         <div class="form-group" style="margin-bottom:var(--space-4)">
           <label class="form-label" for="rec-notes">Observations générales</label>
-          <textarea id="rec-notes" class="input" rows="3" placeholder="Emballages intacts, températures conformes…" style="resize:vertical"></textarea>
+          <textarea id="rec-notes" class="input" rows="3" placeholder="Emballages intacts, températures conformes…" style="resize:vertical" data-ui="custom"></textarea>
         </div>
 
         <button type="button" class="btn btn-accent btn-lg" id="btn-submit-reception" style="width:100%" disabled>
@@ -104,15 +104,15 @@ async function renderHACCPReception() {
       <div style="display:grid;grid-template-columns:2fr 1fr 80px 100px;gap:var(--space-2);margin-bottom:var(--space-2)">
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-name-${id}" style="font-size:11px">Désignation *</label>
-          <input type="text" id="prod-name-${id}" class="input prod-name" placeholder="Ex: Escalope de poulet" required autocomplete="off" style="font-size:var(--text-sm)">
+          <input type="text" id="prod-name-${id}" class="input prod-name" placeholder="Ex: Escalope de poulet" required autocomplete="off" style="font-size:var(--text-sm)" data-ui="custom">
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-qty-${id}" style="font-size:11px">Quantité</label>
-          <input type="number" id="prod-qty-${id}" class="input prod-qty" placeholder="5" min="0" step="any" style="font-size:var(--text-sm)">
+          <input type="number" id="prod-qty-${id}" class="input prod-qty" placeholder="5" min="0" step="any" style="font-size:var(--text-sm)" data-ui="custom">
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-unit-${id}" style="font-size:11px">Unité</label>
-          <select id="prod-unit-${id}" class="input prod-unit" style="font-size:var(--text-sm)">
+          <select id="prod-unit-${id}" class="input prod-unit" style="font-size:var(--text-sm)" data-ui="custom">
             <option value="kg">kg</option>
             <option value="g">g</option>
             <option value="l">L</option>
@@ -123,19 +123,19 @@ async function renderHACCPReception() {
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-temp-${id}" style="font-size:11px">Temp. (°C) *</label>
-          <input type="number" id="prod-temp-${id}" class="input prod-temp" placeholder="4" step="0.1" style="font-size:var(--text-sm)">
+          <input type="number" id="prod-temp-${id}" class="input prod-temp" placeholder="4" step="0.1" style="font-size:var(--text-sm)" data-ui="custom">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-2)">
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-cat-${id}" style="font-size:11px">Catégorie</label>
-          <select id="prod-cat-${id}" class="input prod-cat" style="font-size:var(--text-sm)">
+          <select id="prod-cat-${id}" class="input prod-cat" style="font-size:var(--text-sm)" data-ui="custom">
             ${CATEGORIES.map(c => `<option value="${c.value}">${escapeHtml(c.label)}</option>`).join('')}
           </select>
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-lot-${id}" style="font-size:11px">N° lot</label>
-          <input type="text" id="prod-lot-${id}" class="input prod-lot" placeholder="LOT-240001" autocomplete="off" style="font-size:var(--text-sm)">
+          <input type="text" id="prod-lot-${id}" class="input prod-lot" placeholder="LOT-240001" autocomplete="off" style="font-size:var(--text-sm)" data-ui="custom">
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-dlc-${id}" style="font-size:11px">DLC / DDM</label>
@@ -144,7 +144,7 @@ async function renderHACCPReception() {
       </div>
       <div style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-2)">
         <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm)">
-          <input type="checkbox" id="prod-conform-${id}" class="prod-conform" checked style="width:18px;height:18px;cursor:pointer" aria-label="Produit conforme">
+          <input type="checkbox" id="prod-conform-${id}" class="prod-conform" checked style="width:18px;height:18px;cursor:pointer" aria-label="Produit conforme" data-ui="custom">
           <span>Conforme</span>
         </label>
         <span id="prod-temp-badge-${id}" class="badge" style="font-size:11px"></span>

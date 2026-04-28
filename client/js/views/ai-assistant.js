@@ -46,7 +46,7 @@ async function renderAIAssistant() {
           </button>
           <input type="text" id="ai-input" class="input" placeholder="Parlez à Alto ou écrivez votre demande…"
             aria-label="Message à Alto"
-            style="flex:1;font-size:var(--text-base)" autocomplete="off">
+            style="flex:1;font-size:var(--text-base)" autocomplete="off" data-ui="custom">
           <button type="submit" class="btn btn-primary" id="ai-send-btn" aria-label="Envoyer le message" style="padding:8px 16px">
             <i data-lucide="send" style="width:18px;height:18px" aria-hidden="true"></i>
           </button>

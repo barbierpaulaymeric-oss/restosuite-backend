@@ -137,7 +137,7 @@ async function _renderSupplierMessageThread(restaurantId, context) {
       <footer class="msg-thread__composer">
         <textarea id="supplier-msg-input" class="msg-thread__input"
                   placeholder="Écrivez votre message…"
-                  rows="2" maxlength="2000"></textarea>
+                  rows="2" maxlength="2000" data-ui="custom"></textarea>
         <button class="msg-thread__send" id="supplier-msg-send" aria-label="Envoyer">
           <i data-lucide="send" style="width:18px;height:18px"></i>
         </button>

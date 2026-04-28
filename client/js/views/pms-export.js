@@ -47,7 +47,7 @@ function renderPMSShell() {
         </div>
         <div class="pms-toolbar__right">
           <label class="pms-period-label" for="pms-period-select">Période :</label>
-          <select id="pms-period-select" class="pms-period-select">
+          <select id="pms-period-select" class="pms-period-select" data-ui="custom">
             ${periodOptions.map(o => `<option value="${o.value}"${o.value === _pmsPeriod ? ' selected' : ''}>${o.label}</option>`).join('')}
           </select>
           <button class="btn btn-secondary no-print" id="btn-pms-print">

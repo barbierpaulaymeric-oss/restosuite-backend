@@ -48,7 +48,7 @@ class AdminView {
       <div class="card" style="margin-bottom:2rem">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem">
           <h2 style="margin:0;font-size:1rem">Comptes clients</h2>
-          <input type="text" id="admin-search" placeholder="Rechercher…" class="input" style="max-width:220px;padding:.35rem .75rem;font-size:.875rem">
+          <input type="text" id="admin-search" placeholder="Rechercher…" class="input" style="max-width:220px;padding:.35rem .75rem;font-size:.875rem" data-ui="custom">
         </div>
         <div id="admin-users-table">
           <div class="loading-spinner" style="padding:2rem"></div>

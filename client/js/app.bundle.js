@@ -1350,7 +1350,15 @@ function trapFocus(container) {
     if (sel.disabled) trigger.disabled = true;
     if (sel.id) {
       const lbl = document.querySelector(`label[for="${sel.id}"]`);
-      if (lbl) trigger.setAttribute("aria-labelledby", lbl.id || (lbl.id = uid("ui-lbl")));
+      if (lbl) {
+        trigger.setAttribute("aria-labelledby", lbl.id || (lbl.id = uid("ui-lbl")));
+        lbl.addEventListener("click", (e) => {
+          if (e.target === lbl) {
+            e.preventDefault();
+            trigger.focus();
+          }
+        });
+      }
     }
     if (sel.getAttribute("aria-label")) trigger.setAttribute("aria-label", sel.getAttribute("aria-label"));
     if (sel.required) trigger.setAttribute("aria-required", "true");
@@ -1690,6 +1698,7 @@ function trapFocus(container) {
   }
   const UI = {
     enhance: (root) => enhance(root || document.body),
+    enhanceAll: () => enhance(document.body),
     select: enhanceSelect,
     numberInput: enhanceNumber,
     textInput: enhanceTextInput,
@@ -1862,7 +1871,7 @@ async function renderDashboard() {
     <div class="search-bar" role="search">
       <label for="recipe-search" class="visually-hidden">Rechercher une fiche</label>
       <span class="search-icon" aria-hidden="true"><i data-lucide="search"></i></span>
-      <input type="search" id="recipe-search" placeholder="Rechercher une fiche..." autocomplete="off" aria-label="Rechercher une fiche">
+      <input type="search" id="recipe-search" placeholder="Rechercher une fiche..." autocomplete="off" aria-label="Rechercher une fiche" data-ui="custom">
     </div>
     <div class="recipe-type-filters" role="tablist" aria-label="Filtrer par type de fiche" style="display:flex;gap:8px;margin-bottom:16px;overflow-x:auto">
       <button class="haccp-subnav__link active" role="tab" aria-selected="true" data-type="">Tous</button>
@@ -2795,11 +2804,11 @@ async function renderRecipeForm(editId) {
       <div class="form-row">
         <div class="form-group">
           <label for="f-name">Nom du plat</label>
-          <input type="text" class="form-control" id="f-name" value="${escapeHtml((recipe == null ? void 0 : recipe.name) || "")}" placeholder="Tartare de b\u0153uf..." required aria-required="true">
+          <input type="text" class="form-control" id="f-name" value="${escapeHtml((recipe == null ? void 0 : recipe.name) || "")}" placeholder="Tartare de b\u0153uf..." required aria-required="true" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="f-category">Cat\xE9gorie</label>
-          <select class="form-control" id="f-category">
+          <select class="form-control" id="f-category" data-ui="custom">
             <option value="">\u2014</option>
             ${["entr\xE9e", "plat", "dessert", "boisson", "amuse-bouche", "accompagnement", "sauce", "base"].map(
     (c) => `<option value="${c}" ${(recipe == null ? void 0 : recipe.category) === c ? "selected" : ""}>${c.charAt(0).toUpperCase() + c.slice(1)}</option>`
@@ -2811,7 +2820,7 @@ async function renderRecipeForm(editId) {
       <div class="form-row">
         <div class="form-group">
           <label for="f-recipe-type">Type de recette</label>
-          <select class="form-control" id="f-recipe-type" onchange="onRecipeTypeChange()">
+          <select class="form-control" id="f-recipe-type" onchange="onRecipeTypeChange()" data-ui="custom">
             <option value="plat" ${recipeType === "plat" ? "selected" : ""}>\u{1F37D}\uFE0F Plat final</option>
             <option value="sous_recette" ${recipeType === "sous_recette" ? "selected" : ""}>\u{1F4CB} Sous-recette</option>
             <option value="base" ${recipeType === "base" ? "selected" : ""}>\u{1FAD5} Base / Fond</option>
@@ -2819,22 +2828,22 @@ async function renderRecipeForm(editId) {
         </div>
         <div class="form-group" id="f-price-group" style="${recipeType === "plat" ? "" : "display:none"}">
           <label for="f-price">Prix de vente TTC (\u20AC)</label>
-          <input type="number" class="form-control" id="f-price" value="${(recipe == null ? void 0 : recipe.selling_price) || ""}" step="0.5" min="0" oninput="updateLiveMargin()">
+          <input type="number" class="form-control" id="f-price" value="${(recipe == null ? void 0 : recipe.selling_price) || ""}" step="0.5" min="0" oninput="updateLiveMargin()" data-ui="custom">
         </div>
       </div>
 
       <div class="form-row-3">
         <div class="form-group">
           <label for="f-portions">Portions</label>
-          <input type="number" class="form-control" id="f-portions" value="${(recipe == null ? void 0 : recipe.portions) || 1}" min="1">
+          <input type="number" class="form-control" id="f-portions" value="${(recipe == null ? void 0 : recipe.portions) || 1}" min="1" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="f-prep">Pr\xE9paration (min)</label>
-          <input type="number" class="form-control" id="f-prep" value="${(recipe == null ? void 0 : recipe.prep_time_min) || ""}" min="0">
+          <input type="number" class="form-control" id="f-prep" value="${(recipe == null ? void 0 : recipe.prep_time_min) || ""}" min="0" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="f-cooking">Cuisson (min)</label>
-          <input type="number" class="form-control" id="f-cooking" value="${(recipe == null ? void 0 : recipe.cooking_time_min) || ""}" min="0">
+          <input type="number" class="form-control" id="f-cooking" value="${(recipe == null ? void 0 : recipe.cooking_time_min) || ""}" min="0" data-ui="custom">
         </div>
       </div>
 
@@ -2843,13 +2852,13 @@ async function renderRecipeForm(editId) {
       <div role="group" aria-label="Ajouter un ingr\xE9dient" style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
         <div class="autocomplete-wrapper" style="flex:1;min-width:150px">
           <label for="add-ing-name" class="visually-hidden">Nom de l'ingr\xE9dient</label>
-          <input type="text" class="form-control" id="add-ing-name" placeholder="Nom de l'ingr\xE9dient" autocomplete="off" aria-label="Nom de l'ingr\xE9dient">
+          <input type="text" class="form-control" id="add-ing-name" placeholder="Nom de l'ingr\xE9dient" autocomplete="off" aria-label="Nom de l'ingr\xE9dient" data-ui="custom">
           <div class="autocomplete-list hidden" id="ing-autocomplete" role="listbox"></div>
         </div>
         <label for="add-ing-qty" class="visually-hidden">Quantit\xE9</label>
-        <input type="number" class="form-control" id="add-ing-qty" placeholder="Qt\xE9" style="width:80px" step="any" aria-label="Quantit\xE9">
+        <input type="number" class="form-control" id="add-ing-qty" placeholder="Qt\xE9" style="width:80px" step="any" aria-label="Quantit\xE9" data-ui="custom">
         <label for="add-ing-unit" class="visually-hidden">Unit\xE9</label>
-        <select class="form-control" id="add-ing-unit" style="width:80px" aria-label="Unit\xE9">
+        <select class="form-control" id="add-ing-unit" style="width:80px" aria-label="Unit\xE9" data-ui="custom">
           <option value="g">g</option>
           <option value="kg">kg</option>
           <option value="cl">cl</option>
@@ -2858,9 +2867,9 @@ async function renderRecipeForm(editId) {
           <option value="botte">botte</option>
         </select>
         <label for="add-ing-waste" class="visually-hidden">Pourcentage de perte</label>
-        <input type="number" class="form-control" id="add-ing-waste" placeholder="Perte%" style="width:80px" step="any" min="0" max="100" aria-label="Pourcentage de perte">
+        <input type="number" class="form-control" id="add-ing-waste" placeholder="Perte%" style="width:80px" step="any" min="0" max="100" aria-label="Pourcentage de perte" data-ui="custom">
         <label for="add-ing-notes" class="visually-hidden">Notes ingr\xE9dient</label>
-        <input type="text" class="form-control" id="add-ing-notes" placeholder="Notes" style="width:120px" aria-label="Notes ingr\xE9dient">
+        <input type="text" class="form-control" id="add-ing-notes" placeholder="Notes" style="width:120px" aria-label="Notes ingr\xE9dient" data-ui="custom">
         <button class="btn btn-primary btn-sm" onclick="addIngredientLine()" aria-label="Ajouter l'ingr\xE9dient"><i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i></button>
       </div>
 
@@ -2870,12 +2879,12 @@ async function renderRecipeForm(editId) {
       <div id="sub-recipe-list" role="list" aria-labelledby="sub-recipes-section"></div>
       <div role="group" aria-label="Ajouter une sous-recette" style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
         <label for="add-sub-recipe" class="visually-hidden">Sous-recette</label>
-        <select class="form-control" id="add-sub-recipe" style="flex:1;min-width:180px" aria-label="Sous-recette">
+        <select class="form-control" id="add-sub-recipe" style="flex:1;min-width:180px" aria-label="Sous-recette" data-ui="custom">
           <option value="">\u2014 Choisir une sous-recette \u2014</option>
           ${allRecipesForSub.map((r) => `<option value="${r.id}">${r.recipe_type === "base" ? "\u{1FAD5}" : "\u{1F4CB}"} ${escapeHtml(r.name)}</option>`).join("")}
         </select>
         <label for="add-sub-qty" class="visually-hidden">Portions de sous-recette</label>
-        <input type="number" class="form-control" id="add-sub-qty" placeholder="Portions" style="width:100px" step="any" min="0.1" value="1" aria-label="Portions de sous-recette">
+        <input type="number" class="form-control" id="add-sub-qty" placeholder="Portions" style="width:100px" step="any" min="0.1" value="1" aria-label="Portions de sous-recette" data-ui="custom">
         <button class="btn btn-primary btn-sm" onclick="addSubRecipeLine()" aria-label="Ajouter la sous-recette"><i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i></button>
       </div>
       ${allRecipesForSub.length === 0 ? `<p class="text-muted" style="font-size:var(--text-xs);margin-top:4px">Aucune sous-recette disponible. Cr\xE9ez d'abord des fiches de type "Sous-recette" ou "Base".</p>` : ""}
@@ -2884,7 +2893,7 @@ async function renderRecipeForm(editId) {
       <div id="steps-list" aria-labelledby="steps-section"></div>
       <div role="group" aria-label="Ajouter une \xE9tape" style="display:flex;gap:8px;margin-top:8px">
         <label for="add-step" class="visually-hidden">Nouvelle \xE9tape</label>
-        <input type="text" class="form-control" id="add-step" placeholder="Nouvelle \xE9tape..." style="flex:1" aria-label="Nouvelle \xE9tape">
+        <input type="text" class="form-control" id="add-step" placeholder="Nouvelle \xE9tape..." style="flex:1" aria-label="Nouvelle \xE9tape" data-ui="custom">
         <button class="btn btn-primary btn-sm" onclick="addStepLine()" aria-label="Ajouter l'\xE9tape"><i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i></button>
       </div>
 
@@ -2898,7 +2907,7 @@ async function renderRecipeForm(editId) {
 
       <div class="form-group">
         <label for="f-notes">Notes</label>
-        <textarea class="form-control" id="f-notes" rows="2">${escapeHtml((recipe == null ? void 0 : recipe.notes) || "")}</textarea>
+        <textarea class="form-control" id="f-notes" rows="2" data-ui="custom">${escapeHtml((recipe == null ? void 0 : recipe.notes) || "")}</textarea>
       </div>
 
       <div class="actions-row">
@@ -3413,7 +3422,7 @@ async function renderIngredients() {
     </div>
     <div class="search-bar">
       <span class="search-icon"><i data-lucide="search"></i></span>
-      <input type="text" id="ing-search" placeholder="Rechercher un ingr\xE9dient..." autocomplete="off">
+      <input type="text" id="ing-search" placeholder="Rechercher un ingr\xE9dient..." autocomplete="off" data-ui="custom">
     </div>
     <div id="ing-list"><div class="loading"><div class="spinner"></div></div></div>
   `;
@@ -3483,12 +3492,12 @@ function showIngredientModal(ingredient = null) {
       <h2>${isEdit ? "Modifier l'ingr\xE9dient" : "Nouvel ingr\xE9dient"}</h2>
       <div class="form-group">
         <label>Nom</label>
-        <input type="text" class="form-control" id="m-ing-name" value="${escapeHtml((ingredient == null ? void 0 : ingredient.name) || "")}">
+        <input type="text" class="form-control" id="m-ing-name" value="${escapeHtml((ingredient == null ? void 0 : ingredient.name) || "")}" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Cat\xE9gorie</label>
-          <select class="form-control" id="m-ing-cat">
+          <select class="form-control" id="m-ing-cat" data-ui="custom">
             <option value="">\u2014</option>
             ${["viande", "poisson", "l\xE9gume", "f\xE9culent", "produit laitier", "\xE9pice", "condiment", "autre"].map(
     (c) => `<option value="${c}" ${(ingredient == null ? void 0 : ingredient.category) === c ? "selected" : ""}>${c}</option>`
@@ -3497,7 +3506,7 @@ function showIngredientModal(ingredient = null) {
         </div>
         <div class="form-group">
           <label>Unit\xE9 par d\xE9faut</label>
-          <select class="form-control" id="m-ing-unit">
+          <select class="form-control" id="m-ing-unit" data-ui="custom">
             ${["g", "kg", "cl", "l", "pi\xE8ce", "botte"].map(
     (u) => `<option value="${u}" ${(ingredient == null ? void 0 : ingredient.default_unit) === u ? "selected" : ""}>${u}</option>`
   ).join("")}
@@ -3507,7 +3516,7 @@ function showIngredientModal(ingredient = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Perte (%)</label>
-          <input type="number" class="form-control" id="m-ing-waste" value="${(ingredient == null ? void 0 : ingredient.waste_percent) || 0}" min="0" max="100" step="0.5">
+          <input type="number" class="form-control" id="m-ing-waste" value="${(ingredient == null ? void 0 : ingredient.waste_percent) || 0}" min="0" max="100" step="0.5" data-ui="custom">
         </div>
         <div class="form-group" style="grid-column:1/-1">
           <label>Allerg\xE8nes INCO</label>
@@ -3520,11 +3529,11 @@ function showIngredientModal(ingredient = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Prix unitaire (\u20AC)</label>
-          <input type="number" class="form-control" id="m-ing-price" value="${(ingredient == null ? void 0 : ingredient.price_per_unit) || ""}" min="0" step="0.1" placeholder="ex: 4.50\u20AC/kg">
+          <input type="number" class="form-control" id="m-ing-price" value="${(ingredient == null ? void 0 : ingredient.price_per_unit) || ""}" min="0" step="0.1" placeholder="ex: 4.50\u20AC/kg" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Unit\xE9 de prix</label>
-          <select class="form-control" id="m-ing-price-unit">
+          <select class="form-control" id="m-ing-price-unit" data-ui="custom">
             ${["kg", "l", "pi\xE8ce", "botte"].map(
     (u) => `<option value="${u}" ${((ingredient == null ? void 0 : ingredient.price_unit) || "kg") === u ? "selected" : ""}>${u}</option>`
   ).join("")}
@@ -3726,7 +3735,7 @@ function getAllergenCheckboxes(currentValue) {
   return INCO_ALLERGENS.map((a) => {
     const checked = current.includes(a.name.toLowerCase()) || current.includes(a.code) ? "checked" : "";
     return `<label style="display:flex;align-items:center;gap:4px;font-size:var(--text-sm);cursor:pointer;padding:4px 6px;border-radius:6px;background:var(--bg-card);border:1px solid var(--border-color)">
-      <input type="checkbox" class="allergen-cb" value="${a.code}" data-name="${a.name}" ${checked} style="margin:0">
+      <input type="checkbox" class="allergen-cb" value="${a.code}" data-name="${a.name}" ${checked} style="margin:0" data-ui="custom">
       <span>${a.icon} ${a.name}</span>
     </label>`;
   }).join("");
@@ -3777,7 +3786,7 @@ async function renderStockDashboard() {
     </nav>
     <div class="search-bar" role="search" style="margin-bottom:var(--space-5)">
       <label for="stock-search" class="visually-hidden">Rechercher un ingr\xE9dient</label>
-      <input type="search" id="stock-search" placeholder="Rechercher un ingr\xE9dient..." class="input" aria-label="Rechercher un ingr\xE9dient" style="width:100%">
+      <input type="search" id="stock-search" placeholder="Rechercher un ingr\xE9dient..." class="input" aria-label="Rechercher un ingr\xE9dient" style="width:100%" data-ui="custom">
     </div>
     <div id="stock-alerts-section" role="region" aria-live="polite" aria-label="Alertes stock"></div>
     <div id="stock-content" role="region" aria-label="Liste du stock" aria-live="polite">
@@ -3946,7 +3955,7 @@ async function showInventoryModal() {
       <h2 id="inv-modal-title" style="margin-bottom:var(--space-4)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Inventaire</h2>
       <div class="form-group" style="margin-bottom:var(--space-4)">
         <label class="form-label" for="inv-ingredient">Ingr\xE9dient</label>
-        <select id="inv-ingredient" class="input" aria-required="true">
+        <select id="inv-ingredient" class="input" aria-required="true" data-ui="custom">
           <option value="">\u2014 S\xE9lectionner \u2014</option>
           ${ingredients.map((i) => `<option value="${i.id}" data-unit="${escapeHtml(i.default_unit || "kg")}">${escapeHtml(i.name)}</option>`).join("")}
         </select>
@@ -3954,9 +3963,9 @@ async function showInventoryModal() {
       <div class="form-group" style="margin-bottom:var(--space-4)">
         <label class="form-label" for="inv-qty">Quantit\xE9 r\xE9elle</label>
         <div style="display:flex;gap:var(--space-2)">
-          <input type="number" id="inv-qty" class="input" step="0.01" min="0" placeholder="0" aria-required="true" style="flex:1">
+          <input type="number" id="inv-qty" class="input" step="0.01" min="0" placeholder="0" aria-required="true" style="flex:1" data-ui="custom">
           <label for="inv-unit" class="visually-hidden">Unit\xE9</label>
-          <input type="text" id="inv-unit" class="input" value="kg" style="width:80px" readonly aria-label="Unit\xE9">
+          <input type="text" id="inv-unit" class="input" value="kg" style="width:80px" readonly aria-label="Unit\xE9" data-ui="custom">
         </div>
       </div>
       <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
@@ -4051,7 +4060,7 @@ async function renderStockReception() {
     <form class="reception-form" style="margin-bottom:var(--space-5)" onsubmit="return false;">
       <div class="form-group" style="margin-bottom:var(--space-4)">
         <label class="form-label" for="rec-supplier">Fournisseur</label>
-        <select id="rec-supplier" class="input" aria-label="S\xE9lectionner le fournisseur">
+        <select id="rec-supplier" class="input" aria-label="S\xE9lectionner le fournisseur" data-ui="custom">
           <option value="">\u2014 S\xE9lectionner un fournisseur \u2014</option>
           ${suppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("")}
         </select>
@@ -4086,7 +4095,7 @@ async function renderStockReception() {
       <div class="form-group" style="margin-bottom:var(--space-3)">
         <label class="form-label">Ingr\xE9dient *</label>
         <div style="position:relative">
-          <input type="text" class="input line-ingredient-search" placeholder="Rechercher un ingr\xE9dient..." autocomplete="off">
+          <input type="text" class="input line-ingredient-search" placeholder="Rechercher un ingr\xE9dient..." autocomplete="off" data-ui="custom">
           <input type="hidden" class="line-ingredient-id">
           <div class="autocomplete-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-md);max-height:200px;overflow-y:auto;z-index:10"></div>
         </div>
@@ -4094,21 +4103,21 @@ async function renderStockReception() {
       <div style="display:grid;grid-template-columns:1fr 80px;gap:var(--space-2);margin-bottom:var(--space-3)">
         <div class="form-group">
           <label class="form-label">Quantit\xE9 *</label>
-          <input type="number" class="input line-qty" step="0.01" min="0.01" placeholder="0">
+          <input type="number" class="input line-qty" step="0.01" min="0.01" placeholder="0" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label">Unit\xE9</label>
-          <input type="text" class="input line-unit" value="kg">
+          <input type="text" class="input line-unit" value="kg" data-ui="custom">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-3)">
         <div class="form-group">
           <label class="form-label">Prix unitaire (\u20AC)</label>
-          <input type="number" class="input line-price" step="0.01" min="0" placeholder="0.00">
+          <input type="number" class="input line-price" step="0.01" min="0" placeholder="0.00" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label">N\xB0 de lot</label>
-          <input type="text" class="input line-batch" placeholder="Optionnel">
+          <input type="text" class="input line-batch" placeholder="Optionnel" data-ui="custom">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-3)">
@@ -4118,12 +4127,12 @@ async function renderStockReception() {
         </div>
         <div class="form-group">
           <label class="form-label">T\xB0 r\xE9ception (\xB0C)</label>
-          <input type="number" class="input line-temp" step="0.1" placeholder="Ex: 3.5">
+          <input type="number" class="input line-temp" step="0.1" placeholder="Ex: 3.5" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">Notes</label>
-        <input type="text" class="input line-notes" placeholder="Remarques \xE9ventuelles">
+        <input type="text" class="input line-notes" placeholder="Remarques \xE9ventuelles" data-ui="custom">
       </div>
     `;
     linesContainer.appendChild(lineEl);
@@ -4242,7 +4251,7 @@ async function renderStockMovements() {
     </div>
 
     <div class="movements-filters" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5);flex-wrap:wrap">
-      <select id="mv-type-filter" class="input" style="min-width:140px">
+      <select id="mv-type-filter" class="input" style="min-width:140px" data-ui="custom">
         <option value="">Tous les types</option>
         <option value="reception">\u{1F4E5} R\xE9ception</option>
         <option value="consumption">\u{1F4E4} Consommation</option>
@@ -4568,21 +4577,21 @@ function showSupplierModal(supplier = null) {
       <h2>${isEdit ? "Modifier le fournisseur" : "Nouveau fournisseur"}</h2>
       <div class="form-group">
         <label>Nom</label>
-        <input type="text" class="form-control" id="m-sup-name" value="${escapeHtml((supplier == null ? void 0 : supplier.name) || "")}">
+        <input type="text" class="form-control" id="m-sup-name" value="${escapeHtml((supplier == null ? void 0 : supplier.name) || "")}" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Contact</label>
-          <input type="text" class="form-control" id="m-sup-contact" value="${escapeHtml((supplier == null ? void 0 : supplier.contact) || "")}">
+          <input type="text" class="form-control" id="m-sup-contact" value="${escapeHtml((supplier == null ? void 0 : supplier.contact) || "")}" data-ui="custom">
         </div>
         <div class="form-group">
           <label>T\xE9l\xE9phone</label>
-          <input type="tel" class="form-control" id="m-sup-phone" value="${escapeHtml((supplier == null ? void 0 : supplier.phone) || "")}">
+          <input type="tel" class="form-control" id="m-sup-phone" value="${escapeHtml((supplier == null ? void 0 : supplier.phone) || "")}" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Email</label>
-        <input type="email" class="form-control" id="m-sup-email" value="${escapeHtml((supplier == null ? void 0 : supplier.email) || "")}">
+        <input type="email" class="form-control" id="m-sup-email" value="${escapeHtml((supplier == null ? void 0 : supplier.email) || "")}" data-ui="custom">
       </div>
       <div class="form-group">
         <label>Qualit\xE9 (1-5)</label>
@@ -4593,7 +4602,7 @@ function showSupplierModal(supplier = null) {
       </div>
       <div class="form-group">
         <label>Notes qualit\xE9</label>
-        <textarea class="form-control" id="m-sup-notes" rows="2">${escapeHtml((supplier == null ? void 0 : supplier.quality_notes) || "")}</textarea>
+        <textarea class="form-control" id="m-sup-notes" rows="2" data-ui="custom">${escapeHtml((supplier == null ? void 0 : supplier.quality_notes) || "")}</textarea>
       </div>
       <div class="actions-row">
         <button class="btn btn-primary" id="m-sup-save">
@@ -4853,11 +4862,11 @@ function showTemperatureModal(zoneId, zoneName, minTemp, maxTemp) {
         <input type="number" step="0.1" class="form-control haccp-temp-input" id="modal-temp"
                placeholder="ex: 3.5" inputmode="decimal" autofocus required
                aria-required="true"
-               style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)">
+               style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)" data-ui="custom">
       </div>
       <div class="form-group">
         <label for="modal-notes">Notes (optionnel)</label>
-        <input type="text" class="form-control" id="modal-notes" placeholder="ex: porte rest\xE9e ouverte">
+        <input type="text" class="form-control" id="modal-notes" placeholder="ex: porte rest\xE9e ouverte" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="modal-cancel" aria-label="Annuler et fermer">Annuler</button>
@@ -5168,14 +5177,14 @@ async function renderHACCPReception() {
         <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-4)">
           <div class="form-group">
             <label class="form-label" for="rec-supplier">Fournisseur</label>
-            <select id="rec-supplier" class="input" aria-required="true">
+            <select id="rec-supplier" class="input" aria-required="true" data-ui="custom">
               <option value="">\u2014 S\xE9lectionner \u2014</option>
               ${suppliers.map((s) => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join("")}
             </select>
           </div>
           <div class="form-group">
             <label class="form-label" for="rec-bl">N\xB0 bon de livraison</label>
-            <input type="text" id="rec-bl" class="input" placeholder="BL-2024-001" autocomplete="off">
+            <input type="text" id="rec-bl" class="input" placeholder="BL-2024-001" autocomplete="off" data-ui="custom">
           </div>
         </div>
 
@@ -5191,7 +5200,7 @@ async function renderHACCPReception() {
 
         <div class="form-group" style="margin-bottom:var(--space-4)">
           <label class="form-label" for="rec-notes">Observations g\xE9n\xE9rales</label>
-          <textarea id="rec-notes" class="input" rows="3" placeholder="Emballages intacts, temp\xE9ratures conformes\u2026" style="resize:vertical"></textarea>
+          <textarea id="rec-notes" class="input" rows="3" placeholder="Emballages intacts, temp\xE9ratures conformes\u2026" style="resize:vertical" data-ui="custom"></textarea>
         </div>
 
         <button type="button" class="btn btn-accent btn-lg" id="btn-submit-reception" style="width:100%" disabled>
@@ -5222,15 +5231,15 @@ async function renderHACCPReception() {
       <div style="display:grid;grid-template-columns:2fr 1fr 80px 100px;gap:var(--space-2);margin-bottom:var(--space-2)">
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-name-${id}" style="font-size:11px">D\xE9signation *</label>
-          <input type="text" id="prod-name-${id}" class="input prod-name" placeholder="Ex: Escalope de poulet" required autocomplete="off" style="font-size:var(--text-sm)">
+          <input type="text" id="prod-name-${id}" class="input prod-name" placeholder="Ex: Escalope de poulet" required autocomplete="off" style="font-size:var(--text-sm)" data-ui="custom">
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-qty-${id}" style="font-size:11px">Quantit\xE9</label>
-          <input type="number" id="prod-qty-${id}" class="input prod-qty" placeholder="5" min="0" step="any" style="font-size:var(--text-sm)">
+          <input type="number" id="prod-qty-${id}" class="input prod-qty" placeholder="5" min="0" step="any" style="font-size:var(--text-sm)" data-ui="custom">
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-unit-${id}" style="font-size:11px">Unit\xE9</label>
-          <select id="prod-unit-${id}" class="input prod-unit" style="font-size:var(--text-sm)">
+          <select id="prod-unit-${id}" class="input prod-unit" style="font-size:var(--text-sm)" data-ui="custom">
             <option value="kg">kg</option>
             <option value="g">g</option>
             <option value="l">L</option>
@@ -5241,19 +5250,19 @@ async function renderHACCPReception() {
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-temp-${id}" style="font-size:11px">Temp. (\xB0C) *</label>
-          <input type="number" id="prod-temp-${id}" class="input prod-temp" placeholder="4" step="0.1" style="font-size:var(--text-sm)">
+          <input type="number" id="prod-temp-${id}" class="input prod-temp" placeholder="4" step="0.1" style="font-size:var(--text-sm)" data-ui="custom">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-2)">
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-cat-${id}" style="font-size:11px">Cat\xE9gorie</label>
-          <select id="prod-cat-${id}" class="input prod-cat" style="font-size:var(--text-sm)">
+          <select id="prod-cat-${id}" class="input prod-cat" style="font-size:var(--text-sm)" data-ui="custom">
             ${CATEGORIES.map((c) => `<option value="${c.value}">${escapeHtml(c.label)}</option>`).join("")}
           </select>
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-lot-${id}" style="font-size:11px">N\xB0 lot</label>
-          <input type="text" id="prod-lot-${id}" class="input prod-lot" placeholder="LOT-240001" autocomplete="off" style="font-size:var(--text-sm)">
+          <input type="text" id="prod-lot-${id}" class="input prod-lot" placeholder="LOT-240001" autocomplete="off" style="font-size:var(--text-sm)" data-ui="custom">
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" for="prod-dlc-${id}" style="font-size:11px">DLC / DDM</label>
@@ -5262,7 +5271,7 @@ async function renderHACCPReception() {
       </div>
       <div style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-2)">
         <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm)">
-          <input type="checkbox" id="prod-conform-${id}" class="prod-conform" checked style="width:18px;height:18px;cursor:pointer" aria-label="Produit conforme">
+          <input type="checkbox" id="prod-conform-${id}" class="prod-conform" checked style="width:18px;height:18px;cursor:pointer" aria-label="Produit conforme" data-ui="custom">
           <span>Conforme</span>
         </label>
         <span id="prod-temp-badge-${id}" class="badge" style="font-size:11px"></span>
@@ -5450,7 +5459,7 @@ async function renderHACCPTemperatures() {
                     <td>
                       <input type="number" class="input batch-temp-input" step="0.1"
                         placeholder="\u2014" style="max-width:110px;font-size:var(--text-sm)"
-                        aria-label="Temp\xE9rature pour ${escapeHtml(z.name)}">
+                        aria-label="Temp\xE9rature pour ${escapeHtml(z.name)}" data-ui="custom">
                     </td>
                     <td>
                       <span class="batch-conform-badge badge" style="font-size:11px">\u2014</span>
@@ -5713,7 +5722,7 @@ function showNewTempModal(zones) {
       </div>
       <div class="form-group">
         <label for="modal-notes">Notes (optionnel)</label>
-        <input type="text" class="form-control" id="modal-notes" placeholder="ex: porte rest\xE9e ouverte">
+        <input type="text" class="form-control" id="modal-notes" placeholder="ex: porte rest\xE9e ouverte" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="modal-cancel">Annuler</button>
@@ -5784,11 +5793,11 @@ function showZoneModal(data) {
       <h2 id="zone-modal-title">${isEdit ? '<i data-lucide="pencil" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Modifier la zone' : '<i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Nouvelle zone'}</h2>
       <div class="form-group">
         <label for="zone-name">Nom</label>
-        <input type="text" class="form-control" id="zone-name" value="${isEdit ? escapeHtml(data.name) : ""}" placeholder="ex: Frigo 3" required aria-required="true">
+        <input type="text" class="form-control" id="zone-name" value="${isEdit ? escapeHtml(data.name) : ""}" placeholder="ex: Frigo 3" required aria-required="true" data-ui="custom">
       </div>
       <div class="form-group">
         <label for="zone-type">Type</label>
-        <select class="form-control" id="zone-type">
+        <select class="form-control" id="zone-type" data-ui="custom">
           <option value="fridge" ${isEdit && data.type === "fridge" ? "selected" : ""}>Frigo</option>
           <option value="freezer" ${isEdit && data.type === "freezer" ? "selected" : ""}>Cong\xE9lateur</option>
           <option value="cold_room" ${isEdit && data.type === "cold_room" ? "selected" : ""}>Chambre froide</option>
@@ -5797,11 +5806,11 @@ function showZoneModal(data) {
       <div class="form-row">
         <div class="form-group">
           <label for="zone-min">Temp min (\xB0C)</label>
-          <input type="number" step="0.5" class="form-control" id="zone-min" value="${isEdit ? data.min : "0"}">
+          <input type="number" step="0.5" class="form-control" id="zone-min" value="${isEdit ? data.min : "0"}" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="zone-max">Temp max (\xB0C)</label>
-          <input type="number" step="0.5" class="form-control" id="zone-max" value="${isEdit ? data.max : "4"}">
+          <input type="number" step="0.5" class="form-control" id="zone-max" value="${isEdit ? data.max : "4"}" data-ui="custom">
         </div>
       </div>
       <div class="actions-row" style="justify-content:flex-end">
@@ -5892,7 +5901,7 @@ function showBatchTempModal(zones) {
                   <input type="number" step="0.1" class="form-control batch-temp-input"
                     placeholder="ex: 3.5" inputmode="decimal"
                     style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base);min-height:40px"
-                    aria-label="Temp\xE9rature pour ${escapeHtml(z.name)}">
+                    aria-label="Temp\xE9rature pour ${escapeHtml(z.name)}" data-ui="custom">
                 </td>
                 <td style="padding:var(--space-2) var(--space-3);text-align:center">
                   <span class="batch-conformite" aria-live="polite">\u2014</span>
@@ -5904,7 +5913,7 @@ function showBatchTempModal(zones) {
       </div>
       <div class="form-group" style="margin-top:var(--space-4)">
         <label for="batch-notes">Notes communes (optionnel)</label>
-        <input type="text" class="form-control" id="batch-notes" placeholder="ex: Relev\xE9 du matin">
+        <input type="text" class="form-control" id="batch-notes" placeholder="ex: Relev\xE9 du matin" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end;margin-top:var(--space-4)">
         <button class="btn btn-secondary" id="batch-cancel">Annuler</button>
@@ -6184,16 +6193,16 @@ function showThermometerModal() {
       <h2><i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouveau thermom\xE8tre</h2>
       <div class="form-group">
         <label>Nom *</label>
-        <input type="text" class="form-control" id="th-name" placeholder="ex: Sonde chambre froide A" autofocus>
+        <input type="text" class="form-control" id="th-name" placeholder="ex: Sonde chambre froide A" autofocus data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>N\xB0 de s\xE9rie</label>
-          <input type="text" class="form-control" id="th-serial" placeholder="SN-xxxx">
+          <input type="text" class="form-control" id="th-serial" placeholder="SN-xxxx" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Type</label>
-          <select class="form-control" id="th-type">
+          <select class="form-control" id="th-type" data-ui="custom">
             <option value="digital">Digital</option>
             <option value="analogique">Analogique</option>
             <option value="infrarouge">Infrarouge</option>
@@ -6203,7 +6212,7 @@ function showThermometerModal() {
       </div>
       <div class="form-group">
         <label>Emplacement</label>
-        <input type="text" class="form-control" id="th-location" placeholder="ex: Chambre froide positive">
+        <input type="text" class="form-control" id="th-location" placeholder="ex: Chambre froide positive" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -6269,7 +6278,7 @@ function showCalibrationModal(thermometers, preselected) {
       </p>
       <div class="form-group">
         <label>Thermom\xE8tre *</label>
-        <select class="form-control" id="cal-thermo">
+        <select class="form-control" id="cal-thermo" data-ui="custom">
           ${activeThermos.map((t) => `
             <option value="${t.id}" ${t.id === selectedId ? "selected" : ""}>
               ${escapeHtml(t.name)}${t.location ? " \u2014 " + escapeHtml(t.location) : ""}
@@ -6290,15 +6299,15 @@ function showCalibrationModal(thermometers, preselected) {
       <div class="form-row">
         <div class="form-group">
           <label>T\xB0 r\xE9f\xE9rence (\xB0C) *</label>
-          <input type="number" step="0.1" class="form-control" id="cal-ref" value="0" inputmode="decimal">
+          <input type="number" step="0.1" class="form-control" id="cal-ref" value="0" inputmode="decimal" data-ui="custom">
         </div>
         <div class="form-group">
           <label>T\xB0 mesur\xE9e (\xB0C) *</label>
-          <input type="number" step="0.1" class="form-control" id="cal-meas" placeholder="ex: 0.3" inputmode="decimal">
+          <input type="number" step="0.1" class="form-control" id="cal-meas" placeholder="ex: 0.3" inputmode="decimal" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Tol\xE9rance (\xB1\xB0C)</label>
-          <input type="number" step="0.1" min="0" class="form-control" id="cal-tol" value="0.5" inputmode="decimal">
+          <input type="number" step="0.1" min="0" class="form-control" id="cal-tol" value="0.5" inputmode="decimal" data-ui="custom">
         </div>
       </div>
       <div id="cal-preview" class="text-sm" style="padding:8px 12px;background:var(--surface-alt,#f5f5f5);border-radius:6px;margin-bottom:12px">
@@ -6306,21 +6315,21 @@ function showCalibrationModal(thermometers, preselected) {
       </div>
       <div class="form-group" id="cal-correction-wrap" style="display:none">
         <label>Action corrective *</label>
-        <textarea class="form-control" id="cal-correction" rows="2" placeholder="ex: Sonde retir\xE9e, envoy\xE9e en r\xE9paration"></textarea>
+        <textarea class="form-control" id="cal-correction" rows="2" placeholder="ex: Sonde retir\xE9e, envoy\xE9e en r\xE9paration" data-ui="custom"></textarea>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>\xC9talonn\xE9 par</label>
-          <input type="text" class="form-control" id="cal-by" value="${account ? escapeHtml(account.name || "") : ""}">
+          <input type="text" class="form-control" id="cal-by" value="${account ? escapeHtml(account.name || "") : ""}" data-ui="custom">
         </div>
         <div class="form-group">
           <label>R\xE9f. certificat</label>
-          <input type="text" class="form-control" id="cal-cert" placeholder="ex: COFRAC-2026-001">
+          <input type="text" class="form-control" id="cal-cert" placeholder="ex: COFRAC-2026-001" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="cal-notes">
+        <input type="text" class="form-control" id="cal-notes" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="cal-cancel">Annuler</button>
@@ -6563,16 +6572,16 @@ function showCleaningTaskModal(task) {
       <h2>${isEdit ? '<i data-lucide="pencil" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Modifier la t\xE2che' : '<i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouvelle t\xE2che'}</h2>
       <div class="form-group">
         <label>Nom de la t\xE2che</label>
-        <input type="text" class="form-control" id="task-name" value="${isEdit ? escapeHtml(task.name) : ""}" placeholder="ex: Nettoyage plan de travail">
+        <input type="text" class="form-control" id="task-name" value="${isEdit ? escapeHtml(task.name) : ""}" placeholder="ex: Nettoyage plan de travail" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Zone</label>
-          <input type="text" class="form-control" id="task-zone" value="${isEdit ? escapeHtml(task.zone) : ""}" placeholder="ex: Cuisine">
+          <input type="text" class="form-control" id="task-zone" value="${isEdit ? escapeHtml(task.zone) : ""}" placeholder="ex: Cuisine" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Fr\xE9quence</label>
-          <select class="form-control" id="task-frequency">
+          <select class="form-control" id="task-frequency" data-ui="custom">
             <option value="daily" ${isEdit && task.frequency === "daily" ? "selected" : ""}>Quotidien</option>
             <option value="weekly" ${isEdit && task.frequency === "weekly" ? "selected" : ""}>Hebdomadaire</option>
             <option value="monthly" ${isEdit && task.frequency === "monthly" ? "selected" : ""}>Mensuel</option>
@@ -6582,34 +6591,34 @@ function showCleaningTaskModal(task) {
       <div class="form-row">
         <div class="form-group">
           <label>Produit</label>
-          <input type="text" class="form-control" id="task-product" value="${isEdit && task.product ? escapeHtml(task.product) : ""}" placeholder="ex: D\xE9graissant + d\xE9sinfectant">
+          <input type="text" class="form-control" id="task-product" value="${isEdit && task.product ? escapeHtml(task.product) : ""}" placeholder="ex: D\xE9graissant + d\xE9sinfectant" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Concentration</label>
-          <input type="text" class="form-control" id="task-concentration" value="${isEdit && task.concentration ? escapeHtml(task.concentration) : ""}" placeholder="ex: 5ml/L ou dilution 1:20">
+          <input type="text" class="form-control" id="task-concentration" value="${isEdit && task.concentration ? escapeHtml(task.concentration) : ""}" placeholder="ex: 5ml/L ou dilution 1:20" data-ui="custom">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Temp\xE9rature de l'eau</label>
-          <input type="text" class="form-control" id="task-temperature_eau" value="${isEdit && task.temperature_eau ? escapeHtml(task.temperature_eau) : ""}" placeholder="ex: 60\xB0C">
+          <input type="text" class="form-control" id="task-temperature_eau" value="${isEdit && task.temperature_eau ? escapeHtml(task.temperature_eau) : ""}" placeholder="ex: 60\xB0C" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Temps de contact</label>
-          <input type="text" class="form-control" id="task-temps_contact" value="${isEdit && task.temps_contact ? escapeHtml(task.temps_contact) : ""}" placeholder="ex: 15 minutes">
+          <input type="text" class="form-control" id="task-temps_contact" value="${isEdit && task.temps_contact ? escapeHtml(task.temps_contact) : ""}" placeholder="ex: 15 minutes" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Rin\xE7age</label>
-        <input type="text" class="form-control" id="task-rincage" value="${isEdit && task.rincage ? escapeHtml(task.rincage) : ""}" placeholder="ex: Rin\xE7age eau claire obligatoire">
+        <input type="text" class="form-control" id="task-rincage" value="${isEdit && task.rincage ? escapeHtml(task.rincage) : ""}" placeholder="ex: Rin\xE7age eau claire obligatoire" data-ui="custom">
       </div>
       <div class="form-group">
         <label>EPI n\xE9cessaires</label>
-        <input type="text" class="form-control" id="task-epi" value="${isEdit && task.epi ? escapeHtml(task.epi) : ""}" placeholder="ex: Gants nitrile, lunettes de protection">
+        <input type="text" class="form-control" id="task-epi" value="${isEdit && task.epi ? escapeHtml(task.epi) : ""}" placeholder="ex: Gants nitrile, lunettes de protection" data-ui="custom">
       </div>
       <div class="form-group">
         <label>M\xE9thode g\xE9n\xE9rale</label>
-        <textarea class="form-control" id="task-method" rows="2" placeholder="ex: Nettoyer, rincer, d\xE9sinfecter">${isEdit && task.method ? escapeHtml(task.method) : ""}</textarea>
+        <textarea class="form-control" id="task-method" rows="2" placeholder="ex: Nettoyer, rincer, d\xE9sinfecter" data-ui="custom">${isEdit && task.method ? escapeHtml(task.method) : ""}</textarea>
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="task-cancel">Annuler</button>
@@ -6695,7 +6704,7 @@ async function renderHACCPTraceability() {
           </div>
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
             <label for="filter-supplier" class="visually-hidden">Filtrer par fournisseur</label>
-            <input type="text" class="form-control" id="filter-supplier" style="min-height:40px" placeholder="Fournisseur" aria-label="Filtrer par fournisseur">
+            <input type="text" class="form-control" id="filter-supplier" style="min-height:40px" placeholder="Fournisseur" aria-label="Filtrer par fournisseur" data-ui="custom">
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-filter" aria-label="Appliquer les filtres">Filtrer</button>
         </div>
@@ -6816,29 +6825,29 @@ async function showReceptionModal() {
       <h2 id="modal-reception-title"><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Saisie manuelle \u2014 R\xE9ception marchandise</h2>
       <div class="form-group">
         <label for="rec-product">Produit * <span style="font-size:var(--text-xs);color:var(--text-tertiary)">(nom libre)</span></label>
-        <input type="text" class="form-control" id="rec-product" placeholder="ex: Filet de b\u0153uf" autofocus required aria-required="true">
+        <input type="text" class="form-control" id="rec-product" placeholder="ex: Filet de b\u0153uf" autofocus required aria-required="true" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label for="rec-supplier">Fournisseur</label>
           <div style="position:relative">
-            <input type="text" class="form-control" id="rec-supplier" placeholder="Saisir ou choisir\u2026" list="rec-supplier-list" autocomplete="off">
+            <input type="text" class="form-control" id="rec-supplier" placeholder="Saisir ou choisir\u2026" list="rec-supplier-list" autocomplete="off" data-ui="custom">
             <datalist id="rec-supplier-list">${supplierOptions}</datalist>
           </div>
         </div>
         <div class="form-group">
           <label for="rec-batch">N\xB0 de lot</label>
-          <input type="text" class="form-control" id="rec-batch" placeholder="ex: LOT2024-001">
+          <input type="text" class="form-control" id="rec-batch" placeholder="ex: LOT2024-001" data-ui="custom">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label for="rec-numero-bl">N\xB0 Bon de livraison</label>
-          <input type="text" class="form-control" id="rec-numero-bl" placeholder="ex: BL-2026-04512">
+          <input type="text" class="form-control" id="rec-numero-bl" placeholder="ex: BL-2026-04512" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="rec-temp">T\xB0 \xE0 r\xE9ception (\xB0C)</label>
-          <input type="number" step="0.1" class="form-control" id="rec-temp" placeholder="ex: 3.5" inputmode="decimal">
+          <input type="number" step="0.1" class="form-control" id="rec-temp" placeholder="ex: 3.5" inputmode="decimal" data-ui="custom">
         </div>
       </div>
       <div class="form-row">
@@ -6854,11 +6863,11 @@ async function showReceptionModal() {
       <div class="form-row">
         <div class="form-group">
           <label for="rec-qty">Quantit\xE9</label>
-          <input type="number" step="0.01" class="form-control" id="rec-qty" placeholder="ex: 5" inputmode="decimal">
+          <input type="number" step="0.01" class="form-control" id="rec-qty" placeholder="ex: 5" inputmode="decimal" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="rec-unit">Unit\xE9</label>
-          <select class="form-control" id="rec-unit">
+          <select class="form-control" id="rec-unit" data-ui="custom">
             <option value="kg">kg</option>
             <option value="g">g</option>
             <option value="l">l</option>
@@ -6870,7 +6879,7 @@ async function showReceptionModal() {
       </div>
       <div class="form-group">
         <label for="rec-emballage">\xC9tat de l'emballage</label>
-        <select class="form-control" id="rec-emballage">
+        <select class="form-control" id="rec-emballage" data-ui="custom">
           <option value="">\u2014 S\xE9lectionner \u2014</option>
           <option value="Conforme">Conforme</option>
           <option value="L\xE9g\xE8rement ab\xEEm\xE9">L\xE9g\xE8rement ab\xEEm\xE9</option>
@@ -6881,7 +6890,7 @@ async function showReceptionModal() {
       </div>
       <div class="form-group">
         <label for="rec-organo">Conformit\xE9 organoleptique (aspect, odeur, couleur)</label>
-        <select class="form-control" id="rec-organo">
+        <select class="form-control" id="rec-organo" data-ui="custom">
           <option value="">\u2014 S\xE9lectionner \u2014</option>
           <option value="Conforme">Conforme</option>
           <option value="Odeur anormale">Odeur anormale</option>
@@ -6894,18 +6903,18 @@ async function showReceptionModal() {
         <label style="font-weight:600;margin-bottom:var(--space-2);display:block">Conformit\xE9 globale *</label>
         <div style="display:flex;gap:var(--space-3)">
           <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:2px solid var(--border-default);flex:1;justify-content:center;font-weight:500" id="rec-conforme-label">
-            <input type="radio" name="rec-conformite" id="rec-conforme" value="conforme" style="accent-color:var(--color-success)" checked>
+            <input type="radio" name="rec-conformite" id="rec-conforme" value="conforme" style="accent-color:var(--color-success)" checked data-ui="custom">
             <span style="color:var(--color-success)">\u2713 Conforme</span>
           </label>
           <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:2px solid var(--border-default);flex:1;justify-content:center;font-weight:500" id="rec-nonconforme-label">
-            <input type="radio" name="rec-conformite" id="rec-nonconforme" value="non-conforme" style="accent-color:var(--color-danger)">
+            <input type="radio" name="rec-conformite" id="rec-nonconforme" value="non-conforme" style="accent-color:var(--color-danger)" data-ui="custom">
             <span style="color:var(--color-danger)">\u2717 Non conforme</span>
           </label>
         </div>
       </div>
       <div class="form-group">
         <label for="rec-notes">Notes</label>
-        <input type="text" class="form-control" id="rec-notes" placeholder="ex: Remarque compl\xE9mentaire">
+        <input type="text" class="form-control" id="rec-notes" placeholder="ex: Remarque compl\xE9mentaire" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="rec-cancel" aria-label="Annuler la saisie">Annuler</button>
@@ -7066,7 +7075,7 @@ function showCoolingModal() {
       <p class="text-secondary text-sm" style="margin-bottom:16px">Enregistrez le d\xE9but. Compl\xE9tez les temps de passage ult\xE9rieurement.</p>
       <div class="form-group">
         <label>Produit *</label>
-        <input type="text" class="form-control" id="cool-product" placeholder="ex: Blanquette de veau" autofocus>
+        <input type="text" class="form-control" id="cool-product" placeholder="ex: Blanquette de veau" autofocus data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -7075,12 +7084,12 @@ function showCoolingModal() {
         </div>
         <div class="form-group">
           <label>T\xB0 initiale (\xB0C) *</label>
-          <input type="number" step="0.1" class="form-control" id="cool-temp" placeholder="ex: 85" inputmode="decimal">
+          <input type="number" step="0.1" class="form-control" id="cool-temp" placeholder="ex: 85" inputmode="decimal" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="cool-notes" placeholder="ex: Cellule de refroidissement n\xB01">
+        <input type="text" class="form-control" id="cool-notes" placeholder="ex: Cellule de refroidissement n\xB01" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="cool-cancel">Annuler</button>
@@ -7143,7 +7152,7 @@ function showCoolingUpdateModal(id, productName) {
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="cool-u-notes">
+        <input type="text" class="form-control" id="cool-u-notes" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="cool-u-cancel">Annuler</button>
@@ -7348,7 +7357,7 @@ async function showCookingModal(editId = null) {
 
       <div class="form-group">
         <label>Type de produit (pr\xE9r\xE9glage T\xB0 cible)</label>
-        <select class="form-control" id="cook-preset">
+        <select class="form-control" id="cook-preset" data-ui="custom">
           <option value="">\u2014 Choisir un pr\xE9r\xE9glage \u2014</option>
           ${presetOptions}
         </select>
@@ -7359,7 +7368,7 @@ async function showCookingModal(editId = null) {
         <input type="text" class="form-control" id="cook-product"
                list="cook-product-list"
                placeholder="ex: Poulet r\xF4ti \u2014 tapez pour voir vos fiches" autofocus
-               value="${existingRecord ? escapeHtml(existingRecord.product_name) : ""}">
+               value="${existingRecord ? escapeHtml(existingRecord.product_name) : ""}" data-ui="custom">
         <datalist id="cook-product-list">${recipeOptions}</datalist>
       </div>
 
@@ -7373,7 +7382,7 @@ async function showCookingModal(editId = null) {
           <label>N\xB0 de lot</label>
           <input type="text" class="form-control" id="cook-batch"
                  placeholder="optionnel"
-                 value="${existingRecord && existingRecord.batch_number ? escapeHtml(existingRecord.batch_number) : ""}">
+                 value="${existingRecord && existingRecord.batch_number ? escapeHtml(existingRecord.batch_number) : ""}" data-ui="custom">
         </div>
       </div>
 
@@ -7395,13 +7404,13 @@ async function showCookingModal(editId = null) {
           <label>T\xB0 cible (\xB0C) *</label>
           <input type="number" step="0.1" class="form-control" id="cook-target"
                  inputmode="decimal"
-                 value="${existingRecord ? existingRecord.target_temperature : "63"}">
+                 value="${existingRecord ? existingRecord.target_temperature : "63"}" data-ui="custom">
         </div>
         <div class="form-group">
           <label>T\xB0 mesur\xE9e \xE0 c\u0153ur (\xB0C) *</label>
           <input type="number" step="0.1" class="form-control" id="cook-measured"
                  inputmode="decimal" placeholder="ex: 72.5"
-                 value="${existingRecord ? existingRecord.measured_temperature : ""}">
+                 value="${existingRecord ? existingRecord.measured_temperature : ""}" data-ui="custom">
         </div>
       </div>
 
@@ -7409,7 +7418,7 @@ async function showCookingModal(editId = null) {
 
       <div class="form-group" id="cook-corrective-group" style="display:none">
         <label>Action corrective *</label>
-        <select class="form-control" id="cook-corrective-select">
+        <select class="form-control" id="cook-corrective-select" data-ui="custom">
           <option value="">\u2014 Choisir \u2014</option>
           <option value="Prolongation de la cuisson jusqu'\xE0 atteinte de la T\xB0 cible">Prolongation de la cuisson</option>
           <option value="Produit jet\xE9 (non-conformit\xE9 critique)">Produit jet\xE9</option>
@@ -7422,13 +7431,13 @@ async function showCookingModal(editId = null) {
         <label>Op\xE9rateur</label>
         <input type="text" class="form-control" id="cook-operator"
                placeholder="Qui a effectu\xE9 la cuisson"
-               value="${existingRecord && existingRecord.operator ? escapeHtml(existingRecord.operator) : ""}">
+               value="${existingRecord && existingRecord.operator ? escapeHtml(existingRecord.operator) : ""}" data-ui="custom">
       </div>
 
       <div class="form-group">
         <label>Notes</label>
         <input type="text" class="form-control" id="cook-notes"
-               value="${existingRecord && existingRecord.notes ? escapeHtml(existingRecord.notes) : ""}">
+               value="${existingRecord && existingRecord.notes ? escapeHtml(existingRecord.notes) : ""}" data-ui="custom">
       </div>
 
       <div class="actions-row" style="justify-content:flex-end">
@@ -7629,7 +7638,7 @@ function showReheatingModal() {
       <p class="text-secondary text-sm" style="margin-bottom:16px">Compl\xE9tez quand +63\xB0C est atteint.</p>
       <div class="form-group">
         <label>Produit *</label>
-        <input type="text" class="form-control" id="reheat-product" placeholder="ex: B\u0153uf bourguignon" autofocus>
+        <input type="text" class="form-control" id="reheat-product" placeholder="ex: B\u0153uf bourguignon" autofocus data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -7638,12 +7647,12 @@ function showReheatingModal() {
         </div>
         <div class="form-group">
           <label>T\xB0 initiale (\xB0C) *</label>
-          <input type="number" step="0.1" class="form-control" id="reheat-temp" placeholder="ex: 4" inputmode="decimal">
+          <input type="number" step="0.1" class="form-control" id="reheat-temp" placeholder="ex: 4" inputmode="decimal" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="reheat-notes" placeholder="ex: Bain-marie">
+        <input type="text" class="form-control" id="reheat-notes" placeholder="ex: Bain-marie" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="reheat-cancel">Annuler</button>
@@ -7702,7 +7711,7 @@ function showReheatingUpdateModal(id, productName) {
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="reheat-u-notes">
+        <input type="text" class="form-control" id="reheat-u-notes" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="reheat-u-cancel">Annuler</button>
@@ -7815,7 +7824,7 @@ function showNewFryerModal() {
       <h2><i data-lucide="flame" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Ajouter une friteuse</h2>
       <div class="form-group">
         <label>Nom *</label>
-        <input type="text" class="form-control" id="fryer-name-input" placeholder="ex: Friteuse 1, Grande friteuse" autofocus>
+        <input type="text" class="form-control" id="fryer-name-input" placeholder="ex: Friteuse 1, Grande friteuse" autofocus data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="fryer-cancel">Annuler</button>
@@ -7866,13 +7875,13 @@ function showFryerCheckModal(fryerId, fryerName, actionType) {
         <label>Valeur (% compos\xE9s polaires) *</label>
         <input type="number" step="0.1" min="0" max="100" class="form-control" id="fryer-polar-val"
                placeholder="ex: 18.5" inputmode="decimal" autofocus
-               style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)">
+               style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)" data-ui="custom">
         <p class="text-secondary text-sm">Seuil l\xE9gal : 25%</p>
       </div>
       ` : ""}
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="fryer-check-notes" placeholder="Observations">
+        <input type="text" class="form-control" id="fryer-check-notes" placeholder="Observations" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="fryer-check-cancel">Annuler</button>
@@ -8052,25 +8061,25 @@ function showNCModal() {
       <h2><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>D\xE9clarer une non-conformit\xE9</h2>
       <div class="form-group">
         <label>Titre *</label>
-        <input type="text" class="form-control" id="nc-title" placeholder="ex: Temp\xE9rature frigo hors norme" autofocus>
+        <input type="text" class="form-control" id="nc-title" placeholder="ex: Temp\xE9rature frigo hors norme" autofocus data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Cat\xE9gorie</label>
-          <select class="form-control" id="nc-category">
+          <select class="form-control" id="nc-category" data-ui="custom">
             ${Object.entries(NC_CATEGORIES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}
           </select>
         </div>
         <div class="form-group">
           <label>S\xE9v\xE9rit\xE9</label>
-          <select class="form-control" id="nc-severity">
+          <select class="form-control" id="nc-severity" data-ui="custom">
             ${Object.entries(NC_SEVERITIES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("")}
           </select>
         </div>
       </div>
       <div class="form-group">
         <label>Description</label>
-        <textarea class="form-control" id="nc-description" rows="3" placeholder="D\xE9crivez la non-conformit\xE9..."></textarea>
+        <textarea class="form-control" id="nc-description" rows="3" placeholder="D\xE9crivez la non-conformit\xE9..." data-ui="custom"></textarea>
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="nc-cancel">Annuler</button>
@@ -8119,7 +8128,7 @@ function showNCResolveModal(id, title) {
       <h2><i data-lucide="check-circle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>R\xE9soudre \u2014 ${escapeHtml(title)}</h2>
       <div class="form-group">
         <label>Action corrective *</label>
-        <textarea class="form-control" id="nc-corrective" rows="4" placeholder="D\xE9crivez l'action corrective mise en place..." autofocus></textarea>
+        <textarea class="form-control" id="nc-corrective" rows="4" placeholder="D\xE9crivez l'action corrective mise en place..." autofocus data-ui="custom"></textarea>
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="nc-r-cancel">Annuler</button>
@@ -8362,14 +8371,14 @@ function openAllergenPlanModal(id) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label class="form-label">Pr\xE9sent dans le menu</label>
-          <select name="presence_in_menu" class="form-control">
+          <select name="presence_in_menu" class="form-control" data-ui="custom">
             <option value="1" ${item.presence_in_menu ? "selected" : ""}>Oui</option>
             <option value="0" ${!item.presence_in_menu ? "selected" : ""}>Non</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Niveau de risque</label>
-          <select name="risk_level" class="form-control">
+          <select name="risk_level" class="form-control" data-ui="custom">
             <option value="\xE9lev\xE9"  ${item.risk_level === "\xE9lev\xE9" ? "selected" : ""}>\xC9lev\xE9</option>
             <option value="moyen"  ${item.risk_level === "moyen" ? "selected" : ""}>Moyen</option>
             <option value="faible" ${item.risk_level === "faible" ? "selected" : ""}>Faible</option>
@@ -8378,20 +8387,20 @@ function openAllergenPlanModal(id) {
       </div>
       <div class="form-group">
         <label class="form-label">Risque de contamination crois\xE9e</label>
-        <textarea name="cross_contamination_risk" class="form-control" rows="2">${escapeHtml(item.cross_contamination_risk || "")}</textarea>
+        <textarea name="cross_contamination_risk" class="form-control" rows="2" data-ui="custom">${escapeHtml(item.cross_contamination_risk || "")}</textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Mesures pr\xE9ventives</label>
-        <textarea name="preventive_measures" class="form-control" rows="3">${escapeHtml(item.preventive_measures || "")}</textarea>
+        <textarea name="preventive_measures" class="form-control" rows="3" data-ui="custom">${escapeHtml(item.preventive_measures || "")}</textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Proc\xE9dure de nettoyage</label>
-        <textarea name="cleaning_procedure" class="form-control" rows="2">${escapeHtml(item.cleaning_procedure || "")}</textarea>
+        <textarea name="cleaning_procedure" class="form-control" rows="2" data-ui="custom">${escapeHtml(item.cleaning_procedure || "")}</textarea>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label class="form-label">M\xE9thode d'affichage</label>
-          <input type="text" name="display_method" class="form-control" value="${escapeHtml(item.display_method || "")}" placeholder="Carte, ardoise, oral...">
+          <input type="text" name="display_method" class="form-control" value="${escapeHtml(item.display_method || "")}" placeholder="Carte, ardoise, oral..." data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label">Date de r\xE9vision</label>
@@ -8400,11 +8409,11 @@ function openAllergenPlanModal(id) {
       </div>
       <div class="form-group">
         <label class="form-label">R\xE9f\xE9rence formation</label>
-        <input type="text" name="staff_training_ref" class="form-control" value="${escapeHtml(item.staff_training_ref || "")}">
+        <input type="text" name="staff_training_ref" class="form-control" value="${escapeHtml(item.staff_training_ref || "")}" data-ui="custom">
       </div>
       <div class="form-group">
         <label class="form-label">Notes</label>
-        <textarea name="notes" class="form-control" rows="2">${escapeHtml(item.notes || "")}</textarea>
+        <textarea name="notes" class="form-control" rows="2" data-ui="custom">${escapeHtml(item.notes || "")}</textarea>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button type="button" class="btn btn-secondary" onclick="closeAllergenPlanModal()">Annuler</button>
@@ -8576,7 +8585,7 @@ function openWaterModal(id) {
         </div>
         <div class="form-group">
           <label class="form-label">Type d'analyse</label>
-          <select name="analysis_type" class="form-control">
+          <select name="analysis_type" class="form-control" data-ui="custom">
             <option value="compl\xE8te" ${!item || item.analysis_type === "compl\xE8te" ? "selected" : ""}>Compl\xE8te</option>
             <option value="microbiologique" ${item && item.analysis_type === "microbiologique" ? "selected" : ""}>Microbiologique</option>
             <option value="physico-chimique" ${item && item.analysis_type === "physico-chimique" ? "selected" : ""}>Physico-chimique</option>
@@ -8586,11 +8595,11 @@ function openWaterModal(id) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label class="form-label">Laboratoire / Prestataire</label>
-          <input type="text" name="provider" class="form-control" value="${escapeHtml(item ? item.provider || "" : "")}">
+          <input type="text" name="provider" class="form-control" value="${escapeHtml(item ? item.provider || "" : "")}" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label">Source d'eau</label>
-          <select name="water_source" class="form-control">
+          <select name="water_source" class="form-control" data-ui="custom">
             <option value="r\xE9seau public" ${!item || item.water_source === "r\xE9seau public" ? "selected" : ""}>R\xE9seau public</option>
             <option value="forage" ${item && item.water_source === "forage" ? "selected" : ""}>Forage</option>
             <option value="autre" ${item && item.water_source === "autre" ? "selected" : ""}>Autre</option>
@@ -8599,19 +8608,19 @@ function openWaterModal(id) {
       </div>
       <div class="form-group">
         <label class="form-label">R\xE9sultats de l'analyse</label>
-        <textarea name="results" class="form-control" rows="3" placeholder="pH, turbidit\xE9, nitrates, coliformes...">${escapeHtml(item ? item.results || "" : "")}</textarea>
+        <textarea name="results" class="form-control" rows="3" placeholder="pH, turbidit\xE9, nitrates, coliformes..." data-ui="custom">${escapeHtml(item ? item.results || "" : "")}</textarea>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label class="form-label">Conformit\xE9</label>
-          <select name="conformity" class="form-control">
+          <select name="conformity" class="form-control" data-ui="custom">
             <option value="1" ${!item || item.conformity ? "selected" : ""}>Conforme</option>
             <option value="0" ${item && !item.conformity ? "selected" : ""}>Non conforme</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">R\xE9f\xE9rence rapport</label>
-          <input type="text" name="report_ref" class="form-control" value="${escapeHtml(item ? item.report_ref || "" : "")}">
+          <input type="text" name="report_ref" class="form-control" value="${escapeHtml(item ? item.report_ref || "" : "")}" data-ui="custom">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -8621,12 +8630,12 @@ function openWaterModal(id) {
         </div>
         <div class="form-group">
           <label class="form-label">Traitement en place</label>
-          <input type="text" name="treatment" class="form-control" value="${escapeHtml(item ? item.treatment || "" : "")}" placeholder="Adoucisseur, filtre UV...">
+          <input type="text" name="treatment" class="form-control" value="${escapeHtml(item ? item.treatment || "" : "")}" placeholder="Adoucisseur, filtre UV..." data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">Notes</label>
-        <textarea name="notes" class="form-control" rows="2">${escapeHtml(item ? item.notes || "" : "")}</textarea>
+        <textarea name="notes" class="form-control" rows="2" data-ui="custom">${escapeHtml(item ? item.notes || "" : "")}</textarea>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button type="button" class="btn btn-secondary" onclick="closeWaterModal()">Annuler</button>
@@ -8875,27 +8884,27 @@ function openPmsAuditModal(id) {
         </div>
         <div class="form-group">
           <label class="form-label">Auditeur *</label>
-          <input type="text" name="auditor_name" class="form-control" required value="${escapeHtml(item ? item.auditor_name : "")}">
+          <input type="text" name="auditor_name" class="form-control" required value="${escapeHtml(item ? item.auditor_name : "")}" data-ui="custom">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
         <div class="form-group">
           <label class="form-label">Type d'audit</label>
-          <select name="audit_type" class="form-control">
+          <select name="audit_type" class="form-control" data-ui="custom">
             <option value="interne" ${!item || item.audit_type === "interne" ? "selected" : ""}>Interne</option>
             <option value="externe" ${item && item.audit_type === "externe" ? "selected" : ""}>Externe</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">P\xE9rim\xE8tre</label>
-          <select name="scope" class="form-control">
+          <select name="scope" class="form-control" data-ui="custom">
             <option value="complet" ${!item || item.scope === "complet" ? "selected" : ""}>Complet</option>
             <option value="partiel" ${item && item.scope === "partiel" ? "selected" : ""}>Partiel</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Statut</label>
-          <select name="status" class="form-control">
+          <select name="status" class="form-control" data-ui="custom">
             <option value="planifi\xE9" ${!item || item.status === "planifi\xE9" ? "selected" : ""}>Planifi\xE9</option>
             <option value="r\xE9alis\xE9" ${item && item.status === "r\xE9alis\xE9" ? "selected" : ""}>R\xE9alis\xE9</option>
             <option value="actions_en_cours" ${item && item.status === "actions_en_cours" ? "selected" : ""}>Actions en cours</option>
@@ -8906,7 +8915,7 @@ function openPmsAuditModal(id) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label class="form-label">Score global (0\u2013100)</label>
-          <input type="number" name="overall_score" class="form-control" min="0" max="100" value="${item && item.overall_score !== null ? item.overall_score : ""}">
+          <input type="number" name="overall_score" class="form-control" min="0" max="100" value="${item && item.overall_score !== null ? item.overall_score : ""}" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label">Prochain audit pr\xE9vu</label>
@@ -8920,8 +8929,8 @@ function openPmsAuditModal(id) {
           ${findings.map((f, idx) => `
             <div style="border:1px solid var(--color-border,#e0e0e0);border-radius:6px;padding:10px" data-finding-idx="${idx}">
               <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-                <input type="text" class="form-control finding-section" placeholder="Section" value="${escapeHtml(f.section || "")}" style="flex:1">
-                <select class="form-control finding-severity" style="width:160px">
+                <input type="text" class="form-control finding-section" placeholder="Section" value="${escapeHtml(f.section || "")}" style="flex:1" data-ui="custom">
+                <select class="form-control finding-severity" style="width:160px" data-ui="custom">
                   <option value="en attente" ${f.severity === "en attente" ? "selected" : ""}>En attente</option>
                   <option value="conforme" ${f.severity === "conforme" ? "selected" : ""}>Conforme</option>
                   <option value="mineure" ${f.severity === "mineure" ? "selected" : ""}>Mineure</option>
@@ -8929,8 +8938,8 @@ function openPmsAuditModal(id) {
                 </select>
                 <button type="button" class="btn btn-ghost btn-sm text-danger" onclick="removeFinding(this)"><i data-lucide="x" style="width:14px;height:14px"></i></button>
               </div>
-              <textarea class="form-control finding-finding" placeholder="Constat" rows="2" style="margin-bottom:6px">${escapeHtml(f.finding || "")}</textarea>
-              <input type="text" class="form-control finding-action" placeholder="Action requise (si applicable)" value="${escapeHtml(f.action_required || "")}">
+              <textarea class="form-control finding-finding" placeholder="Constat" rows="2" style="margin-bottom:6px" data-ui="custom">${escapeHtml(f.finding || "")}</textarea>
+              <input type="text" class="form-control finding-action" placeholder="Action requise (si applicable)" value="${escapeHtml(f.action_required || "")}" data-ui="custom">
             </div>
           `).join("")}
         </div>
@@ -8941,7 +8950,7 @@ function openPmsAuditModal(id) {
 
       <div class="form-group">
         <label class="form-label">Notes</label>
-        <textarea name="notes" class="form-control" rows="2">${escapeHtml(item ? item.notes || "" : "")}</textarea>
+        <textarea name="notes" class="form-control" rows="2" data-ui="custom">${escapeHtml(item ? item.notes || "" : "")}</textarea>
       </div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -8995,8 +9004,8 @@ function addFinding() {
   div.setAttribute("data-finding-idx", idx);
   div.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-      <input type="text" class="form-control finding-section" placeholder="Section" style="flex:1">
-      <select class="form-control finding-severity" style="width:160px">
+      <input type="text" class="form-control finding-section" placeholder="Section" style="flex:1" data-ui="custom">
+      <select class="form-control finding-severity" style="width:160px" data-ui="custom">
         <option value="en attente">En attente</option>
         <option value="conforme">Conforme</option>
         <option value="mineure">Mineure</option>
@@ -9004,8 +9013,8 @@ function addFinding() {
       </select>
       <button type="button" class="btn btn-ghost btn-sm text-danger" onclick="removeFinding(this)"><i data-lucide="x" style="width:14px;height:14px"></i></button>
     </div>
-    <textarea class="form-control finding-finding" placeholder="Constat" rows="2" style="margin-bottom:6px"></textarea>
-    <input type="text" class="form-control finding-action" placeholder="Action requise (si applicable)">
+    <textarea class="form-control finding-finding" placeholder="Constat" rows="2" style="margin-bottom:6px" data-ui="custom"></textarea>
+    <input type="text" class="form-control finding-action" placeholder="Action requise (si applicable)" data-ui="custom">
   `;
   list.appendChild(div);
   if (window.lucide) lucide.createIcons();
@@ -9147,49 +9156,49 @@ function showTIACModal(procedure) {
         </div>
         <div class="form-group">
           <label>Nombre de personnes touch\xE9es</label>
-          <input type="number" class="form-control" id="tiac-nb" min="0" value="${isEdit ? procedure.nb_personnes || 0 : ""}">
+          <input type="number" class="form-control" id="tiac-nb" min="0" value="${isEdit ? procedure.nb_personnes || 0 : ""}" data-ui="custom">
         </div>
       </div>
 
       <div class="form-group">
         <label>Description de l'incident *</label>
-        <textarea class="form-control" id="tiac-description" rows="3" placeholder="D\xE9crivez le contexte, les repas concern\xE9s...">${isEdit ? escapeHtml(procedure.description || "") : ""}</textarea>
+        <textarea class="form-control" id="tiac-description" rows="3" placeholder="D\xE9crivez le contexte, les repas concern\xE9s..." data-ui="custom">${isEdit ? escapeHtml(procedure.description || "") : ""}</textarea>
       </div>
 
       <div class="form-group">
         <label>Sympt\xF4mes observ\xE9s</label>
-        <input type="text" class="form-control" id="tiac-symptomes" value="${isEdit ? escapeHtml(procedure.symptomes || "") : ""}" placeholder="ex: Naus\xE9es, vomissements, diarrh\xE9es (apparition 4-6h)">
+        <input type="text" class="form-control" id="tiac-symptomes" value="${isEdit ? escapeHtml(procedure.symptomes || "") : ""}" placeholder="ex: Naus\xE9es, vomissements, diarrh\xE9es (apparition 4-6h)" data-ui="custom">
       </div>
 
       <div class="form-group">
         <label>Aliments suspects</label>
-        <input type="text" class="form-control" id="tiac-aliments" value="${isEdit ? escapeHtml(procedure.aliments_suspects || "") : ""}" placeholder="ex: Poulet r\xF4ti \u2014 lot LOT-2026-0312">
+        <input type="text" class="form-control" id="tiac-aliments" value="${isEdit ? escapeHtml(procedure.aliments_suspects || "") : ""}" placeholder="ex: Poulet r\xF4ti \u2014 lot LOT-2026-0312" data-ui="custom">
       </div>
 
       <div class="form-group">
         <label>Mesures conservatoires prises</label>
-        <textarea class="form-control" id="tiac-mesures" rows="2" placeholder="ex: Mise en quarantaine du stock, arr\xEAt du service, nettoyage...">${isEdit ? escapeHtml(procedure.mesures_conservatoires || "") : ""}</textarea>
+        <textarea class="form-control" id="tiac-mesures" rows="2" placeholder="ex: Mise en quarantaine du stock, arr\xEAt du service, nettoyage..." data-ui="custom">${isEdit ? escapeHtml(procedure.mesures_conservatoires || "") : ""}</textarea>
       </div>
 
       <div class="form-group">
         <label>Contact DDPP</label>
-        <input type="text" class="form-control" id="tiac-contact" value="${isEdit ? escapeHtml(procedure.contact_ddpp || "") : ""}" placeholder="ex: DDPP 75 \u2014 T\xE9l : 01 40 07 22 00">
+        <input type="text" class="form-control" id="tiac-contact" value="${isEdit ? escapeHtml(procedure.contact_ddpp || "") : ""}" placeholder="ex: DDPP 75 \u2014 T\xE9l : 01 40 07 22 00" data-ui="custom">
       </div>
 
       <div class="form-row" style="margin-top:var(--space-3)">
         <label class="checkbox-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="tiac-ars" ${isEdit && procedure.declaration_ars ? "checked" : ""}>
+          <input type="checkbox" id="tiac-ars" ${isEdit && procedure.declaration_ars ? "checked" : ""} data-ui="custom">
           <span>D\xE9claration ARS effectu\xE9e</span>
         </label>
         <label class="checkbox-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="tiac-plats" ${isEdit && procedure.plats_temoins_conserves ? "checked" : ""}>
+          <input type="checkbox" id="tiac-plats" ${isEdit && procedure.plats_temoins_conserves ? "checked" : ""} data-ui="custom">
           <span>Plats t\xE9moins conserv\xE9s</span>
         </label>
       </div>
 
       <div class="form-group" style="margin-top:var(--space-3)">
         <label>Statut</label>
-        <select class="form-control" id="tiac-statut">
+        <select class="form-control" id="tiac-statut" data-ui="custom">
           <option value="en_cours" ${isEdit && procedure.statut === "en_cours" ? "selected" : ""}>En cours</option>
           <option value="en_investigation" ${isEdit && procedure.statut === "en_investigation" ? "selected" : ""}>En investigation</option>
           <option value="clos" ${isEdit && procedure.statut === "clos" ? "selected" : ""}>Clos</option>
@@ -9495,7 +9504,7 @@ function showWitnessMealModal(record = null) {
         </div>
         <div class="form-group">
           <label>Type de repas *</label>
-          <select class="form-control" id="wm-type">
+          <select class="form-control" id="wm-type" data-ui="custom">
             <option value="petit_dejeuner" ${(record == null ? void 0 : record.meal_type) === "petit_dejeuner" ? "selected" : ""}>Petit-d\xE9jeuner</option>
             <option value="dejeuner"       ${!record || record.meal_type === "dejeuner" ? "selected" : ""}>D\xE9jeuner</option>
             <option value="diner"          ${(record == null ? void 0 : record.meal_type) === "diner" ? "selected" : ""}>D\xEEner</option>
@@ -9505,7 +9514,7 @@ function showWitnessMealModal(record = null) {
         </div>
         <div class="form-group">
           <label>Mode de service</label>
-          <select class="form-control" id="wm-service">
+          <select class="form-control" id="wm-service" data-ui="custom">
             <option value="" ${!(record == null ? void 0 : record.service_type) ? "selected" : ""}>\u2014</option>
             <option value="sur_place" ${(record == null ? void 0 : record.service_type) === "sur_place" ? "selected" : ""}>Sur place</option>
             <option value="livraison" ${(record == null ? void 0 : record.service_type) === "livraison" ? "selected" : ""}>Livraison</option>
@@ -9518,15 +9527,15 @@ function showWitnessMealModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>T\xB0 stockage (\xB0C) *</label>
-          <input type="number" step="0.1" min="-2" max="10" class="form-control" id="wm-temp" value="${(_a = record == null ? void 0 : record.storage_temperature) != null ? _a : "2"}" placeholder="0 \xE0 3 \xB0C">
+          <input type="number" step="0.1" min="-2" max="10" class="form-control" id="wm-temp" value="${(_a = record == null ? void 0 : record.storage_temperature) != null ? _a : "2"}" placeholder="0 \xE0 3 \xB0C" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Emplacement frigo</label>
-          <input type="text" class="form-control" id="wm-loc" value="${escapeHtml((record == null ? void 0 : record.storage_location) || "")}" placeholder="ex: Chambre froide plats t\xE9moins">
+          <input type="text" class="form-control" id="wm-loc" value="${escapeHtml((record == null ? void 0 : record.storage_location) || "")}" placeholder="ex: Chambre froide plats t\xE9moins" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Op\xE9rateur</label>
-          <input type="text" class="form-control" id="wm-op" value="${escapeHtml((record == null ? void 0 : record.operator) || "")}" placeholder="Pr\xE9nom NOM">
+          <input type="text" class="form-control" id="wm-op" value="${escapeHtml((record == null ? void 0 : record.operator) || "")}" placeholder="Pr\xE9nom NOM" data-ui="custom">
         </div>
       </div>
 
@@ -9540,7 +9549,7 @@ function showWitnessMealModal(record = null) {
 
       <div class="form-group">
         <label>Notes</label>
-        <textarea class="form-control" id="wm-notes" rows="2" placeholder="ex: Buffet de midi, 180 couverts">${escapeHtml((record == null ? void 0 : record.notes) || "")}</textarea>
+        <textarea class="form-control" id="wm-notes" rows="2" placeholder="ex: Buffet de midi, 180 couverts" data-ui="custom">${escapeHtml((record == null ? void 0 : record.notes) || "")}</textarea>
       </div>
 
       ${isEdit ? `
@@ -9551,7 +9560,7 @@ function showWitnessMealModal(record = null) {
         </div>
         <div class="form-group">
           <label>\xC9limin\xE9 par</label>
-          <input type="text" class="form-control" id="wm-disposed-by" value="${escapeHtml((record == null ? void 0 : record.disposed_by) || "")}" placeholder="Pr\xE9nom NOM">
+          <input type="text" class="form-control" id="wm-disposed-by" value="${escapeHtml((record == null ? void 0 : record.disposed_by) || "")}" placeholder="Pr\xE9nom NOM" data-ui="custom">
         </div>
       </div>
       ` : ""}
@@ -9578,9 +9587,9 @@ function showWitnessMealModal(record = null) {
   function renderSamples() {
     samplesList.innerHTML = sampleState.map((s, i) => `
       <div class="form-row" style="margin-bottom:6px">
-        <input type="text" class="form-control" data-i="${i}" data-k="name"     placeholder="Nom du plat"   value="${escapeHtml(s.name || "")}" style="flex:2">
-        <input type="text" class="form-control" data-i="${i}" data-k="quantity" placeholder="Quantit\xE9 (\u2265100g)" value="${escapeHtml(s.quantity || "")}" style="flex:1">
-        <input type="text" class="form-control" data-i="${i}" data-k="location" placeholder="Emplacement"    value="${escapeHtml(s.location || "")}" style="flex:1">
+        <input type="text" class="form-control" data-i="${i}" data-k="name"     placeholder="Nom du plat"   value="${escapeHtml(s.name || "")}" style="flex:2" data-ui="custom">
+        <input type="text" class="form-control" data-i="${i}" data-k="quantity" placeholder="Quantit\xE9 (\u2265100g)" value="${escapeHtml(s.quantity || "")}" style="flex:1" data-ui="custom">
+        <input type="text" class="form-control" data-i="${i}" data-k="location" placeholder="Emplacement"    value="${escapeHtml(s.location || "")}" style="flex:1" data-ui="custom">
         <button type="button" class="btn btn-ghost btn-sm" data-rm="${i}" style="color:var(--color-danger)"><i data-lucide="x" style="width:14px;height:14px"></i></button>
       </div>
     `).join("");
@@ -9804,11 +9813,11 @@ function showStaffHealthModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Nom du personnel *</label>
-          <input type="text" class="form-control" id="sh-staff" value="${escapeHtml((record == null ? void 0 : record.staff_name) || "")}" placeholder="ex: Marie Dupont" autofocus>
+          <input type="text" class="form-control" id="sh-staff" value="${escapeHtml((record == null ? void 0 : record.staff_name) || "")}" placeholder="ex: Marie Dupont" autofocus data-ui="custom">
         </div>
         <div class="form-group">
           <label>Type de fiche *</label>
-          <select class="form-control" id="sh-type">
+          <select class="form-control" id="sh-type" data-ui="custom">
             <option value="aptitude"          ${!record || record.record_type === "aptitude" ? "selected" : ""}>Aptitude m\xE9dicale</option>
             <option value="visite_medicale"    ${(record == null ? void 0 : record.record_type) === "visite_medicale" ? "selected" : ""}>Visite m\xE9dicale</option>
             <option value="maladie"            ${(record == null ? void 0 : record.record_type) === "maladie" ? "selected" : ""}>Arr\xEAt maladie</option>
@@ -9829,7 +9838,7 @@ function showStaffHealthModal(record = null) {
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <textarea class="form-control" id="sh-notes" rows="3" placeholder="ex: Gastro-ent\xE9rite \u2014 exclu du service jusqu'au retour">${escapeHtml((record == null ? void 0 : record.notes) || "")}</textarea>
+        <textarea class="form-control" id="sh-notes" rows="3" placeholder="ex: Gastro-ent\xE9rite \u2014 exclu du service jusqu'au retour" data-ui="custom">${escapeHtml((record == null ? void 0 : record.notes) || "")}</textarea>
       </div>
       <div style="background:#f0f4ff;border-radius:6px;padding:10px 14px;font-size:0.82rem;color:#3730a3;margin-bottom:16px">
         <strong>Rappel l\xE9gal :</strong> En cas de maladie ou blessure infectieuse, le membre du personnel doit \xEAtre exclu imm\xE9diatement de la manipulation des aliments (CE 852/2004, Chap. VIII, art. 2).
@@ -9908,7 +9917,7 @@ async function renderSanitaryApproval() {
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
                 <div class="form-group">
                   <label class="form-label">Type d'activit\xE9</label>
-                  <select name="activity_type" class="form-control">
+                  <select name="activity_type" class="form-control" data-ui="custom">
                     <option value="restaurant" ${!settings || settings.activity_type === "restaurant" ? "selected" : ""}>Restaurant</option>
                     <option value="traiteur" ${settings && settings.activity_type === "traiteur" ? "selected" : ""}>Traiteur</option>
                     <option value="fabrication" ${settings && settings.activity_type === "fabrication" ? "selected" : ""}>Fabrication</option>
@@ -9917,7 +9926,7 @@ async function renderSanitaryApproval() {
                 </div>
                 <div class="form-group">
                   <label class="form-label">Type d'autorisation</label>
-                  <select name="sanitary_approval_type" class="form-control">
+                  <select name="sanitary_approval_type" class="form-control" data-ui="custom">
                     <option value="d\xE9claration" ${!settings || settings.sanitary_approval_type === "d\xE9claration" ? "selected" : ""}>D\xE9claration d'activit\xE9</option>
                     <option value="d\xE9rogation" ${settings && settings.sanitary_approval_type === "d\xE9rogation" ? "selected" : ""}>D\xE9rogation \xE0 l'agr\xE9ment</option>
                     <option value="agr\xE9ment" ${settings && settings.sanitary_approval_type === "agr\xE9ment" ? "selected" : ""}>Agr\xE9ment sanitaire CE</option>
@@ -9932,7 +9941,7 @@ async function renderSanitaryApproval() {
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
                 <div class="form-group">
                   <label class="form-label">Num\xE9ro d'agr\xE9ment / d\xE9claration</label>
-                  <input type="text" name="sanitary_approval_number" class="form-control" value="${escapeHtml(settings ? settings.sanitary_approval_number || "" : "")}" placeholder="Ex: FR 75 001 01 CE">
+                  <input type="text" name="sanitary_approval_number" class="form-control" value="${escapeHtml(settings ? settings.sanitary_approval_number || "" : "")}" placeholder="Ex: FR 75 001 01 CE" data-ui="custom">
                   <small class="text-secondary" style="font-size:11px;margin-top:4px;display:block">Pour les restaurants : num\xE9ro de d\xE9claration DDPP ou num\xE9ro CE si agr\xE9\xE9s.</small>
                 </div>
                 <div class="form-group">
@@ -9946,12 +9955,12 @@ async function renderSanitaryApproval() {
               <div class="section-title" style="margin-top:0;margin-bottom:16px">Service v\xE9t\xE9rinaire comp\xE9tent</div>
               <div class="form-group">
                 <label class="form-label">DDPP / Service v\xE9t\xE9rinaire</label>
-                <input type="text" name="dd_pp_office" class="form-control" value="${escapeHtml(settings ? settings.dd_pp_office || "" : "")}" placeholder="Ex: DDPP de Paris \u2014 94 avenue Ledru-Rollin, 75012 Paris">
+                <input type="text" name="dd_pp_office" class="form-control" value="${escapeHtml(settings ? settings.dd_pp_office || "" : "")}" placeholder="Ex: DDPP de Paris \u2014 94 avenue Ledru-Rollin, 75012 Paris" data-ui="custom">
                 <small class="text-secondary" style="font-size:11px;margin-top:4px;display:block">La DDPP (Direction D\xE9partementale de la Protection des Populations) est l'autorit\xE9 comp\xE9tente pour les agr\xE9ments sanitaires.</small>
               </div>
               <div class="form-group" style="margin-top:12px">
                 <label class="form-label">Notes / Observations</label>
-                <textarea name="notes" class="form-control" rows="3" placeholder="Conditions particuli\xE8res, restrictions, renouvellements pr\xE9vus...">${escapeHtml(settings ? settings.notes || "" : "")}</textarea>
+                <textarea name="notes" class="form-control" rows="3" placeholder="Conditions particuli\xE8res, restrictions, renouvellements pr\xE9vus..." data-ui="custom">${escapeHtml(settings ? settings.notes || "" : "")}</textarea>
               </div>
             </div>
 
@@ -10209,15 +10218,15 @@ function openHazardModal(hazard) {
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
         <div>
           <label class="form-label">\xC9tape *</label>
-          <select class="form-control" id="hz-step">
+          <select class="form-control" id="hz-step" data-ui="custom">
             ${HACCP_PLAN_STEPS.map((s) => `<option value="${s}" ${hazard && hazard.step_name === s ? "selected" : ""}>${s}</option>`).join("")}
             <option value="__custom__">Autre\u2026</option>
           </select>
-          <input type="text" class="form-control" id="hz-step-custom" placeholder="\xC9tape personnalis\xE9e" style="margin-top:6px;display:none" value="${hazard && !HACCP_PLAN_STEPS.includes(hazard.step_name) ? escapeHtml(hazard.step_name) : ""}">
+          <input type="text" class="form-control" id="hz-step-custom" placeholder="\xC9tape personnalis\xE9e" style="margin-top:6px;display:none" value="${hazard && !HACCP_PLAN_STEPS.includes(hazard.step_name) ? escapeHtml(hazard.step_name) : ""}" data-ui="custom">
         </div>
         <div>
           <label class="form-label">Type de danger *</label>
-          <select class="form-control" id="hz-type">
+          <select class="form-control" id="hz-type" data-ui="custom">
             <option value="B" ${!hazard || hazard.hazard_type === "B" ? "selected" : ""}>B \u2014 Biologique</option>
             <option value="C" ${hazard && hazard.hazard_type === "C" ? "selected" : ""}>C \u2014 Chimique</option>
             <option value="P" ${hazard && hazard.hazard_type === "P" ? "selected" : ""}>P \u2014 Physique</option>
@@ -10225,21 +10234,21 @@ function openHazardModal(hazard) {
         </div>
         <div>
           <label class="form-label">Description du danger *</label>
-          <textarea class="form-control" id="hz-desc" rows="2" placeholder="Ex: Contamination par Salmonella spp.">${hazard ? escapeHtml(hazard.hazard_description) : ""}</textarea>
+          <textarea class="form-control" id="hz-desc" rows="2" placeholder="Ex: Contamination par Salmonella spp." data-ui="custom">${hazard ? escapeHtml(hazard.hazard_description) : ""}</textarea>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div>
             <label class="form-label">Gravit\xE9 (1\u20135)</label>
-            <input type="number" class="form-control" id="hz-severity" min="1" max="5" value="${hazard ? hazard.severity : 3}">
+            <input type="number" class="form-control" id="hz-severity" min="1" max="5" value="${hazard ? hazard.severity : 3}" data-ui="custom">
           </div>
           <div>
             <label class="form-label">Probabilit\xE9 (1\u20135)</label>
-            <input type="number" class="form-control" id="hz-probability" min="1" max="5" value="${hazard ? hazard.probability : 3}">
+            <input type="number" class="form-control" id="hz-probability" min="1" max="5" value="${hazard ? hazard.probability : 3}" data-ui="custom">
           </div>
         </div>
         <div>
           <label class="form-label">Mesures pr\xE9ventives</label>
-          <textarea class="form-control" id="hz-measures" rows="3" placeholder="Ex: Contr\xF4le temp\xE9rature \xE0 r\xE9ception, audit fournisseur\u2026">${hazard ? escapeHtml(hazard.preventive_measures || "") : ""}</textarea>
+          <textarea class="form-control" id="hz-measures" rows="3" placeholder="Ex: Contr\xF4le temp\xE9rature \xE0 r\xE9ception, audit fournisseur\u2026" data-ui="custom">${hazard ? escapeHtml(hazard.preventive_measures || "") : ""}</textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -10331,7 +10340,7 @@ async function renderDecisionTab(container) {
       return `
                       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
                         <span style="font-weight:600;color:var(--text-secondary)">${q}</span>
-                        <select class="form-control dt-select" data-hazard="${h.id}" data-q="${qi + 1}" style="padding:4px 8px;font-size:13px;width:80px">
+                        <select class="form-control dt-select" data-hazard="${h.id}" data-q="${qi + 1}" style="padding:4px 8px;font-size:13px;width:80px" data-ui="custom">
                           <option value="" ${val === null ? "selected" : ""}>\u2014</option>
                           <option value="1" ${val === 1 ? "selected" : ""}>Oui</option>
                           <option value="0" ${val === 0 ? "selected" : ""}>Non</option>
@@ -10408,35 +10417,35 @@ function renderCCPsTab(container) {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div>
                 <label class="form-label">Num\xE9ro CCP</label>
-                <input type="text" class="form-control ccp-number" data-hazard="${h.id}" value="${escapeHtml(num)}" placeholder="Ex: CCP1">
+                <input type="text" class="form-control ccp-number" data-hazard="${h.id}" value="${escapeHtml(num)}" placeholder="Ex: CCP1" data-ui="custom">
               </div>
               <div>
                 <label class="form-label">Responsable</label>
-                <input type="text" class="form-control ccp-responsible" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.responsible_person || "" : "")}" placeholder="Ex: Chef de cuisine">
+                <input type="text" class="form-control ccp-responsible" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.responsible_person || "" : "")}" placeholder="Ex: Chef de cuisine" data-ui="custom">
               </div>
               <div style="grid-column:1/-1">
                 <label class="form-label">Limites critiques</label>
-                <input type="text" class="form-control ccp-limits" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.critical_limits || "" : "")}" placeholder="Ex: Temp\xE9rature \xE0 c\u0153ur \u226575\xB0C pendant 2 min">
+                <input type="text" class="form-control ccp-limits" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.critical_limits || "" : "")}" placeholder="Ex: Temp\xE9rature \xE0 c\u0153ur \u226575\xB0C pendant 2 min" data-ui="custom">
               </div>
               <div>
                 <label class="form-label">Proc\xE9dure de surveillance</label>
-                <textarea class="form-control ccp-monitoring" data-hazard="${h.id}" rows="2" placeholder="Ex: Mesure thermom\xE8tre sonde \xE0 chaque cuisson">${escapeHtml(ccp ? ccp.monitoring_procedure || "" : "")}</textarea>
+                <textarea class="form-control ccp-monitoring" data-hazard="${h.id}" rows="2" placeholder="Ex: Mesure thermom\xE8tre sonde \xE0 chaque cuisson" data-ui="custom">${escapeHtml(ccp ? ccp.monitoring_procedure || "" : "")}</textarea>
               </div>
               <div>
                 <label class="form-label">Fr\xE9quence de surveillance</label>
-                <input type="text" class="form-control ccp-frequency" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.monitoring_frequency || "" : "")}" placeholder="Ex: \xC0 chaque cuisson (100% des lots)">
+                <input type="text" class="form-control ccp-frequency" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.monitoring_frequency || "" : "")}" placeholder="Ex: \xC0 chaque cuisson (100% des lots)" data-ui="custom">
               </div>
               <div>
                 <label class="form-label">Actions correctives</label>
-                <textarea class="form-control ccp-corrective" data-hazard="${h.id}" rows="2" placeholder="Ex: Poursuivre la cuisson, rejeter le lot si T\xB0 non atteinte">${escapeHtml(ccp ? ccp.corrective_actions || "" : "")}</textarea>
+                <textarea class="form-control ccp-corrective" data-hazard="${h.id}" rows="2" placeholder="Ex: Poursuivre la cuisson, rejeter le lot si T\xB0 non atteinte" data-ui="custom">${escapeHtml(ccp ? ccp.corrective_actions || "" : "")}</textarea>
               </div>
               <div>
                 <label class="form-label">Proc\xE9dure de v\xE9rification</label>
-                <textarea class="form-control ccp-verification" data-hazard="${h.id}" rows="2" placeholder="Ex: Calibration mensuelle du thermom\xE8tre, audit trimestriel">${escapeHtml(ccp ? ccp.verification_procedure || "" : "")}</textarea>
+                <textarea class="form-control ccp-verification" data-hazard="${h.id}" rows="2" placeholder="Ex: Calibration mensuelle du thermom\xE8tre, audit trimestriel" data-ui="custom">${escapeHtml(ccp ? ccp.verification_procedure || "" : "")}</textarea>
               </div>
               <div style="grid-column:1/-1">
                 <label class="form-label">Enregistrements</label>
-                <input type="text" class="form-control ccp-records" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.records_kept || "" : "")}" placeholder="Ex: Fiche cuisson journali\xE8re, registre thermom\xE8tre">
+                <input type="text" class="form-control ccp-records" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.records_kept || "" : "")}" placeholder="Ex: Fiche cuisson journali\xE8re, registre thermom\xE8tre" data-ui="custom">
               </div>
             </div>
           </div>
@@ -10805,7 +10814,7 @@ function showRecallChecklist(item) {
         ${steps.map((s) => `
           <label style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2);border-radius:var(--radius-sm);cursor:pointer;transition:background 0.15s"
                  onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background=''">
-            <input type="checkbox" id="chk-${s.id}" style="width:16px;height:16px;cursor:pointer">
+            <input type="checkbox" id="chk-${s.id}" style="width:16px;height:16px;cursor:pointer" data-ui="custom">
             <span style="font-size:var(--text-sm)">${escapeHtml(s.label)}</span>
           </label>
         `).join("")}
@@ -10851,11 +10860,11 @@ function showRecallCloseModal(item) {
       </p>
       <div class="form-group">
         <label>Notes de cl\xF4ture <span style="color:var(--text-tertiary)">(actions men\xE9es, r\xE9sultats)</span></label>
-        <textarea class="form-control" id="close-notes" rows="4" placeholder="D\xE9crivez les actions r\xE9alis\xE9es, les quantit\xE9s d\xE9truites, les retours fournisseurs..."></textarea>
+        <textarea class="form-control" id="close-notes" rows="4" placeholder="D\xE9crivez les actions r\xE9alis\xE9es, les quantit\xE9s d\xE9truites, les retours fournisseurs..." data-ui="custom"></textarea>
       </div>
       <div class="form-group">
         <label style="display:flex;align-items:center;gap:var(--space-2)">
-          <input type="checkbox" id="close-notif" style="width:16px;height:16px">
+          <input type="checkbox" id="close-notif" style="width:16px;height:16px" data-ui="custom">
           Notification envoy\xE9e aux autorit\xE9s comp\xE9tentes
         </label>
       </div>
@@ -10903,11 +10912,11 @@ function showRecallModal(item) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
         <div class="form-group" style="grid-column:1/-1">
           <label>Produit <span style="color:var(--color-danger)">*</span></label>
-          <input type="text" class="form-control" id="rc-product" value="${escapeHtml((item == null ? void 0 : item.product_name) || "")}" placeholder="Nom du produit concern\xE9">
+          <input type="text" class="form-control" id="rc-product" value="${escapeHtml((item == null ? void 0 : item.product_name) || "")}" placeholder="Nom du produit concern\xE9" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Num\xE9ro de lot</label>
-          <input type="text" class="form-control" id="rc-lot" value="${escapeHtml((item == null ? void 0 : item.lot_number) || "")}" placeholder="Ex: FB-2026-0312">
+          <input type="text" class="form-control" id="rc-lot" value="${escapeHtml((item == null ? void 0 : item.lot_number) || "")}" placeholder="Ex: FB-2026-0312" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Date d'alerte</label>
@@ -10916,7 +10925,7 @@ function showRecallModal(item) {
         </div>
         <div class="form-group">
           <label>Raison</label>
-          <select class="form-control" id="rc-reason">
+          <select class="form-control" id="rc-reason" data-ui="custom">
             <option value="sanitaire" ${(item == null ? void 0 : item.reason) === "sanitaire" || !item ? "selected" : ""}>\u{1F9A0} Sanitaire (contamination)</option>
             <option value="qualite"   ${(item == null ? void 0 : item.reason) === "qualite" ? "selected" : ""}>\u26A0\uFE0F Qualit\xE9</option>
             <option value="etiquetage" ${(item == null ? void 0 : item.reason) === "etiquetage" ? "selected" : ""}>\u{1F3F7}\uFE0F \xC9tiquetage / Allerg\xE8ne</option>
@@ -10925,7 +10934,7 @@ function showRecallModal(item) {
         </div>
         <div class="form-group">
           <label>Source de l'alerte</label>
-          <select class="form-control" id="rc-source">
+          <select class="form-control" id="rc-source" data-ui="custom">
             <option value="DGAL"       ${(item == null ? void 0 : item.alert_source) === "DGAL" ? "selected" : ""}>DGAL / Autorit\xE9</option>
             <option value="fournisseur" ${(item == null ? void 0 : item.alert_source) === "fournisseur" || !item ? "selected" : ""}>Fournisseur</option>
             <option value="interne"    ${(item == null ? void 0 : item.alert_source) === "interne" ? "selected" : ""}>D\xE9tection interne</option>
@@ -10934,7 +10943,7 @@ function showRecallModal(item) {
         </div>
         <div class="form-group">
           <label>S\xE9v\xE9rit\xE9</label>
-          <select class="form-control" id="rc-severity">
+          <select class="form-control" id="rc-severity" data-ui="custom">
             <option value="critique" ${(item == null ? void 0 : item.severity) === "critique" ? "selected" : ""}>\u{1F534} Critique</option>
             <option value="majeur"   ${(item == null ? void 0 : item.severity) === "majeur" || !item ? "selected" : ""}>\u{1F7E0} Majeur</option>
             <option value="mineur"   ${(item == null ? void 0 : item.severity) === "mineur" ? "selected" : ""}>\u{1F7E1} Mineur</option>
@@ -10943,8 +10952,8 @@ function showRecallModal(item) {
         <div class="form-group">
           <label>Quantit\xE9 concern\xE9e</label>
           <div style="display:flex;gap:var(--space-2)">
-            <input type="number" class="form-control" id="rc-qty" value="${(item == null ? void 0 : item.quantity_affected) || ""}" placeholder="0" min="0" style="flex:2">
-            <select class="form-control" id="rc-qty-unit" style="flex:1">
+            <input type="number" class="form-control" id="rc-qty" value="${(item == null ? void 0 : item.quantity_affected) || ""}" placeholder="0" min="0" style="flex:2" data-ui="custom">
+            <select class="form-control" id="rc-qty-unit" style="flex:1" data-ui="custom">
               <option value="kg"     ${(item == null ? void 0 : item.quantity_unit) === "kg" || !item ? "selected" : ""}>kg</option>
               <option value="unit\xE9s" ${(item == null ? void 0 : item.quantity_unit) === "unit\xE9s" ? "selected" : ""}>unit\xE9s</option>
               <option value="L"      ${(item == null ? void 0 : item.quantity_unit) === "L" ? "selected" : ""}>L</option>
@@ -10954,11 +10963,11 @@ function showRecallModal(item) {
         </div>
         <div class="form-group" style="grid-column:1/-1">
           <label>Actions prises</label>
-          <textarea class="form-control" id="rc-actions" rows="3" placeholder="Ex: Lots retir\xE9s des frigos, fournisseur contact\xE9...">${escapeHtml((item == null ? void 0 : item.actions_taken) || "")}</textarea>
+          <textarea class="form-control" id="rc-actions" rows="3" placeholder="Ex: Lots retir\xE9s des frigos, fournisseur contact\xE9..." data-ui="custom">${escapeHtml((item == null ? void 0 : item.actions_taken) || "")}</textarea>
         </div>
         ${isEdit ? `
         <div class="form-group" style="display:flex;align-items:center;gap:var(--space-2)">
-          <input type="checkbox" id="rc-notif" style="width:16px;height:16px" ${(item == null ? void 0 : item.notification_sent) ? "checked" : ""}>
+          <input type="checkbox" id="rc-notif" style="width:16px;height:16px" ${(item == null ? void 0 : item.notification_sent) ? "checked" : ""} data-ui="custom">
           <label for="rc-notif" style="margin:0;cursor:pointer">Notification envoy\xE9e aux autorit\xE9s</label>
         </div>
         ` : ""}
@@ -11175,16 +11184,16 @@ function showTrainingModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Employ\xE9 *</label>
-          <input type="text" class="form-control" id="tr-employee" value="${escapeHtml((record == null ? void 0 : record.employee_name) || "")}" placeholder="ex: Marie Dupont" autofocus>
+          <input type="text" class="form-control" id="tr-employee" value="${escapeHtml((record == null ? void 0 : record.employee_name) || "")}" placeholder="ex: Marie Dupont" autofocus data-ui="custom">
         </div>
         <div class="form-group">
           <label>Formateur</label>
-          <input type="text" class="form-control" id="tr-trainer" value="${escapeHtml((record == null ? void 0 : record.trainer) || "")}" placeholder="ex: AFPA Formation">
+          <input type="text" class="form-control" id="tr-trainer" value="${escapeHtml((record == null ? void 0 : record.trainer) || "")}" placeholder="ex: AFPA Formation" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Sujet de formation *</label>
-        <input type="text" class="form-control" id="tr-topic" value="${escapeHtml((record == null ? void 0 : record.training_topic) || "")}" placeholder="ex: Hygi\xE8ne alimentaire HACCP">
+        <input type="text" class="form-control" id="tr-topic" value="${escapeHtml((record == null ? void 0 : record.training_topic) || "")}" placeholder="ex: Hygi\xE8ne alimentaire HACCP" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -11199,11 +11208,11 @@ function showTrainingModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Dur\xE9e (heures)</label>
-          <input type="number" step="0.5" min="0" class="form-control" id="tr-duration" value="${(record == null ? void 0 : record.duration_hours) || ""}" placeholder="ex: 14">
+          <input type="number" step="0.5" min="0" class="form-control" id="tr-duration" value="${(record == null ? void 0 : record.duration_hours) || ""}" placeholder="ex: 14" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Statut</label>
-          <select class="form-control" id="tr-status">
+          <select class="form-control" id="tr-status" data-ui="custom">
             <option value="planifi\xE9" ${!record || record.status === "planifi\xE9" ? "selected" : ""}>Planifi\xE9</option>
             <option value="r\xE9alis\xE9" ${(record == null ? void 0 : record.status) === "r\xE9alis\xE9" ? "selected" : ""}>R\xE9alis\xE9</option>
             <option value="expir\xE9" ${(record == null ? void 0 : record.status) === "expir\xE9" ? "selected" : ""}>Expir\xE9</option>
@@ -11212,11 +11221,11 @@ function showTrainingModal(record = null) {
       </div>
       <div class="form-group">
         <label>R\xE9f\xE9rence certificat</label>
-        <input type="text" class="form-control" id="tr-cert" value="${escapeHtml((record == null ? void 0 : record.certificate_ref) || "")}" placeholder="ex: HACCP-2026-001">
+        <input type="text" class="form-control" id="tr-cert" value="${escapeHtml((record == null ? void 0 : record.certificate_ref) || "")}" placeholder="ex: HACCP-2026-001" data-ui="custom">
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="tr-notes" value="${escapeHtml((record == null ? void 0 : record.notes) || "")}" placeholder="">
+        <input type="text" class="form-control" id="tr-notes" value="${escapeHtml((record == null ? void 0 : record.notes) || "")}" placeholder="" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="tr-cancel">Annuler</button>
@@ -11423,11 +11432,11 @@ function showPestControlModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Prestataire</label>
-          <input type="text" class="form-control" id="pc-provider" value="${escapeHtml((record == null ? void 0 : record.provider_name) || "")}" placeholder="ex: Anticimex Pro" autofocus>
+          <input type="text" class="form-control" id="pc-provider" value="${escapeHtml((record == null ? void 0 : record.provider_name) || "")}" placeholder="ex: Anticimex Pro" autofocus data-ui="custom">
         </div>
         <div class="form-group">
           <label>R\xE9f. contrat</label>
-          <input type="text" class="form-control" id="pc-contract" value="${escapeHtml((record == null ? void 0 : record.contract_ref) || "")}" placeholder="ex: ANTI-2026-0042">
+          <input type="text" class="form-control" id="pc-contract" value="${escapeHtml((record == null ? void 0 : record.contract_ref) || "")}" placeholder="ex: ANTI-2026-0042" data-ui="custom">
         </div>
       </div>
       <div class="form-row">
@@ -11442,20 +11451,20 @@ function showPestControlModal(record = null) {
       </div>
       <div class="form-group">
         <label>Constats</label>
-        <textarea class="form-control" id="pc-findings" rows="2" placeholder="ex: RAS \u2014 aucune trace d'infestation">${escapeHtml((record == null ? void 0 : record.findings) || "")}</textarea>
+        <textarea class="form-control" id="pc-findings" rows="2" placeholder="ex: RAS \u2014 aucune trace d'infestation" data-ui="custom">${escapeHtml((record == null ? void 0 : record.findings) || "")}</textarea>
       </div>
       <div class="form-group">
         <label>Actions effectu\xE9es</label>
-        <textarea class="form-control" id="pc-actions" rows="2" placeholder="ex: V\xE9rification et renouvellement des app\xE2ts">${escapeHtml((record == null ? void 0 : record.actions_taken) || "")}</textarea>
+        <textarea class="form-control" id="pc-actions" rows="2" placeholder="ex: V\xE9rification et renouvellement des app\xE2ts" data-ui="custom">${escapeHtml((record == null ? void 0 : record.actions_taken) || "")}</textarea>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Nombre de stations d'app\xE2t</label>
-          <input type="number" min="0" class="form-control" id="pc-baits" value="${(_a = record == null ? void 0 : record.bait_stations_count) != null ? _a : ""}" placeholder="ex: 8">
+          <input type="number" min="0" class="form-control" id="pc-baits" value="${(_a = record == null ? void 0 : record.bait_stations_count) != null ? _a : ""}" placeholder="ex: 8" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Statut</label>
-          <select class="form-control" id="pc-status">
+          <select class="form-control" id="pc-status" data-ui="custom">
             <option value="conforme" ${!record || record.status === "conforme" ? "selected" : ""}>Conforme</option>
             <option value="non-conforme" ${(record == null ? void 0 : record.status) === "non-conforme" ? "selected" : ""}>Non conforme</option>
             <option value="action-requise" ${(record == null ? void 0 : record.status) === "action-requise" ? "selected" : ""}>Action requise</option>
@@ -11464,7 +11473,7 @@ function showPestControlModal(record = null) {
       </div>
       <div class="form-group">
         <label>R\xE9f\xE9rence rapport</label>
-        <input type="text" class="form-control" id="pc-report" value="${escapeHtml((record == null ? void 0 : record.report_ref) || "")}" placeholder="ex: RPT-2026-Q1">
+        <input type="text" class="form-control" id="pc-report" value="${escapeHtml((record == null ? void 0 : record.report_ref) || "")}" placeholder="ex: RPT-2026-Q1" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="pc-cancel">Annuler</button>
@@ -11659,11 +11668,11 @@ function showMaintenanceModal(record = null) {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Nom de l'\xE9quipement *</label>
-          <input type="text" class="form-control" id="maint-name" value="${escapeHtml((record == null ? void 0 : record.equipment_name) || "")}" placeholder="ex: Chambre froide positive" autofocus>
+          <input type="text" class="form-control" id="maint-name" value="${escapeHtml((record == null ? void 0 : record.equipment_name) || "")}" placeholder="ex: Chambre froide positive" autofocus data-ui="custom">
         </div>
         <div class="form-group">
           <label>Type</label>
-          <select class="form-control" id="maint-type">
+          <select class="form-control" id="maint-type" data-ui="custom">
             <option value="froid" ${(record == null ? void 0 : record.equipment_type) === "froid" ? "selected" : ""}>\u2744\uFE0F Froid</option>
             <option value="cuisson" ${(record == null ? void 0 : record.equipment_type) === "cuisson" ? "selected" : ""}>\u{1F525} Cuisson</option>
             <option value="ventilation" ${(record == null ? void 0 : record.equipment_type) === "ventilation" ? "selected" : ""}>\u{1F4A8} Ventilation</option>
@@ -11674,7 +11683,7 @@ function showMaintenanceModal(record = null) {
       </div>
       <div class="form-group">
         <label>Emplacement</label>
-        <input type="text" class="form-control" id="maint-location" value="${escapeHtml((record == null ? void 0 : record.location) || "")}" placeholder="ex: Cuisine, R\xE9serve, Salle...">
+        <input type="text" class="form-control" id="maint-location" value="${escapeHtml((record == null ? void 0 : record.location) || "")}" placeholder="ex: Cuisine, R\xE9serve, Salle..." data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -11689,14 +11698,14 @@ function showMaintenanceModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Type de maintenance</label>
-          <select class="form-control" id="maint-mtype">
+          <select class="form-control" id="maint-mtype" data-ui="custom">
             <option value="pr\xE9ventive" ${!record || record.maintenance_type === "pr\xE9ventive" ? "selected" : ""}>Pr\xE9ventive</option>
             <option value="corrective" ${(record == null ? void 0 : record.maintenance_type) === "corrective" ? "selected" : ""}>Corrective</option>
           </select>
         </div>
         <div class="form-group">
           <label>Statut</label>
-          <select class="form-control" id="maint-status">
+          <select class="form-control" id="maint-status" data-ui="custom">
             <option value="\xE0_jour" ${(record == null ? void 0 : record.status) === "\xE0_jour" ? "selected" : ""}>\xC0 jour</option>
             <option value="planifi\xE9" ${!record || record.status === "planifi\xE9" ? "selected" : ""}>Planifi\xE9</option>
             <option value="en_retard" ${(record == null ? void 0 : record.status) === "en_retard" ? "selected" : ""}>En retard</option>
@@ -11706,16 +11715,16 @@ function showMaintenanceModal(record = null) {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Prestataire</label>
-          <input type="text" class="form-control" id="maint-provider" value="${escapeHtml((record == null ? void 0 : record.provider) || "")}" placeholder="ex: FrigoTech SARL">
+          <input type="text" class="form-control" id="maint-provider" value="${escapeHtml((record == null ? void 0 : record.provider) || "")}" placeholder="ex: FrigoTech SARL" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Co\xFBt (\u20AC)</label>
-          <input type="number" min="0" step="0.01" class="form-control" id="maint-cost" value="${(_a = record == null ? void 0 : record.cost) != null ? _a : ""}" placeholder="ex: 280">
+          <input type="number" min="0" step="0.01" class="form-control" id="maint-cost" value="${(_a = record == null ? void 0 : record.cost) != null ? _a : ""}" placeholder="ex: 280" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="maint-notes" value="${escapeHtml((record == null ? void 0 : record.notes) || "")}" placeholder="">
+        <input type="text" class="form-control" id="maint-notes" value="${escapeHtml((record == null ? void 0 : record.notes) || "")}" placeholder="" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="maint-cancel">Annuler</button>
@@ -11903,7 +11912,7 @@ function showWasteModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Type de d\xE9chet *</label>
-          <select class="form-control" id="wst-type">
+          <select class="form-control" id="wst-type" data-ui="custom">
             <option value="alimentaire" ${!record || record.waste_type === "alimentaire" ? "selected" : ""}>\u{1F343} Alimentaire</option>
             <option value="emballage" ${(record == null ? void 0 : record.waste_type) === "emballage" ? "selected" : ""}>\u{1F4E6} Emballage</option>
             <option value="huile" ${(record == null ? void 0 : record.waste_type) === "huile" ? "selected" : ""}>\u{1F6E2}\uFE0F Huile</option>
@@ -11913,7 +11922,7 @@ function showWasteModal(record = null) {
         </div>
         <div class="form-group">
           <label>Fr\xE9quence de collecte</label>
-          <select class="form-control" id="wst-freq">
+          <select class="form-control" id="wst-freq" data-ui="custom">
             <option value="quotidienne" ${(record == null ? void 0 : record.collection_frequency) === "quotidienne" ? "selected" : ""}>Quotidienne</option>
             <option value="hebdomadaire" ${!record || record.collection_frequency === "hebdomadaire" ? "selected" : ""}>Hebdomadaire</option>
             <option value="bimestrielle" ${(record == null ? void 0 : record.collection_frequency) === "bimestrielle" ? "selected" : ""}>Bimestrielle</option>
@@ -11924,11 +11933,11 @@ function showWasteModal(record = null) {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Prestataire</label>
-          <input type="text" class="form-control" id="wst-provider" value="${escapeHtml((record == null ? void 0 : record.collection_provider) || "")}" placeholder="ex: Veolia, Paprec Group" autofocus>
+          <input type="text" class="form-control" id="wst-provider" value="${escapeHtml((record == null ? void 0 : record.collection_provider) || "")}" placeholder="ex: Veolia, Paprec Group" autofocus data-ui="custom">
         </div>
         <div class="form-group">
           <label>R\xE9f. contrat</label>
-          <input type="text" class="form-control" id="wst-contract" value="${escapeHtml((record == null ? void 0 : record.contract_ref) || "")}" placeholder="ex: VEO-2026-C088">
+          <input type="text" class="form-control" id="wst-contract" value="${escapeHtml((record == null ? void 0 : record.contract_ref) || "")}" placeholder="ex: VEO-2026-C088" data-ui="custom">
         </div>
       </div>
       <div class="form-row">
@@ -11943,7 +11952,7 @@ function showWasteModal(record = null) {
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <textarea class="form-control" id="wst-notes" rows="2" placeholder="ex: Bac vert 240L \u2014 d\xE9chets organiques">${escapeHtml((record == null ? void 0 : record.notes) || "")}</textarea>
+        <textarea class="form-control" id="wst-notes" rows="2" placeholder="ex: Bac vert 240L \u2014 d\xE9chets organiques" data-ui="custom">${escapeHtml((record == null ? void 0 : record.notes) || "")}</textarea>
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="wst-cancel">Annuler</button>
@@ -12105,8 +12114,8 @@ async function renderCorrectiveActions() {
       ).join("");
       container.innerHTML = `
         <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-          <select id="ca-filter-cat" class="form-control" style="min-width:160px">${catOptions}</select>
-          <select id="ca-filter-status" class="form-control" style="min-width:140px">${statusOptions}</select>
+          <select id="ca-filter-cat" class="form-control" style="min-width:160px" data-ui="custom">${catOptions}</select>
+          <select id="ca-filter-status" class="form-control" style="min-width:140px" data-ui="custom">${statusOptions}</select>
         </div>
 
         ${filtered2.length === 0 ? `
@@ -12306,32 +12315,32 @@ async function renderCorrectiveActions() {
           <div class="modal-body">
             <div class="form-group">
               <label>Mod\xE8le (optionnel)</label>
-              <select id="ca-tpl-select" class="form-control">
+              <select id="ca-tpl-select" class="form-control" data-ui="custom">
                 <option value="">\u2014 Saisie libre \u2014</option>
                 ${tplOptions}
               </select>
             </div>
             <div class="form-group">
               <label>Cat\xE9gorie <span style="color:var(--color-danger)">*</span></label>
-              <select id="ca-category" class="form-control">
+              <select id="ca-category" class="form-control" data-ui="custom">
                 ${catOptions}
               </select>
             </div>
             <div class="form-group">
               <label>D\xE9clencheur (description du probl\xE8me)</label>
-              <input type="text" id="ca-trigger" class="form-control" placeholder="Ex: Temp\xE9rature chambre froide \xE0 6\xB0C \xE0 8h30">
+              <input type="text" id="ca-trigger" class="form-control" placeholder="Ex: Temp\xE9rature chambre froide \xE0 6\xB0C \xE0 8h30" data-ui="custom">
             </div>
             <div class="form-group">
               <label>Action prise</label>
-              <textarea id="ca-action" class="form-control" rows="3" placeholder="D\xE9crivez l'action corrective mise en place"></textarea>
+              <textarea id="ca-action" class="form-control" rows="3" placeholder="D\xE9crivez l'action corrective mise en place" data-ui="custom"></textarea>
             </div>
             <div class="form-group">
               <label>Responsable</label>
-              <input type="text" id="ca-responsible" class="form-control" placeholder="Nom ou poste">
+              <input type="text" id="ca-responsible" class="form-control" placeholder="Nom ou poste" data-ui="custom">
             </div>
             <div class="form-group">
               <label>Notes</label>
-              <textarea id="ca-notes" class="form-control" rows="2"></textarea>
+              <textarea id="ca-notes" class="form-control" rows="2" data-ui="custom"></textarea>
             </div>
           </div>
           <div class="modal-footer">
@@ -12401,15 +12410,15 @@ async function renderCorrectiveActions() {
             </div>
             <div class="form-group">
               <label>Action prise</label>
-              <textarea id="ca-edit-action" class="form-control" rows="3">${escapeHtml(item.action_taken || "")}</textarea>
+              <textarea id="ca-edit-action" class="form-control" rows="3" data-ui="custom">${escapeHtml(item.action_taken || "")}</textarea>
             </div>
             <div class="form-group">
               <label>Responsable</label>
-              <input type="text" id="ca-edit-responsible" class="form-control" value="${escapeHtml(item.responsible_person || "")}">
+              <input type="text" id="ca-edit-responsible" class="form-control" value="${escapeHtml(item.responsible_person || "")}" data-ui="custom">
             </div>
             <div class="form-group">
               <label>Statut</label>
-              <select id="ca-edit-status" class="form-control">${statusOptions}</select>
+              <select id="ca-edit-status" class="form-control" data-ui="custom">${statusOptions}</select>
             </div>
             <div class="form-group">
               <label>Date de d\xE9but</label>
@@ -12421,7 +12430,7 @@ async function renderCorrectiveActions() {
             </div>
             <div class="form-group">
               <label>Notes</label>
-              <textarea id="ca-edit-notes" class="form-control" rows="2">${escapeHtml(item.notes || "")}</textarea>
+              <textarea id="ca-edit-notes" class="form-control" rows="2" data-ui="custom">${escapeHtml(item.notes || "")}</textarea>
             </div>
           </div>
           <div class="modal-footer">
@@ -12469,33 +12478,33 @@ async function renderCorrectiveActions() {
           <div class="modal-body">
             <div class="form-group">
               <label>Cat\xE9gorie <span style="color:var(--color-danger)">*</span></label>
-              <select id="tpl-category" class="form-control">${catOptions}</select>
+              <select id="tpl-category" class="form-control" data-ui="custom">${catOptions}</select>
             </div>
             <div class="form-group">
               <label>Condition d\xE9clenchante</label>
-              <input type="text" id="tpl-trigger" class="form-control" value="${escapeHtml(tpl ? tpl.trigger_condition || "" : "")}" placeholder="Ex: Temp\xE9rature > 4\xB0C en chambre froide">
+              <input type="text" id="tpl-trigger" class="form-control" value="${escapeHtml(tpl ? tpl.trigger_condition || "" : "")}" placeholder="Ex: Temp\xE9rature  data-ui="custom"> 4\xB0C en chambre froide">
             </div>
             <div class="form-group">
               <label>Description de l'action</label>
-              <textarea id="tpl-action" class="form-control" rows="3" placeholder="D\xE9crivez les \xE9tapes de l'action corrective">${escapeHtml(tpl ? tpl.action_description || "" : "")}</textarea>
+              <textarea id="tpl-action" class="form-control" rows="3" placeholder="D\xE9crivez les \xE9tapes de l'action corrective" data-ui="custom">${escapeHtml(tpl ? tpl.action_description || "" : "")}</textarea>
             </div>
             <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div class="form-group">
                 <label>R\xF4le responsable</label>
-                <input type="text" id="tpl-role" class="form-control" value="${escapeHtml(tpl ? tpl.responsible_role || "" : "")}" placeholder="cuisinier / gerant">
+                <input type="text" id="tpl-role" class="form-control" value="${escapeHtml(tpl ? tpl.responsible_role || "" : "")}" placeholder="cuisinier / gerant" data-ui="custom">
               </div>
               <div class="form-group">
                 <label>D\xE9lai max (heures)</label>
-                <input type="number" id="tpl-deadline" class="form-control" value="${tpl ? tpl.deadline_hours != null ? tpl.deadline_hours : "" : ""}" min="0" placeholder="0 = imm\xE9diat">
+                <input type="number" id="tpl-deadline" class="form-control" value="${tpl ? tpl.deadline_hours != null ? tpl.deadline_hours : "" : ""}" min="0" placeholder="0 = imm\xE9diat" data-ui="custom">
               </div>
             </div>
             <div class="form-group">
               <label>Proc\xE9dure d'escalade</label>
-              <textarea id="tpl-escalation" class="form-control" rows="2" placeholder="Conditions et contacts d'escalade">${escapeHtml(tpl ? tpl.escalation_procedure || "" : "")}</textarea>
+              <textarea id="tpl-escalation" class="form-control" rows="2" placeholder="Conditions et contacts d'escalade" data-ui="custom">${escapeHtml(tpl ? tpl.escalation_procedure || "" : "")}</textarea>
             </div>
             <div class="form-group">
               <label>Documents requis</label>
-              <input type="text" id="tpl-docs" class="form-control" value="${escapeHtml(tpl ? tpl.documentation_required || "" : "")}" placeholder="Ex: Fiche de non-conformit\xE9, relev\xE9 temp\xE9rature">
+              <input type="text" id="tpl-docs" class="form-control" value="${escapeHtml(tpl ? tpl.documentation_required || "" : "")}" placeholder="Ex: Fiche de non-conformit\xE9, relev\xE9 temp\xE9rature" data-ui="custom">
             </div>
           </div>
           <div class="modal-footer">
@@ -12658,11 +12667,11 @@ function tdModalHtml(item) {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
             <div class="form-group" style="grid-column:1/-1">
               <label class="form-label">Produit <span style="color:var(--color-danger)">*</span></label>
-              <input type="text" class="form-control" id="td-product-name" value="${escapeHtml(v.product_name || "")}" placeholder="Ex: Blanquette de veau" required>
+              <input type="text" class="form-control" id="td-product-name" value="${escapeHtml(v.product_name || "")}" placeholder="Ex: Blanquette de veau" required data-ui="custom">
             </div>
             <div class="form-group">
               <label class="form-label">N\xB0 de lot</label>
-              <input type="text" class="form-control" id="td-batch-number" value="${escapeHtml(v.batch_number || "")}" placeholder="Ex: BV-2026-04-13-001">
+              <input type="text" class="form-control" id="td-batch-number" value="${escapeHtml(v.batch_number || "")}" placeholder="Ex: BV-2026-04-13-001" data-ui="custom">
             </div>
             <div class="form-group">
               <label class="form-label">Date de fabrication</label>
@@ -12670,7 +12679,7 @@ function tdModalHtml(item) {
             </div>
             <div class="form-group">
               <label class="form-label">Type de destination</label>
-              <select class="form-control" id="td-destination-type">
+              <select class="form-control" id="td-destination-type" data-ui="custom">
                 <option value="">\u2014 Choisir \u2014</option>
                 <option value="salle" ${v.destination_type === "salle" ? "selected" : ""}>Salle</option>
                 <option value="livraison" ${v.destination_type === "livraison" ? "selected" : ""}>Livraison</option>
@@ -12680,15 +12689,15 @@ function tdModalHtml(item) {
             </div>
             <div class="form-group">
               <label class="form-label">Nom de la destination</label>
-              <input type="text" class="form-control" id="td-destination-name" value="${escapeHtml(v.destination_name || "")}" placeholder="Ex: Salle principale">
+              <input type="text" class="form-control" id="td-destination-name" value="${escapeHtml(v.destination_name || "")}" placeholder="Ex: Salle principale" data-ui="custom">
             </div>
             <div class="form-group">
               <label class="form-label">Quantit\xE9</label>
-              <input type="number" class="form-control" id="td-quantity" value="${v.quantity != null ? v.quantity : ""}" step="0.1" min="0" placeholder="0.0">
+              <input type="number" class="form-control" id="td-quantity" value="${v.quantity != null ? v.quantity : ""}" step="0.1" min="0" placeholder="0.0" data-ui="custom">
             </div>
             <div class="form-group">
               <label class="form-label">Unit\xE9</label>
-              <select class="form-control" id="td-unit">
+              <select class="form-control" id="td-unit" data-ui="custom">
                 <option value="kg" ${(v.unit || "kg") === "kg" ? "selected" : ""}>kg</option>
                 <option value="L" ${v.unit === "L" ? "selected" : ""}>L</option>
                 <option value="portion" ${v.unit === "portion" ? "selected" : ""}>portion(s)</option>
@@ -12706,15 +12715,15 @@ function tdModalHtml(item) {
             </div>
             <div class="form-group">
               <label class="form-label">Temp\xE9rature au d\xE9part (\xB0C)</label>
-              <input type="number" class="form-control" id="td-temperature" value="${v.temperature_at_dispatch != null ? v.temperature_at_dispatch : ""}" step="0.1" placeholder="Ex: 4.0">
+              <input type="number" class="form-control" id="td-temperature" value="${v.temperature_at_dispatch != null ? v.temperature_at_dispatch : ""}" step="0.1" placeholder="Ex: 4.0" data-ui="custom">
             </div>
             <div class="form-group">
               <label class="form-label">Responsable</label>
-              <input type="text" class="form-control" id="td-responsible" value="${escapeHtml(v.responsible_person || "")}" placeholder="Ex: Marie Dupont">
+              <input type="text" class="form-control" id="td-responsible" value="${escapeHtml(v.responsible_person || "")}" placeholder="Ex: Marie Dupont" data-ui="custom">
             </div>
             <div class="form-group" style="grid-column:1/-1">
               <label class="form-label">Notes</label>
-              <textarea class="form-control" id="td-notes" rows="3" placeholder="Observations, remarques...">${escapeHtml(v.notes || "")}</textarea>
+              <textarea class="form-control" id="td-notes" rows="3" placeholder="Observations, remarques..." data-ui="custom">${escapeHtml(v.notes || "")}</textarea>
             </div>
           </div>
         </div>
@@ -12791,7 +12800,7 @@ async function renderTraceabilityDownstream() {
             <strong style="font-size:0.9rem">Recherche par num\xE9ro de lot</strong>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
-            <input type="text" class="form-control" id="td-search-batch" placeholder="Ex: BV-2026-04-13-001" value="${escapeHtml(searchHighlightBatch || "")}" style="max-width:320px">
+            <input type="text" class="form-control" id="td-search-batch" placeholder="Ex: BV-2026-04-13-001" value="${escapeHtml(searchHighlightBatch || "")}" style="max-width:320px" data-ui="custom">
             <button class="btn btn-primary" id="td-search-btn">
               <i data-lucide="search" style="width:15px;height:15px"></i> Rechercher
             </button>
@@ -12807,7 +12816,7 @@ async function renderTraceabilityDownstream() {
         <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-4);align-items:flex-end">
           <div class="form-group" style="margin:0;min-width:180px">
             <label class="form-label" style="margin-bottom:4px">Destination</label>
-            <select class="form-control" id="td-filter-dest" style="font-size:0.85rem">
+            <select class="form-control" id="td-filter-dest" style="font-size:0.85rem" data-ui="custom">
               <option value="">Tous types</option>
               <option value="salle">Salle</option>
               <option value="livraison">Livraison</option>
@@ -12817,7 +12826,7 @@ async function renderTraceabilityDownstream() {
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label" style="margin-bottom:4px">Produit</label>
-            <input type="text" class="form-control" id="td-filter-product" placeholder="Nom du produit" style="font-size:0.85rem;max-width:220px">
+            <input type="text" class="form-control" id="td-filter-product" placeholder="Nom du produit" style="font-size:0.85rem;max-width:220px" data-ui="custom">
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label" style="margin-bottom:4px">Du</label>
@@ -13113,18 +13122,18 @@ function showDiagramModal(diagram) {
       <div class="form-row" style="align-items:center;margin-bottom:var(--space-2)">
         <span style="font-weight:600;min-width:28px;color:var(--text-tertiary)">${i + 1}.</span>
         <div class="form-group" style="flex:2;margin-bottom:0">
-          <input type="text" class="form-control etape-nom" placeholder="Nom de l'\xE9tape *" value="${escapeHtml(e.nom || "")}">
+          <input type="text" class="form-control etape-nom" placeholder="Nom de l'\xE9tape *" value="${escapeHtml(e.nom || "")}" data-ui="custom">
         </div>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;white-space:nowrap">
-          <input type="checkbox" class="etape-ccp" ${e.ccp ? "checked" : ""}> CCP
+          <input type="checkbox" class="etape-ccp" ${e.ccp ? "checked" : ""} data-ui="custom"> CCP
         </label>
         <button class="btn btn-ghost btn-sm btn-remove-etape" ${etapesList2.length <= 1 ? "disabled" : ""} style="padding:4px 8px;color:var(--color-danger)">\u2715</button>
       </div>
       <div class="form-group" style="margin-bottom:var(--space-2)">
-        <input type="text" class="form-control etape-desc" placeholder="Description de l'\xE9tape" value="${escapeHtml(e.description || "")}">
+        <input type="text" class="form-control etape-desc" placeholder="Description de l'\xE9tape" value="${escapeHtml(e.description || "")}" data-ui="custom">
       </div>
       <div class="form-group" style="margin-bottom:0">
-        <input type="text" class="form-control etape-pm" placeholder="Point de ma\xEEtrise / limite critique" value="${escapeHtml(e.point_maitrise || "")}">
+        <input type="text" class="form-control etape-pm" placeholder="Point de ma\xEEtrise / limite critique" value="${escapeHtml(e.point_maitrise || "")}" data-ui="custom">
       </div>
     </div>
   `).join("");
@@ -13134,11 +13143,11 @@ function showDiagramModal(diagram) {
 
       <div class="form-group">
         <label>Nom du diagramme *</label>
-        <input type="text" class="form-control" id="diag-nom" value="${isEdit ? escapeHtml(diagram.nom) : ""}" placeholder="ex: Service restaurant \u2014 liaison chaude">
+        <input type="text" class="form-control" id="diag-nom" value="${isEdit ? escapeHtml(diagram.nom) : ""}" placeholder="ex: Service restaurant \u2014 liaison chaude" data-ui="custom">
       </div>
       <div class="form-group">
         <label>Description</label>
-        <textarea class="form-control" id="diag-desc" rows="2" placeholder="Description du diagramme...">${isEdit ? escapeHtml(diagram.description || "") : ""}</textarea>
+        <textarea class="form-control" id="diag-desc" rows="2" placeholder="Description du diagramme..." data-ui="custom">${isEdit ? escapeHtml(diagram.description || "") : ""}</textarea>
       </div>
 
       <div style="margin-bottom:var(--space-3)">
@@ -13276,7 +13285,7 @@ function renderPMSShell() {
         </div>
         <div class="pms-toolbar__right">
           <label class="pms-period-label" for="pms-period-select">P\xE9riode :</label>
-          <select id="pms-period-select" class="pms-period-select">
+          <select id="pms-period-select" class="pms-period-select" data-ui="custom">
             ${periodOptions.map((o) => `<option value="${o.value}"${o.value === _pmsPeriod ? " selected" : ""}>${o.label}</option>`).join("")}
           </select>
           <button class="btn btn-secondary no-print" id="btn-pms-print">
@@ -14859,7 +14868,7 @@ async function renderNewOrder() {
       <div class="section-title" id="section-ingredients">Produits du fournisseur</div>
       <div id="ingredients-list" role="region" aria-labelledby="section-ingredients">
         <label for="ingredient-search" class="visually-hidden">Rechercher un produit</label>
-        <input type="search" class="form-control" id="ingredient-search" placeholder="Rechercher un produit..." style="margin-bottom:12px" aria-label="Rechercher un produit" disabled>
+        <input type="search" class="form-control" id="ingredient-search" placeholder="Rechercher un produit..." style="margin-bottom:12px" aria-label="Rechercher un produit" disabled data-ui="custom">
         <div id="ingredients-filtered" role="list" aria-label="Produits disponibles" aria-live="polite" style="max-height:300px;overflow-y:auto;border:1px solid var(--border-color);border-radius:4px">
           <p class="text-muted" style="padding:16px;text-align:center;margin:0">S\xE9lectionnez un fournisseur pour voir les produits disponibles.</p>
         </div>
@@ -15006,13 +15015,13 @@ function updatePOItemsDisplay() {
             <tr style="border-bottom:1px solid var(--border-color)">
               <td style="padding:8px">${escapeHtml(item.name)}</td>
               <td style="padding:8px;text-align:right">
-                <input type="number" class="form-control" style="max-width:80px" value="${item.quantity}" min="1" onchange="updatePOItemQuantity(${idx}, this.value)">
+                <input type="number" class="form-control" style="max-width:80px" value="${item.quantity}" min="1" onchange="updatePOItemQuantity(${idx}, this.value)" data-ui="custom">
               </td>
               <td style="padding:8px;text-align:right">
-                <input type="text" class="form-control" style="max-width:80px" value="${escapeHtml(item.unit)}" onchange="updatePOItemUnit(${idx}, this.value)">
+                <input type="text" class="form-control" style="max-width:80px" value="${escapeHtml(item.unit)}" onchange="updatePOItemUnit(${idx}, this.value)" data-ui="custom">
               </td>
               <td style="padding:8px;text-align:right">
-                <input type="number" class="form-control" style="max-width:100px" step="0.01" value="${item.unit_price || ""}" placeholder="0.00" onchange="updatePOItemPrice(${idx}, this.value)">
+                <input type="number" class="form-control" style="max-width:100px" step="0.01" value="${item.unit_price || ""}" placeholder="0.00" onchange="updatePOItemPrice(${idx}, this.value)" data-ui="custom">
               </td>
               <td style="padding:8px;text-align:right;font-weight:600">${formatCurrency(lineTotal)}</td>
               <td style="padding:8px;text-align:center">
@@ -15651,7 +15660,7 @@ function _svcRenderServiceUI(app, tableCount) {
                 <h3 class="svc-section-subtitle">Commande en cours</h3>
                 <div id="svc-cart-items"></div>
                 <div class="svc-cart-notes">
-                  <textarea class="form-control svc-notes-input" id="svc-order-notes" rows="2" placeholder="Notes (allergies, demandes sp\xE9ciales...)"></textarea>
+                  <textarea class="form-control svc-notes-input" id="svc-order-notes" rows="2" placeholder="Notes (allergies, demandes sp\xE9ciales...)" data-ui="custom"></textarea>
                 </div>
                 <div class="svc-cart-total" id="svc-cart-total">Total : 0,00 \u20AC</div>
                 <div class="svc-cart-actions">
@@ -17486,15 +17495,15 @@ class OnboardingWizard {
         <div class="ob-form">
           <div class="form-group">
             <label for="ob-firstname">Pr\xE9nom</label>
-            <input type="text" class="form-control" id="ob-firstname" value="${escapeHtml(acc.first_name || "")}" placeholder="Pr\xE9nom" autocomplete="given-name">
+            <input type="text" class="form-control" id="ob-firstname" value="${escapeHtml(acc.first_name || "")}" placeholder="Pr\xE9nom" autocomplete="given-name" data-ui="custom">
           </div>
           <div class="form-group">
             <label for="ob-lastname">Nom</label>
-            <input type="text" class="form-control" id="ob-lastname" value="${escapeHtml(acc.last_name || "")}" placeholder="Nom" autocomplete="family-name">
+            <input type="text" class="form-control" id="ob-lastname" value="${escapeHtml(acc.last_name || "")}" placeholder="Nom" autocomplete="family-name" data-ui="custom">
           </div>
           <div class="form-group">
             <label for="ob-phone">T\xE9l\xE9phone</label>
-            <input type="tel" class="form-control" id="ob-phone" value="${escapeHtml(acc.phone || "")}" placeholder="06 12 34 56 78" autocomplete="tel">
+            <input type="tel" class="form-control" id="ob-phone" value="${escapeHtml(acc.phone || "")}" placeholder="06 12 34 56 78" autocomplete="tel" data-ui="custom">
           </div>
         </div>
       </div>
@@ -17512,37 +17521,37 @@ class OnboardingWizard {
         <div class="ob-form">
           <div class="form-group">
             <label for="ob-rname">Nom du restaurant</label>
-            <input type="text" class="form-control" id="ob-rname" value="${escapeHtml(r.name || "")}" placeholder="Chez Marcel">
+            <input type="text" class="form-control" id="ob-rname" value="${escapeHtml(r.name || "")}" placeholder="Chez Marcel" data-ui="custom">
           </div>
           <div class="form-group">
             <label for="ob-rtype">Type d'\xE9tablissement</label>
-            <select class="form-control" id="ob-rtype">
+            <select class="form-control" id="ob-rtype" data-ui="custom">
               <option value="">\u2014 Choisir \u2014</option>
               ${["brasserie", "gastro", "fast-food", "pizzeria", "bar", "traiteur", "boulangerie", "autre"].map((t) => `<option value="${t}" ${r.type === t ? "selected" : ""}>${t.charAt(0).toUpperCase() + t.slice(1)}</option>`).join("")}
             </select>
           </div>
           <div class="form-group">
             <label for="ob-raddress">Adresse</label>
-            <input type="text" class="form-control" id="ob-raddress" value="${escapeHtml(r.address || "")}" placeholder="12 rue de la Paix" autocomplete="street-address">
+            <input type="text" class="form-control" id="ob-raddress" value="${escapeHtml(r.address || "")}" placeholder="12 rue de la Paix" autocomplete="street-address" data-ui="custom">
           </div>
           <div style="display:flex;gap:var(--space-3)">
             <div class="form-group" style="flex:2">
               <label for="ob-rcity">Ville</label>
-              <input type="text" class="form-control" id="ob-rcity" value="${escapeHtml(r.city || "")}" placeholder="Lyon" autocomplete="address-level2">
+              <input type="text" class="form-control" id="ob-rcity" value="${escapeHtml(r.city || "")}" placeholder="Lyon" autocomplete="address-level2" data-ui="custom">
             </div>
             <div class="form-group" style="flex:1">
               <label for="ob-rpostal">Code postal</label>
-              <input type="text" class="form-control" id="ob-rpostal" value="${escapeHtml(r.postal_code || "")}" placeholder="69001" maxlength="5" inputmode="numeric" autocomplete="postal-code">
+              <input type="text" class="form-control" id="ob-rpostal" value="${escapeHtml(r.postal_code || "")}" placeholder="69001" maxlength="5" inputmode="numeric" autocomplete="postal-code" data-ui="custom">
             </div>
           </div>
           <div style="display:flex;gap:var(--space-3)">
             <div class="form-group" style="flex:1">
               <label for="ob-rphone">T\xE9l\xE9phone</label>
-              <input type="tel" class="form-control" id="ob-rphone" value="${escapeHtml(r.phone || "")}" placeholder="04 78 00 00 00">
+              <input type="tel" class="form-control" id="ob-rphone" value="${escapeHtml(r.phone || "")}" placeholder="04 78 00 00 00" data-ui="custom">
             </div>
             <div class="form-group" style="flex:1">
               <label for="ob-rcovers">Nombre de couverts</label>
-              <input type="number" class="form-control" id="ob-rcovers" value="${r.covers || 30}" placeholder="30" min="1" inputmode="numeric">
+              <input type="number" class="form-control" id="ob-rcovers" value="${r.covers || 30}" placeholder="30" min="1" inputmode="numeric" data-ui="custom">
             </div>
           </div>
         </div>
@@ -17584,19 +17593,19 @@ class OnboardingWizard {
       container.innerHTML = `
         <div class="form-group">
           <label for="ob-salle-count">Salle \u2014 nombre de tables</label>
-          <input type="number" class="form-control" id="ob-salle-count" value="${this._countZone("Salle")}" min="0" placeholder="0" inputmode="numeric">
+          <input type="number" class="form-control" id="ob-salle-count" value="${this._countZone("Salle")}" min="0" placeholder="0" inputmode="numeric" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="ob-terrasse-count">Terrasse \u2014 nombre de tables</label>
-          <input type="number" class="form-control" id="ob-terrasse-count" value="${this._countZone("Terrasse")}" min="0" placeholder="0" inputmode="numeric">
+          <input type="number" class="form-control" id="ob-terrasse-count" value="${this._countZone("Terrasse")}" min="0" placeholder="0" inputmode="numeric" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="ob-bar-count">Bar \u2014 nombre de tables</label>
-          <input type="number" class="form-control" id="ob-bar-count" value="${this._countZone("Bar")}" min="0" placeholder="0" inputmode="numeric">
+          <input type="number" class="form-control" id="ob-bar-count" value="${this._countZone("Bar")}" min="0" placeholder="0" inputmode="numeric" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="ob-seats-default">Couverts par table (par d\xE9faut)</label>
-          <input type="number" class="form-control" id="ob-seats-default" value="4" min="1" inputmode="numeric">
+          <input type="number" class="form-control" id="ob-seats-default" value="4" min="1" inputmode="numeric" data-ui="custom">
         </div>
       `;
     } else {
@@ -17625,11 +17634,11 @@ class OnboardingWizard {
   _renderTableRow(t, i) {
     return `
       <div role="listitem" style="display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-2)">
-        <input type="number" class="form-control" style="width:60px" value="${t.table_number}" data-index="${i}" data-field="table_number" min="1" aria-label="Num\xE9ro de table" inputmode="numeric">
-        <select class="form-control" style="flex:1" data-index="${i}" data-field="zone" aria-label="Zone">
+        <input type="number" class="form-control" style="width:60px" value="${t.table_number}" data-index="${i}" data-field="table_number" min="1" aria-label="Num\xE9ro de table" inputmode="numeric" data-ui="custom">
+        <select class="form-control" style="flex:1" data-index="${i}" data-field="zone" aria-label="Zone" data-ui="custom">
           ${["Salle", "Terrasse", "Bar", "Priv\xE9"].map((z) => `<option value="${z}" ${t.zone === z ? "selected" : ""}>${z}</option>`).join("")}
         </select>
-        <input type="number" class="form-control" style="width:60px" value="${t.seats}" data-index="${i}" data-field="seats" min="1" placeholder="4" aria-label="Couverts" inputmode="numeric">
+        <input type="number" class="form-control" style="width:60px" value="${t.seats}" data-index="${i}" data-field="seats" min="1" placeholder="4" aria-label="Couverts" inputmode="numeric" data-ui="custom">
         <button class="ob-table-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:18px" aria-label="Supprimer la table ${t.table_number}">\u2715</button>
       </div>
     `;
@@ -17705,18 +17714,18 @@ class OnboardingWizard {
         </div>
         <div class="form-group" style="margin-bottom:var(--space-2)">
           <label for="ob-member-name-${i}" class="visually-hidden">Nom du membre ${i + 1}</label>
-          <input type="text" id="ob-member-name-${i}" class="form-control" placeholder="Nom / surnom" value="${escapeHtml(m.name)}" data-index="${i}" data-field="name">
+          <input type="text" id="ob-member-name-${i}" class="form-control" placeholder="Nom / surnom" value="${escapeHtml(m.name)}" data-index="${i}" data-field="name" data-ui="custom">
         </div>
         <div style="display:flex;gap:var(--space-2)">
           <label for="ob-member-role-${i}" class="visually-hidden">R\xF4le du membre ${i + 1}</label>
-          <select id="ob-member-role-${i}" class="form-control ob-role-select" data-index="${i}" data-field="role" style="flex:1">
+          <select id="ob-member-role-${i}" class="form-control ob-role-select" data-index="${i}" data-field="role" style="flex:1" data-ui="custom">
             <option value="cuisinier" ${m.role === "cuisinier" ? "selected" : ""}>\u{1F468}\u200D\u{1F373} Cuisinier</option>
             <option value="serveur" ${m.role === "serveur" ? "selected" : ""}>\u{1F37D}\uFE0F Serveur</option>
             <option value="__custom__" ${!["cuisinier", "serveur"].includes(m.role) && m.role ? "selected" : ""}>\u270F\uFE0F Personnalis\xE9\u2026</option>
           </select>
           <input type="text" class="form-control ob-custom-role" data-index="${i}" data-field="custom_role" placeholder="Ex: P\xE2tissier" aria-label="R\xF4le personnalis\xE9"
                  value="${escapeHtml(!["cuisinier", "serveur", "equipier", ""].includes(m.role) ? m.role : "")}"
-                 style="flex:1;${["cuisinier", "serveur", "equipier", ""].includes(m.role) ? "display:none" : ""}">
+                 style="flex:1;${["cuisinier", "serveur", "equipier", ""].includes(m.role) ? "display:none" : ""}" data-ui="custom">
         </div>
       </div>
     `).join("");
@@ -17780,11 +17789,11 @@ class OnboardingWizard {
     if (!container) return;
     container.innerHTML = this.zones.map((z, i) => `
       <div class="ob-zone-row" data-index="${i}" role="listitem">
-        <input type="text" class="ob-zone-name" value="${escapeHtml(z.name)}" data-field="name" data-index="${i}" aria-label="Nom de la zone ${i + 1}">
+        <input type="text" class="ob-zone-name" value="${escapeHtml(z.name)}" data-field="name" data-index="${i}" aria-label="Nom de la zone ${i + 1}" data-ui="custom">
         <div class="ob-zone-range">
-          <input type="number" class="ob-zone-input" value="${z.min_temp}" data-field="min_temp" data-index="${i}" step="1" aria-label="Temp\xE9rature minimum" inputmode="numeric">
+          <input type="number" class="ob-zone-input" value="${z.min_temp}" data-field="min_temp" data-index="${i}" step="1" aria-label="Temp\xE9rature minimum" inputmode="numeric" data-ui="custom">
           <span class="ob-zone-sep" aria-hidden="true">\xB0C \u2014</span>
-          <input type="number" class="ob-zone-input" value="${z.max_temp}" data-field="max_temp" data-index="${i}" step="1" aria-label="Temp\xE9rature maximum" inputmode="numeric">
+          <input type="number" class="ob-zone-input" value="${z.max_temp}" data-field="max_temp" data-index="${i}" step="1" aria-label="Temp\xE9rature maximum" inputmode="numeric" data-ui="custom">
           <span class="ob-zone-unit" aria-hidden="true">\xB0C</span>
         </div>
         <button class="ob-zone-delete" data-index="${i}" title="Supprimer" aria-label="Supprimer la zone ${escapeHtml(z.name)}">\u2715</button>
@@ -17839,14 +17848,14 @@ class OnboardingWizard {
         </div>
         <div class="form-group" style="margin-bottom:var(--space-2)">
           <label for="ob-supplier-name-${i}" class="visually-hidden">Nom du fournisseur ${i + 1}</label>
-          <input type="text" id="ob-supplier-name-${i}" class="form-control" placeholder="Nom de l'entreprise" value="${escapeHtml(s.name)}" data-index="${i}" data-field="name">
+          <input type="text" id="ob-supplier-name-${i}" class="form-control" placeholder="Nom de l'entreprise" value="${escapeHtml(s.name)}" data-index="${i}" data-field="name" data-ui="custom">
         </div>
         <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-2)">
-          <input type="text" class="form-control" placeholder="Contact" value="${escapeHtml(s.contact)}" data-index="${i}" data-field="contact" style="flex:1" aria-label="Personne de contact">
-          <input type="tel" class="form-control" placeholder="T\xE9l\xE9phone" value="${escapeHtml(s.phone)}" data-index="${i}" data-field="phone" style="flex:1" aria-label="T\xE9l\xE9phone">
+          <input type="text" class="form-control" placeholder="Contact" value="${escapeHtml(s.contact)}" data-index="${i}" data-field="contact" style="flex:1" aria-label="Personne de contact" data-ui="custom">
+          <input type="tel" class="form-control" placeholder="T\xE9l\xE9phone" value="${escapeHtml(s.phone)}" data-index="${i}" data-field="phone" style="flex:1" aria-label="T\xE9l\xE9phone" data-ui="custom">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <input type="email" class="form-control" placeholder="Email" value="${escapeHtml(s.email)}" data-index="${i}" data-field="email" aria-label="Email">
+          <input type="email" class="form-control" placeholder="Email" value="${escapeHtml(s.email)}" data-index="${i}" data-field="email" aria-label="Email" data-ui="custom">
         </div>
       </div>
     `).join("");
@@ -18370,11 +18379,11 @@ class LoginView {
           <div style="text-align:left;width:100%;margin-top:var(--space-4)">
             <div class="form-group">
               <label for="login-email">Email du restaurant</label>
-              <input type="email" class="form-control" id="login-email" value="${escapeHtml(prefill)}" placeholder="votre@email.com" autocomplete="email" required>
+              <input type="email" class="form-control" id="login-email" value="${escapeHtml(prefill)}" placeholder="votre@email.com" autocomplete="email" required data-ui="custom">
             </div>
             <div class="form-group">
               <label for="login-password">Mot de passe</label>
-              <input type="password" class="form-control" id="login-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="current-password" required>
+              <input type="password" class="form-control" id="login-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="current-password" required data-ui="custom">
             </div>
           </div>
 
@@ -18476,24 +18485,24 @@ class LoginView {
       <div style="display:flex;gap:var(--space-3)">
         <div class="form-group" style="flex:1">
           <label for="reg-firstname">Pr\xE9nom</label>
-          <input type="text" class="form-control" id="reg-firstname" placeholder="Paul" autocomplete="given-name">
+          <input type="text" class="form-control" id="reg-firstname" placeholder="Paul" autocomplete="given-name" data-ui="custom">
         </div>
         <div class="form-group" style="flex:1">
           <label for="reg-lastname">Nom</label>
-          <input type="text" class="form-control" id="reg-lastname" placeholder="Dupont" autocomplete="family-name">
+          <input type="text" class="form-control" id="reg-lastname" placeholder="Dupont" autocomplete="family-name" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label for="reg-email">Email</label>
-        <input type="email" class="form-control" id="reg-email" placeholder="votre@email.com" autocomplete="email" required>
+        <input type="email" class="form-control" id="reg-email" placeholder="votre@email.com" autocomplete="email" required data-ui="custom">
       </div>
       <div class="form-group">
         <label for="reg-password">Mot de passe (8 car. min., 1 majuscule, 1 chiffre)</label>
-        <input type="password" class="form-control" id="reg-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password" required aria-describedby="reg-password-help">
+        <input type="password" class="form-control" id="reg-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password" required aria-describedby="reg-password-help" data-ui="custom">
       </div>
       <div class="form-group">
         <label for="reg-password2">Confirmer le mot de passe</label>
-        <input type="password" class="form-control" id="reg-password2" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password" required>
+        <input type="password" class="form-control" id="reg-password2" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password" required data-ui="custom">
       </div>
       <div style="margin-top:var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--border-default)">
         <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md)">
@@ -18507,7 +18516,7 @@ class LoginView {
         <div class="form-group">
           <label for="reg-staff-password">Mot de passe \xE9quipe (partag\xE9 avec le staff)</label>
           <input type="text" class="form-control" id="reg-staff-password" placeholder="ex: Resto2026" autocomplete="off"
-                 style="font-family:var(--font-mono);letter-spacing:0.05em">
+                 style="font-family:var(--font-mono);letter-spacing:0.05em" data-ui="custom">
         </div>
         <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-1)">Optionnel \u2014 vous pourrez le configurer plus tard dans \xC9quipe.</p>
       </div>
@@ -18515,27 +18524,27 @@ class LoginView {
     const supplierFields = `
       <div class="form-group">
         <label for="sup-company">Nom de la soci\xE9t\xE9</label>
-        <input type="text" class="form-control" id="sup-company" placeholder="Boucherie Martin SARL" autocomplete="organization" required>
+        <input type="text" class="form-control" id="sup-company" placeholder="Boucherie Martin SARL" autocomplete="organization" required data-ui="custom">
       </div>
       <div class="form-group">
         <label for="sup-contact">Nom du contact</label>
-        <input type="text" class="form-control" id="sup-contact" placeholder="Jean Martin" autocomplete="name" required>
+        <input type="text" class="form-control" id="sup-contact" placeholder="Jean Martin" autocomplete="name" required data-ui="custom">
       </div>
       <div class="form-group">
         <label for="sup-email">Email professionnel</label>
-        <input type="email" class="form-control" id="sup-email" placeholder="contact@fournisseur.fr" autocomplete="email" required>
+        <input type="email" class="form-control" id="sup-email" placeholder="contact@fournisseur.fr" autocomplete="email" required data-ui="custom">
       </div>
       <div class="form-group">
         <label for="sup-phone">T\xE9l\xE9phone <span style="color:var(--text-tertiary);font-weight:400">(optionnel)</span></label>
-        <input type="tel" class="form-control" id="sup-phone" placeholder="06 12 34 56 78" autocomplete="tel">
+        <input type="tel" class="form-control" id="sup-phone" placeholder="06 12 34 56 78" autocomplete="tel" data-ui="custom">
       </div>
       <div class="form-group">
         <label for="sup-password">Mot de passe (8 car. min., 1 majuscule, 1 chiffre)</label>
-        <input type="password" class="form-control" id="sup-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password" required>
+        <input type="password" class="form-control" id="sup-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password" required data-ui="custom">
       </div>
       <div class="form-group">
         <label for="sup-password2">Confirmer le mot de passe</label>
-        <input type="password" class="form-control" id="sup-password2" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password" required>
+        <input type="password" class="form-control" id="sup-password2" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password" required data-ui="custom">
       </div>
       <div style="margin-top:var(--space-4);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md);font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
         <strong style="color:var(--text-primary)">Comment \xE7a marche ?</strong><br>
@@ -19087,12 +19096,12 @@ function renderSupplierLogin() {
             <div class="form-group">
               <label>Email</label>
               <input type="email" class="form-control" id="supplier-email"
-                     placeholder="contact@fournisseur.fr" autocomplete="email">
+                     placeholder="contact@fournisseur.fr" autocomplete="email" data-ui="custom">
             </div>
             <div class="form-group">
               <label>Mot de passe</label>
               <input type="password" class="form-control" id="supplier-password"
-                     placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="current-password">
+                     placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="current-password" data-ui="custom">
             </div>
             <div id="supplier-login-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3);text-align:center"></div>
             <button class="btn btn-primary" id="supplier-login-btn" style="width:100%;padding:14px;font-size:var(--text-lg);background:#4A90D9;border-color:#4A90D9">
@@ -19489,12 +19498,12 @@ function _renderSupplierCatalogToolbar() {
         <input type="search" id="supplier-catalog-search" class="form-control"
                placeholder="Rechercher un produit, SKU\u2026"
                value="${escapeHtml(_supplierCatalogState.search)}"
-               style="padding-left:34px">
+               style="padding-left:34px" data-ui="custom">
         <i data-lucide="search" style="width:16px;height:16px;position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-tertiary)" aria-hidden="true"></i>
       </div>
       <label class="supplier-catalog-sort">
         <span class="text-secondary text-sm">Trier&nbsp;:</span>
-        <select class="form-control" id="supplier-catalog-sort">
+        <select class="form-control" id="supplier-catalog-sort" data-ui="custom">
           <option value="category-asc"  ${_supplierCatalogState.sortKey === "category" && _supplierCatalogState.sortDir === "asc" ? "selected" : ""}>Cat\xE9gorie A\u2192Z</option>
           <option value="name-asc"      ${_supplierCatalogState.sortKey === "name" && _supplierCatalogState.sortDir === "asc" ? "selected" : ""}>Nom A\u2192Z</option>
           <option value="name-desc"     ${_supplierCatalogState.sortKey === "name" && _supplierCatalogState.sortDir === "desc" ? "selected" : ""}>Nom Z\u2192A</option>
@@ -19713,31 +19722,31 @@ function showEditProductModal(product) {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Nom du produit</label>
-          <input type="text" class="form-control" id="me-name" value="${escapeHtml(product.product_name || "")}">
+          <input type="text" class="form-control" id="me-name" value="${escapeHtml(product.product_name || "")}" data-ui="custom">
         </div>
         <div class="form-group" style="flex:1">
           <label>SKU</label>
-          <input type="text" class="form-control" id="me-sku" value="${escapeHtml(product.sku || "")}" placeholder="ex: MET-LEG-042" maxlength="64">
+          <input type="text" class="form-control" id="me-sku" value="${escapeHtml(product.sku || "")}" placeholder="ex: MET-LEG-042" maxlength="64" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Cat\xE9gorie</label>
-        <input type="text" class="form-control" id="me-category" value="${escapeHtml(product.category || "")}">
+        <input type="text" class="form-control" id="me-category" value="${escapeHtml(product.category || "")}" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Prix HT (\u20AC)</label>
-          <input type="number" class="form-control" id="me-price" step="0.01" min="0" value="${Number(product.price || 0).toFixed(2)}" style="font-family:var(--font-mono)">
+          <input type="number" class="form-control" id="me-price" step="0.01" min="0" value="${Number(product.price || 0).toFixed(2)}" style="font-family:var(--font-mono)" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Unit\xE9</label>
-          <select class="form-control" id="me-unit">
+          <select class="form-control" id="me-unit" data-ui="custom">
             ${UNIT_OPTS.map((u) => `<option value="${escapeHtml(u)}" ${u === product.unit ? "selected" : ""}>${escapeHtml(u)}</option>`).join("")}
           </select>
         </div>
         <div class="form-group">
           <label>TVA (%)</label>
-          <select class="form-control" id="me-tva">
+          <select class="form-control" id="me-tva" data-ui="custom">
             ${TVA_OPTS.sort((a, b) => a - b).map((t) => `<option value="${t}" ${t === tvaCurrent ? "selected" : ""}>${t} %</option>`).join("")}
           </select>
         </div>
@@ -19745,11 +19754,11 @@ function showEditProductModal(product) {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Conditionnement</label>
-          <input type="text" class="form-control" id="me-pkg" value="${escapeHtml(product.packaging || "")}" placeholder="ex: Carton 5 kg" maxlength="80">
+          <input type="text" class="form-control" id="me-pkg" value="${escapeHtml(product.packaging || "")}" placeholder="ex: Carton 5 kg" maxlength="80" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Commande min</label>
-          <input type="number" class="form-control" id="me-min" step="0.1" min="0" value="${Number(product.min_order || 0)}">
+          <input type="number" class="form-control" id="me-min" step="0.1" min="0" value="${Number(product.min_order || 0)}" data-ui="custom">
         </div>
       </div>
       <div class="actions-row">
@@ -19937,26 +19946,26 @@ function showAddProductModal() {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Nom du produit</label>
-          <input type="text" class="form-control" id="m-prod-name" placeholder="ex: Tomates bio">
+          <input type="text" class="form-control" id="m-prod-name" placeholder="ex: Tomates bio" data-ui="custom">
         </div>
         <div class="form-group" style="flex:1">
           <label>SKU (optionnel)</label>
-          <input type="text" class="form-control" id="m-prod-sku" placeholder="ex: MET-LEG-042" maxlength="64">
+          <input type="text" class="form-control" id="m-prod-sku" placeholder="ex: MET-LEG-042" maxlength="64" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Cat\xE9gorie</label>
-        <input type="text" class="form-control" id="m-prod-category" placeholder="ex: L\xE9gumes, Viandes, Cr\xE8merie...">
+        <input type="text" class="form-control" id="m-prod-category" placeholder="ex: L\xE9gumes, Viandes, Cr\xE8merie..." data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Prix HT (\u20AC)</label>
           <input type="number" class="form-control" id="m-prod-price" step="0.01" min="0" placeholder="0.00"
-                 style="font-family:var(--font-mono)">
+                 style="font-family:var(--font-mono)" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Unit\xE9</label>
-          <select class="form-control" id="m-prod-unit">
+          <select class="form-control" id="m-prod-unit" data-ui="custom">
             <option value="kg">kg</option>
             <option value="L">L</option>
             <option value="pi\xE8ce">pi\xE8ce</option>
@@ -19972,7 +19981,7 @@ function showAddProductModal() {
         </div>
         <div class="form-group">
           <label>TVA (%)</label>
-          <select class="form-control" id="m-prod-tva">
+          <select class="form-control" id="m-prod-tva" data-ui="custom">
             <option value="5.5" selected>5,5 % (alimentaire)</option>
             <option value="10">10 % (restauration)</option>
             <option value="20">20 % (alcools, autres)</option>
@@ -19982,11 +19991,11 @@ function showAddProductModal() {
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Conditionnement (optionnel)</label>
-          <input type="text" class="form-control" id="m-prod-pkg" placeholder="ex: Carton 5 kg, Lot de 6, Barquette 500g" maxlength="80">
+          <input type="text" class="form-control" id="m-prod-pkg" placeholder="ex: Carton 5 kg, Lot de 6, Barquette 500g" maxlength="80" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Commande min</label>
-          <input type="number" class="form-control" id="m-prod-min" step="0.1" min="0" value="0">
+          <input type="number" class="form-control" id="m-prod-min" step="0.1" min="0" value="0" data-ui="custom">
         </div>
       </div>
       <div class="actions-row">
@@ -20081,7 +20090,7 @@ async function renderSupplierHistoryTab() {
       </label>
       <label>
         <span class="text-secondary text-sm">Client</span>
-        <select id="historique-restaurant" class="form-control">
+        <select id="historique-restaurant" class="form-control" data-ui="custom">
           <option value="">Tous</option>
         </select>
       </label>
@@ -20089,7 +20098,7 @@ async function renderSupplierHistoryTab() {
         <span class="text-secondary text-sm">R\xE9f\xE9rence</span>
         <input type="search" id="historique-q" class="form-control"
                placeholder="ex: DEMO-PO-005"
-               value="${escapeHtml(_historiqueState.q || "")}">
+               value="${escapeHtml(_historiqueState.q || "")}" data-ui="custom">
       </label>
       <div class="historique-totals" id="historique-totals"></div>
     </div>
@@ -20493,12 +20502,12 @@ function showSupplierMercurialeImport() {
         <td>
           <input type="text" class="mercuriale-input mercuriale-input--name"
                  data-field="name" data-idx="${idx}"
-                 value="${escapeHtml(it.name)}" aria-label="Nom du produit">
+                 value="${escapeHtml(it.name)}" aria-label="Nom du produit" data-ui="custom">
           ${it.status === "update" && it.existing_price != null && it.existing_price !== it.price ? `<div class="mercuriale-old-price">Ancien prix : ${formatCurrency(it.existing_price)}</div>` : ""}
         </td>
         <td>
           <select class="mercuriale-input mercuriale-input--category"
-                  data-field="category" data-idx="${idx}" aria-label="Cat\xE9gorie">
+                  data-field="category" data-idx="${idx}" aria-label="Cat\xE9gorie" data-ui="custom">
             ${MERCURIALE_CATEGORIES.map((c) => `
               <option value="${c}" ${c === it.category ? "selected" : ""}>${c}</option>
             `).join("")}
@@ -20509,12 +20518,12 @@ function showSupplierMercurialeImport() {
           <input type="text" class="mercuriale-input mercuriale-input--unit"
                  data-field="unit" data-idx="${idx}"
                  value="${escapeHtml(it.unit)}" aria-label="Unit\xE9"
-                 maxlength="16">
+                 maxlength="16" data-ui="custom">
         </td>
         <td style="text-align:right">
           <input type="number" step="0.01" min="0" class="mercuriale-input mercuriale-input--price"
                  data-field="price" data-idx="${idx}"
-                 value="${dataPrice}" aria-label="Prix unitaire">
+                 value="${dataPrice}" aria-label="Prix unitaire" data-ui="custom">
         </td>
         <td style="text-align:center">
           <button class="btn-icon mercuriale-row__delete" data-delete-idx="${idx}" aria-label="Retirer la ligne" title="Retirer">
@@ -21054,7 +21063,7 @@ async function _loadSupplierClientOverrides(restaurantId) {
                          placeholder="\u2014"
                          data-catalog-id="${r.id}"
                          data-original="${r.override_price != null ? r.override_price : ""}"
-                         style="width:100px;text-align:right;font-family:var(--font-mono)">
+                         style="width:100px;text-align:right;font-family:var(--font-mono)" data-ui="custom">
                 </td>
                 <td style="text-align:center">
                   ${r.override_price != null ? `<button class="btn-icon supplier-override-clear" data-catalog-id="${r.id}" aria-label="Retirer le tarif sp\xE9cial" title="Retirer">
@@ -21366,7 +21375,7 @@ async function _renderSupplierMessageThread(restaurantId, context) {
       <footer class="msg-thread__composer">
         <textarea id="supplier-msg-input" class="msg-thread__input"
                   placeholder="\xC9crivez votre message\u2026"
-                  rows="2" maxlength="2000"></textarea>
+                  rows="2" maxlength="2000" data-ui="custom"></textarea>
         <button class="msg-thread__send" id="supplier-msg-send" aria-label="Envoyer">
           <i data-lucide="send" style="width:18px;height:18px"></i>
         </button>
@@ -21632,7 +21641,7 @@ async function showNewDeliveryForm() {
     <div class="form-row" style="margin-bottom:var(--space-4)">
       <div class="form-group" style="flex:2">
         <label class="form-label">Restaurant client *</label>
-        <select id="dn-restaurant" class="input">
+        <select id="dn-restaurant" class="input" data-ui="custom">
           ${clientOptions || '<option value="">Aucun client li\xE9</option>'}
         </select>
       </div>
@@ -21643,7 +21652,7 @@ async function showNewDeliveryForm() {
     </div>
     <div class="form-group" style="margin-bottom:var(--space-4)">
       <label class="form-label">Notes</label>
-      <textarea id="dn-notes" class="input" rows="2" placeholder="Notes optionnelles..."></textarea>
+      <textarea id="dn-notes" class="input" rows="2" placeholder="Notes optionnelles..." data-ui="custom"></textarea>
     </div>
     <h3 style="margin-bottom:var(--space-3)">Produits</h3>
     <div id="dn-items-list"></div>
@@ -21670,15 +21679,15 @@ async function showNewDeliveryForm() {
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">Produit *</label>
           <input type="text" class="input dn-product-name" placeholder="Nom du produit" required
-                 list="dn-product-suggestions" autocomplete="off">
+                 list="dn-product-suggestions" autocomplete="off" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">Quantit\xE9 *</label>
-          <input type="number" class="input dn-quantity" step="0.01" min="0.01" placeholder="0" required>
+          <input type="number" class="input dn-quantity" step="0.01" min="0.01" placeholder="0" required data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">Unit\xE9</label>
-          <select class="input dn-unit">
+          <select class="input dn-unit" data-ui="custom">
             <option value="kg">kg</option>
             <option value="L">L</option>
             <option value="pi\xE8ce">pi\xE8ce</option>
@@ -21688,13 +21697,13 @@ async function showNewDeliveryForm() {
         </div>
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">Prix/unit\xE9 (\u20AC)</label>
-          <input type="number" class="input dn-price" step="0.01" min="0" placeholder="0.00">
+          <input type="number" class="input dn-price" step="0.01" min="0" placeholder="0.00" data-ui="custom">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 100px;gap:var(--space-2);margin-bottom:var(--space-2)">
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">N\xB0 Lot</label>
-          <input type="text" class="input dn-batch" placeholder="N\xB0 lot">
+          <input type="text" class="input dn-batch" placeholder="N\xB0 lot" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">DLC</label>
@@ -21702,7 +21711,7 @@ async function showNewDeliveryForm() {
         </div>
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">T\xB0 max (\xB0C)</label>
-          <input type="number" class="input dn-temp" step="0.1" placeholder="4">
+          <input type="number" class="input dn-temp" step="0.1" placeholder="4" data-ui="custom">
         </div>
       </div>
       <details style="margin-top:var(--space-2)">
@@ -21710,19 +21719,19 @@ async function showNewDeliveryForm() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-top:var(--space-2)">
           <div class="form-group">
             <label class="form-label" style="font-size:var(--text-xs)">Zone de p\xEAche (FAO)</label>
-            <input type="text" class="input dn-fishing-zone" placeholder="Ex: 27.7">
+            <input type="text" class="input dn-fishing-zone" placeholder="Ex: 27.7" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="form-label" style="font-size:var(--text-xs)">M\xE9thode de p\xEAche</label>
-            <input type="text" class="input dn-fishing-method" placeholder="Ex: chalut">
+            <input type="text" class="input dn-fishing-method" placeholder="Ex: chalut" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="form-label" style="font-size:var(--text-xs)">Origine (viande)</label>
-            <input type="text" class="input dn-origin" placeholder="Ex: France, Charolais">
+            <input type="text" class="input dn-origin" placeholder="Ex: France, Charolais" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="form-label" style="font-size:var(--text-xs)">N\xB0 agr\xE9ment sanitaire</label>
-            <input type="text" class="input dn-sanitary" placeholder="Ex: FR 01.234.567 CE">
+            <input type="text" class="input dn-sanitary" placeholder="Ex: FR 01.234.567 CE" data-ui="custom">
           </div>
         </div>
       </details>
@@ -22057,7 +22066,7 @@ function _supplierOrderActionPrompt({ orderId, title, body, placeholder, confirm
       <p>${escapeHtml(body)}</p>
       <div class="form-group">
         <label>${escapeHtml(placeholder)}</label>
-        <textarea id="supplier-order-reason" class="form-control" rows="3" maxlength="500" placeholder="${escapeHtml(placeholder)}"></textarea>
+        <textarea id="supplier-order-reason" class="form-control" rows="3" maxlength="500" placeholder="${escapeHtml(placeholder)}" data-ui="custom"></textarea>
       </div>
       <div class="actions-row">
         <button class="${confirmClass}" id="supplier-order-action-confirm">${escapeHtml(confirmLabel)}</button>
@@ -22207,7 +22216,7 @@ async function renderMessagesThread(supplierId) {
       <footer class="msg-thread__composer">
         <textarea id="msg-thread-input" class="msg-thread__input"
                   placeholder="\xC9crivez votre message\u2026"
-                  rows="2" maxlength="2000"></textarea>
+                  rows="2" maxlength="2000" data-ui="custom"></textarea>
         <button class="msg-thread__send" id="msg-thread-send" aria-label="Envoyer">
           <i data-lucide="send" style="width:18px;height:18px"></i>
         </button>
@@ -22551,7 +22560,7 @@ async function renderDeliveryDetail(id) {
         <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;justify-content:flex-end;margin-bottom:var(--space-4)">
           <div class="form-group" style="flex:1;max-width:400px">
             <label class="form-label">Notes de r\xE9ception</label>
-            <textarea id="reception-notes" class="input" rows="2" placeholder="Notes optionnelles..."></textarea>
+            <textarea id="reception-notes" class="input" rows="2" placeholder="Notes optionnelles..." data-ui="custom"></textarea>
           </div>
         </div>
         <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
@@ -22600,19 +22609,19 @@ function renderDeliveryItemRow(item, isPending) {
       ${isPending ? `
         <td style="padding:var(--space-3)">
           <input type="number" class="input item-temp" step="0.1" value="${(_a = item.temperature_required) != null ? _a : ""}"
-                 style="width:80px;font-size:var(--text-sm)" data-item-id="${item.id}" data-temp-required="${(_b = item.temperature_required) != null ? _b : ""}">
+                 style="width:80px;font-size:var(--text-sm)" data-item-id="${item.id}" data-temp-required="${(_b = item.temperature_required) != null ? _b : ""}" data-ui="custom">
           <span class="temp-warning" data-item-id="${item.id}" style="display:none;color:var(--color-danger);font-size:var(--text-xs);font-weight:700">\u26A0\uFE0F T\xB0 trop haute !</span>
         </td>
       ` : ""}
       <td style="padding:var(--space-3);font-size:var(--text-xs)">${extraInfo.length ? extraInfo.join("<br>") : "\u2014"}</td>
       ${isPending ? `
         <td style="padding:var(--space-3)">
-          <select class="input item-action-select" data-item-id="${item.id}" style="font-size:var(--text-sm)">
+          <select class="input item-action-select" data-item-id="${item.id}" style="font-size:var(--text-sm)" data-ui="custom">
             <option value="accepted">\u2705 Accepter</option>
             <option value="rejected">\u274C Refuser</option>
           </select>
           <input type="text" class="input item-rejection-reason" data-item-id="${item.id}" placeholder="Motif refus..."
-                 style="display:none;margin-top:4px;font-size:var(--text-xs);width:140px">
+                 style="display:none;margin-top:4px;font-size:var(--text-xs);width:140px" data-ui="custom">
         </td>
       ` : `
         <td style="padding:var(--space-3)">
@@ -22858,7 +22867,7 @@ async function showInviteSupplierModal() {
       </p>
       <div class="form-group">
         <label>Fournisseur</label>
-        <select class="form-control" id="m-invite-supplier">
+        <select class="form-control" id="m-invite-supplier" data-ui="custom">
           <option value="">\u2014 Choisir \u2014</option>
           ${availableSuppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("")}
         </select>
@@ -22867,7 +22876,7 @@ async function showInviteSupplierModal() {
         <label>Code PIN \xE0 communiquer</label>
         <input type="text" class="form-control" id="m-invite-pin" value="${randomPin}"
                style="font-family:var(--font-mono);font-size:var(--text-xl);text-align:center;letter-spacing:0.3em"
-               maxlength="6" inputmode="numeric">
+               maxlength="6" inputmode="numeric" data-ui="custom">
         <small class="text-secondary">Communiquez ce code au fournisseur par t\xE9l\xE9phone ou email</small>
       </div>
       <div class="actions-row">
@@ -22969,7 +22978,7 @@ async function renderTeam(tab) {
         </div>
         <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-3)">Ce mot de passe est partag\xE9 avec votre staff pour acc\xE9der au restaurant. Chaque membre cr\xE9e ensuite son propre PIN personnel.</p>
         <div style="display:flex;gap:var(--space-2);align-items:center">
-          <input type="password" class="form-control" id="staff-password-input" placeholder="Nouveau mot de passe" autocomplete="new-password" style="max-width:280px">
+          <input type="password" class="form-control" id="staff-password-input" placeholder="Nouveau mot de passe" autocomplete="new-password" style="max-width:280px" data-ui="custom">
           <button class="btn btn-ghost" id="staff-password-toggle" style="padding:8px" title="Afficher/masquer">
             <i data-lucide="eye" style="width:18px;height:18px" id="staff-password-eye"></i>
           </button>
@@ -23284,17 +23293,17 @@ function showAddMemberModal() {
       <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-4)">Le membre cr\xE9era son propre code PIN lors de sa premi\xE8re connexion.</p>
       <div class="form-group">
         <label>Nom</label>
-        <input type="text" class="form-control" id="m-member-name" placeholder="Pr\xE9nom ou surnom" autocomplete="off">
+        <input type="text" class="form-control" id="m-member-name" placeholder="Pr\xE9nom ou surnom" autocomplete="off" data-ui="custom">
       </div>
       <div class="form-group">
         <label>R\xF4le</label>
         <div style="display:flex;gap:var(--space-2)">
-          <select class="form-control" id="m-member-role" style="flex:1">
+          <select class="form-control" id="m-member-role" style="flex:1" data-ui="custom">
             <option value="cuisinier">\u{1F468}\u200D\u{1F373} Cuisinier \u2014 cuisine + stock + HACCP</option>
             <option value="salle">\u{1F37D}\uFE0F Salle \u2014 service + commandes</option>
             <option value="__custom__">\u270F\uFE0F Personnalis\xE9\u2026</option>
           </select>
-          <input type="text" class="form-control" id="m-member-custom-role" placeholder="Ex: P\xE2tissier" style="flex:1;display:none">
+          <input type="text" class="form-control" id="m-member-custom-role" placeholder="Ex: P\xE2tissier" style="flex:1;display:none" data-ui="custom">
         </div>
       </div>
       <div id="m-member-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
@@ -23356,7 +23365,7 @@ function showEditMemberModal(member) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
         <div class="form-group">
           <label>Nom</label>
-          <input type="text" class="form-control" id="m-edit-name" value="${escapeHtml(member.name)}" autocomplete="off">
+          <input type="text" class="form-control" id="m-edit-name" value="${escapeHtml(member.name)}" autocomplete="off" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Date d'embauche</label>
@@ -23367,7 +23376,7 @@ function showEditMemberModal(member) {
       <div class="form-group">
         <label>R\xF4le</label>
         <div style="display:flex;gap:var(--space-2)">
-          <select class="form-control" id="m-edit-role" style="flex:1">
+          <select class="form-control" id="m-edit-role" style="flex:1" data-ui="custom">
             <option value="cuisinier" ${member.role === "cuisinier" ? "selected" : ""}>\u{1F468}\u200D\u{1F373} Cuisinier</option>
             <option value="salle" ${member.role === "salle" ? "selected" : ""}>\u{1F37D}\uFE0F Salle</option>
             <option value="serveur" ${member.role === "serveur" ? "selected" : ""}>\u{1F37D}\uFE0F Serveur</option>
@@ -23375,7 +23384,7 @@ function showEditMemberModal(member) {
           </select>
           <input type="text" class="form-control" id="m-edit-custom-role" placeholder="Ex: P\xE2tissier"
                  value="${escapeHtml(isCustomRole ? member.role : "")}"
-                 style="flex:1;${isCustomRole ? "" : "display:none"}">
+                 style="flex:1;${isCustomRole ? "" : "display:none"}" data-ui="custom">
         </div>
       </div>
 
@@ -23384,7 +23393,7 @@ function showEditMemberModal(member) {
         <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
           ${TEAM_ZONES.map((z) => `
             <label style="display:flex;align-items:center;gap:6px;font-size:var(--text-sm);cursor:pointer;background:var(--bg-secondary);padding:5px 10px;border-radius:var(--radius-md)">
-              <input type="checkbox" class="m-edit-zone" value="${escapeHtml(z)}" ${memberZones.includes(z) ? "checked" : ""} style="width:14px;height:14px">
+              <input type="checkbox" class="m-edit-zone" value="${escapeHtml(z)}" ${memberZones.includes(z) ? "checked" : ""} style="width:14px;height:14px" data-ui="custom">
               ${escapeHtml(z)}
             </label>
           `).join("")}
@@ -23396,7 +23405,7 @@ function showEditMemberModal(member) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           ${TEAM_SKILLS.map((s) => `
             <label style="display:flex;align-items:center;gap:6px;font-size:var(--text-sm);cursor:pointer">
-              <input type="checkbox" class="m-edit-skill" value="${escapeHtml(s)}" ${memberSkills.includes(s) ? "checked" : ""} style="width:14px;height:14px">
+              <input type="checkbox" class="m-edit-skill" value="${escapeHtml(s)}" ${memberSkills.includes(s) ? "checked" : ""} style="width:14px;height:14px" data-ui="custom">
               ${escapeHtml(s)}
             </label>
           `).join("")}
@@ -23405,7 +23414,7 @@ function showEditMemberModal(member) {
 
       <div class="form-group">
         <label>Notes de formation <span style="color:var(--text-tertiary);font-weight:400">(certifications, formations suivies, \xE0 planifier\u2026)</span></label>
-        <textarea class="form-control" id="m-edit-training" rows="3" placeholder="Ex: HACCP niveau 1 \u2014 01/2026&#10;Formation s\xE9curit\xE9 alimentaire \xE0 planifier">${escapeHtml(member.training_notes || "")}</textarea>
+        <textarea class="form-control" id="m-edit-training" rows="3" placeholder="Ex: HACCP niveau 1 \u2014 01/2026&#10;Formation s\xE9curit\xE9 alimentaire \xE0 planifier" data-ui="custom">${escapeHtml(member.training_notes || "")}</textarea>
       </div>
 
       <div id="m-edit-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
@@ -23581,7 +23590,7 @@ function showDeleteAccountModal() {
       <div class="form-group">
         <label style="font-weight:600">Tapez <span style="color:var(--color-danger);font-family:var(--font-mono)">SUPPRIMER</span> pour confirmer</label>
         <input type="text" class="form-control" id="m-delete-confirm" placeholder="SUPPRIMER" autocomplete="off"
-               style="font-family:var(--font-mono);text-align:center;font-size:var(--text-lg);letter-spacing:0.1em">
+               style="font-family:var(--font-mono);text-align:center;font-size:var(--text-lg);letter-spacing:0.1em" data-ui="custom">
       </div>
       <div id="m-delete-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
       <div class="actions-row">
@@ -23820,7 +23829,7 @@ function renderScanResults(data) {
       <td style="padding:8px 4px">${escapeHtml(item.product_name || "\u2014")}</td>
       <td style="text-align:center;padding:8px 4px">
         <input type="number" value="${item.quantity || ""}" data-idx="${i}" data-field="quantity" 
-               style="width:60px;text-align:center;background:var(--color-bg);border:1px solid var(--color-border);border-radius:4px;padding:4px;color:inherit">
+               style="width:60px;text-align:center;background:var(--color-bg);border:1px solid var(--color-border);border-radius:4px;padding:4px;color:inherit" data-ui="custom">
       </td>
       <td style="padding:8px 4px">${escapeHtml(item.unit || "\u2014")}</td>
       <td style="text-align:right;padding:8px 4px">${item.unit_price != null ? item.unit_price.toFixed(2) + "\u20AC" : "\u2014"}</td>
@@ -24209,7 +24218,7 @@ async function renderMercurialeResults(data) {
     <div style="display:flex;gap:var(--space-3);align-items:flex-end;margin-bottom:var(--space-4);flex-wrap:wrap">
       <div class="form-group" style="margin:0;flex:1;min-width:200px">
         <label class="form-label">Fournisseur</label>
-        <select class="input" id="merc-supplier-select">
+        <select class="input" id="merc-supplier-select" data-ui="custom">
           <option value="">\u2014 S\xE9lectionner un fournisseur \u2014</option>
           ${supplierOptions}
         </select>
@@ -24223,7 +24232,7 @@ async function renderMercurialeResults(data) {
       <table>
         <thead>
           <tr>
-            <th style="width:30px"><input type="checkbox" id="merc-check-all" checked></th>
+            <th style="width:30px"><input type="checkbox" id="merc-check-all" checked data-ui="custom"></th>
             <th>Produit (mercuriale)</th>
             <th>Correspondance</th>
             <th class="numeric">Prix</th>
@@ -24237,7 +24246,7 @@ async function renderMercurialeResults(data) {
     const confidence = item.match_confidence === "exact" ? "\u2705" : item.match_confidence === "fuzzy" ? "\u{1F536}" : "\u274C";
     return `
               <tr style="${!matched ? "opacity:0.6" : ""}">
-                <td><input type="checkbox" class="merc-item-cb" data-idx="${i}" ${matched ? "checked" : ""}></td>
+                <td><input type="checkbox" class="merc-item-cb" data-idx="${i}" ${matched ? "checked" : ""} data-ui="custom"></td>
                 <td style="font-weight:500">${escapeHtml(item.product_name || "\u2014")}
                   ${item.organic ? '<span style="color:var(--color-success);font-size:11px"> \u{1F33F} Bio</span>' : ""}
                 </td>
@@ -24352,7 +24361,7 @@ async function renderAIChef() {
       <div style="flex-shrink:0;padding:var(--space-3) 0;border-top:1px solid var(--border-light)">
         <form id="chef-form" style="display:flex;gap:var(--space-2)">
           <input type="text" id="chef-input" class="input" placeholder="Posez votre question \xE0 Alto\u2026"
-            style="flex:1;font-size:var(--text-base)" autocomplete="off">
+            style="flex:1;font-size:var(--text-base)" autocomplete="off" data-ui="custom">
           <button type="submit" class="btn btn-primary" id="chef-send-btn" style="padding:8px 16px">
             <i data-lucide="send" style="width:18px;height:18px"></i>
           </button>
@@ -24495,7 +24504,7 @@ async function renderAIAssistant() {
           </button>
           <input type="text" id="ai-input" class="input" placeholder="Parlez \xE0 Alto ou \xE9crivez votre demande\u2026"
             aria-label="Message \xE0 Alto"
-            style="flex:1;font-size:var(--text-base)" autocomplete="off">
+            style="flex:1;font-size:var(--text-base)" autocomplete="off" data-ui="custom">
           <button type="submit" class="btn btn-primary" id="ai-send-btn" aria-label="Envoyer le message" style="padding:8px 16px">
             <i data-lucide="send" style="width:18px;height:18px" aria-hidden="true"></i>
           </button>
@@ -24798,12 +24807,12 @@ async function renderMenuEngineering() {
     </div>
 
     <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-4);flex-wrap:wrap">
-      <select id="me-period" class="input" style="width:auto">
+      <select id="me-period" class="input" style="width:auto" data-ui="custom">
         <option value="7">7 jours</option>
         <option value="30" selected>30 jours</option>
         <option value="90">90 jours</option>
       </select>
-      <select id="me-category" class="input" style="width:auto">
+      <select id="me-category" class="input" style="width:auto" data-ui="custom">
         <option value="">Toutes cat\xE9gories</option>
       </select>
     </div>
@@ -25322,15 +25331,15 @@ function configureIntegration(provider) {
       <div class="modal-body">
         <div class="form-group">
           <label class="label">Cl\xE9 API</label>
-          <input type="text" class="input" id="integ-api-key" placeholder="Votre cl\xE9 API ${meta.name}">
+          <input type="text" class="input" id="integ-api-key" placeholder="Votre cl\xE9 API ${meta.name}" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="label">Secret API (optionnel)</label>
-          <input type="password" class="input" id="integ-api-secret" placeholder="Secret ou token">
+          <input type="password" class="input" id="integ-api-secret" placeholder="Secret ou token" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="label">URL Webhook (optionnel)</label>
-          <input type="url" class="input" id="integ-webhook" placeholder="https://...">
+          <input type="url" class="input" id="integ-webhook" placeholder="https://..." data-ui="custom">
         </div>
         <div class="form-group" style="display:flex;align-items:center;gap:var(--space-2)">
           <label class="toggle">
@@ -25473,7 +25482,7 @@ function showAddReservation() {
       <div class="modal-body">
         <div class="form-group">
           <label class="label">Nom du client *</label>
-          <input type="text" class="input" id="resa-name" placeholder="Nom" required>
+          <input type="text" class="input" id="resa-name" placeholder="Nom" required data-ui="custom">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           <div class="form-group">
@@ -25488,16 +25497,16 @@ function showAddReservation() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           <div class="form-group">
             <label class="label">Couverts</label>
-            <input type="number" class="input" id="resa-party" value="2" min="1" max="50">
+            <input type="number" class="input" id="resa-party" value="2" min="1" max="50" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="label">T\xE9l\xE9phone</label>
-            <input type="tel" class="input" id="resa-phone" placeholder="06...">
+            <input type="tel" class="input" id="resa-phone" placeholder="06..." data-ui="custom">
           </div>
         </div>
         <div class="form-group">
           <label class="label">Notes</label>
-          <textarea class="input" id="resa-notes" rows="2" placeholder="Anniversaire, allergies, chaise b\xE9b\xE9\u2026"></textarea>
+          <textarea class="input" id="resa-notes" rows="2" placeholder="Anniversaire, allergies, chaise b\xE9b\xE9\u2026" data-ui="custom"></textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -25668,11 +25677,11 @@ function showAddSiteModal() {
       <div class="modal-body">
         <div class="form-group">
           <label class="label">Nom *</label>
-          <input type="text" class="input" id="site-name" placeholder="Nom du restaurant">
+          <input type="text" class="input" id="site-name" placeholder="Nom du restaurant" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="label">Type</label>
-          <select class="input" id="site-type">
+          <select class="input" id="site-type" data-ui="custom">
             <option value="restaurant">Restaurant</option>
             <option value="brasserie">Brasserie</option>
             <option value="bistrot">Bistrot</option>
@@ -25684,26 +25693,26 @@ function showAddSiteModal() {
         </div>
         <div class="form-group">
           <label class="label">Adresse</label>
-          <input type="text" class="input" id="site-address" placeholder="Adresse">
+          <input type="text" class="input" id="site-address" placeholder="Adresse" data-ui="custom">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           <div class="form-group">
             <label class="label">Ville</label>
-            <input type="text" class="input" id="site-city" placeholder="Ville">
+            <input type="text" class="input" id="site-city" placeholder="Ville" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="label">Code postal</label>
-            <input type="text" class="input" id="site-postal" placeholder="75001">
+            <input type="text" class="input" id="site-postal" placeholder="75001" data-ui="custom">
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           <div class="form-group">
             <label class="label">T\xE9l\xE9phone</label>
-            <input type="tel" class="input" id="site-phone" placeholder="01 23 45 67 89">
+            <input type="tel" class="input" id="site-phone" placeholder="01 23 45 67 89" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="label">Couverts</label>
-            <input type="number" class="input" id="site-covers" value="30" min="1">
+            <input type="number" class="input" id="site-covers" value="30" min="1" data-ui="custom">
           </div>
         </div>
       </div>
@@ -25754,25 +25763,25 @@ async function editSite(id) {
         <div class="modal-body">
           <div class="form-group">
             <label class="label">Nom</label>
-            <input type="text" class="input" id="edit-site-name" value="${escapeHtml(site.name || "")}">
+            <input type="text" class="input" id="edit-site-name" value="${escapeHtml(site.name || "")}" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="label">Adresse</label>
-            <input type="text" class="input" id="edit-site-address" value="${escapeHtml(site.address || "")}">
+            <input type="text" class="input" id="edit-site-address" value="${escapeHtml(site.address || "")}" data-ui="custom">
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
             <div class="form-group">
               <label class="label">Ville</label>
-              <input type="text" class="input" id="edit-site-city" value="${escapeHtml(site.city || "")}">
+              <input type="text" class="input" id="edit-site-city" value="${escapeHtml(site.city || "")}" data-ui="custom">
             </div>
             <div class="form-group">
               <label class="label">T\xE9l\xE9phone</label>
-              <input type="tel" class="input" id="edit-site-phone" value="${escapeHtml(site.phone || "")}">
+              <input type="tel" class="input" id="edit-site-phone" value="${escapeHtml(site.phone || "")}" data-ui="custom">
             </div>
           </div>
           <div class="form-group">
             <label class="label">Couverts</label>
-            <input type="number" class="input" id="edit-site-covers" value="${site.covers || 30}">
+            <input type="number" class="input" id="edit-site-covers" value="${site.covers || 30}" data-ui="custom">
           </div>
           <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-md)">
             <p class="text-secondary text-sm"><strong>${site.table_count || 0}</strong> tables \xB7 <strong>${site.staff_count || 0}</strong> membres d'\xE9quipe</p>
@@ -26014,7 +26023,7 @@ function renderCrmCustomers(customers) {
   content.innerHTML = `
     <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-3);align-items:center">
       <label for="crm-search" class="visually-hidden">Rechercher un client</label>
-      <input type="search" class="input" id="crm-search" placeholder="Rechercher un client\u2026" aria-label="Rechercher un client" style="flex:1" oninput="searchCrmCustomers()">
+      <input type="search" class="input" id="crm-search" placeholder="Rechercher un client\u2026" aria-label="Rechercher un client" style="flex:1" oninput="searchCrmCustomers()" data-ui="custom">
       <button class="btn btn-primary btn-sm" onclick="showAddCustomer()" aria-label="Ajouter un nouveau client">
         <i data-lucide="user-plus" style="width:16px;height:16px" aria-hidden="true"></i> Ajouter
       </button>
@@ -26079,16 +26088,16 @@ function showAddCustomer() {
       <div class="modal-body">
         <div class="form-group">
           <label class="label">Nom *</label>
-          <input type="text" class="input" id="cust-name" placeholder="Nom complet">
+          <input type="text" class="input" id="cust-name" placeholder="Nom complet" data-ui="custom">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           <div class="form-group">
             <label class="label">Email</label>
-            <input type="email" class="input" id="cust-email" placeholder="email@exemple.com">
+            <input type="email" class="input" id="cust-email" placeholder="email@exemple.com" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="label">T\xE9l\xE9phone</label>
-            <input type="tel" class="input" id="cust-phone" placeholder="06 12 34 56 78">
+            <input type="tel" class="input" id="cust-phone" placeholder="06 12 34 56 78" data-ui="custom">
           </div>
         </div>
         <div class="form-group">
@@ -26097,7 +26106,7 @@ function showAddCustomer() {
         </div>
         <div class="form-group">
           <label class="label">Notes</label>
-          <textarea class="input" id="cust-notes" rows="2" placeholder="Pr\xE9f\xE9rences, allergies, table pr\xE9f\xE9r\xE9e\u2026"></textarea>
+          <textarea class="input" id="cust-notes" rows="2" placeholder="Pr\xE9f\xE9rences, allergies, table pr\xE9f\xE9r\xE9e\u2026" data-ui="custom"></textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -26306,20 +26315,20 @@ function showAddReward() {
       <div class="modal-body">
         <div class="form-group">
           <label class="label">Nom *</label>
-          <input type="text" class="input" id="reward-name" placeholder="Ex: Dessert offert">
+          <input type="text" class="input" id="reward-name" placeholder="Ex: Dessert offert" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="label">Description</label>
-          <input type="text" class="input" id="reward-desc" placeholder="D\xE9tails de la r\xE9compense">
+          <input type="text" class="input" id="reward-desc" placeholder="D\xE9tails de la r\xE9compense" data-ui="custom">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           <div class="form-group">
             <label class="label">Points n\xE9cessaires *</label>
-            <input type="number" class="input" id="reward-points" value="100" min="1">
+            <input type="number" class="input" id="reward-points" value="100" min="1" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="label">Type</label>
-            <select class="input" id="reward-type">
+            <select class="input" id="reward-type" data-ui="custom">
               <option value="discount">R\xE9duction</option>
               <option value="free_item">Produit offert</option>
               <option value="percentage">% de r\xE9duction</option>
@@ -26519,16 +26528,16 @@ function showCreateAPIKey() {
       <div class="modal-body">
         <div class="form-group">
           <label class="label">Nom de la cl\xE9 *</label>
-          <input type="text" class="input" id="key-name" placeholder="Ex: Site web, Caisse, TheFork">
+          <input type="text" class="input" id="key-name" placeholder="Ex: Site web, Caisse, TheFork" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="label">Permissions</label>
           <div style="display:flex;flex-direction:column;gap:var(--space-2)">
             <label style="display:flex;align-items:center;gap:var(--space-2)">
-              <input type="checkbox" value="read" checked disabled> Lecture (toujours actif)
+              <input type="checkbox" value="read" checked disabled data-ui="custom"> Lecture (toujours actif)
             </label>
             <label style="display:flex;align-items:center;gap:var(--space-2)">
-              <input type="checkbox" id="perm-write" value="write"> \xC9criture (cr\xE9er des commandes)
+              <input type="checkbox" id="perm-write" value="write" data-ui="custom"> \xC9criture (cr\xE9er des commandes)
             </label>
           </div>
         </div>
@@ -26717,7 +26726,7 @@ function openCommandPalette() {
           class="command-palette-input"
           placeholder="Rechercher une action..."
           autocomplete="off"
-        >
+         data-ui="custom">
       </div>
       <div class="command-palette-list" id="command-palette-list">
         ${renderCommandGroups(_commands)}
@@ -27002,7 +27011,7 @@ class AdminView {
       <div class="card" style="margin-bottom:2rem">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem">
           <h2 style="margin:0;font-size:1rem">Comptes clients</h2>
-          <input type="text" id="admin-search" placeholder="Rechercher\u2026" class="input" style="max-width:220px;padding:.35rem .75rem;font-size:.875rem">
+          <input type="text" id="admin-search" placeholder="Rechercher\u2026" class="input" style="max-width:220px;padding:.35rem .75rem;font-size:.875rem" data-ui="custom">
         </div>
         <div id="admin-users-table">
           <div class="loading-spinner" style="padding:2rem"></div>
@@ -27505,6 +27514,10 @@ const Router = {
       const match = path.match(route.pattern);
       if (match) {
         route.handler(...match.slice(1));
+        try {
+          window.UI && window.UI.enhanceAll && window.UI.enhanceAll();
+        } catch (e) {
+        }
         return;
       }
     }

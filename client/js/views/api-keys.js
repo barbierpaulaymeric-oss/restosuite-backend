@@ -114,16 +114,16 @@ function showCreateAPIKey() {
       <div class="modal-body">
         <div class="form-group">
           <label class="label">Nom de la clé *</label>
-          <input type="text" class="input" id="key-name" placeholder="Ex: Site web, Caisse, TheFork">
+          <input type="text" class="input" id="key-name" placeholder="Ex: Site web, Caisse, TheFork" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="label">Permissions</label>
           <div style="display:flex;flex-direction:column;gap:var(--space-2)">
             <label style="display:flex;align-items:center;gap:var(--space-2)">
-              <input type="checkbox" value="read" checked disabled> Lecture (toujours actif)
+              <input type="checkbox" value="read" checked disabled data-ui="custom"> Lecture (toujours actif)
             </label>
             <label style="display:flex;align-items:center;gap:var(--space-2)">
-              <input type="checkbox" id="perm-write" value="write"> Écriture (créer des commandes)
+              <input type="checkbox" id="perm-write" value="write" data-ui="custom"> Écriture (créer des commandes)
             </label>
           </div>
         </div>

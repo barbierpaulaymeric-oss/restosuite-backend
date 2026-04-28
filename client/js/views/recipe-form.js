@@ -110,11 +110,11 @@ async function renderRecipeForm(editId) {
       <div class="form-row">
         <div class="form-group">
           <label for="f-name">Nom du plat</label>
-          <input type="text" class="form-control" id="f-name" value="${escapeHtml(recipe?.name || '')}" placeholder="Tartare de bœuf..." required aria-required="true">
+          <input type="text" class="form-control" id="f-name" value="${escapeHtml(recipe?.name || '')}" placeholder="Tartare de bœuf..." required aria-required="true" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="f-category">Catégorie</label>
-          <select class="form-control" id="f-category">
+          <select class="form-control" id="f-category" data-ui="custom">
             <option value="">—</option>
             ${['entrée','plat','dessert','boisson','amuse-bouche','accompagnement','sauce','base'].map(c =>
               `<option value="${c}" ${recipe?.category === c ? 'selected' : ''}>${c.charAt(0).toUpperCase() + c.slice(1)}</option>`
@@ -126,7 +126,7 @@ async function renderRecipeForm(editId) {
       <div class="form-row">
         <div class="form-group">
           <label for="f-recipe-type">Type de recette</label>
-          <select class="form-control" id="f-recipe-type" onchange="onRecipeTypeChange()">
+          <select class="form-control" id="f-recipe-type" onchange="onRecipeTypeChange()" data-ui="custom">
             <option value="plat" ${recipeType === 'plat' ? 'selected' : ''}>🍽️ Plat final</option>
             <option value="sous_recette" ${recipeType === 'sous_recette' ? 'selected' : ''}>📋 Sous-recette</option>
             <option value="base" ${recipeType === 'base' ? 'selected' : ''}>🫕 Base / Fond</option>
@@ -134,22 +134,22 @@ async function renderRecipeForm(editId) {
         </div>
         <div class="form-group" id="f-price-group" style="${recipeType === 'plat' ? '' : 'display:none'}">
           <label for="f-price">Prix de vente TTC (€)</label>
-          <input type="number" class="form-control" id="f-price" value="${recipe?.selling_price || ''}" step="0.5" min="0" oninput="updateLiveMargin()">
+          <input type="number" class="form-control" id="f-price" value="${recipe?.selling_price || ''}" step="0.5" min="0" oninput="updateLiveMargin()" data-ui="custom">
         </div>
       </div>
 
       <div class="form-row-3">
         <div class="form-group">
           <label for="f-portions">Portions</label>
-          <input type="number" class="form-control" id="f-portions" value="${recipe?.portions || 1}" min="1">
+          <input type="number" class="form-control" id="f-portions" value="${recipe?.portions || 1}" min="1" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="f-prep">Préparation (min)</label>
-          <input type="number" class="form-control" id="f-prep" value="${recipe?.prep_time_min || ''}" min="0">
+          <input type="number" class="form-control" id="f-prep" value="${recipe?.prep_time_min || ''}" min="0" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="f-cooking">Cuisson (min)</label>
-          <input type="number" class="form-control" id="f-cooking" value="${recipe?.cooking_time_min || ''}" min="0">
+          <input type="number" class="form-control" id="f-cooking" value="${recipe?.cooking_time_min || ''}" min="0" data-ui="custom">
         </div>
       </div>
 
@@ -158,13 +158,13 @@ async function renderRecipeForm(editId) {
       <div role="group" aria-label="Ajouter un ingrédient" style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
         <div class="autocomplete-wrapper" style="flex:1;min-width:150px">
           <label for="add-ing-name" class="visually-hidden">Nom de l'ingrédient</label>
-          <input type="text" class="form-control" id="add-ing-name" placeholder="Nom de l'ingrédient" autocomplete="off" aria-label="Nom de l'ingrédient">
+          <input type="text" class="form-control" id="add-ing-name" placeholder="Nom de l'ingrédient" autocomplete="off" aria-label="Nom de l'ingrédient" data-ui="custom">
           <div class="autocomplete-list hidden" id="ing-autocomplete" role="listbox"></div>
         </div>
         <label for="add-ing-qty" class="visually-hidden">Quantité</label>
-        <input type="number" class="form-control" id="add-ing-qty" placeholder="Qté" style="width:80px" step="any" aria-label="Quantité">
+        <input type="number" class="form-control" id="add-ing-qty" placeholder="Qté" style="width:80px" step="any" aria-label="Quantité" data-ui="custom">
         <label for="add-ing-unit" class="visually-hidden">Unité</label>
-        <select class="form-control" id="add-ing-unit" style="width:80px" aria-label="Unité">
+        <select class="form-control" id="add-ing-unit" style="width:80px" aria-label="Unité" data-ui="custom">
           <option value="g">g</option>
           <option value="kg">kg</option>
           <option value="cl">cl</option>
@@ -173,9 +173,9 @@ async function renderRecipeForm(editId) {
           <option value="botte">botte</option>
         </select>
         <label for="add-ing-waste" class="visually-hidden">Pourcentage de perte</label>
-        <input type="number" class="form-control" id="add-ing-waste" placeholder="Perte%" style="width:80px" step="any" min="0" max="100" aria-label="Pourcentage de perte">
+        <input type="number" class="form-control" id="add-ing-waste" placeholder="Perte%" style="width:80px" step="any" min="0" max="100" aria-label="Pourcentage de perte" data-ui="custom">
         <label for="add-ing-notes" class="visually-hidden">Notes ingrédient</label>
-        <input type="text" class="form-control" id="add-ing-notes" placeholder="Notes" style="width:120px" aria-label="Notes ingrédient">
+        <input type="text" class="form-control" id="add-ing-notes" placeholder="Notes" style="width:120px" aria-label="Notes ingrédient" data-ui="custom">
         <button class="btn btn-primary btn-sm" onclick="addIngredientLine()" aria-label="Ajouter l'ingrédient"><i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i></button>
       </div>
 
@@ -185,12 +185,12 @@ async function renderRecipeForm(editId) {
       <div id="sub-recipe-list" role="list" aria-labelledby="sub-recipes-section"></div>
       <div role="group" aria-label="Ajouter une sous-recette" style="display:flex;gap:8px;align-items:end;margin-top:8px;flex-wrap:wrap">
         <label for="add-sub-recipe" class="visually-hidden">Sous-recette</label>
-        <select class="form-control" id="add-sub-recipe" style="flex:1;min-width:180px" aria-label="Sous-recette">
+        <select class="form-control" id="add-sub-recipe" style="flex:1;min-width:180px" aria-label="Sous-recette" data-ui="custom">
           <option value="">— Choisir une sous-recette —</option>
           ${allRecipesForSub.map(r => `<option value="${r.id}">${r.recipe_type === 'base' ? '🫕' : '📋'} ${escapeHtml(r.name)}</option>`).join('')}
         </select>
         <label for="add-sub-qty" class="visually-hidden">Portions de sous-recette</label>
-        <input type="number" class="form-control" id="add-sub-qty" placeholder="Portions" style="width:100px" step="any" min="0.1" value="1" aria-label="Portions de sous-recette">
+        <input type="number" class="form-control" id="add-sub-qty" placeholder="Portions" style="width:100px" step="any" min="0.1" value="1" aria-label="Portions de sous-recette" data-ui="custom">
         <button class="btn btn-primary btn-sm" onclick="addSubRecipeLine()" aria-label="Ajouter la sous-recette"><i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i></button>
       </div>
       ${allRecipesForSub.length === 0 ? '<p class="text-muted" style="font-size:var(--text-xs);margin-top:4px">Aucune sous-recette disponible. Créez d\'abord des fiches de type "Sous-recette" ou "Base".</p>' : ''}
@@ -199,7 +199,7 @@ async function renderRecipeForm(editId) {
       <div id="steps-list" aria-labelledby="steps-section"></div>
       <div role="group" aria-label="Ajouter une étape" style="display:flex;gap:8px;margin-top:8px">
         <label for="add-step" class="visually-hidden">Nouvelle étape</label>
-        <input type="text" class="form-control" id="add-step" placeholder="Nouvelle étape..." style="flex:1" aria-label="Nouvelle étape">
+        <input type="text" class="form-control" id="add-step" placeholder="Nouvelle étape..." style="flex:1" aria-label="Nouvelle étape" data-ui="custom">
         <button class="btn btn-primary btn-sm" onclick="addStepLine()" aria-label="Ajouter l'étape"><i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i></button>
       </div>
 
@@ -213,7 +213,7 @@ async function renderRecipeForm(editId) {
 
       <div class="form-group">
         <label for="f-notes">Notes</label>
-        <textarea class="form-control" id="f-notes" rows="2">${escapeHtml(recipe?.notes || '')}</textarea>
+        <textarea class="form-control" id="f-notes" rows="2" data-ui="custom">${escapeHtml(recipe?.notes || '')}</textarea>
       </div>
 
       <div class="actions-row">

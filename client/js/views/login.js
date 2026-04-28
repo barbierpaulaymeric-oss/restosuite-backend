@@ -155,11 +155,11 @@ class LoginView {
           <div style="text-align:left;width:100%;margin-top:var(--space-4)">
             <div class="form-group">
               <label for="login-email">Email du restaurant</label>
-              <input type="email" class="form-control" id="login-email" value="${escapeHtml(prefill)}" placeholder="votre@email.com" autocomplete="email" required>
+              <input type="email" class="form-control" id="login-email" value="${escapeHtml(prefill)}" placeholder="votre@email.com" autocomplete="email" required data-ui="custom">
             </div>
             <div class="form-group">
               <label for="login-password">Mot de passe</label>
-              <input type="password" class="form-control" id="login-password" placeholder="••••••••" autocomplete="current-password" required>
+              <input type="password" class="form-control" id="login-password" placeholder="••••••••" autocomplete="current-password" required data-ui="custom">
             </div>
           </div>
 
@@ -285,24 +285,24 @@ class LoginView {
       <div style="display:flex;gap:var(--space-3)">
         <div class="form-group" style="flex:1">
           <label for="reg-firstname">Prénom</label>
-          <input type="text" class="form-control" id="reg-firstname" placeholder="Paul" autocomplete="given-name">
+          <input type="text" class="form-control" id="reg-firstname" placeholder="Paul" autocomplete="given-name" data-ui="custom">
         </div>
         <div class="form-group" style="flex:1">
           <label for="reg-lastname">Nom</label>
-          <input type="text" class="form-control" id="reg-lastname" placeholder="Dupont" autocomplete="family-name">
+          <input type="text" class="form-control" id="reg-lastname" placeholder="Dupont" autocomplete="family-name" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label for="reg-email">Email</label>
-        <input type="email" class="form-control" id="reg-email" placeholder="votre@email.com" autocomplete="email" required>
+        <input type="email" class="form-control" id="reg-email" placeholder="votre@email.com" autocomplete="email" required data-ui="custom">
       </div>
       <div class="form-group">
         <label for="reg-password">Mot de passe (8 car. min., 1 majuscule, 1 chiffre)</label>
-        <input type="password" class="form-control" id="reg-password" placeholder="••••••••" autocomplete="new-password" required aria-describedby="reg-password-help">
+        <input type="password" class="form-control" id="reg-password" placeholder="••••••••" autocomplete="new-password" required aria-describedby="reg-password-help" data-ui="custom">
       </div>
       <div class="form-group">
         <label for="reg-password2">Confirmer le mot de passe</label>
-        <input type="password" class="form-control" id="reg-password2" placeholder="••••••••" autocomplete="new-password" required>
+        <input type="password" class="form-control" id="reg-password2" placeholder="••••••••" autocomplete="new-password" required data-ui="custom">
       </div>
       <div style="margin-top:var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--border-default)">
         <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md)">
@@ -316,7 +316,7 @@ class LoginView {
         <div class="form-group">
           <label for="reg-staff-password">Mot de passe équipe (partagé avec le staff)</label>
           <input type="text" class="form-control" id="reg-staff-password" placeholder="ex: Resto2026" autocomplete="off"
-                 style="font-family:var(--font-mono);letter-spacing:0.05em">
+                 style="font-family:var(--font-mono);letter-spacing:0.05em" data-ui="custom">
         </div>
         <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-1)">Optionnel — vous pourrez le configurer plus tard dans Équipe.</p>
       </div>
@@ -325,27 +325,27 @@ class LoginView {
     const supplierFields = `
       <div class="form-group">
         <label for="sup-company">Nom de la société</label>
-        <input type="text" class="form-control" id="sup-company" placeholder="Boucherie Martin SARL" autocomplete="organization" required>
+        <input type="text" class="form-control" id="sup-company" placeholder="Boucherie Martin SARL" autocomplete="organization" required data-ui="custom">
       </div>
       <div class="form-group">
         <label for="sup-contact">Nom du contact</label>
-        <input type="text" class="form-control" id="sup-contact" placeholder="Jean Martin" autocomplete="name" required>
+        <input type="text" class="form-control" id="sup-contact" placeholder="Jean Martin" autocomplete="name" required data-ui="custom">
       </div>
       <div class="form-group">
         <label for="sup-email">Email professionnel</label>
-        <input type="email" class="form-control" id="sup-email" placeholder="contact@fournisseur.fr" autocomplete="email" required>
+        <input type="email" class="form-control" id="sup-email" placeholder="contact@fournisseur.fr" autocomplete="email" required data-ui="custom">
       </div>
       <div class="form-group">
         <label for="sup-phone">Téléphone <span style="color:var(--text-tertiary);font-weight:400">(optionnel)</span></label>
-        <input type="tel" class="form-control" id="sup-phone" placeholder="06 12 34 56 78" autocomplete="tel">
+        <input type="tel" class="form-control" id="sup-phone" placeholder="06 12 34 56 78" autocomplete="tel" data-ui="custom">
       </div>
       <div class="form-group">
         <label for="sup-password">Mot de passe (8 car. min., 1 majuscule, 1 chiffre)</label>
-        <input type="password" class="form-control" id="sup-password" placeholder="••••••••" autocomplete="new-password" required>
+        <input type="password" class="form-control" id="sup-password" placeholder="••••••••" autocomplete="new-password" required data-ui="custom">
       </div>
       <div class="form-group">
         <label for="sup-password2">Confirmer le mot de passe</label>
-        <input type="password" class="form-control" id="sup-password2" placeholder="••••••••" autocomplete="new-password" required>
+        <input type="password" class="form-control" id="sup-password2" placeholder="••••••••" autocomplete="new-password" required data-ui="custom">
       </div>
       <div style="margin-top:var(--space-4);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md);font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
         <strong style="color:var(--text-primary)">Comment ça marche ?</strong><br>

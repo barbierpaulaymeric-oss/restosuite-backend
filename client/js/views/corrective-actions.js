@@ -155,8 +155,8 @@ async function renderCorrectiveActions() {
 
       container.innerHTML = `
         <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-          <select id="ca-filter-cat" class="form-control" style="min-width:160px">${catOptions}</select>
-          <select id="ca-filter-status" class="form-control" style="min-width:140px">${statusOptions}</select>
+          <select id="ca-filter-cat" class="form-control" style="min-width:160px" data-ui="custom">${catOptions}</select>
+          <select id="ca-filter-status" class="form-control" style="min-width:140px" data-ui="custom">${statusOptions}</select>
         </div>
 
         ${filtered.length === 0 ? `
@@ -395,32 +395,32 @@ async function renderCorrectiveActions() {
           <div class="modal-body">
             <div class="form-group">
               <label>Modèle (optionnel)</label>
-              <select id="ca-tpl-select" class="form-control">
+              <select id="ca-tpl-select" class="form-control" data-ui="custom">
                 <option value="">— Saisie libre —</option>
                 ${tplOptions}
               </select>
             </div>
             <div class="form-group">
               <label>Catégorie <span style="color:var(--color-danger)">*</span></label>
-              <select id="ca-category" class="form-control">
+              <select id="ca-category" class="form-control" data-ui="custom">
                 ${catOptions}
               </select>
             </div>
             <div class="form-group">
               <label>Déclencheur (description du problème)</label>
-              <input type="text" id="ca-trigger" class="form-control" placeholder="Ex: Température chambre froide à 6°C à 8h30">
+              <input type="text" id="ca-trigger" class="form-control" placeholder="Ex: Température chambre froide à 6°C à 8h30" data-ui="custom">
             </div>
             <div class="form-group">
               <label>Action prise</label>
-              <textarea id="ca-action" class="form-control" rows="3" placeholder="Décrivez l'action corrective mise en place"></textarea>
+              <textarea id="ca-action" class="form-control" rows="3" placeholder="Décrivez l'action corrective mise en place" data-ui="custom"></textarea>
             </div>
             <div class="form-group">
               <label>Responsable</label>
-              <input type="text" id="ca-responsible" class="form-control" placeholder="Nom ou poste">
+              <input type="text" id="ca-responsible" class="form-control" placeholder="Nom ou poste" data-ui="custom">
             </div>
             <div class="form-group">
               <label>Notes</label>
-              <textarea id="ca-notes" class="form-control" rows="2"></textarea>
+              <textarea id="ca-notes" class="form-control" rows="2" data-ui="custom"></textarea>
             </div>
           </div>
           <div class="modal-footer">
@@ -495,15 +495,15 @@ async function renderCorrectiveActions() {
             </div>
             <div class="form-group">
               <label>Action prise</label>
-              <textarea id="ca-edit-action" class="form-control" rows="3">${escapeHtml(item.action_taken || '')}</textarea>
+              <textarea id="ca-edit-action" class="form-control" rows="3" data-ui="custom">${escapeHtml(item.action_taken || '')}</textarea>
             </div>
             <div class="form-group">
               <label>Responsable</label>
-              <input type="text" id="ca-edit-responsible" class="form-control" value="${escapeHtml(item.responsible_person || '')}">
+              <input type="text" id="ca-edit-responsible" class="form-control" value="${escapeHtml(item.responsible_person || '')}" data-ui="custom">
             </div>
             <div class="form-group">
               <label>Statut</label>
-              <select id="ca-edit-status" class="form-control">${statusOptions}</select>
+              <select id="ca-edit-status" class="form-control" data-ui="custom">${statusOptions}</select>
             </div>
             <div class="form-group">
               <label>Date de début</label>
@@ -515,7 +515,7 @@ async function renderCorrectiveActions() {
             </div>
             <div class="form-group">
               <label>Notes</label>
-              <textarea id="ca-edit-notes" class="form-control" rows="2">${escapeHtml(item.notes || '')}</textarea>
+              <textarea id="ca-edit-notes" class="form-control" rows="2" data-ui="custom">${escapeHtml(item.notes || '')}</textarea>
             </div>
           </div>
           <div class="modal-footer">
@@ -569,33 +569,33 @@ async function renderCorrectiveActions() {
           <div class="modal-body">
             <div class="form-group">
               <label>Catégorie <span style="color:var(--color-danger)">*</span></label>
-              <select id="tpl-category" class="form-control">${catOptions}</select>
+              <select id="tpl-category" class="form-control" data-ui="custom">${catOptions}</select>
             </div>
             <div class="form-group">
               <label>Condition déclenchante</label>
-              <input type="text" id="tpl-trigger" class="form-control" value="${escapeHtml(tpl ? tpl.trigger_condition || '' : '')}" placeholder="Ex: Température > 4°C en chambre froide">
+              <input type="text" id="tpl-trigger" class="form-control" value="${escapeHtml(tpl ? tpl.trigger_condition || '' : '')}" placeholder="Ex: Température  data-ui="custom"> 4°C en chambre froide">
             </div>
             <div class="form-group">
               <label>Description de l'action</label>
-              <textarea id="tpl-action" class="form-control" rows="3" placeholder="Décrivez les étapes de l'action corrective">${escapeHtml(tpl ? tpl.action_description || '' : '')}</textarea>
+              <textarea id="tpl-action" class="form-control" rows="3" placeholder="Décrivez les étapes de l'action corrective" data-ui="custom">${escapeHtml(tpl ? tpl.action_description || '' : '')}</textarea>
             </div>
             <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div class="form-group">
                 <label>Rôle responsable</label>
-                <input type="text" id="tpl-role" class="form-control" value="${escapeHtml(tpl ? tpl.responsible_role || '' : '')}" placeholder="cuisinier / gerant">
+                <input type="text" id="tpl-role" class="form-control" value="${escapeHtml(tpl ? tpl.responsible_role || '' : '')}" placeholder="cuisinier / gerant" data-ui="custom">
               </div>
               <div class="form-group">
                 <label>Délai max (heures)</label>
-                <input type="number" id="tpl-deadline" class="form-control" value="${tpl ? (tpl.deadline_hours != null ? tpl.deadline_hours : '') : ''}" min="0" placeholder="0 = immédiat">
+                <input type="number" id="tpl-deadline" class="form-control" value="${tpl ? (tpl.deadline_hours != null ? tpl.deadline_hours : '') : ''}" min="0" placeholder="0 = immédiat" data-ui="custom">
               </div>
             </div>
             <div class="form-group">
               <label>Procédure d'escalade</label>
-              <textarea id="tpl-escalation" class="form-control" rows="2" placeholder="Conditions et contacts d'escalade">${escapeHtml(tpl ? tpl.escalation_procedure || '' : '')}</textarea>
+              <textarea id="tpl-escalation" class="form-control" rows="2" placeholder="Conditions et contacts d'escalade" data-ui="custom">${escapeHtml(tpl ? tpl.escalation_procedure || '' : '')}</textarea>
             </div>
             <div class="form-group">
               <label>Documents requis</label>
-              <input type="text" id="tpl-docs" class="form-control" value="${escapeHtml(tpl ? tpl.documentation_required || '' : '')}" placeholder="Ex: Fiche de non-conformité, relevé température">
+              <input type="text" id="tpl-docs" class="form-control" value="${escapeHtml(tpl ? tpl.documentation_required || '' : '')}" placeholder="Ex: Fiche de non-conformité, relevé température" data-ui="custom">
             </div>
           </div>
           <div class="modal-footer">

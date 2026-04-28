@@ -1,11 +1,13 @@
-// Bumped 2026-04-28 (v11): ship custom UI component library
-// (client/js/ui-components.js) — replaces native <select>/<input
-// type="number">/checkbox/radio/toggle with styled, accessible
-// vanilla-JS components. Auto-enhances any element with
-// `data-ui="custom"` (or "toggle") via a MutationObserver. Applied
-// initially to the supplier picker in /orders and the zone filter +
-// modal in /haccp/temperatures.
-const CACHE_NAME = 'restosuite-v11';
+// Bumped 2026-04-28 (v12): roll out the custom UI library across
+// the entire app. data-ui="custom" applied to ~418 selects, inputs
+// (text/email/password/tel/url/search/number), textareas, and
+// non-toggle-wrapper checkboxes/radios in client/js/views/*.js.
+// Existing custom toggle wrappers (.toggle / .supplier-toggle /
+// .perm-toggle) deliberately untouched — they have their own
+// slider DOM. Belt-and-suspenders UI.enhanceAll() now also fires
+// from router.js after each route handler, alongside the
+// MutationObserver in ui-components.js.
+const CACHE_NAME = 'restosuite-v12';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

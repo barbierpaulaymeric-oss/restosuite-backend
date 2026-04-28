@@ -43,7 +43,7 @@ async function renderAIChef() {
       <div style="flex-shrink:0;padding:var(--space-3) 0;border-top:1px solid var(--border-light)">
         <form id="chef-form" style="display:flex;gap:var(--space-2)">
           <input type="text" id="chef-input" class="input" placeholder="Posez votre question à Alto…"
-            style="flex:1;font-size:var(--text-base)" autocomplete="off">
+            style="flex:1;font-size:var(--text-base)" autocomplete="off" data-ui="custom">
           <button type="submit" class="btn btn-primary" id="chef-send-btn" style="padding:8px 16px">
             <i data-lucide="send" style="width:18px;height:18px"></i>
           </button>

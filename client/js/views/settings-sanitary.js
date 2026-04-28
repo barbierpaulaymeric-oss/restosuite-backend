@@ -29,7 +29,7 @@ async function renderSanitaryApproval() {
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
                 <div class="form-group">
                   <label class="form-label">Type d'activité</label>
-                  <select name="activity_type" class="form-control">
+                  <select name="activity_type" class="form-control" data-ui="custom">
                     <option value="restaurant" ${(!settings || settings.activity_type === 'restaurant') ? 'selected' : ''}>Restaurant</option>
                     <option value="traiteur" ${settings && settings.activity_type === 'traiteur' ? 'selected' : ''}>Traiteur</option>
                     <option value="fabrication" ${settings && settings.activity_type === 'fabrication' ? 'selected' : ''}>Fabrication</option>
@@ -38,7 +38,7 @@ async function renderSanitaryApproval() {
                 </div>
                 <div class="form-group">
                   <label class="form-label">Type d'autorisation</label>
-                  <select name="sanitary_approval_type" class="form-control">
+                  <select name="sanitary_approval_type" class="form-control" data-ui="custom">
                     <option value="déclaration" ${(!settings || settings.sanitary_approval_type === 'déclaration') ? 'selected' : ''}>Déclaration d'activité</option>
                     <option value="dérogation" ${settings && settings.sanitary_approval_type === 'dérogation' ? 'selected' : ''}>Dérogation à l'agrément</option>
                     <option value="agrément" ${settings && settings.sanitary_approval_type === 'agrément' ? 'selected' : ''}>Agrément sanitaire CE</option>
@@ -53,7 +53,7 @@ async function renderSanitaryApproval() {
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
                 <div class="form-group">
                   <label class="form-label">Numéro d'agrément / déclaration</label>
-                  <input type="text" name="sanitary_approval_number" class="form-control" value="${escapeHtml(settings ? settings.sanitary_approval_number || '' : '')}" placeholder="Ex: FR 75 001 01 CE">
+                  <input type="text" name="sanitary_approval_number" class="form-control" value="${escapeHtml(settings ? settings.sanitary_approval_number || '' : '')}" placeholder="Ex: FR 75 001 01 CE" data-ui="custom">
                   <small class="text-secondary" style="font-size:11px;margin-top:4px;display:block">Pour les restaurants : numéro de déclaration DDPP ou numéro CE si agréés.</small>
                 </div>
                 <div class="form-group">
@@ -67,12 +67,12 @@ async function renderSanitaryApproval() {
               <div class="section-title" style="margin-top:0;margin-bottom:16px">Service vétérinaire compétent</div>
               <div class="form-group">
                 <label class="form-label">DDPP / Service vétérinaire</label>
-                <input type="text" name="dd_pp_office" class="form-control" value="${escapeHtml(settings ? settings.dd_pp_office || '' : '')}" placeholder="Ex: DDPP de Paris — 94 avenue Ledru-Rollin, 75012 Paris">
+                <input type="text" name="dd_pp_office" class="form-control" value="${escapeHtml(settings ? settings.dd_pp_office || '' : '')}" placeholder="Ex: DDPP de Paris — 94 avenue Ledru-Rollin, 75012 Paris" data-ui="custom">
                 <small class="text-secondary" style="font-size:11px;margin-top:4px;display:block">La DDPP (Direction Départementale de la Protection des Populations) est l'autorité compétente pour les agréments sanitaires.</small>
               </div>
               <div class="form-group" style="margin-top:12px">
                 <label class="form-label">Notes / Observations</label>
-                <textarea name="notes" class="form-control" rows="3" placeholder="Conditions particulières, restrictions, renouvellements prévus...">${escapeHtml(settings ? settings.notes || '' : '')}</textarea>
+                <textarea name="notes" class="form-control" rows="3" placeholder="Conditions particulières, restrictions, renouvellements prévus..." data-ui="custom">${escapeHtml(settings ? settings.notes || '' : '')}</textarea>
               </div>
             </div>
 

@@ -165,11 +165,11 @@ function showStaffHealthModal(record = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Nom du personnel *</label>
-          <input type="text" class="form-control" id="sh-staff" value="${escapeHtml(record?.staff_name || '')}" placeholder="ex: Marie Dupont" autofocus>
+          <input type="text" class="form-control" id="sh-staff" value="${escapeHtml(record?.staff_name || '')}" placeholder="ex: Marie Dupont" autofocus data-ui="custom">
         </div>
         <div class="form-group">
           <label>Type de fiche *</label>
-          <select class="form-control" id="sh-type">
+          <select class="form-control" id="sh-type" data-ui="custom">
             <option value="aptitude"          ${(!record || record.record_type === 'aptitude')          ? 'selected' : ''}>Aptitude médicale</option>
             <option value="visite_medicale"    ${record?.record_type === 'visite_medicale'    ? 'selected' : ''}>Visite médicale</option>
             <option value="maladie"            ${record?.record_type === 'maladie'            ? 'selected' : ''}>Arrêt maladie</option>
@@ -190,7 +190,7 @@ function showStaffHealthModal(record = null) {
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <textarea class="form-control" id="sh-notes" rows="3" placeholder="ex: Gastro-entérite — exclu du service jusqu'au retour">${escapeHtml(record?.notes || '')}</textarea>
+        <textarea class="form-control" id="sh-notes" rows="3" placeholder="ex: Gastro-entérite — exclu du service jusqu'au retour" data-ui="custom">${escapeHtml(record?.notes || '')}</textarea>
       </div>
       <div style="background:#f0f4ff;border-radius:6px;padding:10px 14px;font-size:0.82rem;color:#3730a3;margin-bottom:16px">
         <strong>Rappel légal :</strong> En cas de maladie ou blessure infectieuse, le membre du personnel doit être exclu immédiatement de la manipulation des aliments (CE 852/2004, Chap. VIII, art. 2).

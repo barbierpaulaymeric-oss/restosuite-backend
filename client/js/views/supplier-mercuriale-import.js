@@ -241,14 +241,14 @@ function showSupplierMercurialeImport() {
         <td>
           <input type="text" class="mercuriale-input mercuriale-input--name"
                  data-field="name" data-idx="${idx}"
-                 value="${escapeHtml(it.name)}" aria-label="Nom du produit">
+                 value="${escapeHtml(it.name)}" aria-label="Nom du produit" data-ui="custom">
           ${it.status === 'update' && it.existing_price != null && it.existing_price !== it.price
             ? `<div class="mercuriale-old-price">Ancien prix : ${formatCurrency(it.existing_price)}</div>`
             : ''}
         </td>
         <td>
           <select class="mercuriale-input mercuriale-input--category"
-                  data-field="category" data-idx="${idx}" aria-label="Catégorie">
+                  data-field="category" data-idx="${idx}" aria-label="Catégorie" data-ui="custom">
             ${MERCURIALE_CATEGORIES.map(c => `
               <option value="${c}" ${c === it.category ? 'selected' : ''}>${c}</option>
             `).join('')}
@@ -259,12 +259,12 @@ function showSupplierMercurialeImport() {
           <input type="text" class="mercuriale-input mercuriale-input--unit"
                  data-field="unit" data-idx="${idx}"
                  value="${escapeHtml(it.unit)}" aria-label="Unité"
-                 maxlength="16">
+                 maxlength="16" data-ui="custom">
         </td>
         <td style="text-align:right">
           <input type="number" step="0.01" min="0" class="mercuriale-input mercuriale-input--price"
                  data-field="price" data-idx="${idx}"
-                 value="${dataPrice}" aria-label="Prix unitaire">
+                 value="${dataPrice}" aria-label="Prix unitaire" data-ui="custom">
         </td>
         <td style="text-align:center">
           <button class="btn-icon mercuriale-row__delete" data-delete-idx="${idx}" aria-label="Retirer la ligne" title="Retirer">

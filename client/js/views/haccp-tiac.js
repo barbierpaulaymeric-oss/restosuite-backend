@@ -132,49 +132,49 @@ function showTIACModal(procedure) {
         </div>
         <div class="form-group">
           <label>Nombre de personnes touchées</label>
-          <input type="number" class="form-control" id="tiac-nb" min="0" value="${isEdit ? (procedure.nb_personnes || 0) : ''}">
+          <input type="number" class="form-control" id="tiac-nb" min="0" value="${isEdit ? (procedure.nb_personnes || 0) : ''}" data-ui="custom">
         </div>
       </div>
 
       <div class="form-group">
         <label>Description de l'incident *</label>
-        <textarea class="form-control" id="tiac-description" rows="3" placeholder="Décrivez le contexte, les repas concernés...">${isEdit ? escapeHtml(procedure.description || '') : ''}</textarea>
+        <textarea class="form-control" id="tiac-description" rows="3" placeholder="Décrivez le contexte, les repas concernés..." data-ui="custom">${isEdit ? escapeHtml(procedure.description || '') : ''}</textarea>
       </div>
 
       <div class="form-group">
         <label>Symptômes observés</label>
-        <input type="text" class="form-control" id="tiac-symptomes" value="${isEdit ? escapeHtml(procedure.symptomes || '') : ''}" placeholder="ex: Nausées, vomissements, diarrhées (apparition 4-6h)">
+        <input type="text" class="form-control" id="tiac-symptomes" value="${isEdit ? escapeHtml(procedure.symptomes || '') : ''}" placeholder="ex: Nausées, vomissements, diarrhées (apparition 4-6h)" data-ui="custom">
       </div>
 
       <div class="form-group">
         <label>Aliments suspects</label>
-        <input type="text" class="form-control" id="tiac-aliments" value="${isEdit ? escapeHtml(procedure.aliments_suspects || '') : ''}" placeholder="ex: Poulet rôti — lot LOT-2026-0312">
+        <input type="text" class="form-control" id="tiac-aliments" value="${isEdit ? escapeHtml(procedure.aliments_suspects || '') : ''}" placeholder="ex: Poulet rôti — lot LOT-2026-0312" data-ui="custom">
       </div>
 
       <div class="form-group">
         <label>Mesures conservatoires prises</label>
-        <textarea class="form-control" id="tiac-mesures" rows="2" placeholder="ex: Mise en quarantaine du stock, arrêt du service, nettoyage...">${isEdit ? escapeHtml(procedure.mesures_conservatoires || '') : ''}</textarea>
+        <textarea class="form-control" id="tiac-mesures" rows="2" placeholder="ex: Mise en quarantaine du stock, arrêt du service, nettoyage..." data-ui="custom">${isEdit ? escapeHtml(procedure.mesures_conservatoires || '') : ''}</textarea>
       </div>
 
       <div class="form-group">
         <label>Contact DDPP</label>
-        <input type="text" class="form-control" id="tiac-contact" value="${isEdit ? escapeHtml(procedure.contact_ddpp || '') : ''}" placeholder="ex: DDPP 75 — Tél : 01 40 07 22 00">
+        <input type="text" class="form-control" id="tiac-contact" value="${isEdit ? escapeHtml(procedure.contact_ddpp || '') : ''}" placeholder="ex: DDPP 75 — Tél : 01 40 07 22 00" data-ui="custom">
       </div>
 
       <div class="form-row" style="margin-top:var(--space-3)">
         <label class="checkbox-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="tiac-ars" ${isEdit && procedure.declaration_ars ? 'checked' : ''}>
+          <input type="checkbox" id="tiac-ars" ${isEdit && procedure.declaration_ars ? 'checked' : ''} data-ui="custom">
           <span>Déclaration ARS effectuée</span>
         </label>
         <label class="checkbox-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="tiac-plats" ${isEdit && procedure.plats_temoins_conserves ? 'checked' : ''}>
+          <input type="checkbox" id="tiac-plats" ${isEdit && procedure.plats_temoins_conserves ? 'checked' : ''} data-ui="custom">
           <span>Plats témoins conservés</span>
         </label>
       </div>
 
       <div class="form-group" style="margin-top:var(--space-3)">
         <label>Statut</label>
-        <select class="form-control" id="tiac-statut">
+        <select class="form-control" id="tiac-statut" data-ui="custom">
           <option value="en_cours" ${isEdit && procedure.statut === 'en_cours' ? 'selected' : ''}>En cours</option>
           <option value="en_investigation" ${isEdit && procedure.statut === 'en_investigation' ? 'selected' : ''}>En investigation</option>
           <option value="clos" ${isEdit && procedure.statut === 'clos' ? 'selected' : ''}>Clos</option>

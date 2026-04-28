@@ -152,7 +152,7 @@ function openWaterModal(id) {
         </div>
         <div class="form-group">
           <label class="form-label">Type d'analyse</label>
-          <select name="analysis_type" class="form-control">
+          <select name="analysis_type" class="form-control" data-ui="custom">
             <option value="complète" ${(!item || item.analysis_type === 'complète') ? 'selected' : ''}>Complète</option>
             <option value="microbiologique" ${item && item.analysis_type === 'microbiologique' ? 'selected' : ''}>Microbiologique</option>
             <option value="physico-chimique" ${item && item.analysis_type === 'physico-chimique' ? 'selected' : ''}>Physico-chimique</option>
@@ -162,11 +162,11 @@ function openWaterModal(id) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label class="form-label">Laboratoire / Prestataire</label>
-          <input type="text" name="provider" class="form-control" value="${escapeHtml(item ? item.provider || '' : '')}">
+          <input type="text" name="provider" class="form-control" value="${escapeHtml(item ? item.provider || '' : '')}" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label">Source d'eau</label>
-          <select name="water_source" class="form-control">
+          <select name="water_source" class="form-control" data-ui="custom">
             <option value="réseau public" ${(!item || item.water_source === 'réseau public') ? 'selected' : ''}>Réseau public</option>
             <option value="forage" ${item && item.water_source === 'forage' ? 'selected' : ''}>Forage</option>
             <option value="autre" ${item && item.water_source === 'autre' ? 'selected' : ''}>Autre</option>
@@ -175,19 +175,19 @@ function openWaterModal(id) {
       </div>
       <div class="form-group">
         <label class="form-label">Résultats de l'analyse</label>
-        <textarea name="results" class="form-control" rows="3" placeholder="pH, turbidité, nitrates, coliformes...">${escapeHtml(item ? item.results || '' : '')}</textarea>
+        <textarea name="results" class="form-control" rows="3" placeholder="pH, turbidité, nitrates, coliformes..." data-ui="custom">${escapeHtml(item ? item.results || '' : '')}</textarea>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label class="form-label">Conformité</label>
-          <select name="conformity" class="form-control">
+          <select name="conformity" class="form-control" data-ui="custom">
             <option value="1" ${(!item || item.conformity) ? 'selected' : ''}>Conforme</option>
             <option value="0" ${item && !item.conformity ? 'selected' : ''}>Non conforme</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Référence rapport</label>
-          <input type="text" name="report_ref" class="form-control" value="${escapeHtml(item ? item.report_ref || '' : '')}">
+          <input type="text" name="report_ref" class="form-control" value="${escapeHtml(item ? item.report_ref || '' : '')}" data-ui="custom">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -197,12 +197,12 @@ function openWaterModal(id) {
         </div>
         <div class="form-group">
           <label class="form-label">Traitement en place</label>
-          <input type="text" name="treatment" class="form-control" value="${escapeHtml(item ? item.treatment || '' : '')}" placeholder="Adoucisseur, filtre UV...">
+          <input type="text" name="treatment" class="form-control" value="${escapeHtml(item ? item.treatment || '' : '')}" placeholder="Adoucisseur, filtre UV..." data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">Notes</label>
-        <textarea name="notes" class="form-control" rows="2">${escapeHtml(item ? item.notes || '' : '')}</textarea>
+        <textarea name="notes" class="form-control" rows="2" data-ui="custom">${escapeHtml(item ? item.notes || '' : '')}</textarea>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button type="button" class="btn btn-secondary" onclick="closeWaterModal()">Annuler</button>

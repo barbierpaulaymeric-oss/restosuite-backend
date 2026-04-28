@@ -58,7 +58,7 @@ async function renderHACCPTemperatures() {
                     <td>
                       <input type="number" class="input batch-temp-input" step="0.1"
                         placeholder="—" style="max-width:110px;font-size:var(--text-sm)"
-                        aria-label="Température pour ${escapeHtml(z.name)}">
+                        aria-label="Température pour ${escapeHtml(z.name)}" data-ui="custom">
                     </td>
                     <td>
                       <span class="batch-conform-badge badge" style="font-size:11px">—</span>
@@ -341,7 +341,7 @@ function showNewTempModal(zones) {
       </div>
       <div class="form-group">
         <label for="modal-notes">Notes (optionnel)</label>
-        <input type="text" class="form-control" id="modal-notes" placeholder="ex: porte restée ouverte">
+        <input type="text" class="form-control" id="modal-notes" placeholder="ex: porte restée ouverte" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="modal-cancel">Annuler</button>
@@ -406,11 +406,11 @@ function showZoneModal(data) {
       <h2 id="zone-modal-title">${isEdit ? '<i data-lucide="pencil" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Modifier la zone' : '<i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Nouvelle zone'}</h2>
       <div class="form-group">
         <label for="zone-name">Nom</label>
-        <input type="text" class="form-control" id="zone-name" value="${isEdit ? escapeHtml(data.name) : ''}" placeholder="ex: Frigo 3" required aria-required="true">
+        <input type="text" class="form-control" id="zone-name" value="${isEdit ? escapeHtml(data.name) : ''}" placeholder="ex: Frigo 3" required aria-required="true" data-ui="custom">
       </div>
       <div class="form-group">
         <label for="zone-type">Type</label>
-        <select class="form-control" id="zone-type">
+        <select class="form-control" id="zone-type" data-ui="custom">
           <option value="fridge" ${isEdit && data.type === 'fridge' ? 'selected' : ''}>Frigo</option>
           <option value="freezer" ${isEdit && data.type === 'freezer' ? 'selected' : ''}>Congélateur</option>
           <option value="cold_room" ${isEdit && data.type === 'cold_room' ? 'selected' : ''}>Chambre froide</option>
@@ -419,11 +419,11 @@ function showZoneModal(data) {
       <div class="form-row">
         <div class="form-group">
           <label for="zone-min">Temp min (°C)</label>
-          <input type="number" step="0.5" class="form-control" id="zone-min" value="${isEdit ? data.min : '0'}">
+          <input type="number" step="0.5" class="form-control" id="zone-min" value="${isEdit ? data.min : '0'}" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="zone-max">Temp max (°C)</label>
-          <input type="number" step="0.5" class="form-control" id="zone-max" value="${isEdit ? data.max : '4'}">
+          <input type="number" step="0.5" class="form-control" id="zone-max" value="${isEdit ? data.max : '4'}" data-ui="custom">
         </div>
       </div>
       <div class="actions-row" style="justify-content:flex-end">
@@ -507,7 +507,7 @@ function showBatchTempModal(zones) {
                   <input type="number" step="0.1" class="form-control batch-temp-input"
                     placeholder="ex: 3.5" inputmode="decimal"
                     style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base);min-height:40px"
-                    aria-label="Température pour ${escapeHtml(z.name)}">
+                    aria-label="Température pour ${escapeHtml(z.name)}" data-ui="custom">
                 </td>
                 <td style="padding:var(--space-2) var(--space-3);text-align:center">
                   <span class="batch-conformite" aria-live="polite">—</span>
@@ -519,7 +519,7 @@ function showBatchTempModal(zones) {
       </div>
       <div class="form-group" style="margin-top:var(--space-4)">
         <label for="batch-notes">Notes communes (optionnel)</label>
-        <input type="text" class="form-control" id="batch-notes" placeholder="ex: Relevé du matin">
+        <input type="text" class="form-control" id="batch-notes" placeholder="ex: Relevé du matin" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end;margin-top:var(--space-4)">
         <button class="btn btn-secondary" id="batch-cancel">Annuler</button>

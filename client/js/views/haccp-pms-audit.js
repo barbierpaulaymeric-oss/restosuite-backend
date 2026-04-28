@@ -211,27 +211,27 @@ function openPmsAuditModal(id) {
         </div>
         <div class="form-group">
           <label class="form-label">Auditeur *</label>
-          <input type="text" name="auditor_name" class="form-control" required value="${escapeHtml(item ? item.auditor_name : '')}">
+          <input type="text" name="auditor_name" class="form-control" required value="${escapeHtml(item ? item.auditor_name : '')}" data-ui="custom">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
         <div class="form-group">
           <label class="form-label">Type d'audit</label>
-          <select name="audit_type" class="form-control">
+          <select name="audit_type" class="form-control" data-ui="custom">
             <option value="interne" ${(!item || item.audit_type === 'interne') ? 'selected' : ''}>Interne</option>
             <option value="externe" ${item && item.audit_type === 'externe' ? 'selected' : ''}>Externe</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Périmètre</label>
-          <select name="scope" class="form-control">
+          <select name="scope" class="form-control" data-ui="custom">
             <option value="complet" ${(!item || item.scope === 'complet') ? 'selected' : ''}>Complet</option>
             <option value="partiel" ${item && item.scope === 'partiel' ? 'selected' : ''}>Partiel</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Statut</label>
-          <select name="status" class="form-control">
+          <select name="status" class="form-control" data-ui="custom">
             <option value="planifié" ${(!item || item.status === 'planifié') ? 'selected' : ''}>Planifié</option>
             <option value="réalisé" ${item && item.status === 'réalisé' ? 'selected' : ''}>Réalisé</option>
             <option value="actions_en_cours" ${item && item.status === 'actions_en_cours' ? 'selected' : ''}>Actions en cours</option>
@@ -242,7 +242,7 @@ function openPmsAuditModal(id) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label class="form-label">Score global (0–100)</label>
-          <input type="number" name="overall_score" class="form-control" min="0" max="100" value="${item && item.overall_score !== null ? item.overall_score : ''}">
+          <input type="number" name="overall_score" class="form-control" min="0" max="100" value="${item && item.overall_score !== null ? item.overall_score : ''}" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label">Prochain audit prévu</label>
@@ -256,8 +256,8 @@ function openPmsAuditModal(id) {
           ${findings.map((f, idx) => `
             <div style="border:1px solid var(--color-border,#e0e0e0);border-radius:6px;padding:10px" data-finding-idx="${idx}">
               <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-                <input type="text" class="form-control finding-section" placeholder="Section" value="${escapeHtml(f.section || '')}" style="flex:1">
-                <select class="form-control finding-severity" style="width:160px">
+                <input type="text" class="form-control finding-section" placeholder="Section" value="${escapeHtml(f.section || '')}" style="flex:1" data-ui="custom">
+                <select class="form-control finding-severity" style="width:160px" data-ui="custom">
                   <option value="en attente" ${f.severity === 'en attente' ? 'selected' : ''}>En attente</option>
                   <option value="conforme" ${f.severity === 'conforme' ? 'selected' : ''}>Conforme</option>
                   <option value="mineure" ${f.severity === 'mineure' ? 'selected' : ''}>Mineure</option>
@@ -265,8 +265,8 @@ function openPmsAuditModal(id) {
                 </select>
                 <button type="button" class="btn btn-ghost btn-sm text-danger" onclick="removeFinding(this)"><i data-lucide="x" style="width:14px;height:14px"></i></button>
               </div>
-              <textarea class="form-control finding-finding" placeholder="Constat" rows="2" style="margin-bottom:6px">${escapeHtml(f.finding || '')}</textarea>
-              <input type="text" class="form-control finding-action" placeholder="Action requise (si applicable)" value="${escapeHtml(f.action_required || '')}">
+              <textarea class="form-control finding-finding" placeholder="Constat" rows="2" style="margin-bottom:6px" data-ui="custom">${escapeHtml(f.finding || '')}</textarea>
+              <input type="text" class="form-control finding-action" placeholder="Action requise (si applicable)" value="${escapeHtml(f.action_required || '')}" data-ui="custom">
             </div>
           `).join('')}
         </div>
@@ -277,7 +277,7 @@ function openPmsAuditModal(id) {
 
       <div class="form-group">
         <label class="form-label">Notes</label>
-        <textarea name="notes" class="form-control" rows="2">${escapeHtml(item ? item.notes || '' : '')}</textarea>
+        <textarea name="notes" class="form-control" rows="2" data-ui="custom">${escapeHtml(item ? item.notes || '' : '')}</textarea>
       </div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -335,8 +335,8 @@ function addFinding() {
   div.setAttribute('data-finding-idx', idx);
   div.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-      <input type="text" class="form-control finding-section" placeholder="Section" style="flex:1">
-      <select class="form-control finding-severity" style="width:160px">
+      <input type="text" class="form-control finding-section" placeholder="Section" style="flex:1" data-ui="custom">
+      <select class="form-control finding-severity" style="width:160px" data-ui="custom">
         <option value="en attente">En attente</option>
         <option value="conforme">Conforme</option>
         <option value="mineure">Mineure</option>
@@ -344,8 +344,8 @@ function addFinding() {
       </select>
       <button type="button" class="btn btn-ghost btn-sm text-danger" onclick="removeFinding(this)"><i data-lucide="x" style="width:14px;height:14px"></i></button>
     </div>
-    <textarea class="form-control finding-finding" placeholder="Constat" rows="2" style="margin-bottom:6px"></textarea>
-    <input type="text" class="form-control finding-action" placeholder="Action requise (si applicable)">
+    <textarea class="form-control finding-finding" placeholder="Constat" rows="2" style="margin-bottom:6px" data-ui="custom"></textarea>
+    <input type="text" class="form-control finding-action" placeholder="Action requise (si applicable)" data-ui="custom">
   `;
   list.appendChild(div);
   if (window.lucide) lucide.createIcons();

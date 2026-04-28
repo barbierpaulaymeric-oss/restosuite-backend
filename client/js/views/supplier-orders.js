@@ -268,7 +268,7 @@ function _supplierOrderActionPrompt({ orderId, title, body, placeholder, confirm
       <p>${escapeHtml(body)}</p>
       <div class="form-group">
         <label>${escapeHtml(placeholder)}</label>
-        <textarea id="supplier-order-reason" class="form-control" rows="3" maxlength="500" placeholder="${escapeHtml(placeholder)}"></textarea>
+        <textarea id="supplier-order-reason" class="form-control" rows="3" maxlength="500" placeholder="${escapeHtml(placeholder)}" data-ui="custom"></textarea>
       </div>
       <div class="actions-row">
         <button class="${confirmClass}" id="supplier-order-action-confirm">${escapeHtml(confirmLabel)}</button>

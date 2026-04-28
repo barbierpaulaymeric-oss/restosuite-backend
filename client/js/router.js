@@ -120,6 +120,10 @@ const Router = {
       const match = path.match(route.pattern);
       if (match) {
         route.handler(...match.slice(1));
+        // Belt-and-suspenders alongside the MutationObserver in
+        // ui-components.js: catch any data-ui elements that views
+        // injected synchronously before the observer fired.
+        try { window.UI && window.UI.enhanceAll && window.UI.enhanceAll(); } catch {}
         return;
       }
     }

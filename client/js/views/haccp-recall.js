@@ -269,7 +269,7 @@ function showRecallChecklist(item) {
         ${steps.map(s => `
           <label style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2);border-radius:var(--radius-sm);cursor:pointer;transition:background 0.15s"
                  onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background=''">
-            <input type="checkbox" id="chk-${s.id}" style="width:16px;height:16px;cursor:pointer">
+            <input type="checkbox" id="chk-${s.id}" style="width:16px;height:16px;cursor:pointer" data-ui="custom">
             <span style="font-size:var(--text-sm)">${escapeHtml(s.label)}</span>
           </label>
         `).join('')}
@@ -321,11 +321,11 @@ function showRecallCloseModal(item) {
       </p>
       <div class="form-group">
         <label>Notes de clôture <span style="color:var(--text-tertiary)">(actions menées, résultats)</span></label>
-        <textarea class="form-control" id="close-notes" rows="4" placeholder="Décrivez les actions réalisées, les quantités détruites, les retours fournisseurs..."></textarea>
+        <textarea class="form-control" id="close-notes" rows="4" placeholder="Décrivez les actions réalisées, les quantités détruites, les retours fournisseurs..." data-ui="custom"></textarea>
       </div>
       <div class="form-group">
         <label style="display:flex;align-items:center;gap:var(--space-2)">
-          <input type="checkbox" id="close-notif" style="width:16px;height:16px">
+          <input type="checkbox" id="close-notif" style="width:16px;height:16px" data-ui="custom">
           Notification envoyée aux autorités compétentes
         </label>
       </div>
@@ -380,11 +380,11 @@ function showRecallModal(item) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
         <div class="form-group" style="grid-column:1/-1">
           <label>Produit <span style="color:var(--color-danger)">*</span></label>
-          <input type="text" class="form-control" id="rc-product" value="${escapeHtml(item?.product_name || '')}" placeholder="Nom du produit concerné">
+          <input type="text" class="form-control" id="rc-product" value="${escapeHtml(item?.product_name || '')}" placeholder="Nom du produit concerné" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Numéro de lot</label>
-          <input type="text" class="form-control" id="rc-lot" value="${escapeHtml(item?.lot_number || '')}" placeholder="Ex: FB-2026-0312">
+          <input type="text" class="form-control" id="rc-lot" value="${escapeHtml(item?.lot_number || '')}" placeholder="Ex: FB-2026-0312" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Date d'alerte</label>
@@ -393,7 +393,7 @@ function showRecallModal(item) {
         </div>
         <div class="form-group">
           <label>Raison</label>
-          <select class="form-control" id="rc-reason">
+          <select class="form-control" id="rc-reason" data-ui="custom">
             <option value="sanitaire" ${item?.reason === 'sanitaire' || !item ? 'selected' : ''}>🦠 Sanitaire (contamination)</option>
             <option value="qualite"   ${item?.reason === 'qualite'   ? 'selected' : ''}>⚠️ Qualité</option>
             <option value="etiquetage" ${item?.reason === 'etiquetage' ? 'selected' : ''}>🏷️ Étiquetage / Allergène</option>
@@ -402,7 +402,7 @@ function showRecallModal(item) {
         </div>
         <div class="form-group">
           <label>Source de l'alerte</label>
-          <select class="form-control" id="rc-source">
+          <select class="form-control" id="rc-source" data-ui="custom">
             <option value="DGAL"       ${item?.alert_source === 'DGAL'       ? 'selected' : ''}>DGAL / Autorité</option>
             <option value="fournisseur" ${item?.alert_source === 'fournisseur' || !item ? 'selected' : ''}>Fournisseur</option>
             <option value="interne"    ${item?.alert_source === 'interne'    ? 'selected' : ''}>Détection interne</option>
@@ -411,7 +411,7 @@ function showRecallModal(item) {
         </div>
         <div class="form-group">
           <label>Sévérité</label>
-          <select class="form-control" id="rc-severity">
+          <select class="form-control" id="rc-severity" data-ui="custom">
             <option value="critique" ${item?.severity === 'critique' ? 'selected' : ''}>🔴 Critique</option>
             <option value="majeur"   ${item?.severity === 'majeur' || !item ? 'selected' : ''}>🟠 Majeur</option>
             <option value="mineur"   ${item?.severity === 'mineur'   ? 'selected' : ''}>🟡 Mineur</option>
@@ -420,8 +420,8 @@ function showRecallModal(item) {
         <div class="form-group">
           <label>Quantité concernée</label>
           <div style="display:flex;gap:var(--space-2)">
-            <input type="number" class="form-control" id="rc-qty" value="${item?.quantity_affected || ''}" placeholder="0" min="0" style="flex:2">
-            <select class="form-control" id="rc-qty-unit" style="flex:1">
+            <input type="number" class="form-control" id="rc-qty" value="${item?.quantity_affected || ''}" placeholder="0" min="0" style="flex:2" data-ui="custom">
+            <select class="form-control" id="rc-qty-unit" style="flex:1" data-ui="custom">
               <option value="kg"     ${item?.quantity_unit === 'kg'     || !item ? 'selected' : ''}>kg</option>
               <option value="unités" ${item?.quantity_unit === 'unités' ? 'selected' : ''}>unités</option>
               <option value="L"      ${item?.quantity_unit === 'L'      ? 'selected' : ''}>L</option>
@@ -431,11 +431,11 @@ function showRecallModal(item) {
         </div>
         <div class="form-group" style="grid-column:1/-1">
           <label>Actions prises</label>
-          <textarea class="form-control" id="rc-actions" rows="3" placeholder="Ex: Lots retirés des frigos, fournisseur contacté...">${escapeHtml(item?.actions_taken || '')}</textarea>
+          <textarea class="form-control" id="rc-actions" rows="3" placeholder="Ex: Lots retirés des frigos, fournisseur contacté..." data-ui="custom">${escapeHtml(item?.actions_taken || '')}</textarea>
         </div>
         ${isEdit ? `
         <div class="form-group" style="display:flex;align-items:center;gap:var(--space-2)">
-          <input type="checkbox" id="rc-notif" style="width:16px;height:16px" ${item?.notification_sent ? 'checked' : ''}>
+          <input type="checkbox" id="rc-notif" style="width:16px;height:16px" ${item?.notification_sent ? 'checked' : ''} data-ui="custom">
           <label for="rc-notif" style="margin:0;cursor:pointer">Notification envoyée aux autorités</label>
         </div>
         ` : ''}

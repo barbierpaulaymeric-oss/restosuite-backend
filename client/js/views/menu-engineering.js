@@ -17,12 +17,12 @@ async function renderMenuEngineering() {
     </div>
 
     <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-4);flex-wrap:wrap">
-      <select id="me-period" class="input" style="width:auto">
+      <select id="me-period" class="input" style="width:auto" data-ui="custom">
         <option value="7">7 jours</option>
         <option value="30" selected>30 jours</option>
         <option value="90">90 jours</option>
       </select>
-      <select id="me-category" class="input" style="width:auto">
+      <select id="me-category" class="input" style="width:auto" data-ui="custom">
         <option value="">Toutes catégories</option>
       </select>
     </div>

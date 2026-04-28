@@ -40,7 +40,7 @@ async function renderStockReception() {
     <form class="reception-form" style="margin-bottom:var(--space-5)" onsubmit="return false;">
       <div class="form-group" style="margin-bottom:var(--space-4)">
         <label class="form-label" for="rec-supplier">Fournisseur</label>
-        <select id="rec-supplier" class="input" aria-label="Sélectionner le fournisseur">
+        <select id="rec-supplier" class="input" aria-label="Sélectionner le fournisseur" data-ui="custom">
           <option value="">— Sélectionner un fournisseur —</option>
           ${suppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
         </select>
@@ -78,7 +78,7 @@ async function renderStockReception() {
       <div class="form-group" style="margin-bottom:var(--space-3)">
         <label class="form-label">Ingrédient *</label>
         <div style="position:relative">
-          <input type="text" class="input line-ingredient-search" placeholder="Rechercher un ingrédient..." autocomplete="off">
+          <input type="text" class="input line-ingredient-search" placeholder="Rechercher un ingrédient..." autocomplete="off" data-ui="custom">
           <input type="hidden" class="line-ingredient-id">
           <div class="autocomplete-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-md);max-height:200px;overflow-y:auto;z-index:10"></div>
         </div>
@@ -86,21 +86,21 @@ async function renderStockReception() {
       <div style="display:grid;grid-template-columns:1fr 80px;gap:var(--space-2);margin-bottom:var(--space-3)">
         <div class="form-group">
           <label class="form-label">Quantité *</label>
-          <input type="number" class="input line-qty" step="0.01" min="0.01" placeholder="0">
+          <input type="number" class="input line-qty" step="0.01" min="0.01" placeholder="0" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label">Unité</label>
-          <input type="text" class="input line-unit" value="kg">
+          <input type="text" class="input line-unit" value="kg" data-ui="custom">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-3)">
         <div class="form-group">
           <label class="form-label">Prix unitaire (€)</label>
-          <input type="number" class="input line-price" step="0.01" min="0" placeholder="0.00">
+          <input type="number" class="input line-price" step="0.01" min="0" placeholder="0.00" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label">N° de lot</label>
-          <input type="text" class="input line-batch" placeholder="Optionnel">
+          <input type="text" class="input line-batch" placeholder="Optionnel" data-ui="custom">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-3)">
@@ -110,12 +110,12 @@ async function renderStockReception() {
         </div>
         <div class="form-group">
           <label class="form-label">T° réception (°C)</label>
-          <input type="number" class="input line-temp" step="0.1" placeholder="Ex: 3.5">
+          <input type="number" class="input line-temp" step="0.1" placeholder="Ex: 3.5" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">Notes</label>
-        <input type="text" class="input line-notes" placeholder="Remarques éventuelles">
+        <input type="text" class="input line-notes" placeholder="Remarques éventuelles" data-ui="custom">
       </div>
     `;
 

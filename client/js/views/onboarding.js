@@ -109,15 +109,15 @@ class OnboardingWizard {
         <div class="ob-form">
           <div class="form-group">
             <label for="ob-firstname">Prénom</label>
-            <input type="text" class="form-control" id="ob-firstname" value="${escapeHtml(acc.first_name || '')}" placeholder="Prénom" autocomplete="given-name">
+            <input type="text" class="form-control" id="ob-firstname" value="${escapeHtml(acc.first_name || '')}" placeholder="Prénom" autocomplete="given-name" data-ui="custom">
           </div>
           <div class="form-group">
             <label for="ob-lastname">Nom</label>
-            <input type="text" class="form-control" id="ob-lastname" value="${escapeHtml(acc.last_name || '')}" placeholder="Nom" autocomplete="family-name">
+            <input type="text" class="form-control" id="ob-lastname" value="${escapeHtml(acc.last_name || '')}" placeholder="Nom" autocomplete="family-name" data-ui="custom">
           </div>
           <div class="form-group">
             <label for="ob-phone">Téléphone</label>
-            <input type="tel" class="form-control" id="ob-phone" value="${escapeHtml(acc.phone || '')}" placeholder="06 12 34 56 78" autocomplete="tel">
+            <input type="tel" class="form-control" id="ob-phone" value="${escapeHtml(acc.phone || '')}" placeholder="06 12 34 56 78" autocomplete="tel" data-ui="custom">
           </div>
         </div>
       </div>
@@ -136,11 +136,11 @@ class OnboardingWizard {
         <div class="ob-form">
           <div class="form-group">
             <label for="ob-rname">Nom du restaurant</label>
-            <input type="text" class="form-control" id="ob-rname" value="${escapeHtml(r.name || '')}" placeholder="Chez Marcel">
+            <input type="text" class="form-control" id="ob-rname" value="${escapeHtml(r.name || '')}" placeholder="Chez Marcel" data-ui="custom">
           </div>
           <div class="form-group">
             <label for="ob-rtype">Type d'établissement</label>
-            <select class="form-control" id="ob-rtype">
+            <select class="form-control" id="ob-rtype" data-ui="custom">
               <option value="">— Choisir —</option>
               ${['brasserie', 'gastro', 'fast-food', 'pizzeria', 'bar', 'traiteur', 'boulangerie', 'autre']
                 .map(t => `<option value="${t}" ${r.type === t ? 'selected' : ''}>${t.charAt(0).toUpperCase() + t.slice(1)}</option>`).join('')}
@@ -148,26 +148,26 @@ class OnboardingWizard {
           </div>
           <div class="form-group">
             <label for="ob-raddress">Adresse</label>
-            <input type="text" class="form-control" id="ob-raddress" value="${escapeHtml(r.address || '')}" placeholder="12 rue de la Paix" autocomplete="street-address">
+            <input type="text" class="form-control" id="ob-raddress" value="${escapeHtml(r.address || '')}" placeholder="12 rue de la Paix" autocomplete="street-address" data-ui="custom">
           </div>
           <div style="display:flex;gap:var(--space-3)">
             <div class="form-group" style="flex:2">
               <label for="ob-rcity">Ville</label>
-              <input type="text" class="form-control" id="ob-rcity" value="${escapeHtml(r.city || '')}" placeholder="Lyon" autocomplete="address-level2">
+              <input type="text" class="form-control" id="ob-rcity" value="${escapeHtml(r.city || '')}" placeholder="Lyon" autocomplete="address-level2" data-ui="custom">
             </div>
             <div class="form-group" style="flex:1">
               <label for="ob-rpostal">Code postal</label>
-              <input type="text" class="form-control" id="ob-rpostal" value="${escapeHtml(r.postal_code || '')}" placeholder="69001" maxlength="5" inputmode="numeric" autocomplete="postal-code">
+              <input type="text" class="form-control" id="ob-rpostal" value="${escapeHtml(r.postal_code || '')}" placeholder="69001" maxlength="5" inputmode="numeric" autocomplete="postal-code" data-ui="custom">
             </div>
           </div>
           <div style="display:flex;gap:var(--space-3)">
             <div class="form-group" style="flex:1">
               <label for="ob-rphone">Téléphone</label>
-              <input type="tel" class="form-control" id="ob-rphone" value="${escapeHtml(r.phone || '')}" placeholder="04 78 00 00 00">
+              <input type="tel" class="form-control" id="ob-rphone" value="${escapeHtml(r.phone || '')}" placeholder="04 78 00 00 00" data-ui="custom">
             </div>
             <div class="form-group" style="flex:1">
               <label for="ob-rcovers">Nombre de couverts</label>
-              <input type="number" class="form-control" id="ob-rcovers" value="${r.covers || 30}" placeholder="30" min="1" inputmode="numeric">
+              <input type="number" class="form-control" id="ob-rcovers" value="${r.covers || 30}" placeholder="30" min="1" inputmode="numeric" data-ui="custom">
             </div>
           </div>
         </div>
@@ -214,19 +214,19 @@ class OnboardingWizard {
       container.innerHTML = `
         <div class="form-group">
           <label for="ob-salle-count">Salle — nombre de tables</label>
-          <input type="number" class="form-control" id="ob-salle-count" value="${this._countZone('Salle')}" min="0" placeholder="0" inputmode="numeric">
+          <input type="number" class="form-control" id="ob-salle-count" value="${this._countZone('Salle')}" min="0" placeholder="0" inputmode="numeric" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="ob-terrasse-count">Terrasse — nombre de tables</label>
-          <input type="number" class="form-control" id="ob-terrasse-count" value="${this._countZone('Terrasse')}" min="0" placeholder="0" inputmode="numeric">
+          <input type="number" class="form-control" id="ob-terrasse-count" value="${this._countZone('Terrasse')}" min="0" placeholder="0" inputmode="numeric" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="ob-bar-count">Bar — nombre de tables</label>
-          <input type="number" class="form-control" id="ob-bar-count" value="${this._countZone('Bar')}" min="0" placeholder="0" inputmode="numeric">
+          <input type="number" class="form-control" id="ob-bar-count" value="${this._countZone('Bar')}" min="0" placeholder="0" inputmode="numeric" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="ob-seats-default">Couverts par table (par défaut)</label>
-          <input type="number" class="form-control" id="ob-seats-default" value="4" min="1" inputmode="numeric">
+          <input type="number" class="form-control" id="ob-seats-default" value="4" min="1" inputmode="numeric" data-ui="custom">
         </div>
       `;
     } else {
@@ -259,11 +259,11 @@ class OnboardingWizard {
   _renderTableRow(t, i) {
     return `
       <div role="listitem" style="display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-2)">
-        <input type="number" class="form-control" style="width:60px" value="${t.table_number}" data-index="${i}" data-field="table_number" min="1" aria-label="Numéro de table" inputmode="numeric">
-        <select class="form-control" style="flex:1" data-index="${i}" data-field="zone" aria-label="Zone">
+        <input type="number" class="form-control" style="width:60px" value="${t.table_number}" data-index="${i}" data-field="table_number" min="1" aria-label="Numéro de table" inputmode="numeric" data-ui="custom">
+        <select class="form-control" style="flex:1" data-index="${i}" data-field="zone" aria-label="Zone" data-ui="custom">
           ${['Salle', 'Terrasse', 'Bar', 'Privé'].map(z => `<option value="${z}" ${t.zone === z ? 'selected' : ''}>${z}</option>`).join('')}
         </select>
-        <input type="number" class="form-control" style="width:60px" value="${t.seats}" data-index="${i}" data-field="seats" min="1" placeholder="4" aria-label="Couverts" inputmode="numeric">
+        <input type="number" class="form-control" style="width:60px" value="${t.seats}" data-index="${i}" data-field="seats" min="1" placeholder="4" aria-label="Couverts" inputmode="numeric" data-ui="custom">
         <button class="ob-table-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:18px" aria-label="Supprimer la table ${t.table_number}">✕</button>
       </div>
     `;
@@ -349,18 +349,18 @@ class OnboardingWizard {
         </div>
         <div class="form-group" style="margin-bottom:var(--space-2)">
           <label for="ob-member-name-${i}" class="visually-hidden">Nom du membre ${i + 1}</label>
-          <input type="text" id="ob-member-name-${i}" class="form-control" placeholder="Nom / surnom" value="${escapeHtml(m.name)}" data-index="${i}" data-field="name">
+          <input type="text" id="ob-member-name-${i}" class="form-control" placeholder="Nom / surnom" value="${escapeHtml(m.name)}" data-index="${i}" data-field="name" data-ui="custom">
         </div>
         <div style="display:flex;gap:var(--space-2)">
           <label for="ob-member-role-${i}" class="visually-hidden">Rôle du membre ${i + 1}</label>
-          <select id="ob-member-role-${i}" class="form-control ob-role-select" data-index="${i}" data-field="role" style="flex:1">
+          <select id="ob-member-role-${i}" class="form-control ob-role-select" data-index="${i}" data-field="role" style="flex:1" data-ui="custom">
             <option value="cuisinier" ${m.role === 'cuisinier' ? 'selected' : ''}>👨‍🍳 Cuisinier</option>
             <option value="serveur" ${m.role === 'serveur' ? 'selected' : ''}>🍽️ Serveur</option>
             <option value="__custom__" ${!['cuisinier','serveur'].includes(m.role) && m.role ? 'selected' : ''}>✏️ Personnalisé…</option>
           </select>
           <input type="text" class="form-control ob-custom-role" data-index="${i}" data-field="custom_role" placeholder="Ex: Pâtissier" aria-label="Rôle personnalisé"
                  value="${escapeHtml(!['cuisinier','serveur','equipier',''].includes(m.role) ? m.role : '')}"
-                 style="flex:1;${['cuisinier','serveur','equipier',''].includes(m.role) ? 'display:none' : ''}">
+                 style="flex:1;${['cuisinier','serveur','equipier',''].includes(m.role) ? 'display:none' : ''}" data-ui="custom">
         </div>
       </div>
     `).join('');
@@ -433,11 +433,11 @@ class OnboardingWizard {
 
     container.innerHTML = this.zones.map((z, i) => `
       <div class="ob-zone-row" data-index="${i}" role="listitem">
-        <input type="text" class="ob-zone-name" value="${escapeHtml(z.name)}" data-field="name" data-index="${i}" aria-label="Nom de la zone ${i + 1}">
+        <input type="text" class="ob-zone-name" value="${escapeHtml(z.name)}" data-field="name" data-index="${i}" aria-label="Nom de la zone ${i + 1}" data-ui="custom">
         <div class="ob-zone-range">
-          <input type="number" class="ob-zone-input" value="${z.min_temp}" data-field="min_temp" data-index="${i}" step="1" aria-label="Température minimum" inputmode="numeric">
+          <input type="number" class="ob-zone-input" value="${z.min_temp}" data-field="min_temp" data-index="${i}" step="1" aria-label="Température minimum" inputmode="numeric" data-ui="custom">
           <span class="ob-zone-sep" aria-hidden="true">°C —</span>
-          <input type="number" class="ob-zone-input" value="${z.max_temp}" data-field="max_temp" data-index="${i}" step="1" aria-label="Température maximum" inputmode="numeric">
+          <input type="number" class="ob-zone-input" value="${z.max_temp}" data-field="max_temp" data-index="${i}" step="1" aria-label="Température maximum" inputmode="numeric" data-ui="custom">
           <span class="ob-zone-unit" aria-hidden="true">°C</span>
         </div>
         <button class="ob-zone-delete" data-index="${i}" title="Supprimer" aria-label="Supprimer la zone ${escapeHtml(z.name)}">✕</button>
@@ -501,14 +501,14 @@ class OnboardingWizard {
         </div>
         <div class="form-group" style="margin-bottom:var(--space-2)">
           <label for="ob-supplier-name-${i}" class="visually-hidden">Nom du fournisseur ${i + 1}</label>
-          <input type="text" id="ob-supplier-name-${i}" class="form-control" placeholder="Nom de l'entreprise" value="${escapeHtml(s.name)}" data-index="${i}" data-field="name">
+          <input type="text" id="ob-supplier-name-${i}" class="form-control" placeholder="Nom de l'entreprise" value="${escapeHtml(s.name)}" data-index="${i}" data-field="name" data-ui="custom">
         </div>
         <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-2)">
-          <input type="text" class="form-control" placeholder="Contact" value="${escapeHtml(s.contact)}" data-index="${i}" data-field="contact" style="flex:1" aria-label="Personne de contact">
-          <input type="tel" class="form-control" placeholder="Téléphone" value="${escapeHtml(s.phone)}" data-index="${i}" data-field="phone" style="flex:1" aria-label="Téléphone">
+          <input type="text" class="form-control" placeholder="Contact" value="${escapeHtml(s.contact)}" data-index="${i}" data-field="contact" style="flex:1" aria-label="Personne de contact" data-ui="custom">
+          <input type="tel" class="form-control" placeholder="Téléphone" value="${escapeHtml(s.phone)}" data-index="${i}" data-field="phone" style="flex:1" aria-label="Téléphone" data-ui="custom">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <input type="email" class="form-control" placeholder="Email" value="${escapeHtml(s.email)}" data-index="${i}" data-field="email" aria-label="Email">
+          <input type="email" class="form-control" placeholder="Email" value="${escapeHtml(s.email)}" data-index="${i}" data-field="email" aria-label="Email" data-ui="custom">
         </div>
       </div>
     `).join('');

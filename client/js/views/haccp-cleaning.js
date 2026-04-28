@@ -176,16 +176,16 @@ function showCleaningTaskModal(task) {
       <h2>${isEdit ? '<i data-lucide="pencil" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Modifier la tâche' : '<i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouvelle tâche'}</h2>
       <div class="form-group">
         <label>Nom de la tâche</label>
-        <input type="text" class="form-control" id="task-name" value="${isEdit ? escapeHtml(task.name) : ''}" placeholder="ex: Nettoyage plan de travail">
+        <input type="text" class="form-control" id="task-name" value="${isEdit ? escapeHtml(task.name) : ''}" placeholder="ex: Nettoyage plan de travail" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Zone</label>
-          <input type="text" class="form-control" id="task-zone" value="${isEdit ? escapeHtml(task.zone) : ''}" placeholder="ex: Cuisine">
+          <input type="text" class="form-control" id="task-zone" value="${isEdit ? escapeHtml(task.zone) : ''}" placeholder="ex: Cuisine" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Fréquence</label>
-          <select class="form-control" id="task-frequency">
+          <select class="form-control" id="task-frequency" data-ui="custom">
             <option value="daily" ${isEdit && task.frequency === 'daily' ? 'selected' : ''}>Quotidien</option>
             <option value="weekly" ${isEdit && task.frequency === 'weekly' ? 'selected' : ''}>Hebdomadaire</option>
             <option value="monthly" ${isEdit && task.frequency === 'monthly' ? 'selected' : ''}>Mensuel</option>
@@ -195,34 +195,34 @@ function showCleaningTaskModal(task) {
       <div class="form-row">
         <div class="form-group">
           <label>Produit</label>
-          <input type="text" class="form-control" id="task-product" value="${isEdit && task.product ? escapeHtml(task.product) : ''}" placeholder="ex: Dégraissant + désinfectant">
+          <input type="text" class="form-control" id="task-product" value="${isEdit && task.product ? escapeHtml(task.product) : ''}" placeholder="ex: Dégraissant + désinfectant" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Concentration</label>
-          <input type="text" class="form-control" id="task-concentration" value="${isEdit && task.concentration ? escapeHtml(task.concentration) : ''}" placeholder="ex: 5ml/L ou dilution 1:20">
+          <input type="text" class="form-control" id="task-concentration" value="${isEdit && task.concentration ? escapeHtml(task.concentration) : ''}" placeholder="ex: 5ml/L ou dilution 1:20" data-ui="custom">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Température de l'eau</label>
-          <input type="text" class="form-control" id="task-temperature_eau" value="${isEdit && task.temperature_eau ? escapeHtml(task.temperature_eau) : ''}" placeholder="ex: 60°C">
+          <input type="text" class="form-control" id="task-temperature_eau" value="${isEdit && task.temperature_eau ? escapeHtml(task.temperature_eau) : ''}" placeholder="ex: 60°C" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Temps de contact</label>
-          <input type="text" class="form-control" id="task-temps_contact" value="${isEdit && task.temps_contact ? escapeHtml(task.temps_contact) : ''}" placeholder="ex: 15 minutes">
+          <input type="text" class="form-control" id="task-temps_contact" value="${isEdit && task.temps_contact ? escapeHtml(task.temps_contact) : ''}" placeholder="ex: 15 minutes" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Rinçage</label>
-        <input type="text" class="form-control" id="task-rincage" value="${isEdit && task.rincage ? escapeHtml(task.rincage) : ''}" placeholder="ex: Rinçage eau claire obligatoire">
+        <input type="text" class="form-control" id="task-rincage" value="${isEdit && task.rincage ? escapeHtml(task.rincage) : ''}" placeholder="ex: Rinçage eau claire obligatoire" data-ui="custom">
       </div>
       <div class="form-group">
         <label>EPI nécessaires</label>
-        <input type="text" class="form-control" id="task-epi" value="${isEdit && task.epi ? escapeHtml(task.epi) : ''}" placeholder="ex: Gants nitrile, lunettes de protection">
+        <input type="text" class="form-control" id="task-epi" value="${isEdit && task.epi ? escapeHtml(task.epi) : ''}" placeholder="ex: Gants nitrile, lunettes de protection" data-ui="custom">
       </div>
       <div class="form-group">
         <label>Méthode générale</label>
-        <textarea class="form-control" id="task-method" rows="2" placeholder="ex: Nettoyer, rincer, désinfecter">${isEdit && task.method ? escapeHtml(task.method) : ''}</textarea>
+        <textarea class="form-control" id="task-method" rows="2" placeholder="ex: Nettoyer, rincer, désinfecter" data-ui="custom">${isEdit && task.method ? escapeHtml(task.method) : ''}</textarea>
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="task-cancel">Annuler</button>

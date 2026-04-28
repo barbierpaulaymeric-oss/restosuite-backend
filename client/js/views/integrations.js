@@ -109,15 +109,15 @@ function configureIntegration(provider) {
       <div class="modal-body">
         <div class="form-group">
           <label class="label">Clé API</label>
-          <input type="text" class="input" id="integ-api-key" placeholder="Votre clé API ${meta.name}">
+          <input type="text" class="input" id="integ-api-key" placeholder="Votre clé API ${meta.name}" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="label">Secret API (optionnel)</label>
-          <input type="password" class="input" id="integ-api-secret" placeholder="Secret ou token">
+          <input type="password" class="input" id="integ-api-secret" placeholder="Secret ou token" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="label">URL Webhook (optionnel)</label>
-          <input type="url" class="input" id="integ-webhook" placeholder="https://...">
+          <input type="url" class="input" id="integ-webhook" placeholder="https://..." data-ui="custom">
         </div>
         <div class="form-group" style="display:flex;align-items:center;gap:var(--space-2)">
           <label class="toggle">
@@ -267,7 +267,7 @@ function showAddReservation() {
       <div class="modal-body">
         <div class="form-group">
           <label class="label">Nom du client *</label>
-          <input type="text" class="input" id="resa-name" placeholder="Nom" required>
+          <input type="text" class="input" id="resa-name" placeholder="Nom" required data-ui="custom">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           <div class="form-group">
@@ -282,16 +282,16 @@ function showAddReservation() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           <div class="form-group">
             <label class="label">Couverts</label>
-            <input type="number" class="input" id="resa-party" value="2" min="1" max="50">
+            <input type="number" class="input" id="resa-party" value="2" min="1" max="50" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="label">Téléphone</label>
-            <input type="tel" class="input" id="resa-phone" placeholder="06...">
+            <input type="tel" class="input" id="resa-phone" placeholder="06..." data-ui="custom">
           </div>
         </div>
         <div class="form-group">
           <label class="label">Notes</label>
-          <textarea class="input" id="resa-notes" rows="2" placeholder="Anniversaire, allergies, chaise bébé…"></textarea>
+          <textarea class="input" id="resa-notes" rows="2" placeholder="Anniversaire, allergies, chaise bébé…" data-ui="custom"></textarea>
         </div>
       </div>
       <div class="modal-footer">

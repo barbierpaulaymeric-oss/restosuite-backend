@@ -124,7 +124,7 @@ async function renderMercurialeResults(data) {
     <div style="display:flex;gap:var(--space-3);align-items:flex-end;margin-bottom:var(--space-4);flex-wrap:wrap">
       <div class="form-group" style="margin:0;flex:1;min-width:200px">
         <label class="form-label">Fournisseur</label>
-        <select class="input" id="merc-supplier-select">
+        <select class="input" id="merc-supplier-select" data-ui="custom">
           <option value="">— Sélectionner un fournisseur —</option>
           ${supplierOptions}
         </select>
@@ -138,7 +138,7 @@ async function renderMercurialeResults(data) {
       <table>
         <thead>
           <tr>
-            <th style="width:30px"><input type="checkbox" id="merc-check-all" checked></th>
+            <th style="width:30px"><input type="checkbox" id="merc-check-all" checked data-ui="custom"></th>
             <th>Produit (mercuriale)</th>
             <th>Correspondance</th>
             <th class="numeric">Prix</th>
@@ -152,7 +152,7 @@ async function renderMercurialeResults(data) {
             const confidence = item.match_confidence === 'exact' ? '✅' : item.match_confidence === 'fuzzy' ? '🔶' : '❌';
             return `
               <tr style="${!matched ? 'opacity:0.6' : ''}">
-                <td><input type="checkbox" class="merc-item-cb" data-idx="${i}" ${matched ? 'checked' : ''}></td>
+                <td><input type="checkbox" class="merc-item-cb" data-idx="${i}" ${matched ? 'checked' : ''} data-ui="custom"></td>
                 <td style="font-weight:500">${escapeHtml(item.product_name || '—')}
                   ${item.organic ? '<span style="color:var(--color-success);font-size:11px"> 🌿 Bio</span>' : ''}
                 </td>

@@ -46,7 +46,7 @@ async function renderHACCPTraceability() {
           </div>
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
             <label for="filter-supplier" class="visually-hidden">Filtrer par fournisseur</label>
-            <input type="text" class="form-control" id="filter-supplier" style="min-height:40px" placeholder="Fournisseur" aria-label="Filtrer par fournisseur">
+            <input type="text" class="form-control" id="filter-supplier" style="min-height:40px" placeholder="Fournisseur" aria-label="Filtrer par fournisseur" data-ui="custom">
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-filter" aria-label="Appliquer les filtres">Filtrer</button>
         </div>
@@ -176,29 +176,29 @@ async function showReceptionModal() {
       <h2 id="modal-reception-title"><i data-lucide="package" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Saisie manuelle — Réception marchandise</h2>
       <div class="form-group">
         <label for="rec-product">Produit * <span style="font-size:var(--text-xs);color:var(--text-tertiary)">(nom libre)</span></label>
-        <input type="text" class="form-control" id="rec-product" placeholder="ex: Filet de bœuf" autofocus required aria-required="true">
+        <input type="text" class="form-control" id="rec-product" placeholder="ex: Filet de bœuf" autofocus required aria-required="true" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label for="rec-supplier">Fournisseur</label>
           <div style="position:relative">
-            <input type="text" class="form-control" id="rec-supplier" placeholder="Saisir ou choisir…" list="rec-supplier-list" autocomplete="off">
+            <input type="text" class="form-control" id="rec-supplier" placeholder="Saisir ou choisir…" list="rec-supplier-list" autocomplete="off" data-ui="custom">
             <datalist id="rec-supplier-list">${supplierOptions}</datalist>
           </div>
         </div>
         <div class="form-group">
           <label for="rec-batch">N° de lot</label>
-          <input type="text" class="form-control" id="rec-batch" placeholder="ex: LOT2024-001">
+          <input type="text" class="form-control" id="rec-batch" placeholder="ex: LOT2024-001" data-ui="custom">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label for="rec-numero-bl">N° Bon de livraison</label>
-          <input type="text" class="form-control" id="rec-numero-bl" placeholder="ex: BL-2026-04512">
+          <input type="text" class="form-control" id="rec-numero-bl" placeholder="ex: BL-2026-04512" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="rec-temp">T° à réception (°C)</label>
-          <input type="number" step="0.1" class="form-control" id="rec-temp" placeholder="ex: 3.5" inputmode="decimal">
+          <input type="number" step="0.1" class="form-control" id="rec-temp" placeholder="ex: 3.5" inputmode="decimal" data-ui="custom">
         </div>
       </div>
       <div class="form-row">
@@ -214,11 +214,11 @@ async function showReceptionModal() {
       <div class="form-row">
         <div class="form-group">
           <label for="rec-qty">Quantité</label>
-          <input type="number" step="0.01" class="form-control" id="rec-qty" placeholder="ex: 5" inputmode="decimal">
+          <input type="number" step="0.01" class="form-control" id="rec-qty" placeholder="ex: 5" inputmode="decimal" data-ui="custom">
         </div>
         <div class="form-group">
           <label for="rec-unit">Unité</label>
-          <select class="form-control" id="rec-unit">
+          <select class="form-control" id="rec-unit" data-ui="custom">
             <option value="kg">kg</option>
             <option value="g">g</option>
             <option value="l">l</option>
@@ -230,7 +230,7 @@ async function showReceptionModal() {
       </div>
       <div class="form-group">
         <label for="rec-emballage">État de l'emballage</label>
-        <select class="form-control" id="rec-emballage">
+        <select class="form-control" id="rec-emballage" data-ui="custom">
           <option value="">— Sélectionner —</option>
           <option value="Conforme">Conforme</option>
           <option value="Légèrement abîmé">Légèrement abîmé</option>
@@ -241,7 +241,7 @@ async function showReceptionModal() {
       </div>
       <div class="form-group">
         <label for="rec-organo">Conformité organoleptique (aspect, odeur, couleur)</label>
-        <select class="form-control" id="rec-organo">
+        <select class="form-control" id="rec-organo" data-ui="custom">
           <option value="">— Sélectionner —</option>
           <option value="Conforme">Conforme</option>
           <option value="Odeur anormale">Odeur anormale</option>
@@ -254,18 +254,18 @@ async function showReceptionModal() {
         <label style="font-weight:600;margin-bottom:var(--space-2);display:block">Conformité globale *</label>
         <div style="display:flex;gap:var(--space-3)">
           <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:2px solid var(--border-default);flex:1;justify-content:center;font-weight:500" id="rec-conforme-label">
-            <input type="radio" name="rec-conformite" id="rec-conforme" value="conforme" style="accent-color:var(--color-success)" checked>
+            <input type="radio" name="rec-conformite" id="rec-conforme" value="conforme" style="accent-color:var(--color-success)" checked data-ui="custom">
             <span style="color:var(--color-success)">✓ Conforme</span>
           </label>
           <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:2px solid var(--border-default);flex:1;justify-content:center;font-weight:500" id="rec-nonconforme-label">
-            <input type="radio" name="rec-conformite" id="rec-nonconforme" value="non-conforme" style="accent-color:var(--color-danger)">
+            <input type="radio" name="rec-conformite" id="rec-nonconforme" value="non-conforme" style="accent-color:var(--color-danger)" data-ui="custom">
             <span style="color:var(--color-danger)">✗ Non conforme</span>
           </label>
         </div>
       </div>
       <div class="form-group">
         <label for="rec-notes">Notes</label>
-        <input type="text" class="form-control" id="rec-notes" placeholder="ex: Remarque complémentaire">
+        <input type="text" class="form-control" id="rec-notes" placeholder="ex: Remarque complémentaire" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="rec-cancel" aria-label="Annuler la saisie">Annuler</button>

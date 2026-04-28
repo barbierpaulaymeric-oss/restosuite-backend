@@ -199,16 +199,16 @@ function showThermometerModal() {
       <h2><i data-lucide="plus" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Nouveau thermomètre</h2>
       <div class="form-group">
         <label>Nom *</label>
-        <input type="text" class="form-control" id="th-name" placeholder="ex: Sonde chambre froide A" autofocus>
+        <input type="text" class="form-control" id="th-name" placeholder="ex: Sonde chambre froide A" autofocus data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>N° de série</label>
-          <input type="text" class="form-control" id="th-serial" placeholder="SN-xxxx">
+          <input type="text" class="form-control" id="th-serial" placeholder="SN-xxxx" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Type</label>
-          <select class="form-control" id="th-type">
+          <select class="form-control" id="th-type" data-ui="custom">
             <option value="digital">Digital</option>
             <option value="analogique">Analogique</option>
             <option value="infrarouge">Infrarouge</option>
@@ -218,7 +218,7 @@ function showThermometerModal() {
       </div>
       <div class="form-group">
         <label>Emplacement</label>
-        <input type="text" class="form-control" id="th-location" placeholder="ex: Chambre froide positive">
+        <input type="text" class="form-control" id="th-location" placeholder="ex: Chambre froide positive" data-ui="custom">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -284,7 +284,7 @@ function showCalibrationModal(thermometers, preselected) {
       </p>
       <div class="form-group">
         <label>Thermomètre *</label>
-        <select class="form-control" id="cal-thermo">
+        <select class="form-control" id="cal-thermo" data-ui="custom">
           ${activeThermos.map(t => `
             <option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>
               ${escapeHtml(t.name)}${t.location ? ' — ' + escapeHtml(t.location) : ''}
@@ -305,15 +305,15 @@ function showCalibrationModal(thermometers, preselected) {
       <div class="form-row">
         <div class="form-group">
           <label>T° référence (°C) *</label>
-          <input type="number" step="0.1" class="form-control" id="cal-ref" value="0" inputmode="decimal">
+          <input type="number" step="0.1" class="form-control" id="cal-ref" value="0" inputmode="decimal" data-ui="custom">
         </div>
         <div class="form-group">
           <label>T° mesurée (°C) *</label>
-          <input type="number" step="0.1" class="form-control" id="cal-meas" placeholder="ex: 0.3" inputmode="decimal">
+          <input type="number" step="0.1" class="form-control" id="cal-meas" placeholder="ex: 0.3" inputmode="decimal" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Tolérance (±°C)</label>
-          <input type="number" step="0.1" min="0" class="form-control" id="cal-tol" value="0.5" inputmode="decimal">
+          <input type="number" step="0.1" min="0" class="form-control" id="cal-tol" value="0.5" inputmode="decimal" data-ui="custom">
         </div>
       </div>
       <div id="cal-preview" class="text-sm" style="padding:8px 12px;background:var(--surface-alt,#f5f5f5);border-radius:6px;margin-bottom:12px">
@@ -321,21 +321,21 @@ function showCalibrationModal(thermometers, preselected) {
       </div>
       <div class="form-group" id="cal-correction-wrap" style="display:none">
         <label>Action corrective *</label>
-        <textarea class="form-control" id="cal-correction" rows="2" placeholder="ex: Sonde retirée, envoyée en réparation"></textarea>
+        <textarea class="form-control" id="cal-correction" rows="2" placeholder="ex: Sonde retirée, envoyée en réparation" data-ui="custom"></textarea>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Étalonné par</label>
-          <input type="text" class="form-control" id="cal-by" value="${account ? escapeHtml(account.name || '') : ''}">
+          <input type="text" class="form-control" id="cal-by" value="${account ? escapeHtml(account.name || '') : ''}" data-ui="custom">
         </div>
         <div class="form-group">
           <label>Réf. certificat</label>
-          <input type="text" class="form-control" id="cal-cert" placeholder="ex: COFRAC-2026-001">
+          <input type="text" class="form-control" id="cal-cert" placeholder="ex: COFRAC-2026-001" data-ui="custom">
         </div>
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <input type="text" class="form-control" id="cal-notes">
+        <input type="text" class="form-control" id="cal-notes" data-ui="custom">
       </div>
       <div class="actions-row" style="justify-content:flex-end">
         <button class="btn btn-secondary" id="cal-cancel">Annuler</button>

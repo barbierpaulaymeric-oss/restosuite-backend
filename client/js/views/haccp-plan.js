@@ -222,15 +222,15 @@ function openHazardModal(hazard) {
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
         <div>
           <label class="form-label">Étape *</label>
-          <select class="form-control" id="hz-step">
+          <select class="form-control" id="hz-step" data-ui="custom">
             ${HACCP_PLAN_STEPS.map(s => `<option value="${s}" ${hazard && hazard.step_name === s ? 'selected' : ''}>${s}</option>`).join('')}
             <option value="__custom__">Autre…</option>
           </select>
-          <input type="text" class="form-control" id="hz-step-custom" placeholder="Étape personnalisée" style="margin-top:6px;display:none" value="${hazard && !HACCP_PLAN_STEPS.includes(hazard.step_name) ? escapeHtml(hazard.step_name) : ''}">
+          <input type="text" class="form-control" id="hz-step-custom" placeholder="Étape personnalisée" style="margin-top:6px;display:none" value="${hazard && !HACCP_PLAN_STEPS.includes(hazard.step_name) ? escapeHtml(hazard.step_name) : ''}" data-ui="custom">
         </div>
         <div>
           <label class="form-label">Type de danger *</label>
-          <select class="form-control" id="hz-type">
+          <select class="form-control" id="hz-type" data-ui="custom">
             <option value="B" ${!hazard || hazard.hazard_type === 'B' ? 'selected' : ''}>B — Biologique</option>
             <option value="C" ${hazard && hazard.hazard_type === 'C' ? 'selected' : ''}>C — Chimique</option>
             <option value="P" ${hazard && hazard.hazard_type === 'P' ? 'selected' : ''}>P — Physique</option>
@@ -238,21 +238,21 @@ function openHazardModal(hazard) {
         </div>
         <div>
           <label class="form-label">Description du danger *</label>
-          <textarea class="form-control" id="hz-desc" rows="2" placeholder="Ex: Contamination par Salmonella spp.">${hazard ? escapeHtml(hazard.hazard_description) : ''}</textarea>
+          <textarea class="form-control" id="hz-desc" rows="2" placeholder="Ex: Contamination par Salmonella spp." data-ui="custom">${hazard ? escapeHtml(hazard.hazard_description) : ''}</textarea>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div>
             <label class="form-label">Gravité (1–5)</label>
-            <input type="number" class="form-control" id="hz-severity" min="1" max="5" value="${hazard ? hazard.severity : 3}">
+            <input type="number" class="form-control" id="hz-severity" min="1" max="5" value="${hazard ? hazard.severity : 3}" data-ui="custom">
           </div>
           <div>
             <label class="form-label">Probabilité (1–5)</label>
-            <input type="number" class="form-control" id="hz-probability" min="1" max="5" value="${hazard ? hazard.probability : 3}">
+            <input type="number" class="form-control" id="hz-probability" min="1" max="5" value="${hazard ? hazard.probability : 3}" data-ui="custom">
           </div>
         </div>
         <div>
           <label class="form-label">Mesures préventives</label>
-          <textarea class="form-control" id="hz-measures" rows="3" placeholder="Ex: Contrôle température à réception, audit fournisseur…">${hazard ? escapeHtml(hazard.preventive_measures || '') : ''}</textarea>
+          <textarea class="form-control" id="hz-measures" rows="3" placeholder="Ex: Contrôle température à réception, audit fournisseur…" data-ui="custom">${hazard ? escapeHtml(hazard.preventive_measures || '') : ''}</textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -354,7 +354,7 @@ async function renderDecisionTab(container) {
                     return `
                       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
                         <span style="font-weight:600;color:var(--text-secondary)">${q}</span>
-                        <select class="form-control dt-select" data-hazard="${h.id}" data-q="${qi+1}" style="padding:4px 8px;font-size:13px;width:80px">
+                        <select class="form-control dt-select" data-hazard="${h.id}" data-q="${qi+1}" style="padding:4px 8px;font-size:13px;width:80px" data-ui="custom">
                           <option value="" ${val === null ? 'selected' : ''}>—</option>
                           <option value="1" ${val === 1 ? 'selected' : ''}>Oui</option>
                           <option value="0" ${val === 0 ? 'selected' : ''}>Non</option>
@@ -437,35 +437,35 @@ function renderCCPsTab(container) {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div>
                 <label class="form-label">Numéro CCP</label>
-                <input type="text" class="form-control ccp-number" data-hazard="${h.id}" value="${escapeHtml(num)}" placeholder="Ex: CCP1">
+                <input type="text" class="form-control ccp-number" data-hazard="${h.id}" value="${escapeHtml(num)}" placeholder="Ex: CCP1" data-ui="custom">
               </div>
               <div>
                 <label class="form-label">Responsable</label>
-                <input type="text" class="form-control ccp-responsible" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.responsible_person || '' : '')}" placeholder="Ex: Chef de cuisine">
+                <input type="text" class="form-control ccp-responsible" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.responsible_person || '' : '')}" placeholder="Ex: Chef de cuisine" data-ui="custom">
               </div>
               <div style="grid-column:1/-1">
                 <label class="form-label">Limites critiques</label>
-                <input type="text" class="form-control ccp-limits" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.critical_limits || '' : '')}" placeholder="Ex: Température à cœur ≥75°C pendant 2 min">
+                <input type="text" class="form-control ccp-limits" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.critical_limits || '' : '')}" placeholder="Ex: Température à cœur ≥75°C pendant 2 min" data-ui="custom">
               </div>
               <div>
                 <label class="form-label">Procédure de surveillance</label>
-                <textarea class="form-control ccp-monitoring" data-hazard="${h.id}" rows="2" placeholder="Ex: Mesure thermomètre sonde à chaque cuisson">${escapeHtml(ccp ? ccp.monitoring_procedure || '' : '')}</textarea>
+                <textarea class="form-control ccp-monitoring" data-hazard="${h.id}" rows="2" placeholder="Ex: Mesure thermomètre sonde à chaque cuisson" data-ui="custom">${escapeHtml(ccp ? ccp.monitoring_procedure || '' : '')}</textarea>
               </div>
               <div>
                 <label class="form-label">Fréquence de surveillance</label>
-                <input type="text" class="form-control ccp-frequency" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.monitoring_frequency || '' : '')}" placeholder="Ex: À chaque cuisson (100% des lots)">
+                <input type="text" class="form-control ccp-frequency" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.monitoring_frequency || '' : '')}" placeholder="Ex: À chaque cuisson (100% des lots)" data-ui="custom">
               </div>
               <div>
                 <label class="form-label">Actions correctives</label>
-                <textarea class="form-control ccp-corrective" data-hazard="${h.id}" rows="2" placeholder="Ex: Poursuivre la cuisson, rejeter le lot si T° non atteinte">${escapeHtml(ccp ? ccp.corrective_actions || '' : '')}</textarea>
+                <textarea class="form-control ccp-corrective" data-hazard="${h.id}" rows="2" placeholder="Ex: Poursuivre la cuisson, rejeter le lot si T° non atteinte" data-ui="custom">${escapeHtml(ccp ? ccp.corrective_actions || '' : '')}</textarea>
               </div>
               <div>
                 <label class="form-label">Procédure de vérification</label>
-                <textarea class="form-control ccp-verification" data-hazard="${h.id}" rows="2" placeholder="Ex: Calibration mensuelle du thermomètre, audit trimestriel">${escapeHtml(ccp ? ccp.verification_procedure || '' : '')}</textarea>
+                <textarea class="form-control ccp-verification" data-hazard="${h.id}" rows="2" placeholder="Ex: Calibration mensuelle du thermomètre, audit trimestriel" data-ui="custom">${escapeHtml(ccp ? ccp.verification_procedure || '' : '')}</textarea>
               </div>
               <div style="grid-column:1/-1">
                 <label class="form-label">Enregistrements</label>
-                <input type="text" class="form-control ccp-records" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.records_kept || '' : '')}" placeholder="Ex: Fiche cuisson journalière, registre thermomètre">
+                <input type="text" class="form-control ccp-records" data-hazard="${h.id}" value="${escapeHtml(ccp ? ccp.records_kept || '' : '')}" placeholder="Ex: Fiche cuisson journalière, registre thermomètre" data-ui="custom">
               </div>
             </div>
           </div>

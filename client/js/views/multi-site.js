@@ -141,11 +141,11 @@ function showAddSiteModal() {
       <div class="modal-body">
         <div class="form-group">
           <label class="label">Nom *</label>
-          <input type="text" class="input" id="site-name" placeholder="Nom du restaurant">
+          <input type="text" class="input" id="site-name" placeholder="Nom du restaurant" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="label">Type</label>
-          <select class="input" id="site-type">
+          <select class="input" id="site-type" data-ui="custom">
             <option value="restaurant">Restaurant</option>
             <option value="brasserie">Brasserie</option>
             <option value="bistrot">Bistrot</option>
@@ -157,26 +157,26 @@ function showAddSiteModal() {
         </div>
         <div class="form-group">
           <label class="label">Adresse</label>
-          <input type="text" class="input" id="site-address" placeholder="Adresse">
+          <input type="text" class="input" id="site-address" placeholder="Adresse" data-ui="custom">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           <div class="form-group">
             <label class="label">Ville</label>
-            <input type="text" class="input" id="site-city" placeholder="Ville">
+            <input type="text" class="input" id="site-city" placeholder="Ville" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="label">Code postal</label>
-            <input type="text" class="input" id="site-postal" placeholder="75001">
+            <input type="text" class="input" id="site-postal" placeholder="75001" data-ui="custom">
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
           <div class="form-group">
             <label class="label">Téléphone</label>
-            <input type="tel" class="input" id="site-phone" placeholder="01 23 45 67 89">
+            <input type="tel" class="input" id="site-phone" placeholder="01 23 45 67 89" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="label">Couverts</label>
-            <input type="number" class="input" id="site-covers" value="30" min="1">
+            <input type="number" class="input" id="site-covers" value="30" min="1" data-ui="custom">
           </div>
         </div>
       </div>
@@ -229,25 +229,25 @@ async function editSite(id) {
         <div class="modal-body">
           <div class="form-group">
             <label class="label">Nom</label>
-            <input type="text" class="input" id="edit-site-name" value="${escapeHtml(site.name || '')}">
+            <input type="text" class="input" id="edit-site-name" value="${escapeHtml(site.name || '')}" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="label">Adresse</label>
-            <input type="text" class="input" id="edit-site-address" value="${escapeHtml(site.address || '')}">
+            <input type="text" class="input" id="edit-site-address" value="${escapeHtml(site.address || '')}" data-ui="custom">
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
             <div class="form-group">
               <label class="label">Ville</label>
-              <input type="text" class="input" id="edit-site-city" value="${escapeHtml(site.city || '')}">
+              <input type="text" class="input" id="edit-site-city" value="${escapeHtml(site.city || '')}" data-ui="custom">
             </div>
             <div class="form-group">
               <label class="label">Téléphone</label>
-              <input type="tel" class="input" id="edit-site-phone" value="${escapeHtml(site.phone || '')}">
+              <input type="tel" class="input" id="edit-site-phone" value="${escapeHtml(site.phone || '')}" data-ui="custom">
             </div>
           </div>
           <div class="form-group">
             <label class="label">Couverts</label>
-            <input type="number" class="input" id="edit-site-covers" value="${site.covers || 30}">
+            <input type="number" class="input" id="edit-site-covers" value="${site.covers || 30}" data-ui="custom">
           </div>
           <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-md)">
             <p class="text-secondary text-sm"><strong>${site.table_count || 0}</strong> tables · <strong>${site.staff_count || 0}</strong> membres d'équipe</p>

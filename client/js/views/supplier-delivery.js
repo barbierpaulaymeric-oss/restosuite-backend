@@ -207,7 +207,7 @@ async function showNewDeliveryForm() {
     <div class="form-row" style="margin-bottom:var(--space-4)">
       <div class="form-group" style="flex:2">
         <label class="form-label">Restaurant client *</label>
-        <select id="dn-restaurant" class="input">
+        <select id="dn-restaurant" class="input" data-ui="custom">
           ${clientOptions || '<option value="">Aucun client lié</option>'}
         </select>
       </div>
@@ -218,7 +218,7 @@ async function showNewDeliveryForm() {
     </div>
     <div class="form-group" style="margin-bottom:var(--space-4)">
       <label class="form-label">Notes</label>
-      <textarea id="dn-notes" class="input" rows="2" placeholder="Notes optionnelles..."></textarea>
+      <textarea id="dn-notes" class="input" rows="2" placeholder="Notes optionnelles..." data-ui="custom"></textarea>
     </div>
     <h3 style="margin-bottom:var(--space-3)">Produits</h3>
     <div id="dn-items-list"></div>
@@ -247,15 +247,15 @@ async function showNewDeliveryForm() {
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">Produit *</label>
           <input type="text" class="input dn-product-name" placeholder="Nom du produit" required
-                 list="dn-product-suggestions" autocomplete="off">
+                 list="dn-product-suggestions" autocomplete="off" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">Quantité *</label>
-          <input type="number" class="input dn-quantity" step="0.01" min="0.01" placeholder="0" required>
+          <input type="number" class="input dn-quantity" step="0.01" min="0.01" placeholder="0" required data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">Unité</label>
-          <select class="input dn-unit">
+          <select class="input dn-unit" data-ui="custom">
             <option value="kg">kg</option>
             <option value="L">L</option>
             <option value="pièce">pièce</option>
@@ -265,13 +265,13 @@ async function showNewDeliveryForm() {
         </div>
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">Prix/unité (€)</label>
-          <input type="number" class="input dn-price" step="0.01" min="0" placeholder="0.00">
+          <input type="number" class="input dn-price" step="0.01" min="0" placeholder="0.00" data-ui="custom">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 100px;gap:var(--space-2);margin-bottom:var(--space-2)">
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">N° Lot</label>
-          <input type="text" class="input dn-batch" placeholder="N° lot">
+          <input type="text" class="input dn-batch" placeholder="N° lot" data-ui="custom">
         </div>
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">DLC</label>
@@ -279,7 +279,7 @@ async function showNewDeliveryForm() {
         </div>
         <div class="form-group">
           <label class="form-label" style="font-size:var(--text-xs)">T° max (°C)</label>
-          <input type="number" class="input dn-temp" step="0.1" placeholder="4">
+          <input type="number" class="input dn-temp" step="0.1" placeholder="4" data-ui="custom">
         </div>
       </div>
       <details style="margin-top:var(--space-2)">
@@ -287,19 +287,19 @@ async function showNewDeliveryForm() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-top:var(--space-2)">
           <div class="form-group">
             <label class="form-label" style="font-size:var(--text-xs)">Zone de pêche (FAO)</label>
-            <input type="text" class="input dn-fishing-zone" placeholder="Ex: 27.7">
+            <input type="text" class="input dn-fishing-zone" placeholder="Ex: 27.7" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="form-label" style="font-size:var(--text-xs)">Méthode de pêche</label>
-            <input type="text" class="input dn-fishing-method" placeholder="Ex: chalut">
+            <input type="text" class="input dn-fishing-method" placeholder="Ex: chalut" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="form-label" style="font-size:var(--text-xs)">Origine (viande)</label>
-            <input type="text" class="input dn-origin" placeholder="Ex: France, Charolais">
+            <input type="text" class="input dn-origin" placeholder="Ex: France, Charolais" data-ui="custom">
           </div>
           <div class="form-group">
             <label class="form-label" style="font-size:var(--text-xs)">N° agrément sanitaire</label>
-            <input type="text" class="input dn-sanitary" placeholder="Ex: FR 01.234.567 CE">
+            <input type="text" class="input dn-sanitary" placeholder="Ex: FR 01.234.567 CE" data-ui="custom">
           </div>
         </div>
       </details>

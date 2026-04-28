@@ -187,7 +187,7 @@ async function renderDeliveryDetail(id) {
         <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;justify-content:flex-end;margin-bottom:var(--space-4)">
           <div class="form-group" style="flex:1;max-width:400px">
             <label class="form-label">Notes de réception</label>
-            <textarea id="reception-notes" class="input" rows="2" placeholder="Notes optionnelles..."></textarea>
+            <textarea id="reception-notes" class="input" rows="2" placeholder="Notes optionnelles..." data-ui="custom"></textarea>
           </div>
         </div>
         <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
@@ -245,19 +245,19 @@ function renderDeliveryItemRow(item, isPending) {
       ${isPending ? `
         <td style="padding:var(--space-3)">
           <input type="number" class="input item-temp" step="0.1" value="${item.temperature_required ?? ''}"
-                 style="width:80px;font-size:var(--text-sm)" data-item-id="${item.id}" data-temp-required="${item.temperature_required ?? ''}">
+                 style="width:80px;font-size:var(--text-sm)" data-item-id="${item.id}" data-temp-required="${item.temperature_required ?? ''}" data-ui="custom">
           <span class="temp-warning" data-item-id="${item.id}" style="display:none;color:var(--color-danger);font-size:var(--text-xs);font-weight:700">⚠️ T° trop haute !</span>
         </td>
       ` : ''}
       <td style="padding:var(--space-3);font-size:var(--text-xs)">${extraInfo.length ? extraInfo.join('<br>') : '—'}</td>
       ${isPending ? `
         <td style="padding:var(--space-3)">
-          <select class="input item-action-select" data-item-id="${item.id}" style="font-size:var(--text-sm)">
+          <select class="input item-action-select" data-item-id="${item.id}" style="font-size:var(--text-sm)" data-ui="custom">
             <option value="accepted">✅ Accepter</option>
             <option value="rejected">❌ Refuser</option>
           </select>
           <input type="text" class="input item-rejection-reason" data-item-id="${item.id}" placeholder="Motif refus..."
-                 style="display:none;margin-top:4px;font-size:var(--text-xs);width:140px">
+                 style="display:none;margin-top:4px;font-size:var(--text-xs);width:140px" data-ui="custom">
         </td>
       ` : `
         <td style="padding:var(--space-3)">
