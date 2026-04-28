@@ -65,8 +65,21 @@ async function renderTeam(tab) {
 
       <div id="team-list"><div class="loading"><div class="spinner"></div></div></div>
 
+      <!-- RGPD Data Export -->
+      <div style="margin-top:var(--space-8);padding:var(--space-4);border:1px solid var(--border-color);border-radius:var(--radius-lg);background:var(--bg-card)">
+        <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)">
+          <i data-lucide="download-cloud" style="width:20px;height:20px;color:var(--color-accent)"></i>
+          <h3 style="margin:0;font-size:var(--text-base)">Exporter mes données (RGPD)</h3>
+        </div>
+        <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-3)">Téléchargez l'intégralité des données du restaurant au format JSON&nbsp;: comptes, recettes, stocks, commandes, livraisons, relevés HACCP, traçabilité, formations, allergènes.</p>
+        <button class="btn btn-secondary btn-sm" id="rgpd-export-btn">
+          <i data-lucide="download" style="width:14px;height:14px"></i> Télécharger mes données
+        </button>
+        <div id="rgpd-export-message" style="margin-top:var(--space-2);font-size:var(--text-sm)"></div>
+      </div>
+
       <!-- Danger Zone -->
-      <div style="margin-top:var(--space-8);padding:var(--space-4);border:1px solid rgba(217,48,37,0.3);border-radius:var(--radius-lg);background:linear-gradient(135deg, rgba(217,48,37,0.05), transparent)">
+      <div style="margin-top:var(--space-6);padding:var(--space-4);border:1px solid rgba(217,48,37,0.3);border-radius:var(--radius-lg);background:linear-gradient(135deg, rgba(217,48,37,0.05), transparent)">
         <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)">
           <i data-lucide="alert-triangle" style="width:20px;height:20px;color:var(--color-danger)"></i>
           <h3 style="color:var(--color-danger);margin:0;font-size:var(--text-base)">Zone dangereuse</h3>
@@ -122,6 +135,54 @@ async function renderTeam(tab) {
 
   // Delete own account handler
   document.getElementById('delete-account-btn').addEventListener('click', () => showDeleteAccountModal());
+
+  // RGPD data export handler
+  document.getElementById('rgpd-export-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('rgpd-export-btn');
+    const msg = document.getElementById('rgpd-export-message');
+    const me = getAccount();
+    if (!me || !me.id) {
+      msg.style.color = 'var(--color-danger)';
+      msg.textContent = 'Session invalide';
+      return;
+    }
+    btn.disabled = true;
+    msg.style.color = 'var(--text-secondary)';
+    msg.textContent = 'Préparation de l\'export…';
+    try {
+      const res = await fetch(`${API.base}/accounts/${me.id}/export`, {
+        credentials: 'include',
+        headers: (() => {
+          const h = {};
+          const t = localStorage.getItem('restosuite_token');
+          if (t) h['Authorization'] = 'Bearer ' + t;
+          return h;
+        })(),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Échec de l\'export');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const today = new Date().toISOString().slice(0, 10);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `restosuite-export-${today}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      msg.style.color = 'var(--color-success)';
+      msg.textContent = 'Export téléchargé ✓';
+      setTimeout(() => { msg.textContent = ''; }, 4000);
+    } catch (e) {
+      msg.style.color = 'var(--color-danger)';
+      msg.textContent = e.message || 'Erreur lors de l\'export';
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   // Staff password handler
   document.getElementById('staff-password-save-btn').addEventListener('click', async () => {

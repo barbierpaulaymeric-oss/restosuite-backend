@@ -42,6 +42,7 @@ const ROUTE_ROLES = {
   '/integrations': ['gerant'],
   '/predictions': ['gerant'],
   '/menu-engineering': ['gerant'],
+  '/waste-analytics': ['gerant'],
   '/traceability/downstream': ['gerant', 'cuisinier'],
   '/pms/export': ['gerant'],
   '/settings/sanitary-approval': ['gerant'],

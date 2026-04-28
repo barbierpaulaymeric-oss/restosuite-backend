@@ -1,13 +1,9 @@
-// Bumped 2026-04-28 (v12): roll out the custom UI library across
-// the entire app. data-ui="custom" applied to ~418 selects, inputs
-// (text/email/password/tel/url/search/number), textareas, and
-// non-toggle-wrapper checkboxes/radios in client/js/views/*.js.
-// Existing custom toggle wrappers (.toggle / .supplier-toggle /
-// .perm-toggle) deliberately untouched — they have their own
-// slider DOM. Belt-and-suspenders UI.enhanceAll() now also fires
-// from router.js after each route handler, alongside the
-// MutationObserver in ui-components.js.
-const CACHE_NAME = 'restosuite-v12';
+// Bumped 2026-04-28 (v13): RGPD export adds 12 tables (orders,
+// purchase_orders, delivery_notes + items, haccp hazard/ccp/decision,
+// training_records, allergen_management_plan, stock_movements) and
+// new Pilotage > Pertes & gaspillage view (/waste-analytics) backed
+// by GET /api/analytics/waste.
+const CACHE_NAME = 'restosuite-v13';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

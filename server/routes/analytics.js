@@ -273,6 +273,177 @@ router.get('/stock', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
+// GET /api/analytics/waste
+// Aggregates stock_movements where movement_type = 'loss', tenant-scoped.
+// Cost per movement = unit_price (if recorded) else best supplier_prices fallback
+// converted to base unit (kg/l = 1000g/ml). Period defaults to last 12 weeks.
+// ═══════════════════════════════════════════
+router.get('/waste', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const days = Math.max(7, Math.min(Number(req.query.days) || 84, 365)); // 12 weeks default
+    const sinceIso = new Date(Date.now() - days * 86400000).toISOString();
+
+    // Joined-row source so we can derive cost without N+1 lookups.
+    const rows = all(`
+      SELECT
+        sm.id, sm.ingredient_id, sm.quantity, sm.unit, sm.reason,
+        sm.recorded_at, sm.unit_price,
+        i.name AS ingredient_name, i.category AS ingredient_category,
+        i.price_per_unit AS i_price, i.price_unit AS i_price_unit,
+        (SELECT sp.price FROM supplier_prices sp
+           WHERE sp.ingredient_id = sm.ingredient_id AND sp.restaurant_id = ?
+           ORDER BY sp.last_updated DESC LIMIT 1) AS sp_price,
+        (SELECT sp.unit FROM supplier_prices sp
+           WHERE sp.ingredient_id = sm.ingredient_id AND sp.restaurant_id = ?
+           ORDER BY sp.last_updated DESC LIMIT 1) AS sp_unit
+      FROM stock_movements sm
+      LEFT JOIN ingredients i ON i.id = sm.ingredient_id AND i.restaurant_id = ?
+      WHERE sm.movement_type = 'loss'
+        AND sm.recorded_at >= ?
+        AND sm.restaurant_id = ?
+    `, [rid, rid, rid, sinceIso, rid]);
+
+    const norm = (u) => String(u || '').toLowerCase();
+    const baseFactor = (u) => {
+      const x = norm(u);
+      if (x === 'kg' || x === 'l') return 1000;
+      return 1;
+    };
+
+    const lines = rows.map((r) => {
+      const qty = Math.abs(Number(r.quantity) || 0);
+      let unitCost = 0;
+      if (r.unit_price && Number(r.unit_price) > 0) {
+        unitCost = Number(r.unit_price);
+      } else if (r.sp_price && Number(r.sp_price) > 0) {
+        unitCost = Number(r.sp_price) / baseFactor(r.sp_unit);
+      } else if (r.i_price && Number(r.i_price) > 0) {
+        unitCost = Number(r.i_price) / baseFactor(r.i_price_unit);
+      }
+      const cost = qty * unitCost;
+      const d = new Date(r.recorded_at);
+      // ISO week start (Monday)
+      const day = (d.getUTCDay() + 6) % 7;
+      const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day));
+      const weekKey = monday.toISOString().slice(0, 10);
+      const monthKey = d.toISOString().slice(0, 7);
+      return {
+        id: r.id,
+        ingredient_id: r.ingredient_id,
+        ingredient_name: r.ingredient_name || 'Ingrédient supprimé',
+        category: r.ingredient_category || 'Autre',
+        quantity: qty,
+        unit: r.unit,
+        reason: r.reason || 'Non précisé',
+        recorded_at: r.recorded_at,
+        cost: Math.round(cost * 100) / 100,
+        weekKey,
+        monthKey,
+      };
+    });
+
+    let totalCost = 0;
+    const byWeek = new Map();   // weekKey -> { week_start, cost, count }
+    const byMonth = new Map();  // monthKey -> { month, cost, count }
+    const byReason = new Map(); // reason -> { reason, cost, count }
+    const byIngredient = new Map(); // ingredient_id -> { ... }
+
+    for (const l of lines) {
+      totalCost += l.cost;
+
+      const w = byWeek.get(l.weekKey) || { week_start: l.weekKey, cost: 0, count: 0 };
+      w.cost += l.cost; w.count += 1; byWeek.set(l.weekKey, w);
+
+      const m = byMonth.get(l.monthKey) || { month: l.monthKey, cost: 0, count: 0 };
+      m.cost += l.cost; m.count += 1; byMonth.set(l.monthKey, m);
+
+      const r = byReason.get(l.reason) || { reason: l.reason, cost: 0, count: 0 };
+      r.cost += l.cost; r.count += 1; byReason.set(l.reason, r);
+
+      const ikey = l.ingredient_id || 0;
+      const ing = byIngredient.get(ikey) || {
+        ingredient_id: l.ingredient_id,
+        ingredient_name: l.ingredient_name,
+        category: l.category,
+        cost: 0, quantity: 0, count: 0,
+      };
+      ing.cost += l.cost; ing.quantity += l.quantity; ing.count += 1;
+      byIngredient.set(ikey, ing);
+    }
+
+    // Fill weeks with zero so the chart has a continuous series.
+    const weeks = [];
+    const today = new Date();
+    const todayDay = (today.getUTCDay() + 6) % 7;
+    const thisMonday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - todayDay));
+    const numWeeks = Math.max(1, Math.ceil(days / 7));
+    for (let i = numWeeks - 1; i >= 0; i--) {
+      const d = new Date(thisMonday.getTime() - i * 7 * 86400000);
+      const key = d.toISOString().slice(0, 10);
+      const wk = byWeek.get(key) || { week_start: key, cost: 0, count: 0 };
+      weeks.push({ ...wk, cost: Math.round(wk.cost * 100) / 100 });
+    }
+
+    const months = Array.from(byMonth.values())
+      .map(m => ({ ...m, cost: Math.round(m.cost * 100) / 100 }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+
+    const reasons = Array.from(byReason.values())
+      .map(r => ({ ...r, cost: Math.round(r.cost * 100) / 100 }))
+      .sort((a, b) => b.cost - a.cost);
+
+    const ingredients = Array.from(byIngredient.values())
+      .map(i => ({
+        ...i,
+        cost: Math.round(i.cost * 100) / 100,
+        quantity: Math.round(i.quantity * 1000) / 1000,
+      }))
+      .sort((a, b) => b.cost - a.cost)
+      .slice(0, 20);
+
+    // Reception cost over the same window — denominator for waste %.
+    const recv = get(`
+      SELECT COALESCE(SUM(
+        ABS(sm.quantity) * COALESCE(
+          NULLIF(sm.unit_price, 0),
+          (SELECT sp.price / CASE WHEN LOWER(sp.unit) = 'kg' THEN 1000 WHEN LOWER(sp.unit) = 'l' THEN 1000 ELSE 1 END
+             FROM supplier_prices sp WHERE sp.ingredient_id = sm.ingredient_id AND sp.restaurant_id = ?
+             ORDER BY sp.last_updated DESC LIMIT 1),
+          (SELECT i.price_per_unit / CASE WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'kg' THEN 1000 WHEN LOWER(COALESCE(i.price_unit,'kg')) = 'l' THEN 1000 ELSE 1 END
+             FROM ingredients i WHERE i.id = sm.ingredient_id AND i.restaurant_id = ?),
+          0
+        )
+      ), 0) AS total
+      FROM stock_movements sm
+      WHERE sm.movement_type = 'reception'
+        AND sm.recorded_at >= ?
+        AND sm.restaurant_id = ?
+    `, [rid, rid, sinceIso, rid]);
+    const receptionCost = recv && recv.total ? Number(recv.total) : 0;
+    const wastePctOfFoodCost = receptionCost > 0
+      ? Math.round((totalCost / receptionCost) * 1000) / 10
+      : 0;
+
+    res.json({
+      period_days: days,
+      since: sinceIso,
+      total_cost: Math.round(totalCost * 100) / 100,
+      total_count: lines.length,
+      reception_cost: Math.round(receptionCost * 100) / 100,
+      waste_pct_of_food_cost: wastePctOfFoodCost,
+      weekly: weeks,
+      monthly: months,
+      by_reason: reasons,
+      top_ingredients: ingredients,
+    });
+  } catch (e) {
+    console.error('Analytics waste error:', e);
+    res.status(500).json({ error: 'Erreur calcul pertes' });
+  }
+});
+
+// ═══════════════════════════════════════════
 // GET /api/analytics/prices
 // ═══════════════════════════════════════════
 router.get('/prices', (req, res) => {

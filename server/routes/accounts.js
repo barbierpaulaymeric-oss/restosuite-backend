@@ -472,11 +472,23 @@ router.get('/:id/export', requireAuth, (req, res) => {
     recipes: safeAll('SELECT * FROM recipes WHERE restaurant_id = ?', [rid]),
     ingredients: safeAll('SELECT * FROM ingredients WHERE restaurant_id = ?', [rid]),
     stock: safeAll('SELECT * FROM stock WHERE restaurant_id = ?', [rid]),
+    stock_movements: safeAll('SELECT * FROM stock_movements WHERE restaurant_id = ?', [rid]),
     suppliers: safeAll('SELECT * FROM suppliers WHERE restaurant_id = ?', [rid]),
     supplier_prices: safeAll('SELECT * FROM supplier_prices WHERE restaurant_id = ?', [rid]),
+    orders: safeAll('SELECT * FROM orders WHERE restaurant_id = ?', [rid]),
+    order_items: safeAll('SELECT * FROM order_items WHERE restaurant_id = ?', [rid]),
+    purchase_orders: safeAll('SELECT * FROM purchase_orders WHERE restaurant_id = ?', [rid]),
+    purchase_order_items: safeAll('SELECT * FROM purchase_order_items WHERE restaurant_id = ?', [rid]),
+    delivery_notes: safeAll('SELECT * FROM delivery_notes WHERE restaurant_id = ?', [rid]),
+    delivery_note_items: safeAll('SELECT * FROM delivery_note_items WHERE restaurant_id = ?', [rid]),
     temperature_logs: safeAll('SELECT * FROM temperature_logs WHERE restaurant_id = ?', [rid]),
     cleaning_logs: safeAll('SELECT * FROM cleaning_logs WHERE restaurant_id = ?', [rid]),
     traceability_logs: safeAll('SELECT * FROM traceability_logs WHERE restaurant_id = ?', [rid]),
+    haccp_hazard_analysis: safeAll('SELECT * FROM haccp_hazard_analysis WHERE restaurant_id = ?', [rid]),
+    haccp_ccp: safeAll('SELECT * FROM haccp_ccp WHERE restaurant_id = ?', [rid]),
+    haccp_decision_tree_results: safeAll('SELECT * FROM haccp_decision_tree_results WHERE restaurant_id = ?', [rid]),
+    training_records: safeAll('SELECT * FROM training_records WHERE restaurant_id = ?', [rid]),
+    allergen_management_plan: safeAll('SELECT * FROM allergen_management_plan WHERE restaurant_id = ?', [rid]),
   } : {};
 
   const exportData = {

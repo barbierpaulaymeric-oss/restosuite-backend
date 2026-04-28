@@ -79,6 +79,7 @@ const NAV_GROUPS = {
     items: [
       { label: 'Pilotage',          route: '/analytics',        icon: 'bar-chart-3',  roles: ['gerant'] },
       { label: 'Menu Engineering',  route: '/menu-engineering', icon: 'target',       roles: ['gerant'] },
+      { label: 'Pertes & gaspillage', route: '/waste-analytics', icon: 'trash-2',    roles: ['gerant'] },
       { label: 'Prédictions IA',    route: '/predictions',      icon: 'brain',        roles: ['gerant'] },
       { label: 'Mercuriale',        route: '/mercuriale',       icon: 'trending-up',  roles: ['gerant'] },
     ]
@@ -107,6 +108,7 @@ const ROUTE_TO_GROUP = {
   '/analytics': 'pilotage',
   '/menu-engineering': 'pilotage', '/predictions': 'pilotage',
   '/mercuriale': 'pilotage', '/import-mercuriale': 'pilotage',
+  '/waste-analytics': 'pilotage',
   '/more': 'config', '/team': 'config', '/integrations': 'config',
   '/multi-site': 'config', '/api-keys': 'config', '/qrcodes': 'config',
   '/carbon': 'config', '/supplier-portal': 'config', '/errors-log': 'config',
@@ -384,6 +386,7 @@ function registerRoutes() {
   Router.add(/^\/import-mercuriale$/, renderImportMercuriale);
   Router.add(/^\/chef$/, () => { location.hash = '#/ia'; });
   Router.add(/^\/menu-engineering$/, renderMenuEngineering);
+  Router.add(/^\/waste-analytics$/, renderWasteAnalytics);
   Router.add(/^\/carbon$/, renderCarbon);
   Router.add(/^\/integrations$/, renderIntegrations);
   Router.add(/^\/multi-site$/, renderMultiSite);

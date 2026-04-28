@@ -722,6 +722,9 @@ const API = {
   getAnalyticsInsights(refresh = false) {
     return this.request(`/analytics/ai-insights${refresh ? '?refresh=true' : ''}`);
   },
+  getAnalyticsWaste(days = 84) {
+    return this.request(`/analytics/waste?days=${encodeURIComponent(days)}`);
+  },
 
   // ─── Orders ───
   getOrders(status) {
