@@ -15,6 +15,7 @@ const isWatch = process.argv.includes('--watch');
 const JS_FILES = [
   'js/api.js',
   'js/utils.js',
+  'js/ui-components.js',
   'js/views/dashboard.js',
   'js/views/recipe-detail.js',
   'js/views/recipe-form.js',

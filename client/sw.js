@@ -1,10 +1,11 @@
-// Bumped 2026-04-28 (v10): ship server-side restaurant_name JOIN for the
-// supplier delivery-notes endpoint (frontend conditional alone was a no-op
-// because the API never returned the field), refresh /auth/me when the
-// dashboard greeting falls back to "Bonjour Chef", and add null guards in
-// messages.js loadThread() so a thread closed mid-poll doesn't throw a
-// TypeError on innerHTML.
-const CACHE_NAME = 'restosuite-v10';
+// Bumped 2026-04-28 (v11): ship custom UI component library
+// (client/js/ui-components.js) — replaces native <select>/<input
+// type="number">/checkbox/radio/toggle with styled, accessible
+// vanilla-JS components. Auto-enhances any element with
+// `data-ui="custom"` (or "toggle") via a MutationObserver. Applied
+// initially to the supplier picker in /orders and the zone filter +
+// modal in /haccp/temperatures.
+const CACHE_NAME = 'restosuite-v11';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

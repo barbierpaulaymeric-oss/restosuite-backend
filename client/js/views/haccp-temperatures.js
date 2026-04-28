@@ -81,7 +81,7 @@ async function renderHACCPTemperatures() {
         <div class="haccp-filters" role="search" aria-label="Filtrer les relevés">
           <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
             <label for="filter-zone" class="visually-hidden">Zone</label>
-            <select class="form-control" id="filter-zone" style="min-height:40px" aria-label="Filtrer par zone">
+            <select class="form-control" id="filter-zone" data-ui="custom" style="min-height:40px" aria-label="Filtrer par zone">
               <option value="">Toutes les zones</option>
               ${zones.map(z => `<option value="${z.id}">${escapeHtml(z.name)}</option>`).join('')}
             </select>
@@ -329,13 +329,13 @@ function showNewTempModal(zones) {
       <h2 id="new-temp-modal-title"><i data-lucide="thermometer" style="width:20px;height:20px;vertical-align:middle;margin-right:6px" aria-hidden="true"></i>Nouveau relevé</h2>
       <div class="form-group">
         <label for="modal-zone">Zone</label>
-        <select class="form-control" id="modal-zone" aria-required="true">
+        <select class="form-control" id="modal-zone" data-ui="custom" aria-required="true">
           ${zones.map(z => `<option value="${z.id}" data-min="${z.min_temp}" data-max="${z.max_temp}">${escapeHtml(z.name)}</option>`).join('')}
         </select>
       </div>
       <div class="form-group">
         <label for="modal-temp">Température (°C)</label>
-        <input type="number" step="0.1" class="form-control" id="modal-temp" placeholder="ex: 3.5" inputmode="decimal"
+        <input type="number" step="0.1" class="form-control" id="modal-temp" data-ui="custom" placeholder="ex: 3.5" inputmode="decimal"
                required aria-required="true"
                style="font-size:var(--text-2xl);text-align:center;font-family:var(--font-mono)">
       </div>

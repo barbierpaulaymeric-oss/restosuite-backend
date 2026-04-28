@@ -250,7 +250,7 @@ async function renderNewOrder() {
     <div style="max-width:800px">
       <div class="form-group">
         <label for="po-supplier">Fournisseur *</label>
-        <select class="form-control" id="po-supplier" required aria-required="true">
+        <select class="form-control" id="po-supplier" data-ui="custom" required aria-required="true">
           <option value="">— Sélectionner un fournisseur —</option>
           ${suppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
         </select>

@@ -7221,3 +7221,414 @@ body.tour-active { overflow: hidden; }
   font-weight: 700;
   line-height: 1;
 }
+
+/* ═══════════════════════════════════════════
+   Custom UI Components — replacements for native form controls
+   See client/js/ui-components.js for behaviour.
+   ═══════════════════════════════════════════ */
+
+/* ─── Custom Select ─── */
+.ui-select {
+  position: relative;
+  width: 100%;
+  font: inherit;
+}
+.ui-select__native {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  pointer-events: none;
+}
+.ui-select__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: 400 var(--text-base)/var(--leading-normal) var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.ui-select__trigger:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+.ui-select__trigger:focus-visible,
+.ui-select.is-open .ui-select__trigger {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(196, 90, 24, 0.15);
+  background: var(--bg-elevated);
+}
+.ui-select.is-error .ui-select__trigger {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(217, 48, 37, 0.1);
+}
+.ui-select.is-disabled .ui-select__trigger,
+.ui-select__trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: var(--bg-sunken);
+}
+.ui-select__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-select__value.is-placeholder { color: var(--text-tertiary); }
+.ui-select__chevron {
+  display: inline-flex;
+  margin-left: var(--space-3);
+  color: var(--text-tertiary);
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
+}
+.ui-select.is-open .ui-select__chevron { transform: rotate(180deg); color: var(--color-accent); }
+.ui-select__dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  z-index: var(--z-dropdown);
+  display: none;
+  padding: 4px 0;
+  overscroll-behavior: contain;
+}
+.ui-select.is-open .ui-select__dropdown { display: block; }
+.ui-select.is-drop-up .ui-select__dropdown {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+.ui-select__group {
+  padding: 6px var(--space-4) 4px;
+  font: 600 var(--text-xs)/1 var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-tertiary);
+}
+.ui-select__option {
+  padding: 10px var(--space-4);
+  font: 400 var(--text-base)/1.3 var(--font-sans);
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  transition: background var(--transition-fast);
+}
+.ui-select__option--indented { padding-left: calc(var(--space-4) + 12px); }
+.ui-select__option:hover:not(.is-disabled),
+.ui-select__option.is-active {
+  background: var(--color-accent-light);
+}
+.ui-select__option.is-selected {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+.ui-select__option.is-selected::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  flex-shrink: 0;
+}
+.ui-select__option.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Custom Number Input ─── */
+.ui-number {
+  display: inline-flex;
+  align-items: stretch;
+  width: 100%;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.ui-number:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(196, 90, 24, 0.15);
+  background: var(--bg-elevated);
+}
+.ui-number.is-disabled { opacity: 0.55; }
+.ui-number__btn {
+  flex: 0 0 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.ui-number__btn:hover:not(:disabled) {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+.ui-number__btn:active:not(:disabled) {
+  background: var(--color-accent);
+  color: #fff;
+}
+.ui-number__btn:disabled { cursor: not-allowed; opacity: 0.5; }
+.ui-number__btn--minus { border-right: 1px solid var(--border-light); }
+.ui-number__btn--plus { border-left: 1px solid var(--border-light); }
+.ui-number__input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: var(--space-3) var(--space-2);
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font: 500 var(--text-base)/1 var(--font-sans);
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.ui-number__input::-webkit-outer-spin-button,
+.ui-number__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ─── Floating Label Field ─── */
+.ui-field--float {
+  position: relative;
+  display: block;
+  margin-bottom: var(--space-4);
+}
+.ui-field--float > input,
+.ui-field--float > textarea {
+  width: 100%;
+  padding: 22px var(--space-4) 8px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: 400 var(--text-base)/1.3 var(--font-sans);
+  outline: none;
+  min-height: 56px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+.ui-field--float > input::placeholder,
+.ui-field--float > textarea::placeholder {
+  color: transparent;
+}
+.ui-field--float > input:focus,
+.ui-field--float > textarea:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(196, 90, 24, 0.15);
+  background: var(--bg-elevated);
+}
+.ui-field__label {
+  position: absolute;
+  left: var(--space-4);
+  top: 18px;
+  font: 400 var(--text-base)/1 var(--font-sans);
+  color: var(--text-tertiary);
+  pointer-events: none;
+  transform-origin: left top;
+  transition: transform var(--transition-fast), color var(--transition-fast);
+  background: transparent;
+  padding: 0 4px;
+}
+.ui-field--float > input:focus ~ .ui-field__label,
+.ui-field--float > input:not(:placeholder-shown) ~ .ui-field__label,
+.ui-field--float > textarea:focus ~ .ui-field__label,
+.ui-field--float > textarea:not(:placeholder-shown) ~ .ui-field__label {
+  transform: translateY(-12px) scale(0.78);
+  color: var(--color-accent);
+}
+
+/* ─── Custom Textarea ─── */
+.ui-textarea {
+  resize: vertical;
+}
+
+/* ─── Custom Checkbox ─── */
+.ui-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+  font: 400 var(--text-base)/1.3 var(--font-sans);
+  color: var(--text-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+.ui-checkbox__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0; height: 0;
+}
+.ui-checkbox__mark {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px; height: 20px;
+  background: var(--bg-sunken);
+  border: 1.5px solid var(--border-default);
+  border-radius: 5px;
+  color: transparent;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+.ui-checkbox__mark > svg {
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+.ui-checkbox__input:checked + .ui-checkbox__mark {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+.ui-checkbox__input:checked + .ui-checkbox__mark > svg {
+  opacity: 1;
+  transform: scale(1);
+}
+.ui-checkbox:hover .ui-checkbox__input:not(:disabled):not(:checked) + .ui-checkbox__mark {
+  border-color: var(--color-accent);
+}
+.ui-checkbox__input:focus-visible + .ui-checkbox__mark {
+  box-shadow: 0 0 0 3px rgba(196, 90, 24, 0.25);
+}
+.ui-checkbox__input:disabled ~ .ui-checkbox__mark,
+.ui-checkbox__input:disabled ~ .ui-checkbox__label {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ui-checkbox__label { line-height: 1.3; }
+
+/* ─── Custom Radio ─── */
+.ui-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+  font: 400 var(--text-base)/1.3 var(--font-sans);
+  color: var(--text-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+.ui-radio__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0; height: 0;
+}
+.ui-radio__mark {
+  flex-shrink: 0;
+  position: relative;
+  width: 20px; height: 20px;
+  background: var(--bg-sunken);
+  border: 1.5px solid var(--border-default);
+  border-radius: 50%;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.ui-radio__mark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  transform: scale(0);
+  transition: transform var(--transition-fast);
+}
+.ui-radio__input:checked + .ui-radio__mark {
+  border-color: var(--color-accent);
+  background: var(--bg-elevated);
+}
+.ui-radio__input:checked + .ui-radio__mark::after { transform: scale(1); }
+.ui-radio:hover .ui-radio__input:not(:disabled):not(:checked) + .ui-radio__mark {
+  border-color: var(--color-accent);
+}
+.ui-radio__input:focus-visible + .ui-radio__mark {
+  box-shadow: 0 0 0 3px rgba(196, 90, 24, 0.25);
+}
+.ui-radio__input:disabled ~ .ui-radio__mark,
+.ui-radio__input:disabled ~ .ui-radio__label {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ui-radio__label { line-height: 1.3; }
+
+/* ─── Custom Toggle / Switch ─── */
+.ui-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  user-select: none;
+  font: 400 var(--text-base)/1.3 var(--font-sans);
+  color: var(--text-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+.ui-switch__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0; height: 0;
+}
+.ui-switch__slider {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px; height: 22px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: 11px;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.ui-switch__slider::before {
+  content: '';
+  position: absolute;
+  top: 1px; left: 1px;
+  width: 18px; height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast);
+}
+.ui-switch__input:checked + .ui-switch__slider {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.ui-switch__input:checked + .ui-switch__slider::before {
+  transform: translateX(18px);
+}
+.ui-switch__input:focus-visible + .ui-switch__slider {
+  box-shadow: 0 0 0 3px rgba(196, 90, 24, 0.25);
+}
+.ui-switch__input:disabled + .ui-switch__slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ui-switch__label { line-height: 1.3; }
