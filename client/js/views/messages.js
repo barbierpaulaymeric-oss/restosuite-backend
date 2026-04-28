@@ -35,31 +35,48 @@ async function renderMessagesConversations() {
     convs = await API.getMessageConversations();
   } catch (e) {
     // 401 here used to trigger the global cleanup-and-reload via api.js,
-    // logging the user out on their FIRST navigation to /messages even
-    // though every other route worked fine (4-round recurring bug).
-    // getMessageConversations now opts out of that path; surface a
-    // recoverable UI instead so the user can retry without losing their
-    // session.
+    // logging the user out on their FIRST navigation to /messages.
+    // getMessageConversations now opts out of that path; this catch
+    // resolves the 401 by probing /auth/me — if the cookie is genuinely
+    // dead, the api.js layer's normal handling will logout (correct
+    // behaviour). Otherwise we retry the conversations call once: a
+    // transient 401 self-heals without forcing the user to reload.
     const msg = String(e && e.message || '');
     const host = document.getElementById('msg-conv-list');
     if (msg === '401') {
-      host.innerHTML = `
-        <div class="empty-state" role="alert">
-          <div class="empty-icon"><i data-lucide="refresh-cw"></i></div>
-          <p>Impossible de charger les conversations.</p>
-          <p class="text-secondary text-sm">Si le problème persiste, retournez à l'accueil et revenez sur Messages.</p>
-          <div class="actions-row" style="justify-content:center;gap:var(--space-3);margin-top:var(--space-3)">
-            <button class="btn btn-primary" id="msg-retry-btn">Réessayer</button>
-            <a href="#/" class="btn btn-secondary">Retour</a>
-          </div>
-        </div>`;
-      if (window.lucide) lucide.createIcons();
-      const retry = document.getElementById('msg-retry-btn');
-      if (retry) retry.addEventListener('click', () => renderMessagesConversations());
+      try {
+        // Probe the canonical "is my session valid" endpoint. /auth/me uses
+        // the strict 401 path — a real expired session takes the user to
+        // /login automatically here, which is the right outcome.
+        await API.getMe();
+        // Session is valid → the 401 above was transient. Retry once.
+        try {
+          convs = await API.getMessageConversations();
+        } catch (e2) {
+          host.innerHTML = `
+            <div class="empty-state" role="alert">
+              <div class="empty-icon"><i data-lucide="server-crash"></i></div>
+              <p>Service de messagerie temporairement indisponible.</p>
+              <p class="text-secondary text-sm">Votre session est valide — réessayez dans un instant.</p>
+              <div class="actions-row" style="justify-content:center;gap:var(--space-3);margin-top:var(--space-3)">
+                <button class="btn btn-primary" id="msg-retry-btn">Réessayer</button>
+                <a href="#/" class="btn btn-secondary">Retour</a>
+              </div>
+            </div>`;
+          if (window.lucide) lucide.createIcons();
+          const retry = document.getElementById('msg-retry-btn');
+          if (retry) retry.addEventListener('click', () => renderMessagesConversations());
+          return;
+        }
+        // Retry succeeded — fall through to the normal render path below.
+      } catch (_meErr) {
+        // /auth/me triggered the global cleanup; the page is reloading.
+        return;
+      }
+    } else {
+      host.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(msg)}</p>`;
       return;
     }
-    host.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(msg)}</p>`;
-    return;
   }
   // Refresh the nav badge once we hit this view (we may have just marked a
   // thread read elsewhere).

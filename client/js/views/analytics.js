@@ -4,11 +4,34 @@
 
 async function renderAnalytics() {
   const app = document.getElementById('app');
-  const account = getAccount();
+  let account = getAccount();
 
-  // Permission check
+  // Stale-localStorage refresh: if the cached account is missing role or
+  // permissions (saw this in test rounds — user logged in as gérant but the
+  // Pilotage page reported "Accès réservé au gérant" because the stored
+  // copy had been written by an older login flow that omitted those
+  // fields). Pull the canonical shape from /auth/me before deciding access.
+  // /auth/me uses the strict 401 path — a real expired session takes the
+  // user to /login here, which is the right outcome.
+  function _readPerms(a) {
+    if (!a) return {};
+    return typeof a.permissions === 'string'
+      ? (JSON.parse(a.permissions || '{}') || {})
+      : (a.permissions || {});
+  }
+  const _staleAccount = !account || !account.role || account.permissions == null;
+  if (_staleAccount) {
+    try {
+      const me = await API.getMe();
+      if (me && me.account) {
+        try { localStorage.setItem('restosuite_account', JSON.stringify(me.account)); } catch {}
+        account = me.account;
+      }
+    } catch (_) { /* /auth/me will have triggered the global cleanup if dead */ }
+  }
+
   const isGerant = account && account.role === 'gerant';
-  const perms = account ? (typeof account.permissions === 'string' ? JSON.parse(account.permissions || '{}') : (account.permissions || {})) : {};
+  const perms = _readPerms(account);
   const canView = isGerant || perms.view_costs;
 
   if (!canView) {

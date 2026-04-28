@@ -33,7 +33,39 @@ async function renderOrdersDashboard() {
   try {
     allOrders = await API.getPurchaseOrders();
   } catch (e) {
-    showToast('Erreur chargement commandes', 'error');
+    // Same recoverable-401 pattern as the messages view. The list-on-load
+    // GET opted out of the global session-wipe path (api.js), so a transient
+    // 401 here surfaces inline instead of redirecting the user to /login
+    // (recurring bug — Commandes tab was the worst offender on the
+    // restaurant side).
+    const msg = String(e && e.message || '');
+    if (msg === '401') {
+      try {
+        await API.getMe();
+        // Session is valid — retry the list once.
+        try {
+          allOrders = await API.getPurchaseOrders();
+        } catch (e2) {
+          document.getElementById('orders-grid').innerHTML = `
+            <div class="empty-state" role="alert">
+              <div class="empty-icon"><i data-lucide="server-crash"></i></div>
+              <p>Service commandes temporairement indisponible.</p>
+              <p class="text-secondary text-sm">Votre session est valide — réessayez dans un instant.</p>
+              <div class="actions-row" style="justify-content:center;gap:var(--space-3);margin-top:var(--space-3)">
+                <button class="btn btn-primary" onclick="renderOrdersDashboard()">Réessayer</button>
+                <a href="#/" class="btn btn-secondary">Retour</a>
+              </div>
+            </div>`;
+          if (window.lucide) lucide.createIcons();
+          return;
+        }
+      } catch (_meErr) {
+        // /auth/me triggered the global cleanup; the page is reloading.
+        return;
+      }
+    } else {
+      showToast('Erreur chargement commandes', 'error');
+    }
   }
 
   const gridEl = document.getElementById('orders-grid');

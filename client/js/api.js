@@ -739,9 +739,14 @@ const API = {
   cancelOrder(id) { return this.request(`/orders/${id}`, { method: 'DELETE' }); },
 
   // ─── Purchase Orders ───
+  // The list-on-load GET opts out of the global 401-redirect path: a transient
+  // 401 on the user's first nav to /orders had been triggering a full session
+  // wipe + reload (same class of regression as the messages bug a0e8d2a).
+  // Mutations below keep the strict path so a real expired session on submit
+  // still kicks the user back to /login.
   getPurchaseOrders(status) {
     const qs = status ? `?status=${encodeURIComponent(status)}` : '';
-    return this.request(`/purchase-orders${qs}`);
+    return this.request(`/purchase-orders${qs}`, { noRedirectOn401: true });
   },
   getPurchaseOrder(id) { return this.request(`/purchase-orders/${id}`); },
   createPurchaseOrder(data) { return this.request('/purchase-orders', { method: 'POST', body: data }); },

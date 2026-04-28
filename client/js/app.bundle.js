@@ -849,9 +849,14 @@ const API = {
     return this.request(`/orders/${id}`, { method: "DELETE" });
   },
   // ─── Purchase Orders ───
+  // The list-on-load GET opts out of the global 401-redirect path: a transient
+  // 401 on the user's first nav to /orders had been triggering a full session
+  // wipe + reload (same class of regression as the messages bug a0e8d2a).
+  // Mutations below keep the strict path so a real expired session on submit
+  // still kicks the user back to /login.
   getPurchaseOrders(status) {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-    return this.request(`/purchase-orders${qs}`);
+    return this.request(`/purchase-orders${qs}`, { noRedirectOn401: true });
   },
   getPurchaseOrder(id) {
     return this.request(`/purchase-orders/${id}`);
@@ -14256,7 +14261,32 @@ async function renderOrdersDashboard() {
   try {
     allOrders = await API.getPurchaseOrders();
   } catch (e) {
-    showToast("Erreur chargement commandes", "error");
+    const msg = String(e && e.message || "");
+    if (msg === "401") {
+      try {
+        await API.getMe();
+        try {
+          allOrders = await API.getPurchaseOrders();
+        } catch (e2) {
+          document.getElementById("orders-grid").innerHTML = `
+            <div class="empty-state" role="alert">
+              <div class="empty-icon"><i data-lucide="server-crash"></i></div>
+              <p>Service commandes temporairement indisponible.</p>
+              <p class="text-secondary text-sm">Votre session est valide \u2014 r\xE9essayez dans un instant.</p>
+              <div class="actions-row" style="justify-content:center;gap:var(--space-3);margin-top:var(--space-3)">
+                <button class="btn btn-primary" onclick="renderOrdersDashboard()">R\xE9essayer</button>
+                <a href="#/" class="btn btn-secondary">Retour</a>
+              </div>
+            </div>`;
+          if (window.lucide) lucide.createIcons();
+          return;
+        }
+      } catch (_meErr) {
+        return;
+      }
+    } else {
+      showToast("Erreur chargement commandes", "error");
+    }
   }
   const gridEl = document.getElementById("orders-grid");
   function renderOrders(filterStatus) {
@@ -16046,9 +16076,27 @@ function _kitchenElapsed(createdAt) {
 }
 async function renderAnalytics() {
   const app = document.getElementById("app");
-  const account = getAccount();
+  let account = getAccount();
+  function _readPerms(a) {
+    if (!a) return {};
+    return typeof a.permissions === "string" ? JSON.parse(a.permissions || "{}") || {} : a.permissions || {};
+  }
+  const _staleAccount = !account || !account.role || account.permissions == null;
+  if (_staleAccount) {
+    try {
+      const me = await API.getMe();
+      if (me && me.account) {
+        try {
+          localStorage.setItem("restosuite_account", JSON.stringify(me.account));
+        } catch (e) {
+        }
+        account = me.account;
+      }
+    } catch (_) {
+    }
+  }
   const isGerant = account && account.role === "gerant";
-  const perms = account ? typeof account.permissions === "string" ? JSON.parse(account.permissions || "{}") : account.permissions || {} : {};
+  const perms = _readPerms(account);
   const canView = isGerant || perms.view_costs;
   if (!canView) {
     app.innerHTML = `
@@ -21636,23 +21684,33 @@ async function renderMessagesConversations() {
     const msg = String(e && e.message || "");
     const host = document.getElementById("msg-conv-list");
     if (msg === "401") {
-      host.innerHTML = `
-        <div class="empty-state" role="alert">
-          <div class="empty-icon"><i data-lucide="refresh-cw"></i></div>
-          <p>Impossible de charger les conversations.</p>
-          <p class="text-secondary text-sm">Si le probl\xE8me persiste, retournez \xE0 l'accueil et revenez sur Messages.</p>
-          <div class="actions-row" style="justify-content:center;gap:var(--space-3);margin-top:var(--space-3)">
-            <button class="btn btn-primary" id="msg-retry-btn">R\xE9essayer</button>
-            <a href="#/" class="btn btn-secondary">Retour</a>
-          </div>
-        </div>`;
-      if (window.lucide) lucide.createIcons();
-      const retry = document.getElementById("msg-retry-btn");
-      if (retry) retry.addEventListener("click", () => renderMessagesConversations());
+      try {
+        await API.getMe();
+        try {
+          convs = await API.getMessageConversations();
+        } catch (e2) {
+          host.innerHTML = `
+            <div class="empty-state" role="alert">
+              <div class="empty-icon"><i data-lucide="server-crash"></i></div>
+              <p>Service de messagerie temporairement indisponible.</p>
+              <p class="text-secondary text-sm">Votre session est valide \u2014 r\xE9essayez dans un instant.</p>
+              <div class="actions-row" style="justify-content:center;gap:var(--space-3);margin-top:var(--space-3)">
+                <button class="btn btn-primary" id="msg-retry-btn">R\xE9essayer</button>
+                <a href="#/" class="btn btn-secondary">Retour</a>
+              </div>
+            </div>`;
+          if (window.lucide) lucide.createIcons();
+          const retry = document.getElementById("msg-retry-btn");
+          if (retry) retry.addEventListener("click", () => renderMessagesConversations());
+          return;
+        }
+      } catch (_meErr) {
+        return;
+      }
+    } else {
+      host.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(msg)}</p>`;
       return;
     }
-    host.innerHTML = `<p class="text-danger">Erreur : ${escapeHtml(msg)}</p>`;
-    return;
   }
   refreshMessagesNavBadge();
   if (!convs.length) {

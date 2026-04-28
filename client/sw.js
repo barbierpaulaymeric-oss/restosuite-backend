@@ -1,12 +1,8 @@
-// Bumped 2026-04-28: 5th iteration of the "restaurant name on supplier
-// order cards" fix. Each prior bump (v2 → v3 → v4) didn't fully kick a
-// subset of returning sessions: the page-side reload listener used a
-// sessionStorage flag that, once set, blocked any FURTHER sw-update
-// broadcasts in the same tab session — so a user who had already
-// auto-reloaded for v3 wouldn't reload for v4. The activate() handler now
-// also broadcasts a versioned reset so the page clears its flag before
-// reading it, guaranteeing every NEW cache name gets exactly one reload.
-const CACHE_NAME = 'restosuite-v5';
+// Bumped 2026-04-28 (v6): ships the restaurant-side regression sweep
+// (Commandes 401-logout, Messages reliable Réessayer, Pilotage stale-
+// localStorage refresh). v5's per-cache-name reload guard already lets
+// returning users pick this up on next visit without a manual reload.
+const CACHE_NAME = 'restosuite-v6';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
