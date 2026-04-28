@@ -1,12 +1,9 @@
-// Bumped 2026-04-28 (v7): pairs the d97f7bf client-side workarounds with
-// the server-side root cause fix. server/index.js's soft JWT decoder only
-// read Bearer headers, so cookie-only browser sessions 401'd "Token requis"
-// on every gated route (/orders, /analytics, /recipes, /purchase-orders).
-// The fix consolidates the soft decoder into server/lib/soft-auth.js (used
-// by both app.js and index.js) and adds the cookie path. This SW bump
-// forces returning clients to fetch the bundle that pairs with the fixed
-// server.
-const CACHE_NAME = 'restosuite-v7';
+// Bumped 2026-04-28 (v8): force a clean cache refresh for clients still
+// holding the pre-a4f3028 bundle whose cached 401 responses kept surfacing
+// as intermittent "session drops" on Pilotage/analytics. v7 shipped the
+// server fix; v8 evicts any v7 cache entries that captured a stale 401
+// during the transition window.
+const CACHE_NAME = 'restosuite-v8';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

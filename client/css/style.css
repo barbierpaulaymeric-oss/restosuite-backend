@@ -404,6 +404,7 @@ h3 {
     gap: var(--space-3);
     margin-right: auto;
     flex-shrink: 0;
+    cursor: pointer;
   }
 
   .nav-brand svg {

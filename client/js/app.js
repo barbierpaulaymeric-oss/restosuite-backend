@@ -592,6 +592,15 @@ function initNavGroups(role) {
 
   if (backdrop) backdrop.addEventListener('click', closePanel);
   window.addEventListener('hashchange', closePanel);
+
+  const brand = document.getElementById('nav-brand');
+  if (brand) {
+    const goHome = () => { closePanel(); location.hash = '#/'; };
+    brand.addEventListener('click', goHome);
+    brand.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goHome(); }
+    });
+  }
 }
 
 // ═══════════════════════════════════════════
