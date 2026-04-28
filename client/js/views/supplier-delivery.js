@@ -65,6 +65,7 @@ async function loadSupplierDeliveries() {
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
             <strong>Bon #${n.id}</strong>
+            ${n.restaurant_name ? `<span class="text-secondary text-sm" style="margin-left:var(--space-2)">· ${escapeHtml(n.restaurant_name)}</span>` : ''}
             <span class="text-secondary text-sm" style="margin-left:var(--space-2)">
               ${n.delivery_date || new Date(n.created_at).toLocaleDateString('fr-FR')}
             </span>
@@ -102,6 +103,7 @@ async function showSupplierDeliveryDetail(id) {
         </button>
       </div>
       <h2>Bon #${d.id} — ${statusLabels[d.status] || d.status}</h2>
+      ${d.restaurant_name ? `<p class="text-secondary" style="margin:var(--space-1) 0 0">🏪 ${escapeHtml(d.restaurant_name)}</p>` : ''}
       ${d.delivery_date ? `<p class="text-secondary">Date livraison : ${d.delivery_date}</p>` : ''}
       ${d.notes ? `<p class="text-secondary">📝 ${escapeHtml(d.notes)}</p>` : ''}
       <div style="overflow-x:auto;margin-top:var(--space-4)">

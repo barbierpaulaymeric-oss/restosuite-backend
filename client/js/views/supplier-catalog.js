@@ -16,7 +16,7 @@ function bootSupplierApp(session) {
     <div class="supplier-shell">
       <header class="supplier-header">
         <div class="supplier-header__left">
-          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto; margin-right: 8px;">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto; margin-right: 8px; cursor: pointer" id="supplier-logo-home">
           <div>
             <span class="supplier-header__title">Portail Fournisseur</span>
             <span class="supplier-header__name">${escapeHtml(session.supplier_name || session.name)}</span>
@@ -63,6 +63,13 @@ function bootSupplierApp(session) {
     clearSupplierSession();
     document.body.classList.remove('supplier-mode');
     location.reload();
+  });
+
+  document.getElementById('supplier-logo-home').addEventListener('click', () => {
+    document.querySelectorAll('.supplier-nav__tab').forEach(t => t.classList.remove('active'));
+    const dashTab = document.querySelector('.supplier-nav__tab[data-tab="dashboard"]');
+    if (dashTab) dashTab.classList.add('active');
+    renderSupplierDashboardTab();
   });
 
   // Tab navigation

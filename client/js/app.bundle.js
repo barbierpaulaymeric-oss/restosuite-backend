@@ -1418,7 +1418,7 @@ async function renderDashboard() {
   const app = document.getElementById("app");
   const perms = getPermissions();
   const account = getAccount();
-  const greeting = getGreeting(account ? account.name : "Chef");
+  const greeting = getGreeting(account ? account.first_name || account.name || null : null);
   const todayDate = formatFrenchDate(/* @__PURE__ */ new Date());
   app.innerHTML = `
     <header id="dashboard-greeting" role="banner" style="margin-bottom:var(--space-4)">
@@ -1756,9 +1756,10 @@ function renderAISuggestions(container, data) {
 }
 function getGreeting(name) {
   const hour = (/* @__PURE__ */ new Date()).getHours();
-  if (hour < 12) return `Bonjour ${name} \u{1F44B}`;
-  if (hour < 17) return `Bon apr\xE8s-midi ${name} \u2600\uFE0F`;
-  return `Bonsoir ${name} \u{1F319}`;
+  const n = name ? ` ${name}` : "";
+  if (hour < 12) return `Bonjour${n} \u{1F44B}`;
+  if (hour < 17) return `Bon apr\xE8s-midi${n} \u2600\uFE0F`;
+  return `Bonsoir${n} \u{1F319}`;
 }
 function formatFrenchDate(date) {
   const days = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -18902,7 +18903,7 @@ function bootSupplierApp(session) {
     <div class="supplier-shell">
       <header class="supplier-header">
         <div class="supplier-header__left">
-          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto; margin-right: 8px;">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto; margin-right: 8px; cursor: pointer" id="supplier-logo-home">
           <div>
             <span class="supplier-header__title">Portail Fournisseur</span>
             <span class="supplier-header__name">${escapeHtml(session.supplier_name || session.name)}</span>
@@ -18947,6 +18948,12 @@ function bootSupplierApp(session) {
     clearSupplierSession();
     document.body.classList.remove("supplier-mode");
     location.reload();
+  });
+  document.getElementById("supplier-logo-home").addEventListener("click", () => {
+    document.querySelectorAll(".supplier-nav__tab").forEach((t) => t.classList.remove("active"));
+    const dashTab = document.querySelector('.supplier-nav__tab[data-tab="dashboard"]');
+    if (dashTab) dashTab.classList.add("active");
+    renderSupplierDashboardTab();
   });
   document.querySelectorAll(".supplier-nav__tab").forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -21076,6 +21083,7 @@ async function loadSupplierDeliveries() {
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
             <strong>Bon #${n.id}</strong>
+            ${n.restaurant_name ? `<span class="text-secondary text-sm" style="margin-left:var(--space-2)">\xB7 ${escapeHtml(n.restaurant_name)}</span>` : ""}
             <span class="text-secondary text-sm" style="margin-left:var(--space-2)">
               ${n.delivery_date || new Date(n.created_at).toLocaleDateString("fr-FR")}
             </span>
@@ -21110,6 +21118,7 @@ async function showSupplierDeliveryDetail(id) {
         </button>
       </div>
       <h2>Bon #${d.id} \u2014 ${statusLabels[d.status] || d.status}</h2>
+      ${d.restaurant_name ? `<p class="text-secondary" style="margin:var(--space-1) 0 0">\u{1F3EA} ${escapeHtml(d.restaurant_name)}</p>` : ""}
       ${d.delivery_date ? `<p class="text-secondary">Date livraison : ${d.delivery_date}</p>` : ""}
       ${d.notes ? `<p class="text-secondary">\u{1F4DD} ${escapeHtml(d.notes)}</p>` : ""}
       <div style="overflow-x:auto;margin-top:var(--space-4)">
@@ -21808,6 +21817,10 @@ async function renderMessagesThread(supplierId) {
   } catch (_) {
   }
   async function loadThread() {
+    if (!document.getElementById("msg-thread-body")) {
+      _stopMessagesPoll();
+      return;
+    }
     let data;
     try {
       data = await API.getMessageThread(supplierId);

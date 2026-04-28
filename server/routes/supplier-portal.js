@@ -660,8 +660,10 @@ router.get('/delivery-notes', requireSupplierAuth, (req, res) => {
   const rid = req.supplierAccount.restaurant_id;
   const notes = all(`
     SELECT dn.*,
+           r.name AS restaurant_name,
            (SELECT COUNT(*) FROM delivery_note_items WHERE delivery_note_id = dn.id AND restaurant_id = ?) as item_count
     FROM delivery_notes dn
+    LEFT JOIN restaurants r ON r.id = dn.restaurant_id
     WHERE dn.supplier_id = ? AND dn.restaurant_id = ?
     ORDER BY dn.created_at DESC
   `, [rid, supplierId, rid]);
@@ -674,7 +676,12 @@ router.get('/delivery-notes/:id', requireSupplierAuth, (req, res) => {
   const supplierId = req.supplierAccount.supplier_id;
   const rid = req.supplierAccount.restaurant_id;
 
-  const note = get('SELECT * FROM delivery_notes WHERE id = ? AND supplier_id = ? AND restaurant_id = ?', [id, supplierId, rid]);
+  const note = get(`
+    SELECT dn.*, r.name AS restaurant_name
+    FROM delivery_notes dn
+    LEFT JOIN restaurants r ON r.id = dn.restaurant_id
+    WHERE dn.id = ? AND dn.supplier_id = ? AND dn.restaurant_id = ?
+  `, [id, supplierId, rid]);
   if (!note) return res.status(404).json({ error: 'Bon de livraison introuvable' });
 
   const items = all('SELECT * FROM delivery_note_items WHERE delivery_note_id = ? AND restaurant_id = ?', [id, rid]);

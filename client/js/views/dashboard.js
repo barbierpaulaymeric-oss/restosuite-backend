@@ -98,7 +98,7 @@ async function renderDashboard() {
   const app = document.getElementById('app');
   const perms = getPermissions();
   const account = getAccount();
-  const greeting = getGreeting(account ? account.name : 'Chef');
+  const greeting = getGreeting(account ? (account.first_name || account.name || null) : null);
   const todayDate = formatFrenchDate(new Date());
 
   app.innerHTML = `
@@ -487,9 +487,10 @@ function renderAISuggestions(container, data) {
 
 function getGreeting(name) {
   const hour = new Date().getHours();
-  if (hour < 12) return `Bonjour ${name} 👋`;
-  if (hour < 17) return `Bon après-midi ${name} ☀️`;
-  return `Bonsoir ${name} 🌙`;
+  const n = name ? ` ${name}` : '';
+  if (hour < 12) return `Bonjour${n} 👋`;
+  if (hour < 17) return `Bon après-midi${n} ☀️`;
+  return `Bonsoir${n} 🌙`;
 }
 
 function formatFrenchDate(date) {

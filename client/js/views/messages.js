@@ -192,6 +192,7 @@ async function renderMessagesThread(supplierId) {
   } catch (_) { /* url parsing edge case — ignore */ }
 
   async function loadThread() {
+    if (!document.getElementById('msg-thread-body')) { _stopMessagesPoll(); return; }
     let data;
     try {
       data = await API.getMessageThread(supplierId);
