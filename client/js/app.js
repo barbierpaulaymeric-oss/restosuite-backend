@@ -42,6 +42,7 @@ const NAV_GROUPS = {
       { label: 'Fournisseurs',          route: '/suppliers',  icon: 'truck',         roles: ['gerant'] },
       { label: 'Livraisons',             route: '/deliveries',icon: 'package-check',  roles: ['gerant','cuisinier'] },
       { label: 'Factures',               route: '/invoices',  icon: 'receipt',        roles: ['gerant'] },
+      { label: 'Planning',               route: '/planning',  icon: 'calendar-clock', roles: ['gerant'] },
       { label: 'Messages',               route: '/messages',  icon: 'message-square', roles: ['gerant','cuisinier'], badgeKey: 'messages' },
       { label: 'Service (Salle)',        route: '/service',   icon: 'concierge-bell', roles: ['gerant','salle'] },
       { label: 'Cuisine (écran)',        route: '/kitchen',   icon: 'chef-hat',       roles: ['gerant','cuisinier'] },
@@ -113,6 +114,7 @@ const ROUTE_TO_GROUP = {
   '/deliveries': 'operations', '/service': 'operations', '/messages': 'operations',
   '/kitchen': 'operations', '/scan-invoice': 'operations',
   '/invoices': 'operations',
+  '/planning': 'operations',
   '/analytics': 'pilotage',
   '/menu-engineering': 'pilotage', '/predictions': 'pilotage',
   '/mercuriale': 'pilotage', '/import-mercuriale': 'pilotage',
@@ -390,6 +392,7 @@ function registerRoutes() {
   Router.add(/^\/health$/, () => { location.hash = '#/analytics'; });
   Router.add(/^\/more$/, () => new MoreView().render());
   Router.add(/^\/team$/, renderTeam);
+  Router.add(/^\/planning$/, renderPlanning);
   Router.add(/^\/subscribe$/, renderSubscribe);
   Router.add(/^\/supplier-portal$/, renderSupplierPortalManage);
   Router.add(/^\/service$/, renderServiceView);

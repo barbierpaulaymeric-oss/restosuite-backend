@@ -145,6 +145,7 @@ async function loadRecipeAllergens(recipeId) {
     const data = await API.getRecipeAllergens(recipeId);
     const section = document.getElementById('recipe-allergens-section');
     if (!section) return;
+    const crossHtml = renderCrossContaminationBlock(data.cross_contamination_risk);
     if (data.allergens && data.allergens.length > 0) {
       section.innerHTML = `
         <div class="section-title">Allergènes INCO</div>
@@ -158,16 +159,46 @@ async function loadRecipeAllergens(recipeId) {
         <p style="margin-top:var(--space-2);font-size:var(--text-xs);color:var(--text-tertiary)">
           Calcul automatique à partir des ingrédients de la recette
         </p>
+        ${crossHtml}
       `;
     } else {
       section.innerHTML = `
         <div class="section-title">Allergènes INCO</div>
         <p style="font-size:var(--text-sm);color:var(--text-tertiary)">Aucun allergène détecté dans cette recette</p>
+        ${crossHtml}
       `;
     }
+    if (window.lucide) lucide.createIcons();
   } catch (e) {
     // Silent fail — allergens are informational
   }
+}
+
+// Cross-contamination warning block. Severity high = red, medium = orange,
+// low = grey. Renders nothing when there are no detected risks.
+function renderCrossContaminationBlock(risk) {
+  if (!risk || !risk.count || risk.count === 0) return '';
+  const palette = {
+    high:   { bg: 'rgba(217,48,37,0.08)', border: 'rgba(217,48,37,0.4)', icon: 'octagon-alert', label: 'Risque élevé' },
+    medium: { bg: 'rgba(232,114,42,0.08)', border: 'rgba(232,114,42,0.4)', icon: 'triangle-alert', label: 'Risque modéré' },
+    low:    { bg: 'rgba(107,114,128,0.08)', border: 'rgba(107,114,128,0.4)', icon: 'info', label: 'Vigilance' },
+  };
+  const p = palette[risk.max_severity] || palette.low;
+  const items = (risk.risks || []).map(r => `
+    <li style="margin:4px 0;font-size:13px">
+      <strong>${escapeHtml((palette[r.severity] || palette.low).label)} :</strong>
+      ${escapeHtml(r.message)}
+    </li>
+  `).join('');
+  return `
+    <div style="margin-top:var(--space-4);padding:var(--space-3);border-radius:var(--radius-md);background:${p.bg};border:1px solid ${p.border}">
+      <div style="display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:4px">
+        <i data-lucide="${p.icon}" style="width:16px;height:16px"></i>
+        Risque de contamination croisée — ${risk.count} alerte${risk.count > 1 ? 's' : ''}
+      </div>
+      <ul style="margin:6px 0 0 18px;padding:0;color:var(--text-secondary)">${items}</ul>
+    </div>
+  `;
 }
 
 function renderMergedIngredientRows(ingredients, perms, depth) {

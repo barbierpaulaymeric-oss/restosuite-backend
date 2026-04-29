@@ -897,6 +897,34 @@ const API = {
 
   // PMS Export
   getPMSExport(period = '3m') { return this.request(`/pms/export?period=${period}`); },
+
+  // ─── Planning (staff scheduling) ───
+  getStaffMembers() { return this.request('/planning/members', { noRedirectOn401: true }); },
+  createStaffMember(data) { return this.request('/planning/members', { method: 'POST', body: data }); },
+  updateStaffMember(id, data) { return this.request(`/planning/members/${id}`, { method: 'PUT', body: data }); },
+  deleteStaffMember(id) { return this.request(`/planning/members/${id}`, { method: 'DELETE' }); },
+  getPlanningWeek(date) {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : '';
+    return this.request(`/planning/week${qs}`, { noRedirectOn401: true });
+  },
+  getPlanningShifts({ from, to, member_id } = {}) {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    if (member_id) params.set('member_id', String(member_id));
+    const qs = params.toString() ? `?${params}` : '';
+    return this.request(`/planning/shifts${qs}`);
+  },
+  createShift(data) { return this.request('/planning/shifts', { method: 'POST', body: data }); },
+  updateShift(id, data) { return this.request(`/planning/shifts/${id}`, { method: 'PUT', body: data }); },
+  deleteShift(id) { return this.request(`/planning/shifts/${id}`, { method: 'DELETE' }); },
+  getLaborCost({ from, to } = {}) {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const qs = params.toString() ? `?${params}` : '';
+    return this.request(`/planning/labor-cost${qs}`, { noRedirectOn401: true });
+  },
 };
 
 // ─── Toast utility ───

@@ -1073,6 +1073,47 @@ const API = {
   // PMS Export
   getPMSExport(period = "3m") {
     return this.request(`/pms/export?period=${period}`);
+  },
+  // ─── Planning (staff scheduling) ───
+  getStaffMembers() {
+    return this.request("/planning/members", { noRedirectOn401: true });
+  },
+  createStaffMember(data) {
+    return this.request("/planning/members", { method: "POST", body: data });
+  },
+  updateStaffMember(id, data) {
+    return this.request(`/planning/members/${id}`, { method: "PUT", body: data });
+  },
+  deleteStaffMember(id) {
+    return this.request(`/planning/members/${id}`, { method: "DELETE" });
+  },
+  getPlanningWeek(date) {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+    return this.request(`/planning/week${qs}`, { noRedirectOn401: true });
+  },
+  getPlanningShifts({ from, to, member_id } = {}) {
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    if (member_id) params.set("member_id", String(member_id));
+    const qs = params.toString() ? `?${params}` : "";
+    return this.request(`/planning/shifts${qs}`);
+  },
+  createShift(data) {
+    return this.request("/planning/shifts", { method: "POST", body: data });
+  },
+  updateShift(id, data) {
+    return this.request(`/planning/shifts/${id}`, { method: "PUT", body: data });
+  },
+  deleteShift(id) {
+    return this.request(`/planning/shifts/${id}`, { method: "DELETE" });
+  },
+  getLaborCost({ from, to } = {}) {
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const qs = params.toString() ? `?${params}` : "";
+    return this.request(`/planning/labor-cost${qs}`, { noRedirectOn401: true });
   }
 };
 function showToast(message, type = "info") {
@@ -2449,6 +2490,7 @@ async function loadRecipeAllergens(recipeId) {
     const data = await API.getRecipeAllergens(recipeId);
     const section = document.getElementById("recipe-allergens-section");
     if (!section) return;
+    const crossHtml = renderCrossContaminationBlock(data.cross_contamination_risk);
     if (data.allergens && data.allergens.length > 0) {
       section.innerHTML = `
         <div class="section-title">Allerg\xE8nes INCO</div>
@@ -2462,15 +2504,42 @@ async function loadRecipeAllergens(recipeId) {
         <p style="margin-top:var(--space-2);font-size:var(--text-xs);color:var(--text-tertiary)">
           Calcul automatique \xE0 partir des ingr\xE9dients de la recette
         </p>
+        ${crossHtml}
       `;
     } else {
       section.innerHTML = `
         <div class="section-title">Allerg\xE8nes INCO</div>
         <p style="font-size:var(--text-sm);color:var(--text-tertiary)">Aucun allerg\xE8ne d\xE9tect\xE9 dans cette recette</p>
+        ${crossHtml}
       `;
     }
+    if (window.lucide) lucide.createIcons();
   } catch (e) {
   }
+}
+function renderCrossContaminationBlock(risk) {
+  if (!risk || !risk.count || risk.count === 0) return "";
+  const palette = {
+    high: { bg: "rgba(217,48,37,0.08)", border: "rgba(217,48,37,0.4)", icon: "octagon-alert", label: "Risque \xE9lev\xE9" },
+    medium: { bg: "rgba(232,114,42,0.08)", border: "rgba(232,114,42,0.4)", icon: "triangle-alert", label: "Risque mod\xE9r\xE9" },
+    low: { bg: "rgba(107,114,128,0.08)", border: "rgba(107,114,128,0.4)", icon: "info", label: "Vigilance" }
+  };
+  const p = palette[risk.max_severity] || palette.low;
+  const items = (risk.risks || []).map((r) => `
+    <li style="margin:4px 0;font-size:13px">
+      <strong>${escapeHtml((palette[r.severity] || palette.low).label)} :</strong>
+      ${escapeHtml(r.message)}
+    </li>
+  `).join("");
+  return `
+    <div style="margin-top:var(--space-4);padding:var(--space-3);border-radius:var(--radius-md);background:${p.bg};border:1px solid ${p.border}">
+      <div style="display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:4px">
+        <i data-lucide="${p.icon}" style="width:16px;height:16px"></i>
+        Risque de contamination crois\xE9e \u2014 ${risk.count} alerte${risk.count > 1 ? "s" : ""}
+      </div>
+      <ul style="margin:6px 0 0 18px;padding:0;color:var(--text-secondary)">${items}</ul>
+    </div>
+  `;
 }
 function renderMergedIngredientRows(ingredients, perms, depth) {
   return ingredients.map((ing) => {
@@ -14842,6 +14911,12 @@ const PMS_PRINT_CSS = `
       title: "Synth\xE8se HACCP (PDF)",
       desc: "Relev\xE9s de temp\xE9rature, plan de nettoyage et non-conformit\xE9s du mois."
     })}
+          ${exportCard({
+      id: "btn-export-monthly",
+      icon: "file-text",
+      title: "Rapport mensuel comptable (PDF)",
+      desc: "Document tout-en-un : couverture, achats, food cost, variance stock, factures, pertes, HACCP. \xC0 transmettre \xE0 votre comptable."
+    })}
         </div>
 
         <p style="margin-top:24px;color:var(--text-secondary);font-size:12px;line-height:1.5">
@@ -14876,6 +14951,10 @@ const PMS_PRINT_CSS = `
     bindDownload("btn-export-haccp", () => ({
       path: `/api/exports/haccp-summary?month=${currentMonth()}`,
       file: `haccp-${currentMonth()}.pdf`
+    }));
+    bindDownload("btn-export-monthly", () => ({
+      path: `/api/exports/monthly-report?month=${currentMonth()}`,
+      file: `rapport-mensuel-${currentMonth()}.pdf`
     }));
   }
   function exportCard({ id, icon, title, desc }) {
@@ -24300,6 +24379,452 @@ function showDeleteAccountModal() {
   });
   confirmInput.focus();
 }
+(function() {
+  const SHIFT_STATUS_LABELS = {
+    planned: "Pr\xE9vu",
+    confirmed: "Confirm\xE9",
+    completed: "Effectu\xE9",
+    cancelled: "Annul\xE9"
+  };
+  const SHIFT_STATUS_COLORS = {
+    planned: "#6b7280",
+    confirmed: "#2563eb",
+    completed: "#22c55e",
+    cancelled: "#ef4444"
+  };
+  const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+  let _members = [];
+  let _weekRefDate = null;
+  function fmtEur2(n) {
+    const v = Number(n) || 0;
+    return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " \u20AC";
+  }
+  function fmtHours(n) {
+    const v = Number(n) || 0;
+    return v.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + " h";
+  }
+  function isoToday() {
+    return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  }
+  function shiftMonday(iso) {
+    const d = /* @__PURE__ */ new Date(iso + "T00:00:00Z");
+    const day = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() - (day - 1));
+    return d.toISOString().slice(0, 10);
+  }
+  function addDays(iso, n) {
+    const d = /* @__PURE__ */ new Date(iso + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  function fmtDayHeader(iso) {
+    const d = /* @__PURE__ */ new Date(iso + "T12:00:00");
+    return d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+  }
+  function statusBadge2(status) {
+    const label = SHIFT_STATUS_LABELS[status] || status || "\u2014";
+    const color = SHIFT_STATUS_COLORS[status] || "#6b7280";
+    return `<span class="badge" style="background:${color};color:white;font-size:10px;padding:1px 6px;border-radius:6px">${escapeHtml(label)}</span>`;
+  }
+  async function renderPlanning2() {
+    const account = typeof getAccount === "function" ? getAccount() : null;
+    if (!account || account.role !== "gerant") {
+      location.hash = "#/";
+      return;
+    }
+    if (!_weekRefDate) _weekRefDate = isoToday();
+    const monday = shiftMonday(_weekRefDate);
+    const sunday = addDays(monday, 6);
+    const app = document.getElementById("app");
+    app.innerHTML = `
+      <div class="view-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-4)">
+        <div>
+          <h1><i data-lucide="calendar-clock" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Planning</h1>
+          <p class="text-secondary">Plannings hebdomadaires, co\xFBt main d'\u0153uvre, suivi des shifts.</p>
+        </div>
+        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+          <button id="planning-prev-week" class="btn btn-secondary"><i data-lucide="chevron-left" style="width:16px;height:16px"></i></button>
+          <button id="planning-today" class="btn btn-secondary">Aujourd'hui</button>
+          <button id="planning-next-week" class="btn btn-secondary"><i data-lucide="chevron-right" style="width:16px;height:16px"></i></button>
+          <button id="planning-add-member" class="btn btn-secondary" style="display:flex;align-items:center;gap:var(--space-2)">
+            <i data-lucide="user-plus" style="width:16px;height:16px"></i>Membre
+          </button>
+          <button id="planning-add-shift" class="btn btn-primary" style="display:flex;align-items:center;gap:var(--space-2)">
+            <i data-lucide="plus" style="width:16px;height:16px"></i>Shift
+          </button>
+        </div>
+      </div>
+
+      <div id="planning-week-label" style="margin-bottom:var(--space-4);font-weight:600;color:var(--text-secondary)">
+        Semaine du <span id="planning-week-from"></span> au <span id="planning-week-to"></span>
+      </div>
+
+      <div id="planning-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3);margin-bottom:var(--space-5)"></div>
+
+      <div id="planning-grid">
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    document.getElementById("planning-week-from").textContent = fmtDayHeader(monday);
+    document.getElementById("planning-week-to").textContent = fmtDayHeader(sunday);
+    document.getElementById("planning-prev-week").addEventListener("click", () => {
+      _weekRefDate = addDays(monday, -7);
+      renderPlanning2();
+    });
+    document.getElementById("planning-next-week").addEventListener("click", () => {
+      _weekRefDate = addDays(monday, 7);
+      renderPlanning2();
+    });
+    document.getElementById("planning-today").addEventListener("click", () => {
+      _weekRefDate = isoToday();
+      renderPlanning2();
+    });
+    document.getElementById("planning-add-member").addEventListener("click", () => openMemberModal());
+    document.getElementById("planning-add-shift").addEventListener("click", () => openShiftModal());
+    await Promise.all([loadKpis(monday, sunday), loadWeek(monday)]);
+  }
+  async function loadKpis(from, to) {
+    try {
+      const data = await API.getLaborCost({ from, to });
+      const el = document.getElementById("planning-kpis");
+      if (!el) return;
+      el.innerHTML = `
+        ${kpiCard("Heures planifi\xE9es", fmtHours(data.total_hours), "clock")}
+        ${kpiCard("Co\xFBt main d'\u0153uvre", fmtEur2(data.total_cost), "euro")}
+        ${kpiCard("Couverts", data.total_covers > 0 ? data.total_covers.toLocaleString("fr-FR") : "\u2014", "users")}
+        ${kpiCard("Co\xFBt / couvert", data.cost_per_cover != null ? fmtEur2(data.cost_per_cover) : "\u2014", "percent")}
+      `;
+      if (window.lucide) lucide.createIcons();
+    } catch (e) {
+    }
+  }
+  function kpiCard(label, value, icon) {
+    return `
+      <div class="card" style="padding:var(--space-4);display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px;color:var(--text-secondary);font-size:13px">
+          <i data-lucide="${icon}" style="width:14px;height:14px"></i>${escapeHtml(label)}
+        </div>
+        <div style="font-size:22px;font-weight:700">${value}</div>
+      </div>
+    `;
+  }
+  async function loadWeek(monday) {
+    const grid = document.getElementById("planning-grid");
+    if (!grid) return;
+    let data;
+    try {
+      data = await API.getPlanningWeek(monday);
+    } catch (e) {
+      grid.innerHTML = `<div class="empty-state"><p>Erreur de chargement du planning${e && e.message ? " : " + escapeHtml(e.message) : ""}</p></div>`;
+      return;
+    }
+    _members = data.members || [];
+    if (_members.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state" style="padding:var(--space-6);text-align:center">
+          <p style="margin-bottom:var(--space-3)">Aucun membre dans le planning. Commencez par ajouter votre \xE9quipe.</p>
+          <button class="btn btn-primary" id="planning-empty-add">
+            <i data-lucide="user-plus" style="width:16px;height:16px"></i> Ajouter un membre
+          </button>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+      const btn = document.getElementById("planning-empty-add");
+      if (btn) btn.addEventListener("click", () => openMemberModal());
+      return;
+    }
+    const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+    const shiftsByMemberDay = /* @__PURE__ */ new Map();
+    for (const s of data.shifts || []) {
+      const k = `${s.staff_member_id}|${s.date}`;
+      if (!shiftsByMemberDay.has(k)) shiftsByMemberDay.set(k, []);
+      shiftsByMemberDay.get(k).push(s);
+    }
+    const headerCells = days.map((iso, i) => `
+      <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border-color);min-width:120px">
+        <div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase">${DAY_LABELS[i]}</div>
+        <div style="font-weight:600">${fmtDayHeader(iso).split(" ").slice(1).join(" ")}</div>
+      </th>
+    `).join("");
+    const memberRows = _members.map((m) => {
+      const memberHours = days.reduce((sum, iso) => {
+        const arr = shiftsByMemberDay.get(`${m.id}|${iso}`) || [];
+        return sum + arr.reduce((a, s) => a + (s.hours || 0), 0);
+      }, 0);
+      const cells = days.map((iso) => {
+        const arr = shiftsByMemberDay.get(`${m.id}|${iso}`) || [];
+        const inner = arr.length === 0 ? `<button class="planning-cell-add" data-add-shift data-member="${m.id}" data-date="${iso}" style="background:none;border:1px dashed var(--border-color);border-radius:6px;width:100%;padding:6px;color:var(--text-tertiary);font-size:11px;cursor:pointer">+</button>` : arr.map((s) => `
+              <button class="planning-shift" data-edit-shift="${s.id}" style="display:block;width:100%;text-align:left;background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.3);border-radius:6px;padding:5px 7px;margin-bottom:4px;cursor:pointer">
+                <div style="font-weight:600;font-size:12px">${escapeHtml(s.start_time.slice(0, 5))} \u2013 ${escapeHtml(s.end_time.slice(0, 5))}</div>
+                <div style="font-size:10px;color:var(--text-secondary);display:flex;justify-content:space-between;align-items:center;gap:4px;margin-top:2px">
+                  <span>${fmtHours(s.hours)}</span>
+                  ${statusBadge2(s.status)}
+                </div>
+              </button>
+            `).join("");
+        return `<td style="padding:6px;border-bottom:1px solid var(--border-color);vertical-align:top">${inner}</td>`;
+      }).join("");
+      return `
+        <tr>
+          <td style="padding:8px;border-bottom:1px solid var(--border-color);vertical-align:top;min-width:160px">
+            <div style="font-weight:600">${escapeHtml(m.name)}</div>
+            <div style="font-size:11px;color:var(--text-tertiary)">${escapeHtml(m.role || "Sans r\xF4le")}</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">${fmtHours(memberHours)} planifi\xE9es</div>
+          </td>
+          ${cells}
+        </tr>
+      `;
+    }).join("");
+    grid.innerHTML = `
+      <div class="table-container" style="overflow-x:auto;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:var(--bg-card)">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border-color);min-width:160px">Membre</th>
+              ${headerCells}
+            </tr>
+          </thead>
+          <tbody>${memberRows}</tbody>
+        </table>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    grid.querySelectorAll("[data-edit-shift]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = Number(btn.dataset.editShift);
+        const shift = (data.shifts || []).find((s) => s.id === id);
+        if (shift) openShiftModal(shift);
+      });
+    });
+    grid.querySelectorAll("[data-add-shift]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        openShiftModal({
+          staff_member_id: Number(btn.dataset.member),
+          date: btn.dataset.date
+        });
+      });
+    });
+  }
+  function openMemberModal(member) {
+    const isEdit = !!(member && member.id);
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:520px">
+        <h2>${isEdit ? "Modifier le membre" : "Nouveau membre"}</h2>
+        <div class="form-group">
+          <label>Nom *</label>
+          <input type="text" class="form-control" id="m-name" value="${escapeHtml(member && member.name || "")}" data-ui="custom">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+          <div class="form-group">
+            <label>R\xF4le</label>
+            <input type="text" class="form-control" id="m-role" placeholder="Ex: Cuisinier" value="${escapeHtml(member && member.role || "")}" data-ui="custom">
+          </div>
+          <div class="form-group">
+            <label>T\xE9l\xE9phone</label>
+            <input type="text" class="form-control" id="m-phone" value="${escapeHtml(member && member.phone || "")}" data-ui="custom">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" class="form-control" id="m-email" value="${escapeHtml(member && member.email || "")}" data-ui="custom">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+          <div class="form-group">
+            <label>Taux horaire (\u20AC/h)</label>
+            <input type="number" step="0.01" min="0" class="form-control" id="m-rate" value="${member && member.hourly_rate != null ? member.hourly_rate : ""}" data-ui="custom">
+          </div>
+          <div class="form-group">
+            <label>Heures contractuelles / sem.</label>
+            <input type="number" step="0.5" min="0" class="form-control" id="m-contract" value="${member && member.contract_hours != null ? member.contract_hours : 35}" data-ui="custom">
+          </div>
+        </div>
+        <div id="m-error" style="color:var(--color-danger);font-size:13px;min-height:18px;margin-bottom:var(--space-3)"></div>
+        <div class="actions-row" style="display:flex;justify-content:space-between;gap:var(--space-2)">
+          <div>
+            ${isEdit ? `<button class="btn" id="m-delete" style="color:var(--color-danger);border:1px solid rgba(217,48,37,0.3);background:transparent">Supprimer</button>` : ""}
+          </div>
+          <div style="display:flex;gap:var(--space-2)">
+            <button class="btn btn-secondary" id="m-cancel">Annuler</button>
+            <button class="btn btn-primary" id="m-save">${isEdit ? "Enregistrer" : "Cr\xE9er"}</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    if (window.lucide) lucide.createIcons();
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    overlay.querySelector("#m-cancel").addEventListener("click", () => overlay.remove());
+    overlay.querySelector("#m-save").addEventListener("click", async () => {
+      const errEl = overlay.querySelector("#m-error");
+      const payload = {
+        name: overlay.querySelector("#m-name").value.trim(),
+        role: overlay.querySelector("#m-role").value.trim() || null,
+        email: overlay.querySelector("#m-email").value.trim() || null,
+        phone: overlay.querySelector("#m-phone").value.trim() || null,
+        hourly_rate: Number(overlay.querySelector("#m-rate").value) || 0,
+        contract_hours: Number(overlay.querySelector("#m-contract").value) || 0
+      };
+      if (!payload.name) {
+        errEl.textContent = "Le nom est requis";
+        return;
+      }
+      try {
+        if (isEdit) await API.updateStaffMember(member.id, payload);
+        else await API.createStaffMember(payload);
+        showToast(isEdit ? "Membre mis \xE0 jour" : "Membre ajout\xE9", "success");
+        overlay.remove();
+        renderPlanning2();
+      } catch (e) {
+        errEl.textContent = e.message || "Erreur";
+      }
+    });
+    if (isEdit) {
+      overlay.querySelector("#m-delete").addEventListener("click", () => {
+        showConfirmModal(
+          "Supprimer le membre",
+          `Supprimer ${member.name} du planning ? Les shifts existants seront conserv\xE9s mais ne pourront plus \xEAtre modifi\xE9s.`,
+          async () => {
+            try {
+              await API.deleteStaffMember(member.id);
+              showToast("Membre supprim\xE9", "success");
+              overlay.remove();
+              renderPlanning2();
+            } catch (e) {
+              showToast(e.message || "Erreur", "error");
+            }
+          },
+          { confirmText: "Supprimer", confirmClass: "btn btn-danger" }
+        );
+      });
+    }
+    overlay.querySelector("#m-name").focus();
+  }
+  async function openShiftModal(shift) {
+    const isEdit = !!(shift && shift.id);
+    if (_members.length === 0) {
+      try {
+        _members = await API.getStaffMembers();
+      } catch (e) {
+      }
+      if (_members.length === 0) {
+        showToast("Ajoutez au moins un membre avant de planifier un shift", "info");
+        openMemberModal();
+        return;
+      }
+    }
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:520px">
+        <h2>${isEdit ? "Modifier le shift" : "Nouveau shift"}</h2>
+        <div class="form-group">
+          <label>Membre *</label>
+          <select class="form-control" id="s-member" data-ui="custom">
+            ${_members.map((m) => `<option value="${m.id}" ${shift && Number(shift.staff_member_id) === m.id ? "selected" : ""}>${escapeHtml(m.name)}${m.role ? " \u2014 " + escapeHtml(m.role) : ""}</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="date" class="form-control" id="s-date" value="${shift && shift.date || isoToday()}" data-ui="custom">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3)">
+          <div class="form-group">
+            <label>D\xE9but *</label>
+            <input type="time" class="form-control" id="s-start" value="${shift && shift.start_time ? shift.start_time.slice(0, 5) : "09:00"}" data-ui="custom">
+          </div>
+          <div class="form-group">
+            <label>Fin *</label>
+            <input type="time" class="form-control" id="s-end" value="${shift && shift.end_time ? shift.end_time.slice(0, 5) : "17:00"}" data-ui="custom">
+          </div>
+          <div class="form-group">
+            <label>Pause (min)</label>
+            <input type="number" min="0" step="5" class="form-control" id="s-break" value="${shift && shift.break_minutes || 0}" data-ui="custom">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Statut</label>
+          <select class="form-control" id="s-status" data-ui="custom">
+            ${Object.entries(SHIFT_STATUS_LABELS).map(([k, v]) => `<option value="${k}" ${shift && shift.status === k || !shift && k === "planned" ? "selected" : ""}>${escapeHtml(v)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea class="form-control" id="s-notes" rows="2" data-ui="custom">${escapeHtml(shift && shift.notes || "")}</textarea>
+        </div>
+        <div id="s-error" style="color:var(--color-danger);font-size:13px;min-height:18px;margin-bottom:var(--space-3)"></div>
+        <div class="actions-row" style="display:flex;justify-content:space-between;gap:var(--space-2)">
+          <div>
+            ${isEdit ? `<button class="btn" id="s-delete" style="color:var(--color-danger);border:1px solid rgba(217,48,37,0.3);background:transparent">Supprimer</button>` : ""}
+          </div>
+          <div style="display:flex;gap:var(--space-2)">
+            <button class="btn btn-secondary" id="s-cancel">Annuler</button>
+            <button class="btn btn-primary" id="s-save">${isEdit ? "Enregistrer" : "Cr\xE9er"}</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    if (window.lucide) lucide.createIcons();
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    overlay.querySelector("#s-cancel").addEventListener("click", () => overlay.remove());
+    overlay.querySelector("#s-save").addEventListener("click", async () => {
+      const errEl = overlay.querySelector("#s-error");
+      const payload = {
+        staff_member_id: Number(overlay.querySelector("#s-member").value),
+        date: overlay.querySelector("#s-date").value,
+        start_time: overlay.querySelector("#s-start").value,
+        end_time: overlay.querySelector("#s-end").value,
+        break_minutes: Number(overlay.querySelector("#s-break").value) || 0,
+        status: overlay.querySelector("#s-status").value,
+        notes: overlay.querySelector("#s-notes").value.trim() || null
+      };
+      if (!payload.staff_member_id) {
+        errEl.textContent = "Membre requis";
+        return;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.date)) {
+        errEl.textContent = "Date invalide";
+        return;
+      }
+      if (!/^\d{2}:\d{2}/.test(payload.start_time) || !/^\d{2}:\d{2}/.test(payload.end_time)) {
+        errEl.textContent = "Horaires requis";
+        return;
+      }
+      try {
+        if (isEdit) await API.updateShift(shift.id, payload);
+        else await API.createShift(payload);
+        showToast(isEdit ? "Shift mis \xE0 jour" : "Shift cr\xE9\xE9", "success");
+        overlay.remove();
+        renderPlanning2();
+      } catch (e) {
+        errEl.textContent = e.message || "Erreur";
+      }
+    });
+    if (isEdit) {
+      overlay.querySelector("#s-delete").addEventListener("click", () => {
+        showConfirmModal("Supprimer le shift", "Supprimer ce shift ?", async () => {
+          try {
+            await API.deleteShift(shift.id);
+            showToast("Shift supprim\xE9", "success");
+            overlay.remove();
+            renderPlanning2();
+          } catch (e) {
+            showToast(e.message || "Erreur", "error");
+          }
+        }, { confirmText: "Supprimer", confirmClass: "btn btn-danger" });
+      });
+    }
+  }
+  window.renderPlanning = renderPlanning2;
+})();
 function renderSubscribe() {
   const app = document.getElementById("app");
   app.innerHTML = `
@@ -28764,6 +29289,7 @@ const NAV_GROUPS = {
       { label: "Fournisseurs", route: "/suppliers", icon: "truck", roles: ["gerant"] },
       { label: "Livraisons", route: "/deliveries", icon: "package-check", roles: ["gerant", "cuisinier"] },
       { label: "Factures", route: "/invoices", icon: "receipt", roles: ["gerant"] },
+      { label: "Planning", route: "/planning", icon: "calendar-clock", roles: ["gerant"] },
       { label: "Messages", route: "/messages", icon: "message-square", roles: ["gerant", "cuisinier"], badgeKey: "messages" },
       { label: "Service (Salle)", route: "/service", icon: "concierge-bell", roles: ["gerant", "salle"] },
       { label: "Cuisine (\xE9cran)", route: "/kitchen", icon: "chef-hat", roles: ["gerant", "cuisinier"] }
@@ -28843,6 +29369,7 @@ const ROUTE_TO_GROUP = {
   "/kitchen": "operations",
   "/scan-invoice": "operations",
   "/invoices": "operations",
+  "/planning": "operations",
   "/analytics": "pilotage",
   "/menu-engineering": "pilotage",
   "/predictions": "pilotage",
@@ -29095,6 +29622,7 @@ function registerRoutes() {
   });
   Router.add(/^\/more$/, () => new MoreView().render());
   Router.add(/^\/team$/, renderTeam);
+  Router.add(/^\/planning$/, renderPlanning);
   Router.add(/^\/subscribe$/, renderSubscribe);
   Router.add(/^\/supplier-portal$/, renderSupplierPortalManage);
   Router.add(/^\/service$/, renderServiceView);

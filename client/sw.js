@@ -1,11 +1,12 @@
-// Bumped 2026-04-29 (v17): supplier invoices feature shipped — new
-// /api/invoices routes, client/js/views/invoices.js, "Factures" entry
-// in the Opérations nav group. Cache bump forces clients to fetch the
-// new app bundle that includes the view.
-// (v16 shipped customer-facing allergen card PDF export; v15 shipped
-// accountant-friendly monthly exports; v14 shipped covers tracking;
-// v13 shipped RGPD export +12 tables and /waste-analytics.)
-const CACHE_NAME = 'restosuite-v17';
+// Bumped 2026-04-29 (v18): three new features shipped — staff scheduling
+// (/api/planning + client/js/views/planning.js + "Planning" entry in
+// Opérations nav), cross-contamination allergen warnings (/api/allergens/
+// cross-contamination + recipe-detail badge), and the all-in-one accountant
+// monthly PDF report (/api/exports/monthly-report + button on /#/exports).
+// Cache bump forces clients to fetch the new bundle.
+// (v17 shipped supplier invoices; v16 shipped customer-facing allergen card
+// PDF export; v15 shipped accountant-friendly monthly CSV exports.)
+const CACHE_NAME = 'restosuite-v18';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

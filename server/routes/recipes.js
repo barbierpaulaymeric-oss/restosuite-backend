@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
-const { getRecipeAllergens, INCO_ALLERGENS } = require('./allergens');
+const { getRecipeAllergens, INCO_ALLERGENS, computeCrossContaminationForRecipe, maxSeverity: allergenMaxSeverity } = require('./allergens');
 const { validate, recipeValidation } = require('../middleware/validate');
 const router = Router();
 router.use(requireAuth);
@@ -348,8 +348,22 @@ router.get('/availability', (req, res) => {
 
 router.get('/:id', (req, res) => {
   const rid = req.user.restaurant_id;
-  const recipe = getFullRecipe(Number(req.params.id), rid);
+  const id = Number(req.params.id);
+  const recipe = getFullRecipe(id, rid);
   if (!recipe) return res.status(404).json({ error: 'not found' });
+  // Cross-contamination summary surfaced inline so the recipe detail UI can
+  // render a warning badge without a second round-trip.
+  try {
+    const allergens = getRecipeAllergens(id);
+    const risks = computeCrossContaminationForRecipe(id, allergens);
+    recipe.cross_contamination_risk = {
+      count: risks.length,
+      max_severity: allergenMaxSeverity(risks),
+      risks,
+    };
+  } catch {
+    recipe.cross_contamination_risk = { count: 0, max_severity: null, risks: [] };
+  }
   res.json(recipe);
 });
 

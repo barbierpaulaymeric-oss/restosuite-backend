@@ -4,6 +4,7 @@
 // GET /api/exports/monthly-food-cost?month=YYYY-MM   (CSV)
 // GET /api/exports/stock-variance?month=YYYY-MM      (CSV)
 // GET /api/exports/haccp-summary?month=YYYY-MM       (PDF)
+// GET /api/exports/monthly-report?month=YYYY-MM      (PDF, all-in-one)
 // ═══════════════════════════════════════════
 //
 // Every query is scoped by req.user.restaurant_id; cross-tenant rows are
@@ -502,6 +503,467 @@ router.get('/haccp-summary', (req, res) => {
   } catch (e) {
     console.error('haccp-summary export error:', e.message);
     if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de la génération du PDF' });
+  }
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// 5. Monthly all-in-one PDF report (cover + purchases + food-cost +
+//    stock variance + invoices + waste + HACCP summary).
+// ───────────────────────────────────────────────────────────────────────────
+// Pulls aggregated data from the same tables the per-CSV exports use, so the
+// figures match. Uses tabular layout instead of CSV rows. Optional sections
+// degrade silently when their tables are missing (older installs).
+
+function pdfRow(doc, cells, widths, y, opts = {}) {
+  const x = opts.x || PDF_MARGIN;
+  const fontSize = opts.fontSize || 9;
+  const bold = !!opts.bold;
+  const fill = opts.fill || null;
+  const padX = 4;
+  const lineH = fontSize + 4;
+
+  if (fill) {
+    doc.rect(x, y, widths.reduce((a, b) => a + b, 0), lineH).fill(fill);
+  }
+  doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(fontSize).fillColor('#1a1a1a');
+  let cx = x;
+  for (let i = 0; i < cells.length; i++) {
+    const w = widths[i];
+    const align = (opts.align && opts.align[i]) || 'left';
+    doc.text(String(cells[i] == null ? '' : cells[i]),
+      cx + padX, y + 2,
+      { width: w - padX * 2, align, lineBreak: false }
+    );
+    cx += w;
+  }
+  return y + lineH;
+}
+
+router.get('/monthly-report', (req, res) => {
+  const month = parseMonth(req.query.month);
+  if (!month) {
+    return res.status(400).json({ error: 'Paramètre "month" requis au format YYYY-MM' });
+  }
+
+  try {
+    const rid = req.user.restaurant_id;
+    const restaurant = get('SELECT name FROM restaurants WHERE id = ?', [rid]) || {};
+
+    // ── 1. Purchases summary ─────────────────────────────────────────────
+    const purchaseTotals = get(`
+      SELECT COUNT(*) AS n, COALESCE(SUM(total_amount), 0) AS total
+      FROM purchase_orders
+      WHERE restaurant_id = ?
+        AND status != 'brouillon'
+        AND COALESCE(sent_at, created_at) >= ?
+        AND COALESCE(sent_at, created_at) <  ?
+    `, [rid, month.start, month.end]) || { n: 0, total: 0 };
+
+    const topSuppliers = all(`
+      SELECT s.name AS supplier_name,
+             COUNT(po.id) AS order_count,
+             COALESCE(SUM(po.total_amount), 0) AS total_ttc
+      FROM purchase_orders po
+      LEFT JOIN suppliers s ON s.id = po.supplier_id AND s.restaurant_id = ?
+      WHERE po.restaurant_id = ?
+        AND po.status != 'brouillon'
+        AND COALESCE(po.sent_at, po.created_at) >= ?
+        AND COALESCE(po.sent_at, po.created_at) <  ?
+      GROUP BY po.supplier_id
+      ORDER BY total_ttc DESC
+      LIMIT 10
+    `, [rid, rid, month.start, month.end]);
+
+    // ── 2. Food cost (top 10 by revenue) ─────────────────────────────────
+    let foodCostRows = [];
+    let foodCostTotals = { revenue: 0, cost: 0 };
+    try {
+      const recipes = all(`
+        SELECT r.id, r.name, r.category, r.portions, r.selling_price,
+               COALESCE(SUM(oi.quantity), 0) AS portions_sold
+        FROM recipes r
+        LEFT JOIN order_items oi
+          ON oi.recipe_id = r.id
+         AND oi.restaurant_id = ?
+         AND oi.created_at >= ?
+         AND oi.created_at <  ?
+        WHERE r.restaurant_id = ?
+        GROUP BY r.id
+        HAVING portions_sold > 0
+        ORDER BY portions_sold DESC
+      `, [rid, month.start, month.end, rid]);
+
+      for (const recipe of recipes) {
+        const ingredients = all(`
+          SELECT ri.gross_quantity, i.price_per_unit
+          FROM recipe_ingredients ri
+          LEFT JOIN ingredients i ON i.id = ri.ingredient_id AND i.restaurant_id = ?
+          WHERE ri.recipe_id = ? AND ri.restaurant_id = ?
+        `, [rid, recipe.id, rid]);
+        const portions = Math.max(1, Number(recipe.portions) || 1);
+        let recipeCost = 0;
+        for (const ri of ingredients) {
+          recipeCost += (Number(ri.gross_quantity) || 0) * (Number(ri.price_per_unit) || 0);
+        }
+        const unitCost = recipeCost / portions;
+        const sellingPrice = Number(recipe.selling_price) || 0;
+        const portionsSold = Number(recipe.portions_sold) || 0;
+        const totalRev  = sellingPrice * portionsSold;
+        const totalCost = unitCost * portionsSold;
+        foodCostRows.push({
+          name: recipe.name,
+          portions_sold: portionsSold,
+          unit_cost: unitCost,
+          selling_price: sellingPrice,
+          food_cost_pct: sellingPrice > 0 ? (unitCost / sellingPrice) * 100 : 0,
+          total_revenue: totalRev,
+        });
+        foodCostTotals.revenue += totalRev;
+        foodCostTotals.cost    += totalCost;
+      }
+      // Top 10 by revenue
+      foodCostRows.sort((a, b) => b.total_revenue - a.total_revenue);
+      foodCostRows = foodCostRows.slice(0, 10);
+    } catch {
+      foodCostRows = [];
+    }
+    const overallFC = foodCostTotals.revenue > 0
+      ? (foodCostTotals.cost / foodCostTotals.revenue) * 100
+      : 0;
+
+    // ── 3. Stock variance summary (top 10 ingredients with variance ≠ 0) ─
+    let varianceRows = [];
+    try {
+      const ingredients = all(`
+        SELECT i.id, i.name, i.default_unit, i.price_per_unit,
+               COALESCE(s.quantity, 0) AS closing_stock
+        FROM ingredients i
+        LEFT JOIN stock s ON s.ingredient_id = i.id AND s.restaurant_id = ?
+        WHERE i.restaurant_id = ?
+      `, [rid, rid]);
+
+      const movements = all(`
+        SELECT ingredient_id, movement_type, SUM(quantity) AS qty
+        FROM stock_movements
+        WHERE restaurant_id = ?
+          AND recorded_at >= ?
+          AND recorded_at <  ?
+        GROUP BY ingredient_id, movement_type
+      `, [rid, month.start, month.end]);
+
+      const byIng = new Map();
+      for (const m of movements) {
+        const id = m.ingredient_id;
+        if (!byIng.has(id)) byIng.set(id, { reception: 0, consumption: 0, loss: 0 });
+        const bucket = byIng.get(id);
+        const t = (m.movement_type || '').toLowerCase();
+        const q = Math.abs(Number(m.qty) || 0);
+        if (t === 'reception' || t === 'réception' || t === 'entree' || t === 'entrée' || t === 'in') bucket.reception += q;
+        else if (t === 'perte' || t === 'casse' || t === 'loss' || t === 'waste' || t === 'dechet' || t === 'déchet') bucket.loss += q;
+        else bucket.consumption += q;
+      }
+      for (const ing of ingredients) {
+        const m = byIng.get(ing.id) || { reception: 0, consumption: 0, loss: 0 };
+        if (m.reception === 0 && m.consumption === 0 && m.loss === 0) continue;
+        varianceRows.push({
+          name: ing.name,
+          unit: ing.default_unit || '',
+          reception: m.reception,
+          consumption: m.consumption,
+          loss: m.loss,
+          loss_value: m.loss * (Number(ing.price_per_unit) || 0),
+        });
+      }
+      varianceRows.sort((a, b) => b.loss_value - a.loss_value);
+      varianceRows = varianceRows.slice(0, 10);
+    } catch {
+      varianceRows = [];
+    }
+
+    // ── 4. Supplier invoices summary ────────────────────────────────────
+    let invoicesByStatus = [];
+    let invoicesTotals = { count: 0, ht: 0, tva: 0, ttc: 0 };
+    try {
+      invoicesByStatus = all(`
+        SELECT status,
+               COUNT(*) AS n,
+               COALESCE(SUM(total_ht), 0) AS ht,
+               COALESCE(SUM(tva_amount), 0) AS tva,
+               COALESCE(SUM(total_ttc), 0) AS ttc
+        FROM supplier_invoices
+        WHERE restaurant_id = ?
+          AND deleted_at IS NULL
+          AND COALESCE(invoice_date, date(created_at)) >= ?
+          AND COALESCE(invoice_date, date(created_at)) <  ?
+        GROUP BY status
+        ORDER BY status
+      `, [rid, month.startDate, month.endDate]);
+      for (const s of invoicesByStatus) {
+        invoicesTotals.count += s.n;
+        invoicesTotals.ht   += Number(s.ht)  || 0;
+        invoicesTotals.tva  += Number(s.tva) || 0;
+        invoicesTotals.ttc  += Number(s.ttc) || 0;
+      }
+    } catch {
+      invoicesByStatus = [];
+    }
+
+    // ── 5. Waste summary ────────────────────────────────────────────────
+    let wasteSummary = { count: 0, value: 0 };
+    let wasteByReason = [];
+    try {
+      const totalRow = get(`
+        SELECT COUNT(*) AS n, COALESCE(SUM(estimated_value), 0) AS v
+        FROM waste_management
+        WHERE restaurant_id = ?
+          AND date >= ? AND date <= ?
+      `, [rid, month.startDate, month.endDate]);
+      wasteSummary.count = (totalRow && totalRow.n) || 0;
+      wasteSummary.value = Number(totalRow && totalRow.v) || 0;
+      wasteByReason = all(`
+        SELECT COALESCE(NULLIF(reason, ''), 'Non précisé') AS reason,
+               COUNT(*) AS n,
+               COALESCE(SUM(estimated_value), 0) AS v
+        FROM waste_management
+        WHERE restaurant_id = ?
+          AND date >= ? AND date <= ?
+        GROUP BY reason
+        ORDER BY v DESC
+        LIMIT 8
+      `, [rid, month.startDate, month.endDate]);
+    } catch {
+      wasteSummary = { count: 0, value: 0 };
+      wasteByReason = [];
+    }
+
+    // ── 6. HACCP summary ────────────────────────────────────────────────
+    let haccp = { tempCount: 0, tempAlerts: 0, ncTotal: 0, ncCritical: 0, ncResolved: 0 };
+    try {
+      haccp.tempCount  = get(`SELECT COUNT(*) AS n FROM temperature_logs WHERE restaurant_id = ? AND recorded_at >= ? AND recorded_at < ?`, [rid, month.start, month.end]).n;
+      haccp.tempAlerts = get(`SELECT COUNT(*) AS n FROM temperature_logs WHERE restaurant_id = ? AND recorded_at >= ? AND recorded_at < ? AND is_alert = 1`, [rid, month.start, month.end]).n;
+      haccp.ncTotal    = get(`SELECT COUNT(*) AS n FROM non_conformities WHERE restaurant_id = ? AND detected_at >= ? AND detected_at < ?`, [rid, month.start, month.end]).n;
+      haccp.ncCritical = get(`SELECT COUNT(*) AS n FROM non_conformities WHERE restaurant_id = ? AND detected_at >= ? AND detected_at < ? AND (severity = 'critique' OR severity = 'majeure')`, [rid, month.start, month.end]).n;
+      haccp.ncResolved = get(`SELECT COUNT(*) AS n FROM non_conformities WHERE restaurant_id = ? AND detected_at >= ? AND detected_at < ? AND (status = 'resolu' OR status = 'résolu' OR status = 'closed' OR status = 'clos')`, [rid, month.start, month.end]).n;
+    } catch {}
+
+    // ───────────────────────── Render PDF ─────────────────────────────────
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: PDF_MARGIN, bottom: PDF_MARGIN, left: PDF_MARGIN, right: PDF_MARGIN },
+      bufferPages: true,
+    });
+    const filename = safeFilename(`rapport-mensuel-${restaurant.name || 'restaurant'}-${month.iso}.pdf`);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    doc.pipe(res);
+
+    // ── Cover page ───────────────────────────────────────────────────────
+    let y = PDF_MARGIN + 60;
+    doc.font('Helvetica-Bold').fontSize(28).fillColor('#1B2A4A');
+    doc.text('Rapport mensuel comptable', PDF_MARGIN, y, { align: 'center', width: CONTENT_W });
+    y += 36;
+    doc.font('Helvetica').fontSize(16).fillColor('#444');
+    doc.text(restaurant.name || 'Établissement', PDF_MARGIN, y, { align: 'center', width: CONTENT_W });
+    y += 24;
+    doc.font('Helvetica-Bold').fontSize(20).fillColor('#1B2A4A');
+    doc.text(month.label, PDF_MARGIN, y, { align: 'center', width: CONTENT_W });
+    y += 36;
+    doc.font('Helvetica').fontSize(10).fillColor('#666');
+    doc.text(`Période : du ${new Date(month.start).toLocaleDateString('fr-FR')} au ${new Date(new Date(month.end).getTime() - 86400000).toLocaleDateString('fr-FR')}`, PDF_MARGIN, y, { align: 'center', width: CONTENT_W });
+    y += 14;
+    doc.text(`Document généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, PDF_MARGIN, y, { align: 'center', width: CONTENT_W });
+    y += 60;
+
+    doc.moveTo(PDF_MARGIN + 60, y).lineTo(PDF_MARGIN + CONTENT_W - 60, y).lineWidth(1).stroke('#1B2A4A');
+    y += 24;
+
+    doc.font('Helvetica-Bold').fontSize(12).fillColor('#1B2A4A');
+    doc.text('Sommaire', PDF_MARGIN, y, { align: 'center', width: CONTENT_W });
+    y += 20;
+    doc.font('Helvetica').fontSize(10).fillColor('#444');
+    const toc = [
+      '1. Synthèse achats fournisseurs',
+      '2. Food cost — top recettes vendues',
+      '3. Variance de stock — pertes',
+      '4. Factures fournisseurs',
+      '5. Pertes & gaspillage',
+      '6. Synthèse HACCP',
+    ];
+    for (const line of toc) {
+      doc.text(`   ${line}`, PDF_MARGIN + 80, y, { width: CONTENT_W - 160 });
+      y += 16;
+    }
+
+    // ── Section 1: purchases ─────────────────────────────────────────────
+    doc.addPage();
+    y = PDF_MARGIN;
+    y = pdfSection(doc, '1. Synthèse achats fournisseurs', y);
+    y = pdfStat(doc, 'Commandes envoyées', purchaseTotals.n, y);
+    y = pdfStat(doc, 'Total achats (TTC estimé)', `${r2(purchaseTotals.total).toFixed(2)} €`, y);
+    y += 8;
+
+    if (topSuppliers.length > 0) {
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#1B2A4A');
+      doc.text('Top fournisseurs sur la période', PDF_MARGIN + 6, y);
+      y += 14;
+      const widths = [220, 80, 100];
+      y = pdfRow(doc, ['Fournisseur', 'Cdes', 'Total (TTC)'], widths, y, {
+        bold: true, fill: '#E8EEF8', align: ['left', 'right', 'right'],
+      });
+      for (const s of topSuppliers) {
+        if (y + 20 > 800) { doc.addPage(); y = PDF_MARGIN; }
+        y = pdfRow(doc, [
+          s.supplier_name || '—',
+          s.order_count,
+          `${r2(s.total_ttc).toFixed(2)} €`,
+        ], widths, y, { align: ['left', 'right', 'right'] });
+      }
+    } else {
+      doc.font('Helvetica-Oblique').fontSize(9).fillColor('#888');
+      doc.text('Aucune commande envoyée sur cette période.', PDF_MARGIN + 6, y);
+      y += 14;
+    }
+
+    // ── Section 2: food cost ─────────────────────────────────────────────
+    if (y + 60 > 800) { doc.addPage(); y = PDF_MARGIN; } else y += 16;
+    y = pdfSection(doc, '2. Food cost — top recettes vendues', y);
+    y = pdfStat(doc, 'Chiffre d\'affaires recettes', `${r2(foodCostTotals.revenue).toFixed(2)} €`, y);
+    y = pdfStat(doc, 'Coût ingrédients estimé', `${r2(foodCostTotals.cost).toFixed(2)} €`, y);
+    y = pdfStat(doc, 'Food cost global', `${r2(overallFC).toFixed(1)} %`, y, overallFC > 35);
+    y += 8;
+
+    if (foodCostRows.length > 0) {
+      const widths = [180, 50, 70, 70, 60, 80];
+      y = pdfRow(doc, ['Recette', 'Vendues', 'Coût u.', 'Vente', 'FC %', 'CA'], widths, y, {
+        bold: true, fill: '#E8EEF8',
+        align: ['left', 'right', 'right', 'right', 'right', 'right'],
+      });
+      for (const r of foodCostRows) {
+        if (y + 20 > 800) { doc.addPage(); y = PDF_MARGIN; }
+        y = pdfRow(doc, [
+          r.name,
+          r.portions_sold,
+          `${r2(r.unit_cost).toFixed(2)}€`,
+          `${r2(r.selling_price).toFixed(2)}€`,
+          `${r2(r.food_cost_pct).toFixed(0)}%`,
+          `${r2(r.total_revenue).toFixed(2)}€`,
+        ], widths, y, { align: ['left', 'right', 'right', 'right', 'right', 'right'] });
+      }
+    } else {
+      doc.font('Helvetica-Oblique').fontSize(9).fillColor('#888');
+      doc.text('Aucune vente enregistrée — vérifiez la saisie service.', PDF_MARGIN + 6, y);
+      y += 14;
+    }
+
+    // ── Section 3: stock variance ────────────────────────────────────────
+    if (y + 60 > 800) { doc.addPage(); y = PDF_MARGIN; } else y += 16;
+    y = pdfSection(doc, '3. Variance de stock — pertes', y);
+    if (varianceRows.length > 0) {
+      const widths = [180, 50, 70, 80, 60, 80];
+      y = pdfRow(doc, ['Ingrédient', 'Unité', 'Récept.', 'Conso.', 'Pertes', 'Val. pertes'], widths, y, {
+        bold: true, fill: '#E8EEF8',
+        align: ['left', 'left', 'right', 'right', 'right', 'right'],
+      });
+      for (const v of varianceRows) {
+        if (y + 20 > 800) { doc.addPage(); y = PDF_MARGIN; }
+        y = pdfRow(doc, [
+          v.name,
+          v.unit,
+          r2(v.reception).toFixed(2),
+          r2(v.consumption).toFixed(2),
+          r2(v.loss).toFixed(2),
+          `${r2(v.loss_value).toFixed(2)} €`,
+        ], widths, y, { align: ['left', 'left', 'right', 'right', 'right', 'right'] });
+      }
+    } else {
+      doc.font('Helvetica-Oblique').fontSize(9).fillColor('#888');
+      doc.text('Aucun mouvement de stock sur cette période.', PDF_MARGIN + 6, y);
+      y += 14;
+    }
+
+    // ── Section 4: invoices ──────────────────────────────────────────────
+    if (y + 60 > 800) { doc.addPage(); y = PDF_MARGIN; } else y += 16;
+    y = pdfSection(doc, '4. Factures fournisseurs', y);
+    y = pdfStat(doc, 'Total factures', invoicesTotals.count, y);
+    y = pdfStat(doc, 'Total HT', `${r2(invoicesTotals.ht).toFixed(2)} €`, y);
+    y = pdfStat(doc, 'TVA', `${r2(invoicesTotals.tva).toFixed(2)} €`, y);
+    y = pdfStat(doc, 'Total TTC', `${r2(invoicesTotals.ttc).toFixed(2)} €`, y);
+    y += 8;
+
+    if (invoicesByStatus.length > 0) {
+      const widths = [120, 60, 90, 90, 90];
+      y = pdfRow(doc, ['Statut', 'Cnt', 'HT', 'TVA', 'TTC'], widths, y, {
+        bold: true, fill: '#E8EEF8',
+        align: ['left', 'right', 'right', 'right', 'right'],
+      });
+      for (const s of invoicesByStatus) {
+        if (y + 20 > 800) { doc.addPage(); y = PDF_MARGIN; }
+        y = pdfRow(doc, [
+          s.status || '—',
+          s.n,
+          `${r2(s.ht).toFixed(2)}€`,
+          `${r2(s.tva).toFixed(2)}€`,
+          `${r2(s.ttc).toFixed(2)}€`,
+        ], widths, y, { align: ['left', 'right', 'right', 'right', 'right'] });
+      }
+    } else {
+      doc.font('Helvetica-Oblique').fontSize(9).fillColor('#888');
+      doc.text('Aucune facture sur cette période.', PDF_MARGIN + 6, y);
+      y += 14;
+    }
+
+    // ── Section 5: waste ────────────────────────────────────────────────
+    if (y + 60 > 800) { doc.addPage(); y = PDF_MARGIN; } else y += 16;
+    y = pdfSection(doc, '5. Pertes & gaspillage', y);
+    y = pdfStat(doc, 'Événements de perte', wasteSummary.count, y);
+    y = pdfStat(doc, 'Valeur totale perdue', `${r2(wasteSummary.value).toFixed(2)} €`, y, wasteSummary.value > 0);
+    y += 8;
+
+    if (wasteByReason.length > 0) {
+      const widths = [280, 60, 100];
+      y = pdfRow(doc, ['Motif', 'Cnt', 'Valeur'], widths, y, {
+        bold: true, fill: '#E8EEF8',
+        align: ['left', 'right', 'right'],
+      });
+      for (const w of wasteByReason) {
+        if (y + 20 > 800) { doc.addPage(); y = PDF_MARGIN; }
+        y = pdfRow(doc, [
+          w.reason,
+          w.n,
+          `${r2(w.v).toFixed(2)} €`,
+        ], widths, y, { align: ['left', 'right', 'right'] });
+      }
+    } else {
+      doc.font('Helvetica-Oblique').fontSize(9).fillColor('#888');
+      doc.text('Aucune perte enregistrée — saisissez les pertes pour analyse.', PDF_MARGIN + 6, y);
+      y += 14;
+    }
+
+    // ── Section 6: HACCP summary ────────────────────────────────────────
+    if (y + 60 > 800) { doc.addPage(); y = PDF_MARGIN; } else y += 16;
+    y = pdfSection(doc, '6. Synthèse HACCP', y);
+    y = pdfStat(doc, 'Relevés de température', haccp.tempCount, y);
+    y = pdfStat(doc, 'Alertes (hors limites)', haccp.tempAlerts, y, haccp.tempAlerts > 0);
+    y = pdfStat(doc, 'Taux de conformité', haccp.tempCount > 0 ? `${(((haccp.tempCount - haccp.tempAlerts) / haccp.tempCount) * 100).toFixed(1)} %` : 'n/a', y);
+    y = pdfStat(doc, 'Non-conformités totales', haccp.ncTotal, y);
+    y = pdfStat(doc, 'Critiques / majeures', haccp.ncCritical, y, haccp.ncCritical > 0);
+    y = pdfStat(doc, 'Résolues', haccp.ncResolved, y);
+
+    // ── Footer on every page ────────────────────────────────────────────
+    const pageCount = doc.bufferedPageRange().count;
+    for (let i = 0; i < pageCount; i++) {
+      doc.switchToPage(i);
+      doc.font('Helvetica').fontSize(7).fillColor('#888');
+      doc.text(
+        `${restaurant.name || 'Établissement'} — Rapport mensuel ${month.label} — Page ${i + 1}/${pageCount}`,
+        PDF_MARGIN, 820, { width: CONTENT_W, align: 'center' }
+      );
+    }
+
+    doc.end();
+  } catch (e) {
+    console.error('monthly-report export error:', e.message);
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de la génération du rapport mensuel' });
   }
 });
 

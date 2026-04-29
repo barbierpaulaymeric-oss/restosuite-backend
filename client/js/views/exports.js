@@ -102,6 +102,12 @@
             title: 'Synthèse HACCP (PDF)',
             desc: 'Relevés de température, plan de nettoyage et non-conformités du mois.',
           })}
+          ${exportCard({
+            id: 'btn-export-monthly',
+            icon: 'file-text',
+            title: 'Rapport mensuel comptable (PDF)',
+            desc: 'Document tout-en-un : couverture, achats, food cost, variance stock, factures, pertes, HACCP. À transmettre à votre comptable.',
+          })}
         </div>
 
         <p style="margin-top:24px;color:var(--text-secondary);font-size:12px;line-height:1.5">
@@ -140,6 +146,10 @@
     bindDownload('btn-export-haccp', () => ({
       path: `/api/exports/haccp-summary?month=${currentMonth()}`,
       file: `haccp-${currentMonth()}.pdf`,
+    }));
+    bindDownload('btn-export-monthly', () => ({
+      path: `/api/exports/monthly-report?month=${currentMonth()}`,
+      file: `rapport-mensuel-${currentMonth()}.pdf`,
     }));
   }
 

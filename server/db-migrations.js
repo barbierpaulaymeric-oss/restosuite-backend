@@ -1985,6 +1985,55 @@ try {
   console.warn('⚠️ supplier_invoices migration error:', e.message);
 }
 
+// ─── Migration: staff_members + staff_shifts (planning) ───
+// Lightweight scheduling: a staff_member is the schedulable entity (separate
+// from accounts so a chef without app access can still be planned). Shifts
+// reference staff_member_id. No FK REFERENCES — matches cooling_logs convention
+// so :memory: test DB is happy.
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS staff_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      role TEXT,
+      email TEXT,
+      phone TEXT,
+      hourly_rate REAL DEFAULT 0,
+      contract_hours REAL DEFAULT 35,
+      account_id INTEGER,
+      deleted_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_staff_members_restaurant
+      ON staff_members(restaurant_id);
+
+    CREATE TABLE IF NOT EXISTS staff_shifts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      staff_member_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      start_time TEXT NOT NULL,
+      end_time TEXT NOT NULL,
+      break_minutes INTEGER DEFAULT 0,
+      notes TEXT,
+      status TEXT NOT NULL DEFAULT 'planned',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_staff_shifts_restaurant
+      ON staff_shifts(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_staff_shifts_restaurant_date
+      ON staff_shifts(restaurant_id, date);
+    CREATE INDEX IF NOT EXISTS idx_staff_shifts_member
+      ON staff_shifts(staff_member_id);
+  `);
+  console.log('✅ Migration: staff_members + staff_shifts ready');
+} catch (e) {
+  console.warn('⚠️ planning migration error:', e.message);
+}
+
 }
 
 module.exports = { runMigrations };

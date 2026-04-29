@@ -101,6 +101,7 @@ describe('Exports — auth', () => {
     `/api/exports/monthly-food-cost?month=${MONTH}`,
     `/api/exports/stock-variance?month=${MONTH}`,
     `/api/exports/haccp-summary?month=${MONTH}`,
+    `/api/exports/monthly-report?month=${MONTH}`,
   ]) {
     it(`${path} → 401 without token`, async () => {
       const res = await request(app).get(path);
@@ -110,7 +111,7 @@ describe('Exports — auth', () => {
 });
 
 describe('Exports — month parameter validation', () => {
-  for (const ep of ['monthly-purchases', 'monthly-food-cost', 'stock-variance', 'haccp-summary']) {
+  for (const ep of ['monthly-purchases', 'monthly-food-cost', 'stock-variance', 'haccp-summary', 'monthly-report']) {
     it(`/api/exports/${ep} → 400 when month missing`, async () => {
       const res = await request(app).get(`/api/exports/${ep}`).set(AUTH);
       expect(res.status).toBe(400);
@@ -237,5 +238,37 @@ describe('Exports — tenant isolation cross-check', () => {
     expect(res.text).not.toContain('PO-9720');
     expect(res.text).not.toContain('Supplier 9710');
     expect(res.text).not.toContain('Tomates');
+  });
+});
+
+describe('Exports — monthly-report PDF (all-in-one)', () => {
+  async function fetchPdf(auth) {
+    return request(app)
+      .get(`/api/exports/monthly-report?month=${MONTH}`)
+      .set(auth)
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks = [];
+        r.on('data', c => chunks.push(c));
+        r.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
+  }
+
+  it('returns a PDF with proper headers and magic bytes', async () => {
+    const res = await fetchPdf(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/application\/pdf/);
+    expect(res.headers['content-disposition']).toMatch(/rapport-mensuel-.*-2026-04\.pdf/);
+    const head = Buffer.from(res.body).slice(0, 4).toString();
+    expect(head).toBe('%PDF');
+    // The body should be non-trivial (cover + 6 sections at least)
+    expect(res.body.length).toBeGreaterThan(2000);
+  });
+
+  it('still produces a PDF for a tenant with no data (empty months)', async () => {
+    const res = await fetchPdf(AUTH_OTHER);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/application\/pdf/);
+    expect(res.body.length).toBeGreaterThan(800);
   });
 });

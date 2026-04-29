@@ -2,6 +2,7 @@ const { Router } = require('express');
 const PDFDocument = require('pdfkit');
 const { db, all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
+const { detectCrossContaminationRisks } = require('../lib/cross-contamination');
 const router = Router();
 
 // ═══════════════════════════════════════════
@@ -93,7 +94,7 @@ router.put('/ingredients/:id', requireAuth, (req, res) => {
   }
 });
 
-// GET /api/allergens/recipes/:id — Allergènes calculés automatiquement pour une recette
+// GET /api/allergens/recipes/:id — Allergènes + risques de contamination croisée
 router.get('/recipes/:id', requireAuth, (req, res) => {
   try {
     const recipeId = Number(req.params.id);
@@ -101,12 +102,18 @@ router.get('/recipes/:id', requireAuth, (req, res) => {
     if (!recipe) return res.status(404).json({ error: 'Recette non trouvée' });
 
     const allergens = getRecipeAllergens(recipeId);
+    const risks = computeCrossContaminationForRecipe(recipeId, allergens);
     res.json({
       recipe_id: recipeId,
       recipe_name: recipe.name,
       allergens,
       inco_display: allergens.map(a => `${a.icon} ${a.name}`).join(', '),
-      allergen_count: allergens.length
+      allergen_count: allergens.length,
+      cross_contamination_risk: {
+        count: risks.length,
+        max_severity: maxSeverity(risks),
+        risks,
+      },
     });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
@@ -117,17 +124,102 @@ router.get('/recipes/:id', requireAuth, (req, res) => {
 router.get('/menu', requireAuth, (req, res) => {
   try {
     const recipes = all('SELECT id, name, selling_price FROM recipes WHERE restaurant_id = ? ORDER BY name', [req.user.restaurant_id]);
-    const result = recipes.map(r => ({
-      recipe_id: r.id,
-      recipe_name: r.name,
-      selling_price: r.selling_price,
-      allergens: getRecipeAllergens(r.id)
-    }));
+    const result = recipes.map(r => {
+      const allergens = getRecipeAllergens(r.id);
+      const risks = computeCrossContaminationForRecipe(r.id, allergens);
+      return {
+        recipe_id: r.id,
+        recipe_name: r.name,
+        selling_price: r.selling_price,
+        allergens,
+        cross_contamination_risk: {
+          count: risks.length,
+          max_severity: maxSeverity(risks),
+        },
+      };
+    });
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
+
+// GET /api/allergens/cross-contamination/:id — Détail des risques pour une recette
+router.get('/cross-contamination/:id', requireAuth, (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const recipeId = Number(req.params.id);
+    const recipe = get('SELECT id, name FROM recipes WHERE id = ? AND restaurant_id = ?', [recipeId, rid]);
+    if (!recipe) return res.status(404).json({ error: 'Recette non trouvée' });
+    const allergens = getRecipeAllergens(recipeId);
+    const risks = computeCrossContaminationForRecipe(recipeId, allergens);
+    res.json({
+      recipe_id: recipeId,
+      recipe_name: recipe.name,
+      allergens,
+      risks,
+      max_severity: maxSeverity(risks),
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// GET /api/allergens/cross-contamination — Liste de toutes les recettes à risque
+router.get('/cross-contamination', requireAuth, (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const recipes = all('SELECT id, name, category FROM recipes WHERE restaurant_id = ? ORDER BY name', [rid]);
+    const items = recipes.map(r => {
+      const allergens = getRecipeAllergens(r.id);
+      const risks = computeCrossContaminationForRecipe(r.id, allergens);
+      return {
+        recipe_id: r.id,
+        recipe_name: r.name,
+        category: r.category || null,
+        allergen_codes: allergens.map(a => a.code),
+        risk_count: risks.length,
+        max_severity: maxSeverity(risks),
+        risks,
+      };
+    }).filter(x => x.risk_count > 0);
+    res.json({ items, total: items.length });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// ─── Cross-contamination helpers (DB-aware wrapper around the pure detector) ───
+const SEVERITY_RANK = { high: 3, medium: 2, low: 1 };
+function maxSeverity(risks) {
+  if (!risks || risks.length === 0) return null;
+  let best = risks[0].severity;
+  for (const r of risks) {
+    if ((SEVERITY_RANK[r.severity] || 0) > (SEVERITY_RANK[best] || 0)) best = r.severity;
+  }
+  return best;
+}
+
+function computeCrossContaminationForRecipe(recipeId, allergens) {
+  const ingredients = all(`
+    SELECT ri.ingredient_id, ri.sub_recipe_id,
+           i.name AS ingredient_name,
+           i.allergens AS allergen_text,
+           sr.name AS sub_recipe_name
+    FROM recipe_ingredients ri
+    LEFT JOIN ingredients i ON i.id = ri.ingredient_id
+    LEFT JOIN recipes sr    ON sr.id = ri.sub_recipe_id
+    WHERE ri.recipe_id = ?
+  `, [recipeId]);
+
+  const flat = ingredients.map(ing => ({
+    name: ing.ingredient_name || ing.sub_recipe_name || '',
+  }));
+  return detectCrossContaminationRisks({
+    ingredients: flat,
+    recipeAllergens: allergens || [],
+  });
+}
 
 // ─── Helpers ───
 
@@ -440,3 +532,5 @@ router.get('/card-pdf', requireAuth, (req, res) => {
 module.exports = router;
 module.exports.INCO_ALLERGENS = INCO_ALLERGENS;
 module.exports.getRecipeAllergens = getRecipeAllergens;
+module.exports.computeCrossContaminationForRecipe = computeCrossContaminationForRecipe;
+module.exports.maxSeverity = maxSeverity;
