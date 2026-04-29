@@ -3958,12 +3958,30 @@ tr:has(td[colspan]) td {
 }
 .svc-menu-item:hover { border-color: var(--color-accent); }
 .svc-menu-item:active { transform: scale(0.98); background: var(--color-accent-light); }
+.svc-menu-item__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
 .svc-menu-item__name {
   flex: 1;
   font-weight: 600;
   font-size: var(--text-base);
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.svc-menu-item__fc {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+.svc-menu-item__fc--good { color: var(--color-success, #2e7d32); }
+.svc-menu-item__fc--warn { color: var(--color-warning, #c47800); }
+.svc-menu-item__fc--bad  { color: var(--color-danger, #c62828); }
 .svc-menu-item__price {
   font-family: var(--font-mono);
   font-size: var(--text-sm);

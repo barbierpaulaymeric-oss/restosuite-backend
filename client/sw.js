@@ -1,12 +1,11 @@
-// Bumped 2026-04-29 (v19): integration-test bug-fix sweep — allergen card PDF
-// downloads now hit a blob+anchor pattern (was opening about:blank), the
-// Gestion nav group has a clickable button (the span was a label only, no
-// dropdown trigger), Pilotage's "Actions rapides" links to /waste-analytics
-// (the view existed but had no entry point), and /settings now redirects to
-// /more (the actual settings page) rather than /subscribe.
-// (v18 shipped planning + xcontamination + monthly PDF; v17 shipped supplier
-// invoices; v16 shipped customer-facing allergen card PDF.)
-const CACHE_NAME = 'restosuite-v19';
+// Bumped 2026-04-29 (v20): service-module carte browser fix
+// (client/js/views/service.js — handle getRecipes() {recipes,...} response,
+// surface food-cost per recipe, add a menu search input) + seed-demo.js
+// stock_movements movement_type values aligned with the routes/UI ('in'→
+// 'reception', 'out'→'consumption') so the Mouvements view filter works on
+// fresh demos. (v19 was the integration-test bug-fix sweep; v18 shipped
+// planning + xcontamination + monthly PDF.)
+const CACHE_NAME = 'restosuite-v20';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

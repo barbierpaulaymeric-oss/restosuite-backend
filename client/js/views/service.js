@@ -9,6 +9,7 @@ let _serviceState = {
   selectedTable: null,
   tables: {},
   menu: [],
+  menuSearch: '',
   allOrders: [],
   account: null,
   mobileTab: 'tables',
@@ -189,7 +190,11 @@ function _svcRenderServiceUI(app, tableCount) {
             </div>
             <div class="svc-order-cols">
               <div class="svc-menu-panel" id="svc-menu-panel">
-                <h3 class="svc-section-subtitle">Menu</h3>
+                <div class="svc-menu-header" style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)">
+                  <h3 class="svc-section-subtitle" style="margin:0;flex:1">Carte</h3>
+                  <a href="#/recipes" class="btn btn-ghost btn-sm" title="Gérer les fiches techniques" style="text-decoration:none">📋 Fiches</a>
+                </div>
+                <input type="search" id="svc-menu-search" class="form-control" placeholder="Rechercher un plat…" style="width:100%;margin-bottom:var(--space-2)" data-ui="custom">
                 <div id="svc-menu-list"></div>
               </div>
               <div class="svc-cart-panel" id="svc-cart-panel">
@@ -259,6 +264,19 @@ function _svcRenderServiceUI(app, tableCount) {
   document.getElementById('svc-close-table-btn').addEventListener('click', _svcCloseTable);
   document.getElementById('svc-save-btn').addEventListener('click', () => _svcSaveOrder(false));
   document.getElementById('svc-send-btn').addEventListener('click', () => _svcSaveOrder(true));
+
+  // Menu search (debounced)
+  const searchEl = document.getElementById('svc-menu-search');
+  if (searchEl) {
+    let st;
+    searchEl.addEventListener('input', () => {
+      clearTimeout(st);
+      st = setTimeout(() => {
+        _serviceState.menuSearch = searchEl.value.trim().toLowerCase();
+        _svcRenderMenu();
+      }, 150);
+    });
+  }
 }
 
 // ═══ STOP SERVICE + RECAP ═══
@@ -474,14 +492,24 @@ function _svcExit() {
 // ═══ DATA LOADING ═══
 async function _svcLoadData(tableCount) {
   try {
-    const [recipes, orders] = await Promise.all([
+    const [recipesResp, orders] = await Promise.all([
       API.getRecipes(),
       API.getOrders()
     ]);
 
-    const plats = recipes.filter(r => (r.recipe_type || 'plat') === 'plat');
+    // API.getRecipes() returns {recipes, total, limit, offset}; the previous
+    // code treated the response as a bare array, so .filter() threw and the
+    // menu silently rendered empty (only the "Erreur chargement" toast hinted
+    // at it). Sub-recipes / bases / sauces are excluded — they aren't sellable.
+    const recipeList = Array.isArray(recipesResp) ? recipesResp : (recipesResp.recipes || []);
+    const plats = recipeList.filter(r => {
+      const rt = r.recipe_type || 'plat';
+      if (rt === 'sous_recette' || rt === 'base') return false;
+      if (r.category === 'sauce' || r.category === 'base') return false;
+      return true;
+    });
     const grouped = {};
-    const categoryOrder = ['entrée', 'plat', 'dessert', 'boisson', 'accompagnement'];
+    const categoryOrder = ['entrée', 'entrée froide', 'entrée chaude', 'plat', 'plat principal', 'dessert', 'boisson', 'accompagnement'];
     for (const r of plats) {
       const cat = r.category || 'Autres';
       if (!grouped[cat]) grouped[cat] = [];
@@ -667,26 +695,51 @@ function _svcRenderMenu() {
   if (!el) return;
 
   if (_serviceState.menu.length === 0) {
-    el.innerHTML = '<p class="text-muted" style="padding:16px">Aucun plat au menu.</p>';
+    el.innerHTML = `<div class="svc-menu-empty" style="padding:var(--space-4);text-align:center;color:var(--text-secondary)">
+      <p style="margin-bottom:var(--space-2)">Aucun plat au menu.</p>
+      <a href="#/recipes/new" class="btn btn-primary btn-sm" style="text-decoration:none">+ Créer une fiche technique</a>
+    </div>`;
     return;
   }
 
-  const emojis = { 'entrée': '🥗', 'plat': '🍽️', 'dessert': '🍰', 'boisson': '🥂', 'accompagnement': '🥬', 'Autres': '📋' };
+  const emojis = {
+    'entrée': '🥗', 'entrée froide': '🥗', 'entrée chaude': '🥘',
+    'plat': '🍽️', 'plat principal': '🍽️',
+    'dessert': '🍰', 'boisson': '🥂', 'accompagnement': '🥬', 'Autres': '📋'
+  };
+  const q = (_serviceState.menuSearch || '').toLowerCase();
 
   let html = '';
+  let totalShown = 0;
   for (const [cat, items] of _serviceState.menu) {
+    const filtered = q ? items.filter(it => (it.name || '').toLowerCase().includes(q)) : items;
+    if (filtered.length === 0) continue;
     const emoji = emojis[cat] || '📋';
-    html += `<div class="svc-menu-category"><h4 class="svc-menu-cat-title">${emoji} ${cat.charAt(0).toUpperCase() + cat.slice(1)}</h4><div class="svc-menu-items">`;
-    for (const item of items) {
+    html += `<div class="svc-menu-category"><h4 class="svc-menu-cat-title">${emoji} ${escapeHtml(cat.charAt(0).toUpperCase() + cat.slice(1))} <span style="color:var(--text-tertiary);font-weight:400;font-size:var(--text-xs)">(${filtered.length})</span></h4><div class="svc-menu-items">`;
+    for (const item of filtered) {
+      const price = item.selling_price || 0;
+      const cpp = item.cost_per_portion || 0;
+      const fcPct = item.food_cost_percent;
+      const fcCls = fcPct == null ? '' : (fcPct > 35 ? 'svc-menu-item__fc--bad' : fcPct > 28 ? 'svc-menu-item__fc--warn' : 'svc-menu-item__fc--good');
+      const fcText = (price > 0 && cpp > 0)
+        ? `Coût ${formatCurrency(cpp)}${fcPct != null ? ` · ${fcPct.toFixed(0)}%` : ''}`
+        : (price > 0 ? 'Coût n/c' : '');
       html += `
-        <button class="svc-menu-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" data-price="${item.selling_price || 0}">
-          <span class="svc-menu-item__name">${escapeHtml(item.name)}</span>
-          <span class="svc-menu-item__price">${item.selling_price ? formatCurrency(item.selling_price) : '—'}</span>
+        <button class="svc-menu-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" data-price="${price}">
+          <span class="svc-menu-item__main">
+            <span class="svc-menu-item__name">${escapeHtml(item.name)}</span>
+            ${fcText ? `<span class="svc-menu-item__fc ${fcCls}">${escapeHtml(fcText)}</span>` : ''}
+          </span>
+          <span class="svc-menu-item__price">${price ? formatCurrency(price) : '—'}</span>
           <span class="svc-menu-item__add">+</span>
         </button>
       `;
+      totalShown++;
     }
     html += '</div></div>';
+  }
+  if (totalShown === 0) {
+    html = `<p class="text-muted" style="padding:16px;text-align:center">Aucun plat ne correspond à « ${escapeHtml(q)} ».</p>`;
   }
   el.innerHTML = html;
 

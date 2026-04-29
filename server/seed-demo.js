@@ -1736,8 +1736,13 @@ const seedMovements = db.transaction(() => {
     const supId = supplierIds[it.supplier] || null;
     const ts = daysAgo(it.daysAgo, 8, 30);
     const dlc = sqlDate(new Date(ts.getTime() + it.dlc_days * 86_400_000));
+    // Routes use 'reception' / 'consumption' / 'loss' / 'adjustment' / 'inventory'
+    // (see server/routes/stock.js + the filter dropdown in stock-movements.js).
+    // Earlier seed used 'in' / 'out' which read fine in SQL but never matched
+    // the UI's filter labels — receptions and consumptions both showed under
+    // "Tous les types" only.
     insertMovement.run(
-      RID, iid, 'in', it.qty, it.unit, `Réception ${it.supplier}`, supId,
+      RID, iid, 'reception', it.qty, it.unit, `Réception ${it.supplier}`, supId,
       it.batch, dlc, it.price, ownerId, sqlDateTime(ts)
     );
     count++;
@@ -1753,7 +1758,7 @@ const seedMovements = db.transaction(() => {
       const unit = name === 'œuf fermier' ? 'pièce' : 'g';
       const ts = daysAgo(d, 11 + Math.floor(Math.random() * 10), Math.floor(Math.random() * 60));
       insertMovement.run(
-        RID, iid, 'out', baseQty, unit, 'Production service', null,
+        RID, iid, 'consumption', baseQty, unit, 'Production service', null,
         null, null, null, ownerId, sqlDateTime(ts)
       );
       count++;
