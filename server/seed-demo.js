@@ -1,34 +1,39 @@
 #!/usr/bin/env node
 'use strict';
 // ═══════════════════════════════════════════════════════════════════════════
-// Demo seed — DEV / SALES ONLY. Populates the DB with realistic French
-// brasserie data (3 demo restaurants, fake supplier accounts, fake orders,
-// fake messages, fake delivery notes) so the product can be explored without
-// hand-entering anything.
+// Demo seed — DEV / SALES ONLY. Populates a fresh DB with a fully-fledged
+// Parisian bistrot ("Le Comptoir du Marché — Paris 15"), 6 staff members
+// with shifts for this week, 3 suppliers, 85 ingredients, 15 recipes + 3
+// sub-recipes (fond de veau / sauce béarnaise / crème anglaise), 2 weeks of
+// service history (orders, covers, service sessions), supplier orders +
+// delivery notes + invoices, HACCP temperature/cleaning/traceability data,
+// and 3 message threads with suppliers.
 //
 //   FAKE ACCOUNTS CREATED (NEVER ship these to real users):
-//     • Gérant:     demo@restosuite.fr            / Demo2026!
+//     • Gérant:      demo@restosuite.fr            / Demo2026!
 //     • Fournisseur: demo-fournisseur@restosuite.fr / Demo2026!  (PIN 1111)
 //     • Extra restos: Le Bistrot de Marie, Sakura
 //
 //   Run manually:
-//     node server/seed-demo.js
-//     SEED_DEMO=true node server/seed-demo.js   # required if NODE_ENV=production
+//     npm run seed:demo                              # from /server
+//     SEED_DEMO=true node server/seed-demo.js        # required if NODE_ENV=production
 //
-// Idempotent: re-running is a no-op once the demo owner exists. Everything is
-// scoped to restaurant_id = 1. Never wire this into server boot.
+// Idempotent: re-running is a no-op once the demo owner exists. Every
+// "ensure*" helper DELETE-then-INSERTs its own scoped rows so re-runs
+// refresh catalogs/orders/messages/extras even on an already-seeded DB.
+// Never wire this into server boot.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ─── Production guard ──────────────────────────────────────────────────────
 // Refuses to touch a production DB by default. Real users must never see
-// "Chez Laurent" / "demo@restosuite.fr" in their account list. To run against
-// a prod-shaped environment intentionally (e.g. seeding a staging Render
-// instance), set SEED_DEMO=true.
+// "Le Comptoir du Marché" / "demo@restosuite.fr" in their account list. To
+// run against a prod-shaped environment intentionally (e.g. seeding a
+// staging Render instance), set SEED_DEMO=true.
 if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO !== 'true') {
   console.error('✗ Refusing to seed demo data: NODE_ENV=production.');
   console.error('  This script creates fake restaurants and supplier accounts');
-  console.error('  (demo@restosuite.fr, Chez Laurent, etc.) — never run it');
-  console.error('  against a real production database.');
+  console.error('  (demo@restosuite.fr, Le Comptoir du Marché, etc.) — never run');
+  console.error('  it against a real production database.');
   console.error('  Override with SEED_DEMO=true if you really mean it.');
   process.exit(1);
 }
@@ -40,76 +45,67 @@ const RID = 1;
 const OWNER_EMAIL = 'demo@restosuite.fr';
 const OWNER_PASSWORD = 'Demo2026!';
 
-// Hoisted up so ensureSupplierDemoLogin() (which runs before the early-exit
-// guard for already-seeded DBs) can reach them. Original definitions further
-// down are now redundant but kept removed to avoid a second source of truth.
 const SUPPLIER_DEMO_EMAIL = 'demo-fournisseur@restosuite.fr';
 const SUPPLIER_DEMO_PASSWORD = 'Demo2026!';
 const SUPPLIER_DEMO_PIN = '1111';
 
 function log(msg) { console.log(`  ${msg}`); }
 function section(title) { console.log(`\n▸ ${title}`); }
+function pad2(n) { return String(n).padStart(2, '0'); }
+function sqlDateTime(d) { return d.toISOString().replace('T', ' ').slice(0, 19); }
+function sqlDate(d) { return d.toISOString().slice(0, 10); }
+function daysAgo(n, hour = 9, minute = 0) {
+  const d = new Date(Date.now() - n * 86_400_000);
+  d.setHours(hour, minute, 0, 0);
+  return d;
+}
 
-// ─── Supplier catalog demo data ─────────────────────────────────────────────
-// Realistic French wholesale prices for the demo brasserie. Categories use the
-// 13-bucket scheme from server/lib/mercuriale-categorize.js so the supplier
-// portal review UI shows products under the same labels the categorizer
-// auto-assigns. Adjust prices freely — this is sales-demo data, not a price
-// ledger. NEVER store anything tenant-private in this constant.
+// ─── Supplier catalog demo data (3 suppliers) ──────────────────────────────
+// Metro Paris Nation: generalist wholesaler — épicerie/produits secs +
+// boissons + condiments (~50 products).
+// PassionFroid: cold-chain + surgelés specialist — viandes premium,
+// poissons frais, frites surgelées (~25 products).
+// TerreAzur: fruits & légumes specialist — légumes du jour, herbes,
+// fruits de saison (~30 products).
+//
+// SKU convention: <2-3 letter supplier>-<3-letter cat>-<NNN>. tva_rate=5.5
+// for foodstuffs (default), 20 for alcohol. Categories use the 13-bucket
+// scheme from server/lib/mercuriale-categorize.js.
 const SUPPLIER_CATALOG_DATA = {
-  // ~60 products across most categories — this is the supplier prospects log into
-  // (demo-fournisseur@restosuite.fr) so the catalog has to look generously stocked.
-  // SKU convention: MET-<3-letter-cat>-<NNN>. tva_rate=5.5 for foodstuffs (default),
-  // 20 for alcohol — none here. packaging mirrors realistic French wholesale formats.
   'Metro Paris Nation': [
     // Viandes
     { sku: 'MET-VIA-001', name: 'Entrecôte de bœuf',     category: 'Viandes', unit: 'kg', price: 18.90, tva_rate: 5.5, packaging: 'Sous vide 2 pièces ~500g' },
     { sku: 'MET-VIA-002', name: 'Filet de poulet',       category: 'Viandes', unit: 'kg', price: 8.50,  tva_rate: 5.5, packaging: 'Barquette 2.5 kg' },
-    { sku: 'MET-VIA-003', name: 'Côtes d\'agneau',       category: 'Viandes', unit: 'kg', price: 22.00, tva_rate: 5.5, packaging: 'Sous vide 1 kg' },
-    { sku: 'MET-VIA-004', name: 'Bavette d\'aloyau',     category: 'Viandes', unit: 'kg', price: 16.50, tva_rate: 5.5, packaging: 'Sous vide 1.5 kg' },
-    { sku: 'MET-VIA-005', name: 'Escalope de veau',      category: 'Viandes', unit: 'kg', price: 24.00, tva_rate: 5.5, packaging: 'Barquette 1 kg' },
-    { sku: 'MET-VIA-006', name: 'Steak haché 15% MG',    category: 'Viandes', unit: 'kg', price: 9.80,  tva_rate: 5.5, packaging: 'Carton 5 kg (50×100g)' },
-    { sku: 'MET-VIA-007', name: 'Magret de canard',      category: 'Viandes', unit: 'kg', price: 19.50, tva_rate: 5.5, packaging: 'Sous vide 2 pièces ~700g' },
-    { sku: 'MET-VIA-008', name: 'Saucisse de Toulouse',  category: 'Viandes', unit: 'kg', price: 7.90,  tva_rate: 5.5, packaging: 'Barquette 1 kg' },
-    { sku: 'MET-VIA-009', name: 'Cuisses de poulet',     category: 'Viandes', unit: 'kg', price: 6.20,  tva_rate: 5.5, packaging: 'Carton 5 kg' },
-    { sku: 'MET-VIA-010', name: 'Jarret de porc',        category: 'Viandes', unit: 'kg', price: 5.90,  tva_rate: 5.5, packaging: 'Sous vide ~1.2 kg' },
+    { sku: 'MET-VIA-003', name: 'Bavette d\'aloyau',     category: 'Viandes', unit: 'kg', price: 16.50, tva_rate: 5.5, packaging: 'Sous vide 1.5 kg' },
+    { sku: 'MET-VIA-004', name: 'Steak haché 15% MG',    category: 'Viandes', unit: 'kg', price: 9.80,  tva_rate: 5.5, packaging: 'Carton 5 kg (50×100g)' },
+    { sku: 'MET-VIA-005', name: 'Magret de canard',      category: 'Viandes', unit: 'kg', price: 19.50, tva_rate: 5.5, packaging: 'Sous vide 2 pièces ~700g' },
+    { sku: 'MET-VIA-006', name: 'Saucisse de Toulouse',  category: 'Viandes', unit: 'kg', price: 7.90,  tva_rate: 5.5, packaging: 'Barquette 1 kg' },
     // Charcuterie
     { sku: 'MET-CHA-001', name: 'Lardons fumés',         category: 'Charcuterie', unit: 'kg', price: 6.50,  tva_rate: 5.5, packaging: 'Sachet 1 kg' },
     { sku: 'MET-CHA-002', name: 'Jambon de Paris',       category: 'Charcuterie', unit: 'kg', price: 9.80,  tva_rate: 5.5, packaging: 'Bloc sous vide ~2 kg' },
     { sku: 'MET-CHA-003', name: 'Saucisson sec',         category: 'Charcuterie', unit: 'kg', price: 18.50, tva_rate: 5.5, packaging: 'Lot de 4 pièces ~250g' },
-    // Poissons
+    // Poissons d'appoint
     { sku: 'MET-POI-001', name: 'Filet de saumon',       category: 'Poissons', unit: 'kg', price: 19.00, tva_rate: 5.5, packaging: 'Caisse 2 kg' },
     { sku: 'MET-POI-002', name: 'Cabillaud',             category: 'Poissons', unit: 'kg', price: 15.50, tva_rate: 5.5, packaging: 'Caisse 3 kg sur glace' },
     { sku: 'MET-POI-003', name: 'Crevettes roses cuites', category: 'Poissons', unit: 'kg', price: 14.90, tva_rate: 5.5, packaging: 'Sachet 1 kg' },
-    { sku: 'MET-POI-004', name: 'Moules de bouchot',     category: 'Poissons', unit: 'kg', price: 4.50,  tva_rate: 5.5, packaging: 'Sac 4 kg AOP' },
-    { sku: 'MET-POI-005', name: 'Bar de ligne',          category: 'Poissons', unit: 'kg', price: 28.00, tva_rate: 5.5, packaging: 'Pièce entière 0.6–1 kg' },
-    { sku: 'MET-POI-006', name: 'Thon rouge',            category: 'Poissons', unit: 'kg', price: 32.00, tva_rate: 5.5, packaging: 'Pavé sous vide 500g' },
-    { sku: 'MET-POI-007', name: 'Noix de Saint-Jacques', category: 'Poissons', unit: 'kg', price: 38.00, tva_rate: 5.5, packaging: 'Barquette 500g' },
-    { sku: 'MET-POI-008', name: 'Gambas',                category: 'Poissons', unit: 'kg', price: 22.00, tva_rate: 5.5, packaging: 'Boîte 2 kg surgelé' },
     // Légumes
     { sku: 'MET-LEG-001', name: 'Pommes de terre',       category: 'Légumes', unit: 'kg', price: 1.20, tva_rate: 5.5, packaging: 'Sac 25 kg' },
     { sku: 'MET-LEG-002', name: 'Carottes',              category: 'Légumes', unit: 'kg', price: 1.50, tva_rate: 5.5, packaging: 'Sac 10 kg' },
     { sku: 'MET-LEG-003', name: 'Oignons jaunes',        category: 'Légumes', unit: 'kg', price: 1.80, tva_rate: 5.5, packaging: 'Filet 5 kg' },
     { sku: 'MET-LEG-004', name: 'Tomates grappe',        category: 'Légumes', unit: 'kg', price: 3.50, tva_rate: 5.5, packaging: 'Cagette 6 kg' },
-    { sku: 'MET-LEG-005', name: 'Courgettes',            category: 'Légumes', unit: 'kg', price: 2.80, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
-    { sku: 'MET-LEG-006', name: 'Haricots verts',        category: 'Légumes', unit: 'kg', price: 4.90, tva_rate: 5.5, packaging: 'Cagette 3 kg' },
-    { sku: 'MET-LEG-007', name: 'Champignons de Paris',  category: 'Légumes', unit: 'kg', price: 3.20, tva_rate: 5.5, packaging: 'Barquette 500g' },
-    { sku: 'MET-LEG-008', name: 'Poireaux',              category: 'Légumes', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Botte 1 kg' },
-    { sku: 'MET-LEG-009', name: 'Épinards frais',        category: 'Légumes', unit: 'kg', price: 5.50, tva_rate: 5.5, packaging: 'Sachet 1 kg lavé' },
-    { sku: 'MET-LEG-010', name: 'Ail',                   category: 'Légumes', unit: 'kg', price: 6.00, tva_rate: 5.5, packaging: 'Filet 1 kg' },
+    { sku: 'MET-LEG-005', name: 'Champignons de Paris',  category: 'Légumes', unit: 'kg', price: 3.20, tva_rate: 5.5, packaging: 'Barquette 500g' },
+    { sku: 'MET-LEG-006', name: 'Ail',                   category: 'Légumes', unit: 'kg', price: 6.00, tva_rate: 5.5, packaging: 'Filet 1 kg' },
     // Fruits
     { sku: 'MET-FRU-001', name: 'Citrons',               category: 'Fruits', unit: 'kg', price: 2.80, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
     { sku: 'MET-FRU-002', name: 'Pommes Golden',         category: 'Fruits', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Cagette 7 kg' },
-    { sku: 'MET-FRU-003', name: 'Fraises',               category: 'Fruits', unit: 'kg', price: 8.90, tva_rate: 5.5, packaging: 'Barquette 500g x8' },
-    { sku: 'MET-FRU-004', name: 'Framboises',            category: 'Fruits', unit: 'kg', price: 18.00, tva_rate: 5.5, packaging: 'Barquette 125g x12' },
     // Produits laitiers
     { sku: 'MET-LAI-001', name: 'Beurre doux',           category: 'Produits laitiers', unit: 'kg', price: 8.50,  tva_rate: 5.5, packaging: 'Plaque 5 kg' },
     { sku: 'MET-LAI-002', name: 'Crème fraîche 35%',     category: 'Produits laitiers', unit: 'L',  price: 4.20,  tva_rate: 5.5, packaging: 'Bidon 5 L' },
     { sku: 'MET-LAI-003', name: 'Lait entier',           category: 'Produits laitiers', unit: 'L',  price: 1.10,  tva_rate: 5.5, packaging: 'Brique 1 L x12' },
     { sku: 'MET-LAI-004', name: 'Parmesan Reggiano',     category: 'Produits laitiers', unit: 'kg', price: 22.00, tva_rate: 5.5, packaging: 'Pointe 1 kg sous vide' },
     { sku: 'MET-LAI-005', name: 'Gruyère râpé',          category: 'Produits laitiers', unit: 'kg', price: 9.50,  tva_rate: 5.5, packaging: 'Sachet 1 kg' },
-    { sku: 'MET-LAI-006', name: 'Mozzarella',            category: 'Produits laitiers', unit: 'kg', price: 8.00,  tva_rate: 5.5, packaging: 'Boules 125g x10' },
-    { sku: 'MET-LAI-007', name: 'Œufs plein air x30',    category: 'Produits laitiers', unit: 'plateau', price: 8.50, tva_rate: 5.5, packaging: 'Plateau 30 œufs' },
+    { sku: 'MET-LAI-006', name: 'Œufs plein air x30',    category: 'Produits laitiers', unit: 'plateau', price: 8.50, tva_rate: 5.5, packaging: 'Plateau 30 œufs' },
+    { sku: 'MET-LAI-007', name: 'Mascarpone',            category: 'Produits laitiers', unit: 'kg', price: 7.80,  tva_rate: 5.5, packaging: 'Pot 1 kg' },
     // Boulangerie
     { sku: 'MET-BLG-001', name: 'Farine T55',            category: 'Boulangerie', unit: 'kg', price: 0.90, tva_rate: 5.5, packaging: 'Sac 25 kg' },
     { sku: 'MET-BLG-002', name: 'Pain de mie tranché',   category: 'Boulangerie', unit: 'pièce', price: 2.80, tva_rate: 5.5, packaging: 'Sachet 750g' },
@@ -127,240 +123,159 @@ const SUPPLIER_CATALOG_DATA = {
     // Épicerie sèche
     { sku: 'MET-EPI-001', name: 'Sucre semoule',         category: 'Épicerie sèche', unit: 'kg', price: 1.10, tva_rate: 5.5, packaging: 'Sac 25 kg' },
     { sku: 'MET-EPI-002', name: 'Pâtes penne',           category: 'Épicerie sèche', unit: 'kg', price: 1.50, tva_rate: 5.5, packaging: 'Carton 5 kg' },
-    { sku: 'MET-EPI-003', name: 'Riz basmati',           category: 'Épicerie sèche', unit: 'kg', price: 2.20, tva_rate: 5.5, packaging: 'Sac 5 kg' },
+    { sku: 'MET-EPI-003', name: 'Riz arborio',           category: 'Épicerie sèche', unit: 'kg', price: 3.80, tva_rate: 5.5, packaging: 'Sac 5 kg' },
     { sku: 'MET-EPI-004', name: 'Lentilles vertes',      category: 'Épicerie sèche', unit: 'kg', price: 3.50, tva_rate: 5.5, packaging: 'Sac 5 kg du Puy' },
+    { sku: 'MET-EPI-005', name: 'Chocolat noir 70%',     category: 'Épicerie sèche', unit: 'kg', price: 14.00, tva_rate: 5.5, packaging: 'Pistoles 5 kg' },
+    { sku: 'MET-EPI-006', name: 'Gousses de vanille',    category: 'Épicerie sèche', unit: 'pièce', price: 2.80, tva_rate: 5.5, packaging: 'Tube 25 pièces' },
+    // Boissons (non-alcool)
+    { sku: 'MET-BOI-001', name: 'Eau Évian 1.5L x6',     category: 'Boissons', unit: 'lot', price: 4.50, tva_rate: 5.5, packaging: 'Pack 6 bouteilles 1.5 L' },
+    { sku: 'MET-BOI-002', name: 'Coca-Cola 33cl x24',    category: 'Boissons', unit: 'lot', price: 18.00, tva_rate: 5.5, packaging: 'Pack 24 canettes 33 cl' },
+    { sku: 'MET-BOI-003', name: 'Café arabica 1kg',      category: 'Boissons', unit: 'kg', price: 24.00, tva_rate: 5.5, packaging: 'Sachet 1 kg moulu' },
+    // Vins (TVA 20%)
+    { sku: 'MET-VIN-001', name: 'Côtes du Rhône rouge 75cl', category: 'Boissons', unit: 'bouteille', price: 5.50, tva_rate: 20, packaging: 'Carton 6 bouteilles' },
+    { sku: 'MET-VIN-002', name: 'Bordeaux supérieur 75cl',   category: 'Boissons', unit: 'bouteille', price: 7.20, tva_rate: 20, packaging: 'Carton 6 bouteilles' },
+    { sku: 'MET-VIN-003', name: 'Sancerre blanc 75cl',       category: 'Boissons', unit: 'bouteille', price: 13.50, tva_rate: 20, packaging: 'Carton 6 bouteilles' },
+    { sku: 'MET-VIN-004', name: 'Champagne brut 75cl',       category: 'Boissons', unit: 'bouteille', price: 22.00, tva_rate: 20, packaging: 'Carton 6 bouteilles' },
+  ],
+
+  'PassionFroid': [
+    // Viandes premium (cold chain)
+    { sku: 'PF-VIA-001', name: 'Onglet de bœuf',         category: 'Viandes', unit: 'kg', price: 21.50, tva_rate: 5.5, packaging: 'Sous vide 1.2 kg' },
+    { sku: 'PF-VIA-002', name: 'Filet mignon de porc',   category: 'Viandes', unit: 'kg', price: 14.50, tva_rate: 5.5, packaging: 'Sous vide 1 kg' },
+    { sku: 'PF-VIA-003', name: 'Suprême de volaille fermier', category: 'Viandes', unit: 'kg', price: 12.50, tva_rate: 5.5, packaging: 'Barquette 2 kg' },
+    { sku: 'PF-VIA-004', name: 'Cuisse de canard confite', category: 'Viandes', unit: 'pièce', price: 4.20, tva_rate: 5.5, packaging: 'Boîte 8 cuisses' },
+    { sku: 'PF-VIA-005', name: 'Joue de bœuf',           category: 'Viandes', unit: 'kg', price: 13.80, tva_rate: 5.5, packaging: 'Sous vide 1.5 kg' },
+    // Charcuterie premium
+    { sku: 'PF-CHA-001', name: 'Pâté de campagne maison', category: 'Charcuterie', unit: 'kg', price: 14.50, tva_rate: 5.5, packaging: 'Terrine 1 kg' },
+    { sku: 'PF-CHA-002', name: 'Foie gras de canard mi-cuit', category: 'Charcuterie', unit: 'kg', price: 65.00, tva_rate: 5.5, packaging: 'Lobe 500g' },
+    { sku: 'PF-CHA-003', name: 'Chorizo doux',           category: 'Charcuterie', unit: 'kg', price: 16.80, tva_rate: 5.5, packaging: 'Sachet 1 kg' },
+    // Poissons frais
+    { sku: 'PF-POI-001', name: 'Pavé de saumon Norvège', category: 'Poissons', unit: 'kg', price: 22.00, tva_rate: 5.5, packaging: 'Caisse 2 kg sur glace' },
+    { sku: 'PF-POI-002', name: 'Saumon extra-frais sashimi', category: 'Poissons', unit: 'kg', price: 32.00, tva_rate: 5.5, packaging: 'Pavé sous vide 1 kg' },
+    { sku: 'PF-POI-003', name: 'Dorade royale entière',  category: 'Poissons', unit: 'kg', price: 18.50, tva_rate: 5.5, packaging: 'Caisse 4 kg' },
+    { sku: 'PF-POI-004', name: 'Lieu jaune en filet',    category: 'Poissons', unit: 'kg', price: 16.00, tva_rate: 5.5, packaging: 'Caisse 2 kg' },
+    { sku: 'PF-POI-005', name: 'Noix de Saint-Jacques',  category: 'Poissons', unit: 'kg', price: 38.00, tva_rate: 5.5, packaging: 'Barquette 500g' },
+    { sku: 'PF-POI-006', name: 'Gambas',                 category: 'Poissons', unit: 'kg', price: 22.00, tva_rate: 5.5, packaging: 'Boîte 2 kg surgelé' },
+    { sku: 'PF-POI-007', name: 'Moules de bouchot AOP',  category: 'Poissons', unit: 'kg', price: 4.50,  tva_rate: 5.5, packaging: 'Sac 4 kg' },
+    // Produits laitiers premium
+    { sku: 'PF-LAI-001', name: 'Beurre AOP Charentes',   category: 'Produits laitiers', unit: 'kg', price: 12.00, tva_rate: 5.5, packaging: 'Plaque 5 kg' },
+    { sku: 'PF-LAI-002', name: 'Crème liquide 35% MG',   category: 'Produits laitiers', unit: 'L',  price: 5.20,  tva_rate: 5.5, packaging: 'Bidon 5 L' },
+    { sku: 'PF-LAI-003', name: 'Crème fraîche épaisse',  category: 'Produits laitiers', unit: 'kg', price: 6.20,  tva_rate: 5.5, packaging: 'Pot 1 kg' },
+    { sku: 'PF-LAI-004', name: 'Mozzarella di bufala',   category: 'Produits laitiers', unit: 'kg', price: 18.00, tva_rate: 5.5, packaging: 'Boules 200g x6' },
+    { sku: 'PF-LAI-005', name: 'Œufs fermiers plein air x30', category: 'Produits laitiers', unit: 'plateau', price: 9.20, tva_rate: 5.5, packaging: 'Plateau 30 œufs label rouge' },
     // Surgelés
-    { sku: 'MET-SUR-001', name: 'Frites tradition',      category: 'Surgelés', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Carton 10 kg' },
-    { sku: 'MET-SUR-002', name: 'Petits pois',           category: 'Surgelés', unit: 'kg', price: 3.20, tva_rate: 5.5, packaging: 'Carton 2.5 kg' },
-    // Boissons (non-alcoolisées → TVA 5.5)
-    { sku: 'MET-BOI-001', name: 'Eau Évian 1.5L x6',     category: 'Boissons', unit: 'lot', price: 4.50,  tva_rate: 5.5, packaging: 'Pack de 6 bouteilles 1.5 L' },
-    { sku: 'MET-BOI-002', name: 'Coca-Cola 33cl x24',    category: 'Boissons', unit: 'lot', price: 18.00, tva_rate: 5.5, packaging: 'Pack de 24 canettes 33 cl' },
+    { sku: 'PF-SUR-001', name: 'Frites tradition surgelées', category: 'Surgelés', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Carton 10 kg' },
+    { sku: 'PF-SUR-002', name: 'Petits pois surgelés',   category: 'Surgelés', unit: 'kg', price: 3.20, tva_rate: 5.5, packaging: 'Carton 2.5 kg' },
+    { sku: 'PF-SUR-003', name: 'Pommes dauphines',       category: 'Surgelés', unit: 'kg', price: 3.80, tva_rate: 5.5, packaging: 'Carton 5 kg' },
+    { sku: 'PF-SUR-004', name: 'Glace vanille 5L',       category: 'Surgelés', unit: 'L',  price: 8.50, tva_rate: 5.5, packaging: 'Bac 5 L' },
+    { sku: 'PF-SUR-005', name: 'Sorbet citron 5L',       category: 'Surgelés', unit: 'L',  price: 9.20, tva_rate: 5.5, packaging: 'Bac 5 L' },
   ],
 
-  // ~40 products: F&L specialist with slightly tighter prices on hero items and
-  // a deeper bench (heritage tomatoes, herbs, exotic fruits) Metro doesn't carry.
-  // SKU convention: POM-<3-letter-cat>-<NNN>. All TVA 5.5 (frais alimentaire).
-  'Pomona TerreAzur': [
+  'TerreAzur': [
     // Légumes
-    { sku: 'POM-LEG-001', name: 'Pommes de terre Bintje',    category: 'Légumes', unit: 'kg', price: 1.10, tva_rate: 5.5, packaging: 'Sac 25 kg' },
-    { sku: 'POM-LEG-002', name: 'Carottes nouvelles',        category: 'Légumes', unit: 'kg', price: 1.40, tva_rate: 5.5, packaging: 'Cagette 10 kg' },
-    { sku: 'POM-LEG-003', name: 'Oignons rosés de Roscoff',  category: 'Légumes', unit: 'kg', price: 2.20, tva_rate: 5.5, packaging: 'Filet 5 kg AOP' },
-    { sku: 'POM-LEG-004', name: 'Tomates anciennes',         category: 'Légumes', unit: 'kg', price: 4.80, tva_rate: 5.5, packaging: 'Cagette 4 kg variétés' },
-    { sku: 'POM-LEG-005', name: 'Courgettes vertes',         category: 'Légumes', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
-    { sku: 'POM-LEG-006', name: 'Haricots verts extra-fins', category: 'Légumes', unit: 'kg', price: 5.50, tva_rate: 5.5, packaging: 'Cagette 3 kg' },
-    { sku: 'POM-LEG-007', name: 'Champignons de Paris bruns', category: 'Légumes', unit: 'kg', price: 3.50, tva_rate: 5.5, packaging: 'Barquette 500g' },
-    { sku: 'POM-LEG-008', name: 'Poireaux nouveaux',         category: 'Légumes', unit: 'kg', price: 2.20, tva_rate: 5.5, packaging: 'Botte 1 kg' },
-    { sku: 'POM-LEG-009', name: 'Épinards branches',         category: 'Légumes', unit: 'kg', price: 5.00, tva_rate: 5.5, packaging: 'Sachet 1 kg' },
-    { sku: 'POM-LEG-010', name: 'Ail rose de Lautrec',       category: 'Légumes', unit: 'kg', price: 8.00, tva_rate: 5.5, packaging: 'Tresse 1 kg IGP' },
-    { sku: 'POM-LEG-011', name: 'Endives belges',            category: 'Légumes', unit: 'kg', price: 2.80, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
-    { sku: 'POM-LEG-012', name: 'Artichauts violets',        category: 'Légumes', unit: 'pièce', price: 2.50, tva_rate: 5.5, packaging: 'Cagette 12 pièces' },
-    { sku: 'POM-LEG-013', name: 'Asperges vertes',           category: 'Légumes', unit: 'kg', price: 9.50, tva_rate: 5.5, packaging: 'Botte 500g' },
-    { sku: 'POM-LEG-014', name: 'Aubergines',                category: 'Légumes', unit: 'kg', price: 2.40, tva_rate: 5.5, packaging: 'Cagette 6 kg' },
-    { sku: 'POM-LEG-015', name: 'Poivrons rouges',           category: 'Légumes', unit: 'kg', price: 3.20, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
-    { sku: 'POM-LEG-016', name: 'Fenouil',                   category: 'Légumes', unit: 'kg', price: 3.00, tva_rate: 5.5, packaging: 'Cagette 8 kg' },
-    { sku: 'POM-LEG-017', name: 'Radis roses (botte)',       category: 'Légumes', unit: 'botte', price: 1.20, tva_rate: 5.5, packaging: 'Botte 250g' },
-    { sku: 'POM-LEG-018', name: 'Salade laitue batavia',     category: 'Légumes', unit: 'pièce', price: 1.10, tva_rate: 5.5, packaging: 'Pièce ~400g' },
-    { sku: 'POM-LEG-019', name: 'Roquette',                  category: 'Légumes', unit: 'kg', price: 8.50, tva_rate: 5.5, packaging: 'Sachet 500g lavé' },
-    { sku: 'POM-LEG-020', name: 'Mâche',                     category: 'Légumes', unit: 'kg', price: 12.00, tva_rate: 5.5, packaging: 'Sachet 250g lavé' },
-    // Herbes (catégorisées Légumes par le catégoriseur)
-    { sku: 'POM-HER-001', name: 'Persil plat (botte)',       category: 'Légumes', unit: 'botte', price: 0.80, tva_rate: 5.5, packaging: 'Botte ~80g' },
-    { sku: 'POM-HER-002', name: 'Basilic frais (botte)',     category: 'Légumes', unit: 'botte', price: 1.20, tva_rate: 5.5, packaging: 'Botte ~50g' },
-    { sku: 'POM-HER-003', name: 'Coriandre (botte)',         category: 'Légumes', unit: 'botte', price: 1.00, tva_rate: 5.5, packaging: 'Botte ~80g' },
-    { sku: 'POM-HER-004', name: 'Menthe fraîche (botte)',    category: 'Légumes', unit: 'botte', price: 1.20, tva_rate: 5.5, packaging: 'Botte ~50g' },
-    { sku: 'POM-HER-005', name: 'Thym frais (botte)',        category: 'Légumes', unit: 'botte', price: 1.50, tva_rate: 5.5, packaging: 'Botte ~30g' },
+    { sku: 'TA-LEG-001', name: 'Pommes de terre Bintje',    category: 'Légumes', unit: 'kg', price: 1.10, tva_rate: 5.5, packaging: 'Sac 25 kg' },
+    { sku: 'TA-LEG-002', name: 'Carottes nouvelles',        category: 'Légumes', unit: 'kg', price: 1.40, tva_rate: 5.5, packaging: 'Cagette 10 kg' },
+    { sku: 'TA-LEG-003', name: 'Oignons rosés de Roscoff',  category: 'Légumes', unit: 'kg', price: 2.20, tva_rate: 5.5, packaging: 'Filet 5 kg AOP' },
+    { sku: 'TA-LEG-004', name: 'Tomates anciennes',         category: 'Légumes', unit: 'kg', price: 4.80, tva_rate: 5.5, packaging: 'Cagette 4 kg variétés' },
+    { sku: 'TA-LEG-005', name: 'Courgettes vertes',         category: 'Légumes', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
+    { sku: 'TA-LEG-006', name: 'Haricots verts extra-fins', category: 'Légumes', unit: 'kg', price: 5.50, tva_rate: 5.5, packaging: 'Cagette 3 kg' },
+    { sku: 'TA-LEG-007', name: 'Champignons de Paris bruns', category: 'Légumes', unit: 'kg', price: 3.50, tva_rate: 5.5, packaging: 'Barquette 500g' },
+    { sku: 'TA-LEG-008', name: 'Poireaux nouveaux',         category: 'Légumes', unit: 'kg', price: 2.20, tva_rate: 5.5, packaging: 'Botte 1 kg' },
+    { sku: 'TA-LEG-009', name: 'Épinards branches',         category: 'Légumes', unit: 'kg', price: 5.00, tva_rate: 5.5, packaging: 'Sachet 1 kg' },
+    { sku: 'TA-LEG-010', name: 'Ail rose de Lautrec',       category: 'Légumes', unit: 'kg', price: 8.00, tva_rate: 5.5, packaging: 'Tresse 1 kg IGP' },
+    { sku: 'TA-LEG-011', name: 'Endives belges',            category: 'Légumes', unit: 'kg', price: 2.80, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
+    { sku: 'TA-LEG-012', name: 'Aubergines',                category: 'Légumes', unit: 'kg', price: 2.40, tva_rate: 5.5, packaging: 'Cagette 6 kg' },
+    { sku: 'TA-LEG-013', name: 'Poivrons rouges',           category: 'Légumes', unit: 'kg', price: 3.20, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
+    { sku: 'TA-LEG-014', name: 'Fenouil',                   category: 'Légumes', unit: 'kg', price: 3.00, tva_rate: 5.5, packaging: 'Cagette 8 kg' },
+    { sku: 'TA-LEG-015', name: 'Salade laitue batavia',     category: 'Légumes', unit: 'pièce', price: 1.10, tva_rate: 5.5, packaging: 'Pièce ~400g' },
+    { sku: 'TA-LEG-016', name: 'Roquette',                  category: 'Légumes', unit: 'kg', price: 8.50, tva_rate: 5.5, packaging: 'Sachet 500g lavé' },
+    { sku: 'TA-LEG-017', name: 'Cèpes frais',               category: 'Légumes', unit: 'kg', price: 38.00, tva_rate: 5.5, packaging: 'Cagette 1 kg saison' },
+    { sku: 'TA-LEG-018', name: 'Échalotes grises',          category: 'Légumes', unit: 'kg', price: 5.50, tva_rate: 5.5, packaging: 'Filet 5 kg' },
+    // Herbes
+    { sku: 'TA-HER-001', name: 'Persil plat (botte)',       category: 'Légumes', unit: 'botte', price: 0.80, tva_rate: 5.5, packaging: 'Botte ~80g' },
+    { sku: 'TA-HER-002', name: 'Basilic frais (botte)',     category: 'Légumes', unit: 'botte', price: 1.20, tva_rate: 5.5, packaging: 'Botte ~50g' },
+    { sku: 'TA-HER-003', name: 'Ciboulette (botte)',        category: 'Légumes', unit: 'botte', price: 1.00, tva_rate: 5.5, packaging: 'Botte ~50g' },
+    { sku: 'TA-HER-004', name: 'Thym frais (botte)',        category: 'Légumes', unit: 'botte', price: 1.50, tva_rate: 5.5, packaging: 'Botte ~30g' },
+    { sku: 'TA-HER-005', name: 'Estragon frais (botte)',    category: 'Légumes', unit: 'botte', price: 1.80, tva_rate: 5.5, packaging: 'Botte ~30g' },
     // Fruits
-    { sku: 'POM-FRU-001', name: 'Citrons primofiori',        category: 'Fruits', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
-    { sku: 'POM-FRU-002', name: 'Pommes Granny Smith',       category: 'Fruits', unit: 'kg', price: 2.80, tva_rate: 5.5, packaging: 'Cagette 7 kg' },
-    { sku: 'POM-FRU-003', name: 'Pommes Pink Lady',          category: 'Fruits', unit: 'kg', price: 3.50, tva_rate: 5.5, packaging: 'Cagette 6 kg' },
-    { sku: 'POM-FRU-004', name: 'Fraises gariguette',        category: 'Fruits', unit: 'kg', price: 9.50, tva_rate: 5.5, packaging: 'Barquette 500g x6' },
-    { sku: 'POM-FRU-005', name: 'Framboises',                category: 'Fruits', unit: 'kg', price: 17.50, tva_rate: 5.5, packaging: 'Barquette 125g x12' },
-    { sku: 'POM-FRU-006', name: 'Mangues',                   category: 'Fruits', unit: 'kg', price: 4.20, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
-    { sku: 'POM-FRU-007', name: 'Ananas Victoria',           category: 'Fruits', unit: 'pièce', price: 2.80, tva_rate: 5.5, packaging: 'Cagette 8 pièces' },
-    { sku: 'POM-FRU-008', name: 'Bananes',                   category: 'Fruits', unit: 'kg', price: 1.80, tva_rate: 5.5, packaging: 'Carton 18 kg' },
-    { sku: 'POM-FRU-009', name: 'Oranges sanguines',         category: 'Fruits', unit: 'kg', price: 2.90, tva_rate: 5.5, packaging: 'Cagette 10 kg' },
-    { sku: 'POM-FRU-010', name: 'Kiwis',                     category: 'Fruits', unit: 'kg', price: 3.50, tva_rate: 5.5, packaging: 'Plateau 3 kg' },
-    { sku: 'POM-FRU-011', name: 'Pamplemousses roses',       category: 'Fruits', unit: 'kg', price: 2.20, tva_rate: 5.5, packaging: 'Cagette 9 kg' },
-    { sku: 'POM-FRU-012', name: 'Poires Williams',           category: 'Fruits', unit: 'kg', price: 3.20, tva_rate: 5.5, packaging: 'Cagette 6 kg' },
-    { sku: 'POM-FRU-013', name: 'Cerises',                   category: 'Fruits', unit: 'kg', price: 12.00, tva_rate: 5.5, packaging: 'Barquette 500g x10' },
-    { sku: 'POM-FRU-014', name: 'Abricots',                  category: 'Fruits', unit: 'kg', price: 5.80, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
-    { sku: 'POM-FRU-015', name: 'Melons charentais',         category: 'Fruits', unit: 'pièce', price: 3.50, tva_rate: 5.5, packaging: 'Cagette 8 pièces' },
-  ],
-
-  // ~30 products: drinks-only wholesaler. Bottles ('bouteille'), kegs ('fût')
-  // and packs ('lot') are all real units the brasserie buyer will see — we
-  // intentionally don't normalize to per-litre prices here.
-  // SKU convention: FRB-<3-letter-type>-<NNN> (VIN/BIE/SOF/SPI). Alcoholic
-  // drinks → TVA 20%; non-alcoholic softs/eaux/jus → TVA 5.5%.
-  'France Boissons': [
-    // Vins (TVA 20% — alcohol)
-    { sku: 'FRB-VIN-001', name: 'Côtes du Rhône rouge 75cl',   category: 'Boissons', unit: 'bouteille', price: 5.50,  tva_rate: 20, packaging: 'Carton 6 bouteilles' },
-    { sku: 'FRB-VIN-002', name: 'Bordeaux supérieur 75cl',     category: 'Boissons', unit: 'bouteille', price: 7.20,  tva_rate: 20, packaging: 'Carton 6 bouteilles' },
-    { sku: 'FRB-VIN-003', name: 'Bourgogne aligoté 75cl',      category: 'Boissons', unit: 'bouteille', price: 9.80,  tva_rate: 20, packaging: 'Carton 6 bouteilles' },
-    { sku: 'FRB-VIN-004', name: 'Sancerre blanc 75cl',         category: 'Boissons', unit: 'bouteille', price: 13.50, tva_rate: 20, packaging: 'Carton 6 bouteilles' },
-    { sku: 'FRB-VIN-005', name: 'Côtes de Provence rosé 75cl', category: 'Boissons', unit: 'bouteille', price: 6.80,  tva_rate: 20, packaging: 'Carton 6 bouteilles' },
-    { sku: 'FRB-VIN-006', name: 'Champagne brut 75cl',         category: 'Boissons', unit: 'bouteille', price: 22.00, tva_rate: 20, packaging: 'Carton 6 bouteilles' },
-    { sku: 'FRB-VIN-007', name: 'Crémant d\'Alsace 75cl',      category: 'Boissons', unit: 'bouteille', price: 11.50, tva_rate: 20, packaging: 'Carton 6 bouteilles' },
-    { sku: 'FRB-VIN-008', name: 'Pouilly-Fumé 75cl',           category: 'Boissons', unit: 'bouteille', price: 16.00, tva_rate: 20, packaging: 'Carton 6 bouteilles' },
-    // Bières (TVA 20% — alcohol)
-    { sku: 'FRB-BIE-001', name: 'Heineken fût 30L',            category: 'Boissons', unit: 'fût', price: 95.00, tva_rate: 20, packaging: 'Fût 30 L' },
-    { sku: 'FRB-BIE-002', name: 'Stella Artois fût 30L',       category: 'Boissons', unit: 'fût', price: 88.00, tva_rate: 20, packaging: 'Fût 30 L' },
-    { sku: 'FRB-BIE-003', name: 'Leffe Blonde fût 20L',        category: 'Boissons', unit: 'fût', price: 78.00, tva_rate: 20, packaging: 'Fût 20 L' },
-    { sku: 'FRB-BIE-004', name: '1664 33cl x24',               category: 'Boissons', unit: 'lot', price: 22.00, tva_rate: 20, packaging: 'Pack 24 canettes 33 cl' },
-    { sku: 'FRB-BIE-005', name: 'Carlsberg 33cl x24',          category: 'Boissons', unit: 'lot', price: 19.50, tva_rate: 20, packaging: 'Pack 24 canettes 33 cl' },
-    { sku: 'FRB-BIE-006', name: 'Guinness 50cl x12',           category: 'Boissons', unit: 'lot', price: 28.00, tva_rate: 20, packaging: 'Pack 12 canettes 50 cl' },
-    // Soft drinks + eaux (TVA 5.5 — non-alcoholic)
-    { sku: 'FRB-SOF-001', name: 'Coca-Cola 33cl x24',          category: 'Boissons', unit: 'lot', price: 17.50, tva_rate: 5.5, packaging: 'Pack 24 canettes 33 cl' },
-    { sku: 'FRB-SOF-002', name: 'Coca-Cola Zero 33cl x24',     category: 'Boissons', unit: 'lot', price: 17.50, tva_rate: 5.5, packaging: 'Pack 24 canettes 33 cl' },
-    { sku: 'FRB-SOF-003', name: 'Orangina 33cl x24',           category: 'Boissons', unit: 'lot', price: 18.00, tva_rate: 5.5, packaging: 'Pack 24 canettes 33 cl' },
-    { sku: 'FRB-SOF-004', name: 'Schweppes Tonic 25cl x24',    category: 'Boissons', unit: 'lot', price: 19.50, tva_rate: 5.5, packaging: 'Pack 24 bouteilles 25 cl' },
-    { sku: 'FRB-SOF-005', name: 'Perrier 33cl x24',            category: 'Boissons', unit: 'lot', price: 16.50, tva_rate: 5.5, packaging: 'Pack 24 bouteilles 33 cl' },
-    { sku: 'FRB-SOF-006', name: 'Eau Vittel 1L x12',           category: 'Boissons', unit: 'lot', price: 8.50,  tva_rate: 5.5, packaging: 'Pack 12 bouteilles 1 L' },
-    { sku: 'FRB-SOF-007', name: 'Jus d\'orange Tropicana 1L x6', category: 'Boissons', unit: 'lot', price: 14.50, tva_rate: 5.5, packaging: 'Pack 6 briques 1 L' },
-    { sku: 'FRB-SOF-008', name: 'Limonade artisanale 33cl x12', category: 'Boissons', unit: 'lot', price: 12.00, tva_rate: 5.5, packaging: 'Pack 12 bouteilles 33 cl' },
-    // Spiritueux (TVA 20% — alcohol)
-    { sku: 'FRB-SPI-001', name: 'Whisky JB 70cl',              category: 'Boissons', unit: 'bouteille', price: 18.50, tva_rate: 20, packaging: 'Bouteille 70 cl' },
-    { sku: 'FRB-SPI-002', name: 'Vodka Smirnoff 70cl',         category: 'Boissons', unit: 'bouteille', price: 16.00, tva_rate: 20, packaging: 'Bouteille 70 cl' },
-    { sku: 'FRB-SPI-003', name: 'Gin Bombay Sapphire 70cl',    category: 'Boissons', unit: 'bouteille', price: 24.00, tva_rate: 20, packaging: 'Bouteille 70 cl' },
-    { sku: 'FRB-SPI-004', name: 'Rhum Bacardi 70cl',           category: 'Boissons', unit: 'bouteille', price: 17.50, tva_rate: 20, packaging: 'Bouteille 70 cl' },
-    { sku: 'FRB-SPI-005', name: 'Cognac Hennessy VS 70cl',     category: 'Boissons', unit: 'bouteille', price: 38.00, tva_rate: 20, packaging: 'Bouteille 70 cl' },
-    { sku: 'FRB-SPI-006', name: 'Pastis Ricard 1L',            category: 'Boissons', unit: 'bouteille', price: 18.50, tva_rate: 20, packaging: 'Bouteille 1 L' },
-    { sku: 'FRB-SPI-007', name: 'Liqueur Cointreau 70cl',      category: 'Boissons', unit: 'bouteille', price: 22.00, tva_rate: 20, packaging: 'Bouteille 70 cl' },
-    { sku: 'FRB-SPI-008', name: 'Martini Bianco 1L',           category: 'Boissons', unit: 'bouteille', price: 12.50, tva_rate: 20, packaging: 'Bouteille 1 L' },
+    { sku: 'TA-FRU-001', name: 'Citrons primofiori',        category: 'Fruits', unit: 'kg', price: 2.50, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
+    { sku: 'TA-FRU-002', name: 'Pommes Golden',             category: 'Fruits', unit: 'kg', price: 2.40, tva_rate: 5.5, packaging: 'Cagette 7 kg' },
+    { sku: 'TA-FRU-003', name: 'Poires Williams',           category: 'Fruits', unit: 'kg', price: 3.20, tva_rate: 5.5, packaging: 'Cagette 6 kg' },
+    { sku: 'TA-FRU-004', name: 'Fraises gariguette',        category: 'Fruits', unit: 'kg', price: 9.50, tva_rate: 5.5, packaging: 'Barquette 500g x6' },
+    { sku: 'TA-FRU-005', name: 'Framboises',                category: 'Fruits', unit: 'kg', price: 17.50, tva_rate: 5.5, packaging: 'Barquette 125g x12' },
+    { sku: 'TA-FRU-006', name: 'Oranges',                   category: 'Fruits', unit: 'kg', price: 2.20, tva_rate: 5.5, packaging: 'Cagette 10 kg' },
+    { sku: 'TA-FRU-007', name: 'Mangues',                   category: 'Fruits', unit: 'kg', price: 4.20, tva_rate: 5.5, packaging: 'Cagette 5 kg' },
   ],
 };
 
-// Idempotent demo purchase orders for Chez Laurent → Metro Paris Nation over
-// the last ~90 days. Without these the supplier-portal dashboard, historique,
-// stats, and Mes clients drill-in all show zeros, which is exactly what the
-// commercial audit flagged. References are prefixed with DEMO-PO- so we can
-// safely DELETE-then-INSERT on every re-seed without touching real data.
-//
-// We intentionally don't draw from supplier_catalog rows by FK — those rows
-// may not exist yet when this runs from the early-exit guard, and the data
-// is just for display. Items reference catalog products by NAME so the
-// /stats LEFT JOIN by product_name still resolves the category bucket.
+// ─── Demo purchase orders for Le Comptoir → 3 suppliers (last 14 days) ────
+// 8 orders spread across Metro / PassionFroid / TerreAzur. Items reference
+// catalog products by NAME (no FK) so the /stats LEFT JOIN by product_name
+// still resolves the category bucket. References prefixed DEMO-PO- so we
+// can DELETE-then-INSERT on every re-seed without touching real data.
 const DEMO_ORDER_REFS_PREFIX = 'DEMO-PO-';
-
 const _DEMO_ORDER_RECIPES = [
-  // Bistrot favorites — picked from Metro's catalog by name
-  { items: [
-      { name: 'Entrecôte de bœuf', qty: 6, unit: 'kg', price: 18.90 },
-      { name: 'Pommes de terre', qty: 25, unit: 'kg', price: 1.20 },
-      { name: 'Beurre doux', qty: 3, unit: 'kg', price: 8.50 },
-      { name: 'Tomates grappe', qty: 6, unit: 'kg', price: 3.50 },
-      { name: 'Champignons de Paris', qty: 2, unit: 'kg', price: 3.20 },
-    ] },
-  { items: [
-      { name: 'Filet de saumon', qty: 4, unit: 'kg', price: 19.00 },
-      { name: 'Crème fraîche 35%', qty: 5, unit: 'L', price: 4.20 },
-      { name: 'Citrons', qty: 3, unit: 'kg', price: 2.80 },
-      { name: 'Aneth (botte)', qty: 2, unit: 'botte', price: 1.50 }, // matches "Autre"
-    ] },
-  { items: [
-      { name: 'Filet de poulet', qty: 8, unit: 'kg', price: 8.50 },
-      { name: 'Crème fraîche 35%', qty: 4, unit: 'L', price: 4.20 },
-      { name: 'Champignons de Paris', qty: 3, unit: 'kg', price: 3.20 },
-      { name: 'Riz basmati', qty: 5, unit: 'kg', price: 2.20 },
-    ] },
-  { items: [
-      { name: 'Magret de canard', qty: 5, unit: 'kg', price: 19.50 },
-      { name: 'Pommes de terre', qty: 20, unit: 'kg', price: 1.20 },
-      { name: 'Oignons jaunes', qty: 5, unit: 'kg', price: 1.80 },
-      { name: 'Vinaigre balsamique', qty: 1, unit: 'L', price: 4.80 },
-    ] },
-  { items: [
-      { name: 'Steak haché 15% MG', qty: 12, unit: 'kg', price: 9.80 },
-      { name: 'Frites tradition', qty: 15, unit: 'kg', price: 2.50 },
-      { name: 'Œufs plein air x30', qty: 4, unit: 'plateau', price: 8.50 },
-      { name: 'Lardons fumés', qty: 2, unit: 'kg', price: 6.50 },
-    ] },
-  { items: [
-      { name: 'Cabillaud', qty: 3, unit: 'kg', price: 15.50 },
-      { name: 'Moules de bouchot', qty: 8, unit: 'kg', price: 4.50 },
-      { name: 'Pommes de terre', qty: 10, unit: 'kg', price: 1.20 },
-      { name: 'Crème fraîche 35%', qty: 3, unit: 'L', price: 4.20 },
-    ] },
-  { items: [
-      { name: 'Bavette d\'aloyau', qty: 5, unit: 'kg', price: 16.50 },
-      { name: 'Échalotes', qty: 2, unit: 'kg', price: 5.50 },     // matches "Autre"
-      { name: 'Beurre doux', qty: 2, unit: 'kg', price: 8.50 },
-      { name: 'Frites tradition', qty: 10, unit: 'kg', price: 2.50 },
-    ] },
-  { items: [
-      { name: 'Côtes d\'agneau', qty: 4, unit: 'kg', price: 22.00 },
-      { name: 'Pommes de terre', qty: 15, unit: 'kg', price: 1.20 },
-      { name: 'Haricots verts', qty: 4, unit: 'kg', price: 4.90 },
-    ] },
-  { items: [
-      { name: 'Escalope de veau', qty: 4, unit: 'kg', price: 24.00 },
-      { name: 'Crème fraîche 35%', qty: 4, unit: 'L', price: 4.20 },
-      { name: 'Champignons de Paris', qty: 3, unit: 'kg', price: 3.20 },
-    ] },
-  { items: [
-      { name: 'Saucisse de Toulouse', qty: 6, unit: 'kg', price: 7.90 },
-      { name: 'Lentilles vertes', qty: 4, unit: 'kg', price: 3.50 },
-      { name: 'Carottes', qty: 5, unit: 'kg', price: 1.50 },
-      { name: 'Jambon de Paris', qty: 2, unit: 'kg', price: 9.80 },
-    ] },
-  { items: [
-      { name: 'Filet de saumon', qty: 5, unit: 'kg', price: 19.00 },
-      { name: 'Riz basmati', qty: 6, unit: 'kg', price: 2.20 },
-      { name: 'Citrons', qty: 4, unit: 'kg', price: 2.80 },
-    ] },
-  { items: [
-      { name: 'Entrecôte de bœuf', qty: 7, unit: 'kg', price: 18.90 },
-      { name: 'Beurre doux', qty: 4, unit: 'kg', price: 8.50 },
-      { name: 'Pommes de terre', qty: 30, unit: 'kg', price: 1.20 },
-      { name: 'Sel de Guérande', qty: 2, unit: 'kg', price: 3.50 },
-    ] },
-  { items: [
-      { name: 'Crevettes roses cuites', qty: 3, unit: 'kg', price: 14.90 },
-      { name: 'Mozzarella', qty: 2, unit: 'kg', price: 8.00 },
-      { name: 'Tomates grappe', qty: 8, unit: 'kg', price: 3.50 },
+  { supplier: 'Metro Paris Nation', daysAgoCreated: 13, items: [
+      { name: 'Pommes de terre',     qty: 25, unit: 'kg', price: 1.20 },
+      { name: 'Riz arborio',         qty: 5,  unit: 'kg', price: 3.80 },
+      { name: 'Pâtes penne',         qty: 4,  unit: 'kg', price: 1.50 },
+      { name: 'Farine T55',          qty: 5,  unit: 'kg', price: 0.90 },
       { name: 'Huile d\'olive vierge extra', qty: 2, unit: 'L', price: 6.50 },
+      { name: 'Sel de Guérande',     qty: 1,  unit: 'kg', price: 3.50 },
     ] },
-  { items: [
-      { name: 'Filet de poulet', qty: 6, unit: 'kg', price: 8.50 },
-      { name: 'Pâtes penne', qty: 5, unit: 'kg', price: 1.50 },
-      { name: 'Parmesan Reggiano', qty: 1, unit: 'kg', price: 22.00 },
-      { name: 'Crème fraîche 35%', qty: 3, unit: 'L', price: 4.20 },
+  { supplier: 'TerreAzur', daysAgoCreated: 12, items: [
+      { name: 'Pommes de terre Bintje', qty: 20, unit: 'kg', price: 1.10 },
+      { name: 'Carottes nouvelles',     qty: 8,  unit: 'kg', price: 1.40 },
+      { name: 'Oignons rosés de Roscoff', qty: 5, unit: 'kg', price: 2.20 },
+      { name: 'Tomates anciennes',      qty: 4,  unit: 'kg', price: 4.80 },
+      { name: 'Persil plat (botte)',    qty: 5,  unit: 'botte', price: 0.80 },
     ] },
-  { items: [
-      { name: 'Magret de canard', qty: 4, unit: 'kg', price: 19.50 },
-      { name: 'Pommes Golden', qty: 5, unit: 'kg', price: 2.50 },
-      { name: 'Beurre doux', qty: 2, unit: 'kg', price: 8.50 },
+  { supplier: 'PassionFroid', daysAgoCreated: 10, items: [
+      { name: 'Pavé de saumon Norvège',     qty: 5, unit: 'kg', price: 22.00 },
+      { name: 'Beurre AOP Charentes',       qty: 4, unit: 'kg', price: 12.00 },
+      { name: 'Crème liquide 35% MG',       qty: 5, unit: 'L',  price: 5.20 },
+      { name: 'Œufs fermiers plein air x30', qty: 4, unit: 'plateau', price: 9.20 },
+      { name: 'Frites tradition surgelées', qty: 10, unit: 'kg', price: 2.50 },
     ] },
-  { items: [
-      { name: 'Bar de ligne', qty: 2, unit: 'kg', price: 28.00 },
-      { name: 'Citrons', qty: 3, unit: 'kg', price: 2.80 },
-      { name: 'Huile d\'olive vierge extra', qty: 1, unit: 'L', price: 6.50 },
-      { name: 'Sel de Guérande', qty: 1, unit: 'kg', price: 3.50 },
+  { supplier: 'Metro Paris Nation', daysAgoCreated: 8, items: [
+      { name: 'Bordeaux supérieur 75cl', qty: 12, unit: 'bouteille', price: 7.20 },
+      { name: 'Sancerre blanc 75cl',     qty: 6,  unit: 'bouteille', price: 13.50 },
+      { name: 'Café arabica 1kg',        qty: 3,  unit: 'kg', price: 24.00 },
+      { name: 'Eau Évian 1.5L x6',       qty: 4,  unit: 'lot', price: 4.50 },
     ] },
-  { items: [
-      { name: 'Steak haché 15% MG', qty: 10, unit: 'kg', price: 9.80 },
+  { supplier: 'TerreAzur', daysAgoCreated: 6, items: [
+      { name: 'Cèpes frais',            qty: 2,  unit: 'kg', price: 38.00 },
+      { name: 'Champignons de Paris bruns', qty: 3, unit: 'kg', price: 3.50 },
+      { name: 'Salade laitue batavia',  qty: 12, unit: 'pièce', price: 1.10 },
+      { name: 'Citrons primofiori',     qty: 4,  unit: 'kg', price: 2.50 },
+      { name: 'Estragon frais (botte)', qty: 3,  unit: 'botte', price: 1.80 },
+    ] },
+  { supplier: 'PassionFroid', daysAgoCreated: 4, items: [
+      { name: 'Onglet de bœuf',                qty: 4, unit: 'kg', price: 21.50 },
+      { name: 'Suprême de volaille fermier',   qty: 5, unit: 'kg', price: 12.50 },
+      { name: 'Cuisse de canard confite',      qty: 12, unit: 'pièce', price: 4.20 },
+      { name: 'Foie gras de canard mi-cuit',   qty: 1, unit: 'kg', price: 65.00 },
+    ] },
+  { supplier: 'Metro Paris Nation', daysAgoCreated: 2, items: [
+      { name: 'Steak haché 15% MG',  qty: 8, unit: 'kg', price: 9.80 },
+      { name: 'Lardons fumés',       qty: 2, unit: 'kg', price: 6.50 },
       { name: 'Pain de mie tranché', qty: 6, unit: 'pièce', price: 2.80 },
-      { name: 'Mozzarella', qty: 3, unit: 'kg', price: 8.00 },
-      { name: 'Tomates grappe', qty: 5, unit: 'kg', price: 3.50 },
+      { name: 'Mascarpone',          qty: 2, unit: 'kg', price: 7.80 },
     ] },
-  { items: [
-      { name: 'Filet de saumon', qty: 6, unit: 'kg', price: 19.00 },
-      { name: 'Lait entier', qty: 12, unit: 'L', price: 1.10 },
-      { name: 'Beurre doux', qty: 3, unit: 'kg', price: 8.50 },
-      { name: 'Farine T55', qty: 5, unit: 'kg', price: 0.90 },
+  { supplier: 'Metro Paris Nation', daysAgoCreated: 1, items: [
+      { name: 'Chocolat noir 70%',   qty: 3, unit: 'kg', price: 14.00 },
+      { name: 'Sucre semoule',       qty: 5, unit: 'kg', price: 1.10 },
+      { name: 'Gousses de vanille',  qty: 6, unit: 'pièce', price: 2.80 },
+      { name: 'Crème fraîche 35%',   qty: 3, unit: 'L', price: 4.20 },
     ] },
 ];
 
-// Status mix: most are 'livrée', a couple recent ones are 'envoyée' (alert),
-// one is 'brouillon' for the dashboard alert badge.
-const _DEMO_ORDER_STATUS_MIX = (idx, total) => {
-  if (idx === 0) return 'brouillon';                                       // newest = draft
-  if (idx === 1 || idx === 2) return 'envoyée';                            // 2 awaiting confirmation
-  return idx > total - 4 ? 'livrée' : (Math.random() < 0.85 ? 'livrée' : 'envoyée');
-};
+function _orderStatusByAge(daysAgoCreated, idx, total) {
+  if (idx === total - 1) return 'brouillon';                 // newest → draft
+  if (daysAgoCreated <= 2) return 'envoyée';                 // recent awaiting confirmation
+  return 'livrée';                                            // older delivered
+}
 
-// Realistic restaurant→supplier order notes. Rotated by idx so re-seeds give
-// the same notes for the same orders. `null` is allowed (≈ 1/4 orders) so the
-// portal looks lifelike (real users don't always leave a note).
 const _DEMO_ORDER_NOTES = [
   null,
   'Livraison souhaitée avant 10h',
@@ -369,27 +284,21 @@ const _DEMO_ORDER_NOTES = [
   'Service midi, livraison avant 11h impérative',
   'Préciser DLC sur le bon SVP',
   'Glace requise pour les produits frais',
-  'Sortie marché 6h, prévoir livraison 5h30',
   'RAS, commande standard',
-  'Nouveau livreur : sonner à l\'interphone "restaurant"',
-  null,
   'Réception par chef Thomas, merci',
   'Bons frais SVP, weekend chargé',
-  'Vérifier la qualité des framboises (incident la semaine dernière)',
-  'Livraison côté cour, pas la rue',
   null,
   'Carton entier seulement, merci',
-  'Doubler la commande de pommes de terre si possible',
 ];
 function _demoNoteFor(idx) {
   return _DEMO_ORDER_NOTES[idx % _DEMO_ORDER_NOTES.length];
 }
 
-// Extra demo restaurants used to populate Mes clients with more than one
-// entry. Each becomes its own tenant (separate restaurant_id) with its own
-// "Metro Paris Nation" suppliers row sharing the demo email, so the supplier
-// portal's getSupplierIdentities() (email-based) groups them under the same
-// vendor for read-only views.
+// ─── Extra demo restaurants (Marie + Sakura) ──────────────────────────────
+// Each becomes its own tenant (separate restaurant_id) with its own Metro
+// suppliers row sharing the demo email so the supplier portal's
+// getSupplierIdentities() (email-based) groups them under the same vendor
+// for read-only views.
 const EXTRA_DEMO_RESTAURANTS = [
   {
     id: 2,
@@ -427,15 +336,11 @@ const EXTRA_DEMO_RESTAURANTS = [
   },
 ];
 
-// Order recipes for Marie (bistrot — viandes/cremes) and Sakura (fusion —
-// poisson/asia notes). Smaller baskets than Chez Laurent's 18-recipe set so
-// each restaurant looks like a different operation.
 const _MARIE_ORDER_RECIPES = [
   { items: [
       { name: 'Bavette d\'aloyau', qty: 4, unit: 'kg', price: 16.50 },
       { name: 'Pommes de terre',   qty: 12, unit: 'kg', price: 1.20 },
       { name: 'Beurre doux',       qty: 1.5, unit: 'kg', price: 8.50 },
-      { name: 'Échalotes',         qty: 1, unit: 'kg', price: 5.50 },
     ] },
   { items: [
       { name: 'Filet de poulet',     qty: 5, unit: 'kg', price: 8.50 },
@@ -445,8 +350,8 @@ const _MARIE_ORDER_RECIPES = [
     ] },
   { items: [
       { name: 'Steak haché 15% MG', qty: 8, unit: 'kg', price: 9.80 },
-      { name: 'Frites tradition',   qty: 10, unit: 'kg', price: 2.50 },
-      { name: 'Mozzarella',         qty: 2, unit: 'kg', price: 8.00 },
+      { name: 'Pain de mie tranché', qty: 6, unit: 'pièce', price: 2.80 },
+      { name: 'Tomates grappe',     qty: 5, unit: 'kg', price: 3.50 },
     ] },
   { items: [
       { name: 'Magret de canard',   qty: 3, unit: 'kg', price: 19.50 },
@@ -462,448 +367,58 @@ const _MARIE_ORDER_RECIPES = [
       { name: 'Cabillaud',           qty: 2, unit: 'kg', price: 15.50 },
       { name: 'Beurre doux',         qty: 2, unit: 'kg', price: 8.50 },
       { name: 'Citrons',             qty: 2, unit: 'kg', price: 2.80 },
-      { name: 'Sel de Guérande',     qty: 1, unit: 'kg', price: 3.50 },
     ] },
 ];
 const _SAKURA_ORDER_RECIPES = [
   { items: [
       { name: 'Filet de saumon', qty: 6, unit: 'kg', price: 19.00 },
-      { name: 'Riz basmati',     qty: 8, unit: 'kg', price: 2.20 },
+      { name: 'Riz arborio',     qty: 8, unit: 'kg', price: 3.80 },
       { name: 'Citrons',         qty: 2, unit: 'kg', price: 2.80 },
     ] },
   { items: [
-      { name: 'Thon rouge',                qty: 3, unit: 'kg', price: 32.00 },
-      { name: 'Crevettes roses cuites',    qty: 2, unit: 'kg', price: 14.90 },
-      { name: 'Riz basmati',               qty: 6, unit: 'kg', price: 2.20 },
-    ] },
-  { items: [
-      { name: 'Gambas',          qty: 3, unit: 'kg', price: 22.00 },
-      { name: 'Bar de ligne',    qty: 2, unit: 'kg', price: 28.00 },
-      { name: 'Citrons',         qty: 2, unit: 'kg', price: 2.80 },
+      { name: 'Crevettes roses cuites', qty: 3, unit: 'kg', price: 14.90 },
+      { name: 'Riz arborio',            qty: 6, unit: 'kg', price: 3.80 },
     ] },
   { items: [
       { name: 'Filet de poulet',           qty: 4, unit: 'kg', price: 8.50 },
-      { name: 'Riz basmati',               qty: 5, unit: 'kg', price: 2.20 },
       { name: 'Œufs plein air x30',        qty: 3, unit: 'plateau', price: 8.50 },
-    ] },
-  { items: [
-      { name: 'Noix de Saint-Jacques',     qty: 2, unit: 'kg', price: 38.00 },
-      { name: 'Beurre doux',               qty: 1, unit: 'kg', price: 8.50 },
-      { name: 'Citrons',                   qty: 1, unit: 'kg', price: 2.80 },
     ] },
 ];
 
 const EXTRA_DEMO_REF_PREFIX = 'DEMO-PO-X-';
-const POMONA_REF_PREFIX = 'DEMO-PO-POM-';
 
-// Build/refresh the extra demo restaurants + their Metro supplier rows + their
-// supplier_accounts (email-linked to the same demo identity) + a handful of
-// orders + a couple Chez Laurent → Pomona orders so Pomona is non-empty.
-// Idempotent: identifies its own rows by id (restaurants) or supplier name +
-// reference prefixes (suppliers/orders) and re-inserts on every run.
-function ensureExtraDemoRestaurants() {
-  const summary = { restaurants: 0, marie_orders: 0, sakura_orders: 0, pomona_orders: 0 };
+// ─── Idempotent ensure* helpers (run on every invocation, even re-seeds) ──
 
-  for (const r of EXTRA_DEMO_RESTAURANTS) {
-    // Restaurant — UPSERT by id.
-    const existing = get('SELECT id FROM restaurants WHERE id = ?', [r.id]);
-    if (existing) {
-      run(
-        `UPDATE restaurants SET
-           name = ?, type = ?, address = ?, city = ?, postal_code = ?,
-           phone = ?, covers = ?, siret = ?, plan = ?
-         WHERE id = ?`,
-        [r.name, r.type, r.address, r.city, r.postal_code, r.phone, r.covers, r.siret, r.plan, r.id]
-      );
-    } else {
-      run(
-        `INSERT INTO restaurants (id, name, type, address, city, postal_code, phone, covers, siret, plan)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [r.id, r.name, r.type, r.address, r.city, r.postal_code, r.phone, r.covers, r.siret, r.plan]
-      );
-    }
-    summary.restaurants++;
-
-    // Owner account — INSERT once. We don't update the password on re-seed
-    // so any manual changes stick.
-    const ownerExists = get('SELECT id FROM accounts WHERE email = ?', [r.owner_email]);
-    if (!ownerExists) {
-      const ownerHash = bcrypt.hashSync(OWNER_PASSWORD, 10);
-      const ownerPerms = JSON.stringify({
-        view_recipes: true, view_costs: true, edit_recipes: true,
-        view_suppliers: true, export_pdf: true,
-      });
-      run(
-        `INSERT INTO accounts (name, pin, role, permissions, email, password_hash, first_name, last_name, restaurant_id, onboarding_step, is_owner, trial_start)
-         VALUES (?, NULL, 'gerant', ?, ?, ?, ?, ?, ?, 10, 1, datetime('now'))`,
-        [r.owner_name, ownerPerms, r.owner_email, ownerHash, r.owner_first, r.owner_last, r.id]
-      );
-    }
-
-    // Metro Paris Nation supplier in this tenant. Same email as the demo
-    // login so getSupplierIdentities() groups all 3 tenants under the one
-    // vendor identity.
-    let metroRow = get(
-      'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
-      ['Metro Paris Nation', r.id]
-    );
-    if (!metroRow) {
-      const metroHash = bcrypt.hashSync(SUPPLIER_DEMO_PASSWORD, 10);
-      const metroId = run(
-        `INSERT INTO suppliers (name, contact, phone, email, password_hash, contact_name, quality_rating, quality_notes, restaurant_id)
-         VALUES (?, ?, ?, ?, ?, ?, 4, ?, ?)`,
-        [
-          'Metro Paris Nation',
-          'Jean Dupont',
-          '01 40 09 40 00',
-          SUPPLIER_DEMO_EMAIL,
-          metroHash,
-          'Jean Dupont (commercial Metro)',
-          'Grossiste généraliste, livraison 6j/7',
-          r.id,
-        ]
-      ).lastInsertRowid;
-      metroRow = { id: metroId };
-    }
-
-    // supplier_account row for the demo identity in this tenant — same email
-    // and password hash.
-    const supplierAccountExists = get(
-      'SELECT id FROM supplier_accounts WHERE supplier_id = ? AND email = ? AND restaurant_id = ?',
-      [metroRow.id, SUPPLIER_DEMO_EMAIL, r.id]
-    );
-    if (!supplierAccountExists) {
-      const pinHash = bcrypt.hashSync(r.metro_supplier_account.pin, 10);
-      run(
-        `INSERT INTO supplier_accounts (restaurant_id, supplier_id, name, email, pin)
-         VALUES (?, ?, ?, ?, ?)`,
-        [r.id, metroRow.id, r.metro_supplier_account.name, SUPPLIER_DEMO_EMAIL, pinHash]
-      );
-    }
-
-    // Orders for this restaurant. Wipe previous ones first by ref prefix.
-    const recipes = r.id === 2 ? _MARIE_ORDER_RECIPES : _SAKURA_ORDER_RECIPES;
-    run(
-      `DELETE FROM purchase_order_items
-        WHERE purchase_order_id IN (
-          SELECT id FROM purchase_orders
-           WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?
-        )`,
-      [metroRow.id, r.id, `${EXTRA_DEMO_REF_PREFIX}%`]
-    );
-    run(
-      'DELETE FROM purchase_orders WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?',
-      [metroRow.id, r.id, `${EXTRA_DEMO_REF_PREFIX}%`]
-    );
-    // Wipe Marie/Sakura supplier_notifications too (identified by [DEMO]
-    // prefix) before the order loop seeds new ones.
-    run(
-      `DELETE FROM supplier_notifications
-        WHERE supplier_id = ? AND restaurant_id = ? AND message LIKE ?`,
-      [metroRow.id, r.id, '[DEMO]%']
-    );
-
-    // Spread orders across last ~60 days (oldest first).
-    const span = 60;
-    recipes.forEach((recipe, i) => {
-      const total = recipes.length;
-      const idx = total - 1 - i;
-      const dayOffset = Math.round((idx / Math.max(1, total - 1)) * span);
-      const created = new Date(Date.now() - dayOffset * 86_400_000);
-      created.setHours(8 + (i % 4), (10 + i * 13) % 60, 0, 0);
-      const createdSql = created.toISOString().replace('T', ' ').slice(0, 19);
-      const dateTag = createdSql.slice(0, 10).replace(/-/g, '');
-      const ref = `${EXTRA_DEMO_REF_PREFIX}R${r.id}-${dateTag}-${String(idx + 1).padStart(2, '0')}`;
-      // Mostly livrée; the most recent one for each restaurant stays
-      // 'envoyée' so the dashboard alert + pending-count badge ticks up.
-      const status = idx === 0 ? 'envoyée' : 'livrée';
-
-      let total_amount = 0;
-      const lines = recipe.items.map(it => {
-        const line = Math.round(it.qty * it.price * 100) / 100;
-        total_amount += line;
-        return { ...it, total: line };
-      });
-      total_amount = Math.round(total_amount * 100) / 100;
-
-      const orderId = run(
-        `INSERT INTO purchase_orders
-           (supplier_id, restaurant_id, reference, status, total_amount, expected_delivery, notes, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          metroRow.id, r.id, ref, status, total_amount,
-          new Date(created.getTime() + 86_400_000).toISOString().slice(0, 10),
-          _demoNoteFor(idx + r.id), createdSql,
-        ]
-      ).lastInsertRowid;
-
-      for (const ln of lines) {
-        run(
-          `INSERT INTO purchase_order_items
-             (purchase_order_id, restaurant_id, ingredient_id, product_name, quantity, unit, unit_price, total_price)
-           VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
-          [orderId, r.id, ln.name, ln.qty, ln.unit, ln.price, ln.total]
-        );
-      }
-      // One supplier_notifications row per order so the supplier portal's
-      // Notifications tab + identity-aware unread badge get something to show
-      // for these tenants. The most recent order (idx=0) stays unread.
-      run(
-        `INSERT INTO supplier_notifications
-           (supplier_id, restaurant_id, type, order_id, message, read, created_at)
-         VALUES (?, ?, 'order_created', ?, ?, ?, ?)`,
-        [
-          metroRow.id, r.id, orderId,
-          `[DEMO] Nouvelle commande ${ref} — ${total_amount.toFixed(2)} €`,
-          idx === 0 ? 0 : 1,
-          createdSql,
-        ]
-      );
-      if (r.id === 2) summary.marie_orders++;
-      else if (r.id === 3) summary.sakura_orders++;
-    });
-  }
-
-  // Bonus: a couple Chez Laurent → Pomona orders so Pomona's portal isn't
-  // empty if a sales demo logs in as the Pomona supplier later.
-  const pomona = get(
-    'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
-    ['Pomona TerreAzur', RID]
-  );
-  if (pomona) {
-    run(
-      `DELETE FROM purchase_order_items
-        WHERE purchase_order_id IN (
-          SELECT id FROM purchase_orders
-           WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?
-        )`,
-      [pomona.id, RID, `${POMONA_REF_PREFIX}%`]
-    );
-    run(
-      'DELETE FROM purchase_orders WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?',
-      [pomona.id, RID, `${POMONA_REF_PREFIX}%`]
-    );
-
-    const pomonaRecipes = [
-      { offsetDays: 5, items: [
-        { name: 'Tomates anciennes',    qty: 8, unit: 'kg', price: 4.80 },
-        { name: 'Roquette',             qty: 1, unit: 'kg', price: 8.50 },
-        { name: 'Basilic frais (botte)', qty: 6, unit: 'botte', price: 1.20 },
-      ] },
-      { offsetDays: 14, items: [
-        { name: 'Asperges vertes',     qty: 4, unit: 'kg', price: 9.50 },
-        { name: 'Fraises gariguette',  qty: 5, unit: 'kg', price: 9.50 },
-        { name: 'Citrons primofiori',  qty: 3, unit: 'kg', price: 2.50 },
-      ] },
-    ];
-    pomonaRecipes.forEach((recipe, i) => {
-      const created = new Date(Date.now() - recipe.offsetDays * 86_400_000);
-      created.setHours(7, 30 + i * 10, 0, 0);
-      const createdSql = created.toISOString().replace('T', ' ').slice(0, 19);
-      const dateTag = createdSql.slice(0, 10).replace(/-/g, '');
-      const ref = `${POMONA_REF_PREFIX}${dateTag}-${String(i + 1).padStart(2, '0')}`;
-      const total_amount = Math.round(recipe.items.reduce((s, it) => s + it.qty * it.price, 0) * 100) / 100;
-      const orderId = run(
-        `INSERT INTO purchase_orders
-           (supplier_id, restaurant_id, reference, status, total_amount, expected_delivery, notes, created_at)
-         VALUES (?, ?, ?, 'livrée', ?, ?, ?, ?)`,
-        [
-          pomona.id, RID, ref, total_amount,
-          new Date(created.getTime() + 86_400_000).toISOString().slice(0, 10),
-          _demoNoteFor(i + 5), createdSql,
-        ]
-      ).lastInsertRowid;
-      for (const it of recipe.items) {
-        run(
-          `INSERT INTO purchase_order_items
-             (purchase_order_id, restaurant_id, ingredient_id, product_name, quantity, unit, unit_price, total_price)
-           VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
-          [orderId, RID, it.name, it.qty, it.unit, it.price, Math.round(it.qty * it.price * 100) / 100]
-        );
-      }
-      summary.pomona_orders++;
-    });
-  }
-
-  return summary;
-}
-
-// Demo messages between Chez Laurent (restaurant_id=1) and Metro Paris Nation
-// (the suppliers row in tenant 1). Six-turn conversation: chef reports a
-// short-delivery, supplier apologizes + commits to a make-good, chef confirms,
-// then a new disponibilité ping for the next service. The thread is tagged
-// with `related_to='general'`/`'order'` so the context-badge UI lights up.
-//
-// Idempotent: deletes ALL messages between the (Metro tenant-1, Chez Laurent)
-// conversation_id before re-inserting. We don't try to identify rows by
-// content — re-running fully replaces the demo thread.
-const _DEMO_MESSAGES = [
-  { sender: 'restaurant', name: 'Laurent Martin',          msg: 'Bonjour, il manquait 2 kg de filet de saumon dans la livraison de ce matin.', daysAgo: 3, hour: 10, minute: 12, related_to: 'delivery' },
-  { sender: 'supplier',   name: 'Jean Dupont (Metro)',     msg: 'Bonjour Laurent, désolé pour l\'oubli. On vous les envoie demain matin en première tournée.', daysAgo: 3, hour: 10, minute: 47, related_to: 'delivery' },
-  { sender: 'restaurant', name: 'Laurent Martin',          msg: 'Parfait, merci pour la réactivité.',          daysAgo: 3, hour: 11, minute: 5,  related_to: null },
-  { sender: 'restaurant', name: 'Laurent Martin',          msg: 'Pourriez-vous me confirmer la disponibilité des noix de Saint-Jacques pour vendredi ?', daysAgo: 1, hour: 14, minute: 32, related_to: 'product' },
-  { sender: 'supplier',   name: 'Jean Dupont (Metro)',     msg: 'Oui, pas de souci. En calibre 20/30 ou 30/40 ?', daysAgo: 1, hour: 15, minute: 18, related_to: 'product' },
-  { sender: 'restaurant', name: 'Laurent Martin',          msg: '30/40 svp, 5 kg.',                            daysAgo: 1, hour: 15, minute: 22, related_to: 'product' },
-];
-
-function ensureDemoMessages() {
+function ensureSupplierDemoLogin() {
   const metro = get(
     'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
     ['Metro Paris Nation', RID]
   );
-  if (!metro) return { inserted: 0 };
+  if (!metro) return false;
 
-  const conversationId = `supplier_${metro.id}_restaurant_${RID}`;
-  // Wipe + reinsert in one transaction. The most-recent supplier message
-  // stays unread (read_at = NULL) so the restaurant nav badge ticks up; older
-  // supplier messages are pre-marked read so the chat doesn't look unattended.
-  const tx = db.transaction(() => {
-    run('DELETE FROM messages WHERE conversation_id = ?', [conversationId]);
-    let inserted = 0;
-    _DEMO_MESSAGES.forEach((m, i) => {
-      const created = new Date(Date.now() - m.daysAgo * 86_400_000);
-      created.setHours(m.hour, m.minute, 0, 0);
-      const createdSql = created.toISOString().replace('T', ' ').slice(0, 19);
-      // Last 2 messages (the live exchange) are unread on whichever side is
-      // the recipient; older ones are read on both sides.
-      const isRecent = i >= _DEMO_MESSAGES.length - 2;
-      const readAt = isRecent ? null : createdSql;
-      run(
-        `INSERT INTO messages
-           (conversation_id, restaurant_id, supplier_id,
-            sender_type, sender_id, sender_name,
-            message, related_to, related_id, read_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
-        [
-          conversationId, RID, metro.id,
-          m.sender, m.sender === 'restaurant' ? 1 : 1, m.name,
-          m.msg, m.related_to, readAt, createdSql,
-        ]
-      );
-      inserted++;
-    });
-    return inserted;
-  });
-  const inserted = tx();
-  return { inserted, conversationId };
+  const hash = bcrypt.hashSync(SUPPLIER_DEMO_PASSWORD, 10);
+  run(
+    `UPDATE suppliers
+        SET email = ?, password_hash = ?, contact_name = ?
+      WHERE id = ? AND restaurant_id = ?`,
+    [SUPPLIER_DEMO_EMAIL, hash, 'Jean Dupont (commercial Metro)', metro.id, RID]
+  );
+
+  const accountExists = get(
+    'SELECT id FROM supplier_accounts WHERE supplier_id = ? AND email = ? AND restaurant_id = ?',
+    [metro.id, SUPPLIER_DEMO_EMAIL, RID]
+  );
+  if (!accountExists) {
+    const pinHash = bcrypt.hashSync(SUPPLIER_DEMO_PIN, 10);
+    run(
+      `INSERT INTO supplier_accounts (supplier_id, name, email, pin, restaurant_id)
+       VALUES (?, ?, ?, ?, ?)`,
+      [metro.id, 'Jean Dupont', SUPPLIER_DEMO_EMAIL, pinHash, RID]
+    );
+  }
+  return true;
 }
 
-function ensureSupplierOrders() {
-  const metro = get(
-    'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
-    ['Metro Paris Nation', RID]
-  );
-  if (!metro) return { inserted: 0 };
-
-  // Wipe previous demo orders + their items first. Real (non-DEMO-) orders
-  // stay untouched.
-  run(
-    `DELETE FROM purchase_order_items
-      WHERE purchase_order_id IN (
-        SELECT id FROM purchase_orders
-         WHERE supplier_id = ? AND restaurant_id = ?
-           AND reference LIKE ?
-      )`,
-    [metro.id, RID, `${DEMO_ORDER_REFS_PREFIX}%`]
-  );
-  run(
-    'DELETE FROM purchase_orders WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?',
-    [metro.id, RID, `${DEMO_ORDER_REFS_PREFIX}%`]
-  );
-  // Wipe previous demo notifications. They reference ids that are about to be
-  // deleted/recreated; we identify them by the DEMO- message prefix.
-  run(
-    `DELETE FROM supplier_notifications
-      WHERE supplier_id = ? AND restaurant_id = ? AND message LIKE ?`,
-    [metro.id, RID, '[DEMO]%']
-  );
-
-  const insertOrder = db.prepare(
-    `INSERT INTO purchase_orders
-       (supplier_id, restaurant_id, reference, status, total_amount, expected_delivery, notes, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  );
-  const insertItem = db.prepare(
-    `INSERT INTO purchase_order_items
-       (purchase_order_id, restaurant_id, ingredient_id, product_name, quantity, unit, unit_price, total_price)
-     VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`
-  );
-  // Notifications mirror the order-creation hook (notifySupplierOfOrder in
-  // purchase-orders.js). Demo orders bypass that hook because they're inserted
-  // directly, so we drop matching rows here. Message prefixed [DEMO] so the
-  // wipe-on-reseed query can find them. The 10 most recent orders get one
-  // notification each — older ones don't, mirroring "you've already been
-  // notified about these in the past".
-  const insertNotif = db.prepare(
-    `INSERT INTO supplier_notifications
-       (supplier_id, restaurant_id, type, order_id, message, read, created_at)
-     VALUES (?, ?, 'order_created', ?, ?, ?, ?)`
-  );
-
-  let inserted = 0;
-  let notifs = 0;
-  const total = _DEMO_ORDER_RECIPES.length;
-  // Spread orders across the past ~90 days, oldest first.
-  const spanDays = 90;
-  const tx = db.transaction(() => {
-    _DEMO_ORDER_RECIPES.forEach((recipe, i) => {
-      // Reverse-index so idx=0 is the newest (draft), idx=total-1 the oldest.
-      const idx = total - 1 - i;
-      const dayOffset = Math.round((idx / Math.max(1, total - 1)) * spanDays);
-      const created = new Date(Date.now() - dayOffset * 86_400_000);
-      // Skew the time to lunch-prep hours so the timestamps feel real.
-      created.setHours(8 + (i % 4), 30 + (i * 7) % 30, 0, 0);
-      const createdSql = created.toISOString().replace('T', ' ').slice(0, 19);
-      const dateTag = createdSql.slice(0, 10).replace(/-/g, '');
-      const seq = String(idx + 1).padStart(3, '0');
-      const ref = `${DEMO_ORDER_REFS_PREFIX}${dateTag}-${seq}`;
-      const status = _DEMO_ORDER_STATUS_MIX(idx, total);
-      const expected = new Date(created.getTime() + 86_400_000)
-        .toISOString().slice(0, 10);
-
-      let total_amount = 0;
-      const lines = recipe.items.map(it => {
-        const line = Math.round(it.qty * it.price * 100) / 100;
-        total_amount += line;
-        return { ...it, total: line };
-      });
-      total_amount = Math.round(total_amount * 100) / 100;
-
-      const orderId = insertOrder.run(
-        metro.id, RID, ref, status, total_amount,
-        expected, _demoNoteFor(idx), createdSql
-      ).lastInsertRowid;
-
-      for (const ln of lines) {
-        insertItem.run(orderId, RID, ln.name, ln.qty, ln.unit, ln.price, ln.total);
-      }
-      inserted++;
-
-      // Drop a matching notification for the 10 most recent orders. The 4
-      // newest stay unread (badge populates), older 6 are pre-marked read so
-      // the list isn't all-bold. idx=0 is newest.
-      if (idx < 10) {
-        const isUnread = idx < 4 ? 1 : 0;
-        insertNotif.run(
-          metro.id, RID, orderId,
-          `[DEMO] Nouvelle commande ${ref} — ${total_amount.toFixed(2)} €`,
-          1 - isUnread, // schema is `read` (1=read, 0=unread)
-          createdSql
-        );
-        notifs++;
-      }
-    });
-  });
-  tx();
-  return { inserted, notifs };
-}
-
-// Idempotent: deletes the supplier's existing demo catalog rows then bulk-
-// inserts the fresh list inside one transaction. supplier_catalog has no
-// UNIQUE constraint on (supplier_id, product_name), so INSERT OR REPLACE
-// would silently keep duplicates on every re-run — DELETE-then-INSERT is
-// the only safe pattern here. Noops for any supplier that doesn't exist
-// yet (the full-seed path will create them and call this again).
 function ensureSupplierCatalogs() {
   let totalInserted = 0;
   let touchedSuppliers = 0;
@@ -940,41 +455,358 @@ function ensureSupplierCatalogs() {
   return { totalInserted, touchedSuppliers };
 }
 
-// ─── Incremental supplier-portal demo provisioning ─────────────────────────
-// Production was seeded before the demo supplier credentials existed (commit
-// 4dfb53e). The early-exit guard below blocks a full re-seed, so without this
-// helper there's no way to add the supplier-portal rows to an existing demo DB
-// short of hand-editing SQLite. Runs idempotently before the guard: if the
-// Metro supplier row exists we attach the company login + member account; if
-// not we no-op and let the full seed below create both from scratch.
-function ensureSupplierDemoLogin() {
-  const metro = get(
-    'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
-    ['Metro Paris Nation', RID]
-  );
-  if (!metro) return false; // full seed path will create everything
+function ensureExtraDemoRestaurants() {
+  const summary = { restaurants: 0, marie_orders: 0, sakura_orders: 0 };
 
-  const hash = bcrypt.hashSync(SUPPLIER_DEMO_PASSWORD, 10);
-  run(
-    `UPDATE suppliers
-        SET email = ?, password_hash = ?, contact_name = ?
-      WHERE id = ? AND restaurant_id = ?`,
-    [SUPPLIER_DEMO_EMAIL, hash, 'Jean Dupont (commercial Metro)', metro.id, RID]
-  );
+  for (const r of EXTRA_DEMO_RESTAURANTS) {
+    const existing = get('SELECT id FROM restaurants WHERE id = ?', [r.id]);
+    if (existing) {
+      run(
+        `UPDATE restaurants SET
+           name = ?, type = ?, address = ?, city = ?, postal_code = ?,
+           phone = ?, covers = ?, siret = ?, plan = ?
+         WHERE id = ?`,
+        [r.name, r.type, r.address, r.city, r.postal_code, r.phone, r.covers, r.siret, r.plan, r.id]
+      );
+    } else {
+      run(
+        `INSERT INTO restaurants (id, name, type, address, city, postal_code, phone, covers, siret, plan)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [r.id, r.name, r.type, r.address, r.city, r.postal_code, r.phone, r.covers, r.siret, r.plan]
+      );
+    }
+    summary.restaurants++;
 
-  const accountExists = get(
-    'SELECT id FROM supplier_accounts WHERE supplier_id = ? AND email = ? AND restaurant_id = ?',
-    [metro.id, SUPPLIER_DEMO_EMAIL, RID]
-  );
-  if (!accountExists) {
-    const pinHash = bcrypt.hashSync(SUPPLIER_DEMO_PIN, 10);
-    run(
-      `INSERT INTO supplier_accounts (supplier_id, name, email, pin, restaurant_id)
-       VALUES (?, ?, ?, ?, ?)`,
-      [metro.id, 'Jean Dupont', SUPPLIER_DEMO_EMAIL, pinHash, RID]
+    const ownerExists = get('SELECT id FROM accounts WHERE email = ?', [r.owner_email]);
+    if (!ownerExists) {
+      const ownerHash = bcrypt.hashSync(OWNER_PASSWORD, 10);
+      const ownerPerms = JSON.stringify({
+        view_recipes: true, view_costs: true, edit_recipes: true,
+        view_suppliers: true, export_pdf: true,
+      });
+      run(
+        `INSERT INTO accounts (name, pin, role, permissions, email, password_hash, first_name, last_name, restaurant_id, onboarding_step, is_owner, trial_start)
+         VALUES (?, NULL, 'gerant', ?, ?, ?, ?, ?, ?, 10, 1, datetime('now'))`,
+        [r.owner_name, ownerPerms, r.owner_email, ownerHash, r.owner_first, r.owner_last, r.id]
+      );
+    }
+
+    let metroRow = get(
+      'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
+      ['Metro Paris Nation', r.id]
     );
+    if (!metroRow) {
+      const metroHash = bcrypt.hashSync(SUPPLIER_DEMO_PASSWORD, 10);
+      const metroId = run(
+        `INSERT INTO suppliers (name, contact, phone, email, password_hash, contact_name, quality_rating, quality_notes, restaurant_id)
+         VALUES (?, ?, ?, ?, ?, ?, 4, ?, ?)`,
+        [
+          'Metro Paris Nation',
+          'Jean Dupont',
+          '01 40 09 40 00',
+          SUPPLIER_DEMO_EMAIL,
+          metroHash,
+          'Jean Dupont (commercial Metro)',
+          'Grossiste généraliste, livraison 6j/7',
+          r.id,
+        ]
+      ).lastInsertRowid;
+      metroRow = { id: metroId };
+    }
+
+    const supplierAccountExists = get(
+      'SELECT id FROM supplier_accounts WHERE supplier_id = ? AND email = ? AND restaurant_id = ?',
+      [metroRow.id, SUPPLIER_DEMO_EMAIL, r.id]
+    );
+    if (!supplierAccountExists) {
+      const pinHash = bcrypt.hashSync(r.metro_supplier_account.pin, 10);
+      run(
+        `INSERT INTO supplier_accounts (restaurant_id, supplier_id, name, email, pin)
+         VALUES (?, ?, ?, ?, ?)`,
+        [r.id, metroRow.id, r.metro_supplier_account.name, SUPPLIER_DEMO_EMAIL, pinHash]
+      );
+    }
+
+    const recipes = r.id === 2 ? _MARIE_ORDER_RECIPES : _SAKURA_ORDER_RECIPES;
+    run(
+      `DELETE FROM purchase_order_items
+        WHERE purchase_order_id IN (
+          SELECT id FROM purchase_orders
+           WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?
+        )`,
+      [metroRow.id, r.id, `${EXTRA_DEMO_REF_PREFIX}%`]
+    );
+    run(
+      'DELETE FROM purchase_orders WHERE supplier_id = ? AND restaurant_id = ? AND reference LIKE ?',
+      [metroRow.id, r.id, `${EXTRA_DEMO_REF_PREFIX}%`]
+    );
+    run(
+      `DELETE FROM supplier_notifications
+        WHERE supplier_id = ? AND restaurant_id = ? AND message LIKE ?`,
+      [metroRow.id, r.id, '[DEMO]%']
+    );
+
+    const span = 60;
+    recipes.forEach((recipe, i) => {
+      const total = recipes.length;
+      const idx = total - 1 - i;
+      const dayOffset = Math.round((idx / Math.max(1, total - 1)) * span);
+      const created = new Date(Date.now() - dayOffset * 86_400_000);
+      created.setHours(8 + (i % 4), (10 + i * 13) % 60, 0, 0);
+      const createdSql = sqlDateTime(created);
+      const dateTag = createdSql.slice(0, 10).replace(/-/g, '');
+      const ref = `${EXTRA_DEMO_REF_PREFIX}R${r.id}-${dateTag}-${pad2(idx + 1)}`;
+      const status = idx === 0 ? 'envoyée' : 'livrée';
+
+      let total_amount = 0;
+      const lines = recipe.items.map(it => {
+        const line = Math.round(it.qty * it.price * 100) / 100;
+        total_amount += line;
+        return { ...it, total: line };
+      });
+      total_amount = Math.round(total_amount * 100) / 100;
+
+      const orderId = run(
+        `INSERT INTO purchase_orders
+           (supplier_id, restaurant_id, reference, status, total_amount, expected_delivery, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          metroRow.id, r.id, ref, status, total_amount,
+          new Date(created.getTime() + 86_400_000).toISOString().slice(0, 10),
+          _demoNoteFor(idx + r.id), createdSql,
+        ]
+      ).lastInsertRowid;
+
+      for (const ln of lines) {
+        run(
+          `INSERT INTO purchase_order_items
+             (purchase_order_id, restaurant_id, ingredient_id, product_name, quantity, unit, unit_price, total_price)
+           VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
+          [orderId, r.id, ln.name, ln.qty, ln.unit, ln.price, ln.total]
+        );
+      }
+      run(
+        `INSERT INTO supplier_notifications
+           (supplier_id, restaurant_id, type, order_id, message, read, created_at)
+         VALUES (?, ?, 'order_created', ?, ?, ?, ?)`,
+        [
+          metroRow.id, r.id, orderId,
+          `[DEMO] Nouvelle commande ${ref} — ${total_amount.toFixed(2)} €`,
+          idx === 0 ? 0 : 1,
+          createdSql,
+        ]
+      );
+      if (r.id === 2) summary.marie_orders++;
+      else if (r.id === 3) summary.sakura_orders++;
+    });
   }
-  return true;
+
+  return summary;
+}
+
+// 8 supplier orders for Le Comptoir, spread across Metro / PassionFroid /
+// TerreAzur over the past 14 days. Idempotent: DELETE-then-INSERT scoped to
+// reference LIKE 'DEMO-PO-%'. Real (non-DEMO-) orders stay untouched.
+function ensureSupplierOrders() {
+  const supplierByName = {};
+  for (const name of ['Metro Paris Nation', 'PassionFroid', 'TerreAzur']) {
+    const row = get(
+      'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
+      [name, RID]
+    );
+    if (row) supplierByName[name] = row.id;
+  }
+  if (!supplierByName['Metro Paris Nation']) return { inserted: 0, notifs: 0 };
+
+  const supplierIdList = Object.values(supplierByName);
+  const placeholders = supplierIdList.map(() => '?').join(',');
+  run(
+    `DELETE FROM purchase_order_items
+      WHERE purchase_order_id IN (
+        SELECT id FROM purchase_orders
+         WHERE supplier_id IN (${placeholders}) AND restaurant_id = ?
+           AND reference LIKE ?
+      )`,
+    [...supplierIdList, RID, `${DEMO_ORDER_REFS_PREFIX}%`]
+  );
+  run(
+    `DELETE FROM purchase_orders
+      WHERE supplier_id IN (${placeholders}) AND restaurant_id = ?
+        AND reference LIKE ?`,
+    [...supplierIdList, RID, `${DEMO_ORDER_REFS_PREFIX}%`]
+  );
+  run(
+    `DELETE FROM supplier_notifications
+      WHERE supplier_id IN (${placeholders}) AND restaurant_id = ?
+        AND message LIKE ?`,
+    [...supplierIdList, RID, '[DEMO]%']
+  );
+
+  const insertOrder = db.prepare(
+    `INSERT INTO purchase_orders
+       (supplier_id, restaurant_id, reference, status, total_amount, expected_delivery, notes, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const insertItem = db.prepare(
+    `INSERT INTO purchase_order_items
+       (purchase_order_id, restaurant_id, ingredient_id, product_name, quantity, unit, unit_price, total_price)
+     VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`
+  );
+  const insertNotif = db.prepare(
+    `INSERT INTO supplier_notifications
+       (supplier_id, restaurant_id, type, order_id, message, read, created_at)
+     VALUES (?, ?, 'order_created', ?, ?, ?, ?)`
+  );
+
+  let inserted = 0;
+  let notifs = 0;
+  const total = _DEMO_ORDER_RECIPES.length;
+  const tx = db.transaction(() => {
+    _DEMO_ORDER_RECIPES.forEach((recipe, idx) => {
+      const supplierId = supplierByName[recipe.supplier];
+      if (!supplierId) return;
+
+      const created = daysAgo(recipe.daysAgoCreated, 8 + (idx % 4), 30 + (idx * 7) % 30);
+      const createdSql = sqlDateTime(created);
+      const dateTag = createdSql.slice(0, 10).replace(/-/g, '');
+      const ref = `${DEMO_ORDER_REFS_PREFIX}${dateTag}-${pad2(idx + 1)}`;
+      const status = _orderStatusByAge(recipe.daysAgoCreated, idx, total);
+      const expected = sqlDate(new Date(created.getTime() + 86_400_000));
+
+      let total_amount = 0;
+      const lines = recipe.items.map(it => {
+        const line = Math.round(it.qty * it.price * 100) / 100;
+        total_amount += line;
+        return { ...it, total: line };
+      });
+      total_amount = Math.round(total_amount * 100) / 100;
+
+      const orderId = insertOrder.run(
+        supplierId, RID, ref, status, total_amount,
+        expected, _demoNoteFor(idx), createdSql
+      ).lastInsertRowid;
+
+      for (const ln of lines) {
+        insertItem.run(orderId, RID, ln.name, ln.qty, ln.unit, ln.price, ln.total);
+      }
+      inserted++;
+
+      // Notification for the 5 most recent orders. The 2 newest stay
+      // unread (badge populates), older ones are pre-marked read.
+      const newestIdx = total - 1 - idx;
+      if (newestIdx < 5) {
+        const isUnread = newestIdx < 2 ? 1 : 0;
+        insertNotif.run(
+          supplierId, RID, orderId,
+          `[DEMO] Nouvelle commande ${ref} — ${total_amount.toFixed(2)} €`,
+          1 - isUnread,
+          createdSql
+        );
+        notifs++;
+      }
+    });
+  });
+  tx();
+  return { inserted, notifs };
+}
+
+// 3 message threads with suppliers (Metro, PassionFroid, TerreAzur). Each
+// 4-6 turn conversation about a recent delivery / availability ping. The
+// most recent supplier message stays unread so the restaurant's chat-badge
+// in nav lights up. Idempotent: DELETE-then-INSERT scoped to conversation_id.
+const _DEMO_THREADS = [
+  {
+    supplier: 'Metro Paris Nation',
+    supplierContact: 'Jean Dupont (Metro)',
+    messages: [
+      { sender: 'restaurant', daysAgo: 5, hour: 10, minute: 12, related_to: 'delivery',
+        msg: 'Bonjour Jean, il manquait 2 plateaux d\'œufs sur la livraison de ce matin.' },
+      { sender: 'supplier', daysAgo: 5, hour: 10, minute: 47, related_to: 'delivery',
+        msg: 'Bonjour Laurent, désolé pour l\'oubli. On vous les envoie demain matin en première tournée.' },
+      { sender: 'restaurant', daysAgo: 5, hour: 11, minute: 5,
+        msg: 'Parfait, merci pour la réactivité.' },
+      { sender: 'restaurant', daysAgo: 1, hour: 14, minute: 32, related_to: 'product',
+        msg: 'Pourriez-vous me confirmer la dispo des Sancerre blanc 75cl pour vendredi ?' },
+      { sender: 'supplier', daysAgo: 1, hour: 15, minute: 18, related_to: 'product',
+        msg: 'Oui, pas de souci, j\'en bloque 12 bouteilles pour vous.' },
+    ],
+  },
+  {
+    supplier: 'PassionFroid',
+    supplierContact: 'Sandrine Bertrand (PassionFroid)',
+    messages: [
+      { sender: 'supplier', daysAgo: 6, hour: 8, minute: 50, related_to: 'product',
+        msg: 'Bonjour Laurent, arrivage exceptionnel de noix de Saint-Jacques de la baie de Saint-Brieuc cette semaine. Intéressé ?' },
+      { sender: 'restaurant', daysAgo: 6, hour: 9, minute: 22, related_to: 'product',
+        msg: 'Bonjour Sandrine, oui très intéressé. 5 kg svp, calibre 30/40.' },
+      { sender: 'supplier', daysAgo: 6, hour: 10, minute: 1, related_to: 'product',
+        msg: 'Noté, livraison demain matin. Je vous mets aussi 2 kg de gambas en sample.' },
+      { sender: 'restaurant', daysAgo: 4, hour: 11, minute: 15, related_to: 'delivery',
+        msg: 'Saumon livré ce matin à 1.6°C, parfait. Merci pour la qualité.' },
+      { sender: 'supplier', daysAgo: 0, hour: 9, minute: 30, related_to: 'product',
+        msg: 'Petit message: hausse de 0,80€/kg sur le foie gras dès lundi prochain (saison oblige). Vous voulez stocker un peu avant ?' },
+    ],
+  },
+  {
+    supplier: 'TerreAzur',
+    supplierContact: 'Mathieu Roux (TerreAzur)',
+    messages: [
+      { sender: 'restaurant', daysAgo: 7, hour: 7, minute: 30, related_to: 'product',
+        msg: 'Bonjour Mathieu, vous avez encore des cèpes frais cette semaine ? Combien ?' },
+      { sender: 'supplier', daysAgo: 7, hour: 8, minute: 12, related_to: 'product',
+        msg: 'Bonjour ! Oui, arrivage de 8 kg ce matin. À 38€/kg. Je peux vous en réserver 2 kg.' },
+      { sender: 'restaurant', daysAgo: 7, hour: 8, minute: 25, related_to: 'product',
+        msg: 'Parfait, prenez-en 2 kg, livraison avec la commande de demain.' },
+      { sender: 'restaurant', daysAgo: 3, hour: 14, minute: 0, related_to: 'delivery',
+        msg: 'Les fraises gariguette de jeudi étaient un peu molles, le chef m\'a fait remonter.' },
+      { sender: 'supplier', daysAgo: 3, hour: 15, minute: 45, related_to: 'delivery',
+        msg: 'Désolé Laurent, lot un peu chaud à la sortie de Rungis. Je vous fais un avoir de 18€ sur la prochaine.' },
+      { sender: 'supplier', daysAgo: 0, hour: 10, minute: 10, related_to: 'product',
+        msg: 'Disponible aujourd\'hui : asperges vertes du Gard à 9€/kg, top qualité. Je vous en mets ?' },
+    ],
+  },
+];
+
+function ensureDemoMessages() {
+  let inserted = 0;
+  const conversationIds = [];
+  const tx = db.transaction(() => {
+    for (const thread of _DEMO_THREADS) {
+      const supplier = get(
+        'SELECT id FROM suppliers WHERE name = ? AND restaurant_id = ?',
+        [thread.supplier, RID]
+      );
+      if (!supplier) continue;
+
+      const conversationId = `supplier_${supplier.id}_restaurant_${RID}`;
+      conversationIds.push(conversationId);
+      run('DELETE FROM messages WHERE conversation_id = ?', [conversationId]);
+
+      thread.messages.forEach((m, i) => {
+        const created = daysAgo(m.daysAgo, m.hour, m.minute);
+        const createdSql = sqlDateTime(created);
+        // Most-recent supplier message stays unread (badge); older ones read.
+        const isLast = i === thread.messages.length - 1;
+        const readAt = (isLast && m.sender === 'supplier') ? null : createdSql;
+        const senderName = m.sender === 'restaurant' ? 'Laurent Martin' : thread.supplierContact;
+        run(
+          `INSERT INTO messages
+             (conversation_id, restaurant_id, supplier_id,
+              sender_type, sender_id, sender_name,
+              message, related_to, related_id, read_at, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+          [
+            conversationId, RID, supplier.id,
+            m.sender, 1, senderName,
+            m.msg, m.related_to || null, readAt, createdSql,
+          ]
+        );
+        inserted++;
+      });
+    }
+  });
+  tx();
+  return { inserted, threads: conversationIds.length };
 }
 
 // ─── Idempotency guard ─────────────────────────────────────────────────────
@@ -994,21 +826,25 @@ if (existing) {
     console.log(`   ↳ Refreshed supplier catalogs: ${catalog.totalInserted} products across ${catalog.touchedSuppliers} suppliers.`);
   }
   if (orders.inserted > 0) {
-    console.log(`   ↳ Refreshed supplier demo orders: ${orders.inserted} purchase_orders + ${orders.notifs} notifications for Metro Paris Nation.`);
+    console.log(`   ↳ Refreshed Le Comptoir purchase orders: ${orders.inserted} POs + ${orders.notifs} notifications.`);
   }
   if (extras.restaurants > 0) {
-    console.log(`   ↳ Refreshed extra demo restaurants: ${extras.restaurants} resto + ${extras.marie_orders + extras.sakura_orders} Metro orders + ${extras.pomona_orders} Pomona orders.`);
+    console.log(`   ↳ Refreshed extra demo restaurants: ${extras.restaurants} resto + ${extras.marie_orders + extras.sakura_orders} cross-tenant Metro orders.`);
   }
   if (messages && messages.inserted > 0) {
-    console.log(`   ↳ Refreshed demo messages: ${messages.inserted} entre Chez Laurent et Metro.`);
+    console.log(`   ↳ Refreshed demo messages: ${messages.inserted} messages across ${messages.threads} threads.`);
   }
   process.exit(0);
 }
 
-console.log('🌱 Seeding demo data for Chez Laurent — Paris 11…');
+// ═══════════════════════════════════════════════════════════════════════════
+// FRESH SEED — runs on a DB that doesn't yet have the demo owner.
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('🌱 Seeding demo data for Le Comptoir du Marché — Paris 15…');
 
 // ─── 1. Restaurant ─────────────────────────────────────────────────────────
 section('Restaurant');
+const RESTAURANT_NAME = 'Le Comptoir du Marché';
 const restaurantRow = get('SELECT id FROM restaurants WHERE id = ?', [RID]);
 if (restaurantRow) {
   run(
@@ -1017,28 +853,28 @@ if (restaurantRow) {
        phone = ?, covers = ?, siret = ?, plan = ?,
        service_start = ?, service_end = ?, service_active = 1
      WHERE id = ?`,
-    ['Chez Laurent - Paris 11', 'brasserie', '42 rue de la Roquette',
-     'Paris', '75011', '01 43 57 12 34', 45, '12345678900012', 'pro',
+    [RESTAURANT_NAME, 'bistrot gastronomique', '12 rue du Commerce',
+     'Paris', '75015', '01 45 75 22 18', 45, '79234156700019', 'pro',
      '11:30', '23:00', RID]
   );
-  log(`Restaurant ${RID} updated`);
+  log(`Restaurant ${RID} updated → ${RESTAURANT_NAME}`);
 } else {
   run(
     `INSERT INTO restaurants (id, name, type, address, city, postal_code, phone, covers, siret, plan, service_start, service_end, service_active)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-    [RID, 'Chez Laurent - Paris 11', 'brasserie', '42 rue de la Roquette',
-     'Paris', '75011', '01 43 57 12 34', 45, '12345678900012', 'pro',
+    [RID, RESTAURANT_NAME, 'bistrot gastronomique', '12 rue du Commerce',
+     'Paris', '75015', '01 45 75 22 18', 45, '79234156700019', 'pro',
      '11:30', '23:00']
   );
-  log(`Restaurant ${RID} created`);
+  log(`Restaurant ${RID} created → ${RESTAURANT_NAME}`);
 }
 
-// ─── 2. Accounts ───────────────────────────────────────────────────────────
+// ─── 2. Accounts (owner + 3 staff with PIN) ────────────────────────────────
 section('Accounts');
 const ownerHash = bcrypt.hashSync(OWNER_PASSWORD, 10);
 const ownerPerms = JSON.stringify({
   view_recipes: true, view_costs: true, edit_recipes: true,
-  view_suppliers: true, export_pdf: true
+  view_suppliers: true, export_pdf: true,
 });
 
 const ownerResult = run(
@@ -1050,34 +886,130 @@ const ownerId = ownerResult.lastInsertRowid;
 log(`Gérant: ${OWNER_EMAIL} / ${OWNER_PASSWORD} (id=${ownerId})`);
 
 const staffPerms = JSON.stringify({ view_recipes: true });
-const staff = [
+// Sub-set of staff_members that ALSO get a PIN-login account. The second,
+// commis #2 and plongeur don't need to clock into the app.
+const staffWithAccounts = [
   { name: 'Thomas Moreau', first: 'Thomas', last: 'Moreau', pin: '1234', role: 'cuisinier', zones: ['Cuisine'], skills: ['Cuisson', 'Découpe', 'Sauces'] },
-  { name: 'Julie Dubois',  first: 'Julie',  last: 'Dubois',  pin: '5678', role: 'equipier',  zones: ['Cuisine', 'Plonge'], skills: ['Mise en place', 'Plonge'] },
+  { name: 'Julie Dubois',  first: 'Julie',  last: 'Dubois',  pin: '5678', role: 'cuisinier', zones: ['Cuisine'], skills: ['Mise en place', 'Pâtisserie'] },
   { name: 'Marc Bernard',  first: 'Marc',   last: 'Bernard', pin: '9012', role: 'salle',     zones: ['Salle'],   skills: ['Service', 'Bar', 'Encaissement'] },
 ];
-
-for (const s of staff) {
+const accountIdByName = {};
+for (const s of staffWithAccounts) {
   const pinHash = bcrypt.hashSync(s.pin, 10);
-  run(
+  const r = run(
     `INSERT INTO accounts (name, pin, role, permissions, first_name, last_name, restaurant_id, is_owner, zones, skills, hire_date)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, date('now', '-90 days'))`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, date('now', '-180 days'))`,
     [s.name, pinHash, s.role, staffPerms, s.first, s.last, RID, JSON.stringify(s.zones), JSON.stringify(s.skills)]
   );
+  accountIdByName[s.name] = r.lastInsertRowid;
   log(`Staff: ${s.name} (${s.role}) PIN=${s.pin}`);
 }
 
-// ─── 3. Suppliers ──────────────────────────────────────────────────────────
+// ─── 2b. Staff members (planning roster, 6 people) + shifts (this week) ───
+section('Staff members & shifts (this week)');
+const staffRoster = [
+  { name: 'Thomas Moreau',  role: 'Chef de cuisine',       hourly_rate: 18.00, contract: 39, account: 'Thomas Moreau', email: 'thomas.moreau@lecomptoir-pdm.fr', phone: '06 23 45 67 89' },
+  { name: 'Pierre Lefèvre', role: 'Second de cuisine',     hourly_rate: 15.50, contract: 39, account: null,             email: 'pierre.lefevre@lecomptoir-pdm.fr', phone: '06 34 56 78 90' },
+  { name: 'Julie Dubois',   role: 'Commis de cuisine',     hourly_rate: 12.50, contract: 35, account: 'Julie Dubois',  email: 'julie.dubois@lecomptoir-pdm.fr',   phone: '06 45 67 89 01' },
+  { name: 'Camille Roux',   role: 'Commis de cuisine',     hourly_rate: 12.50, contract: 35, account: null,             email: 'camille.roux@lecomptoir-pdm.fr',   phone: '06 56 78 90 12' },
+  { name: 'Karim Benali',   role: 'Plongeur',              hourly_rate: 11.65, contract: 35, account: null,             email: 'karim.benali@lecomptoir-pdm.fr',   phone: '06 67 89 01 23' },
+  { name: 'Marc Bernard',   role: 'Serveur',               hourly_rate: 12.00, contract: 35, account: 'Marc Bernard',   email: 'marc.bernard@lecomptoir-pdm.fr',   phone: '06 78 90 12 34' },
+];
+
+const insertStaff = db.prepare(
+  `INSERT INTO staff_members (restaurant_id, name, role, email, phone, hourly_rate, contract_hours, account_id)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+);
+const staffIdByName = {};
+for (const s of staffRoster) {
+  const accId = s.account ? (accountIdByName[s.account] || null) : null;
+  const r = insertStaff.run(RID, s.name, s.role, s.email, s.phone, s.hourly_rate, s.contract, accId);
+  staffIdByName[s.name] = r.lastInsertRowid;
+}
+log(`${staffRoster.length} staff members in roster`);
+
+// Shifts for "this week" — Monday → Sunday containing today.
+// Restaurant closed Sun + Mon (typical Paris bistrot). Service Tue→Sat
+// lunch (11:00-15:00) + dinner (18:30-23:30); shift count varies per role.
+const today = new Date();
+const dow = today.getDay(); // 0=Sun
+const monday = new Date(today);
+monday.setDate(today.getDate() - ((dow + 6) % 7)); // step back to Monday
+monday.setHours(0, 0, 0, 0);
+function dateOfWeekday(idx) { // 0=Mon, 6=Sun
+  const d = new Date(monday);
+  d.setDate(monday.getDate() + idx);
+  return sqlDate(d);
+}
+
+// Shift template per staff member. Tuples = [weekdayIdx, start, end, break_min].
+// weekday 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+const shiftPlan = {
+  'Thomas Moreau':  [
+    [1, '10:30', '15:00', 30], [1, '18:00', '23:30', 0],
+    [2, '10:30', '15:00', 30], [2, '18:00', '23:30', 0],
+    [3, '10:30', '15:00', 30], [3, '18:00', '23:30', 0],
+    [4, '10:30', '15:00', 30], [4, '18:00', '23:30', 0],
+    [5, '10:30', '15:00', 30], [5, '18:00', '23:30', 0],
+  ],
+  'Pierre Lefèvre': [
+    [1, '11:00', '15:00', 30], [1, '18:30', '23:30', 0],
+    [2, '11:00', '15:00', 30], [2, '18:30', '23:30', 0],
+    [3, '11:00', '15:00', 30],
+    [4, '11:00', '15:00', 30], [4, '18:30', '23:30', 0],
+    [5, '11:00', '15:00', 30], [5, '18:30', '23:30', 0],
+  ],
+  'Julie Dubois':   [
+    [1, '09:00', '15:00', 30],
+    [2, '09:00', '15:00', 30], [2, '18:30', '23:00', 0],
+    [3, '09:00', '15:00', 30],
+    [4, '09:00', '15:00', 30], [4, '18:30', '23:00', 0],
+    [5, '09:00', '15:00', 30], [5, '18:30', '23:30', 0],
+  ],
+  'Camille Roux':   [
+    [1, '18:00', '23:30', 0],
+    [2, '11:00', '15:00', 30], [2, '18:00', '23:30', 0],
+    [3, '18:00', '23:30', 0],
+    [4, '11:00', '15:00', 30], [4, '18:00', '23:30', 0],
+    [5, '11:00', '15:00', 30], [5, '18:00', '23:30', 0],
+  ],
+  'Karim Benali':   [
+    [1, '11:30', '15:30', 0], [1, '19:00', '23:30', 0],
+    [2, '11:30', '15:30', 0], [2, '19:00', '23:30', 0],
+    [3, '11:30', '15:30', 0], [3, '19:00', '23:30', 0],
+    [4, '11:30', '15:30', 0], [4, '19:00', '23:30', 0],
+    [5, '11:30', '15:30', 0], [5, '19:00', '23:30', 0],
+  ],
+  'Marc Bernard':   [
+    [1, '11:30', '15:30', 30], [1, '18:30', '23:30', 0],
+    [2, '11:30', '15:30', 30], [2, '18:30', '23:30', 0],
+    [3, '11:30', '15:30', 30], [3, '18:30', '23:30', 0],
+    [4, '11:30', '15:30', 30], [4, '18:30', '23:30', 0],
+    [5, '11:30', '15:30', 30], [5, '18:30', '23:30', 0],
+  ],
+};
+
+const insertShift = db.prepare(
+  `INSERT INTO staff_shifts (restaurant_id, staff_member_id, date, start_time, end_time, break_minutes, status)
+   VALUES (?, ?, ?, ?, ?, ?, 'planned')`
+);
+let shiftCount = 0;
+for (const [name, shifts] of Object.entries(shiftPlan)) {
+  const sid = staffIdByName[name];
+  if (!sid) continue;
+  for (const [wd, start, end, brk] of shifts) {
+    insertShift.run(RID, sid, dateOfWeekday(wd), start, end, brk);
+    shiftCount++;
+  }
+}
+log(`${shiftCount} shifts planned for week of ${dateOfWeekday(0)}`);
+
+// ─── 3. Suppliers (3) ──────────────────────────────────────────────────────
 section('Suppliers');
-// The Metro entry doubles as the demo supplier-portal login. SUPPLIER_DEMO_*
-// constants are hoisted to the top of the file so ensureSupplierDemoLogin()
-// can reach them when re-seeding an existing demo DB.
 const suppliers = [
-  { name: 'Metro Paris Nation',   contact: 'Jean Dupont', phone: '01 40 09 40 00', email: SUPPLIER_DEMO_EMAIL,            rating: 4, notes: 'Grossiste généraliste, livraison 6j/7' },
-  { name: 'Pomona TerreAzur',     contact: 'Sylvie D.',   phone: '01 49 29 30 00', email: 'commandes@pomona-terreazur.fr', rating: 5, notes: 'Fruits & légumes, très bon rapport qualité/prix' },
-  { name: 'Bigard Boucherie Pro', contact: 'Julien B.',   phone: '02 98 85 33 33', email: 'pro@bigard.fr',                rating: 5, notes: 'Viandes françaises, traçabilité complète' },
-  { name: 'France Boissons',      contact: 'Karine L.',   phone: '03 88 65 65 65', email: 'commandes@france-boissons.fr', rating: 4, notes: 'Boissons & spiritueux' },
-  { name: 'Brake France',         contact: 'Pierre M.',   phone: '01 58 31 99 00', email: 'pro@brake.fr',                 rating: 3, notes: 'Surgelés & produits de la mer' },
-  { name: 'Marée du Jour',        contact: 'Antoine R.',  phone: '02 98 44 20 20', email: 'commandes@maree-du-jour.fr',   rating: 5, notes: 'Poissonnerie Rungis, arrivages quotidiens' },
+  { name: 'Metro Paris Nation', contact: 'Jean Dupont',       phone: '01 40 09 40 00', email: SUPPLIER_DEMO_EMAIL,            rating: 4, notes: 'Grossiste généraliste, livraison 6j/7. Référent épicerie & produits secs.' },
+  { name: 'PassionFroid',       contact: 'Sandrine Bertrand', phone: '01 49 29 50 00', email: 'commandes@passionfroid.fr',    rating: 5, notes: 'Spécialiste cold chain : viandes premium, poissons frais, surgelés.' },
+  { name: 'TerreAzur',          contact: 'Mathieu Roux',      phone: '01 49 29 30 00', email: 'commandes@terreazur.fr',       rating: 5, notes: 'Fruits & légumes frais, herbes aromatiques. Arrivages quotidiens Rungis.' },
 ];
 const supplierIds = {};
 for (const s of suppliers) {
@@ -1090,24 +1022,22 @@ for (const s of suppliers) {
   log(`${s.name} (★${s.rating})`);
 }
 
-// Wire the company-login credentials onto the Metro row. password_hash and
-// contact_name live in the suppliers table (not supplier_accounts) — that's
-// what /api/supplier-portal/company-login authenticates against.
+// Wire the company-login credentials onto the Metro row so the supplier
+// portal's /api/supplier-portal/company-login can authenticate.
 const supplierDemoHash = bcrypt.hashSync(SUPPLIER_DEMO_PASSWORD, 10);
 run(
-  `UPDATE suppliers
-      SET password_hash = ?, contact_name = ?
+  `UPDATE suppliers SET password_hash = ?, contact_name = ?
     WHERE id = ? AND restaurant_id = ?`,
   [supplierDemoHash, 'Jean Dupont (commercial Metro)', supplierIds['Metro Paris Nation'], RID]
 );
 log(`Metro company-login: ${SUPPLIER_DEMO_EMAIL} / ${SUPPLIER_DEMO_PASSWORD}`);
 
-// ─── 3b. Supplier portal accounts (Metro, Pomona, France Boissons) ─────────
+// ─── 3b. Supplier portal accounts ──────────────────────────────────────────
 section('Supplier portal accounts');
 const supplierLogins = [
-  { supplier: 'Metro Paris Nation',   name: 'Jean Dupont',      email: SUPPLIER_DEMO_EMAIL,             pin: SUPPLIER_DEMO_PIN },
-  { supplier: 'Pomona TerreAzur',     name: 'Pomona Commandes', email: 'commandes@pomona-terreazur.fr', pin: '2222' },
-  { supplier: 'France Boissons',      name: 'FB Commandes',     email: 'commandes@france-boissons.fr',  pin: '3333' },
+  { supplier: 'Metro Paris Nation', name: 'Jean Dupont',       email: SUPPLIER_DEMO_EMAIL,           pin: SUPPLIER_DEMO_PIN },
+  { supplier: 'PassionFroid',       name: 'Sandrine Bertrand', email: 'commandes@passionfroid.fr',   pin: '3333' },
+  { supplier: 'TerreAzur',          name: 'Mathieu Roux',      email: 'commandes@terreazur.fr',      pin: '2222' },
 ];
 for (const sl of supplierLogins) {
   const pinHash = bcrypt.hashSync(sl.pin, 10);
@@ -1119,86 +1049,134 @@ for (const sl of supplierLogins) {
   log(`${sl.name} PIN=${sl.pin}`);
 }
 
-// ─── 3c. Supplier catalogs (Metro / Pomona / France Boissons) ──────────────
-// Same helper used by the early-exit guard so any future re-seed (or first-
-// run) ends with the demo catalogs in identical state.
+// ─── 3c. Supplier catalogs ─────────────────────────────────────────────────
 section('Supplier catalogs');
 {
   const catalog = ensureSupplierCatalogs();
   log(`${catalog.totalInserted} products inserted across ${catalog.touchedSuppliers} suppliers`);
 }
 
-// ─── 3d. Supplier demo orders (Chez Laurent → Metro, last 90 days) ─────────
-// Drives the supplier-portal dashboard KPIs, /historique tab, /stats panel,
-// and Mes clients drill-in. Without these the portal looks dead.
-section('Supplier demo orders');
+// ─── 3d. Supplier orders (8 over last 14 days) ─────────────────────────────
+section('Supplier orders');
 {
   const o = ensureSupplierOrders();
-  log(`${o.inserted} purchase_orders + ${o.notifs} notifications for Metro Paris Nation`);
+  log(`${o.inserted} purchase_orders + ${o.notifs} notifications across 3 suppliers`);
 }
 
-// ─── 3e. Extra demo restaurants (Marie / Sakura) + Pomona orders ───────────
-// Multi-tenant supplier identity: each restaurant has its own Metro suppliers
-// row keyed on the demo email; the supplier portal uses email-based identity
-// expansion to span all 3 in Mes clients/Historique/Dashboard/Stats.
-section('Extra demo restaurants + cross-tenant orders');
+// ─── 3e. Extra demo restaurants (Marie / Sakura) ───────────────────────────
+section('Extra demo restaurants + cross-tenant Metro orders');
 {
   const e = ensureExtraDemoRestaurants();
-  log(`${e.restaurants} restaurant(s) · ${e.marie_orders} Marie + ${e.sakura_orders} Sakura Metro orders · ${e.pomona_orders} Chez Laurent → Pomona orders`);
+  log(`${e.restaurants} restaurant(s) · ${e.marie_orders} Marie + ${e.sakura_orders} Sakura Metro orders`);
 }
 
-// ─── 3f. Demo messages (Chez Laurent ↔ Metro) ──────────────────────────────
-section('Demo messages');
+// ─── 3f. Demo messages (3 threads) ─────────────────────────────────────────
+section('Demo messages (3 threads)');
 {
   const m = ensureDemoMessages();
-  log(`${m.inserted} messages dans la conversation ${m.conversationId}`);
+  log(`${m.inserted} messages across ${m.threads} threads`);
 }
 
-// ─── 4. Ingredients ────────────────────────────────────────────────────────
+// ─── 4. Ingredients (85+) ──────────────────────────────────────────────────
 section('Ingredients');
-// The boot-time seed may already have inserted generic names (UNIQUE COLLATE NOCASE).
-// We INSERT OR IGNORE to top up, then fetch ids for recipe wiring.
+// Boot-time seed-ingredients.js may already have generic names (UNIQUE
+// COLLATE NOCASE on name). INSERT OR IGNORE then UPDATE so we own the row's
+// price/category/allergens for our scope.
 const ingredients = [
-  // Viandes
-  { name: 'entrecôte de bœuf',        cat: 'viandes',    unit: 'g',     price: 32.00, priceUnit: 'kg', waste: 8,  allergens: null },
-  { name: 'suprême de volaille',      cat: 'viandes',    unit: 'g',     price: 12.50, priceUnit: 'kg', waste: 5,  allergens: null },
-  { name: 'cuisse de canard confite', cat: 'viandes',    unit: 'pièce', price: 4.50,  priceUnit: 'pièce', waste: 0, allergens: null },
-  { name: 'bœuf haché 15% MG',        cat: 'viandes',    unit: 'g',     price: 11.00, priceUnit: 'kg', waste: 0,  allergens: null },
-  { name: 'lardons fumés',            cat: 'viandes',    unit: 'g',     price: 9.80,  priceUnit: 'kg', waste: 0,  allergens: null },
-  { name: 'foie de porc',             cat: 'viandes',    unit: 'g',     price: 6.00,  priceUnit: 'kg', waste: 10, allergens: null },
-  // Poissons
-  { name: 'pavé de saumon',           cat: 'poissons',   unit: 'g',     price: 24.00, priceUnit: 'kg', waste: 8,  allergens: 'poisson' },
-  { name: 'saumon extra-frais sashimi', cat: 'poissons', unit: 'g',     price: 32.00, priceUnit: 'kg', waste: 15, allergens: 'poisson' },
-  // Légumes
-  { name: 'pomme de terre bintje',    cat: 'légumes',    unit: 'g',     price: 1.40,  priceUnit: 'kg', waste: 18, allergens: null },
-  { name: 'champignons de Paris',     cat: 'légumes',    unit: 'g',     price: 5.80,  priceUnit: 'kg', waste: 10, allergens: null },
-  { name: 'cèpes frais',              cat: 'légumes',    unit: 'g',     price: 38.00, priceUnit: 'kg', waste: 15, allergens: null },
-  { name: 'oignon jaune',             cat: 'légumes',    unit: 'g',     price: 1.50,  priceUnit: 'kg', waste: 10, allergens: null },
-  { name: 'échalote grise',           cat: 'légumes',    unit: 'g',     price: 5.50,  priceUnit: 'kg', waste: 10, allergens: null },
-  { name: 'ail rose',                 cat: 'légumes',    unit: 'g',     price: 9.00,  priceUnit: 'kg', waste: 20, allergens: null },
-  { name: 'cœur de romaine',          cat: 'légumes',    unit: 'pièce', price: 1.80,  priceUnit: 'pièce', waste: 15, allergens: null },
-  { name: 'tomate cœur de bœuf',      cat: 'légumes',    unit: 'g',     price: 4.20,  priceUnit: 'kg', waste: 5,  allergens: null },
-  { name: 'pomme golden',             cat: 'fruits',     unit: 'g',     price: 2.40,  priceUnit: 'kg', waste: 10, allergens: null },
-  // Produits laitiers
-  { name: 'beurre AOP Charentes',     cat: 'produits laitiers', unit: 'g',  price: 12.00, priceUnit: 'kg', waste: 0, allergens: 'lait' },
-  { name: 'crème liquide 35% MG',     cat: 'produits laitiers', unit: 'ml', price: 5.20,  priceUnit: 'l',  waste: 0, allergens: 'lait' },
-  { name: 'parmesan reggiano',        cat: 'produits laitiers', unit: 'g',  price: 28.00, priceUnit: 'kg', waste: 5, allergens: 'lait' },
-  { name: 'gruyère râpé',             cat: 'produits laitiers', unit: 'g',  price: 14.50, priceUnit: 'kg', waste: 0, allergens: 'lait' },
-  { name: 'œuf fermier',              cat: 'produits laitiers', unit: 'pièce', price: 0.42, priceUnit: 'pièce', waste: 12, allergens: 'œuf' },
-  { name: 'mascarpone',               cat: 'produits laitiers', unit: 'g',  price: 7.80,  priceUnit: 'kg', waste: 0, allergens: 'lait' },
-  // Épicerie
-  { name: 'pain de mie brioché',      cat: 'épicerie',   unit: 'g',     price: 6.00,  priceUnit: 'kg', waste: 5,  allergens: 'gluten,lait,œuf' },
-  { name: 'farine T55',               cat: 'épicerie',   unit: 'g',     price: 1.10,  priceUnit: 'kg', waste: 0,  allergens: 'gluten' },
-  { name: 'riz arborio',              cat: 'épicerie',   unit: 'g',     price: 3.80,  priceUnit: 'kg', waste: 0,  allergens: null },
-  { name: 'bouillon de volaille',     cat: 'épicerie',   unit: 'ml',    price: 4.50,  priceUnit: 'l',  waste: 0,  allergens: null },
-  { name: 'vin blanc de cuisson',     cat: 'épicerie',   unit: 'ml',    price: 3.80,  priceUnit: 'l',  waste: 0,  allergens: 'sulfites' },
-  { name: 'sucre semoule',            cat: 'épicerie',   unit: 'g',     price: 1.20,  priceUnit: 'kg', waste: 0,  allergens: null },
-  { name: 'chocolat noir 70%',        cat: 'épicerie',   unit: 'g',     price: 14.00, priceUnit: 'kg', waste: 0,  allergens: 'lait,soja' },
-  { name: 'gousse de vanille',        cat: 'épicerie',   unit: 'pièce', price: 2.80,  priceUnit: 'pièce', waste: 0, allergens: null },
-  { name: 'miel de Provence',         cat: 'épicerie',   unit: 'g',     price: 18.00, priceUnit: 'kg', waste: 0,  allergens: null },
-  // Herbes
-  { name: 'thym frais',               cat: 'herbes',     unit: 'botte', price: 1.20, priceUnit: 'botte', waste: 40, allergens: null },
-  { name: 'persil plat',              cat: 'herbes',     unit: 'botte', price: 1.00, priceUnit: 'botte', waste: 30, allergens: null },
+  // ── Viandes (12)
+  { name: 'entrecôte de bœuf',        cat: 'viandes',    unit: 'g',     price: 32.00, priceUnit: 'kg',    waste: 8,  allergens: null },
+  { name: 'onglet de bœuf',           cat: 'viandes',    unit: 'g',     price: 21.50, priceUnit: 'kg',    waste: 8,  allergens: null },
+  { name: 'bavette d\'aloyau',        cat: 'viandes',    unit: 'g',     price: 17.50, priceUnit: 'kg',    waste: 8,  allergens: null },
+  { name: 'joue de bœuf',             cat: 'viandes',    unit: 'g',     price: 13.80, priceUnit: 'kg',    waste: 12, allergens: null },
+  { name: 'bœuf haché 15% MG',        cat: 'viandes',    unit: 'g',     price: 11.00, priceUnit: 'kg',    waste: 0,  allergens: null },
+  { name: 'suprême de volaille',      cat: 'viandes',    unit: 'g',     price: 12.50, priceUnit: 'kg',    waste: 5,  allergens: null },
+  { name: 'cuisse de volaille',       cat: 'viandes',    unit: 'g',     price: 7.20,  priceUnit: 'kg',    waste: 12, allergens: null },
+  { name: 'magret de canard',         cat: 'viandes',    unit: 'g',     price: 19.50, priceUnit: 'kg',    waste: 8,  allergens: null },
+  { name: 'cuisse de canard confite', cat: 'viandes',    unit: 'pièce', price: 4.20,  priceUnit: 'pièce', waste: 0,  allergens: null },
+  { name: 'saucisse de Toulouse',     cat: 'viandes',    unit: 'g',     price: 7.90,  priceUnit: 'kg',    waste: 0,  allergens: null },
+  { name: 'filet mignon de porc',     cat: 'viandes',    unit: 'g',     price: 14.50, priceUnit: 'kg',    waste: 5,  allergens: null },
+  { name: 'foie de porc',             cat: 'viandes',    unit: 'g',     price: 6.00,  priceUnit: 'kg',    waste: 10, allergens: null },
+  // ── Charcuterie (5)
+  { name: 'lardons fumés',            cat: 'charcuterie', unit: 'g',    price: 9.80,  priceUnit: 'kg',    waste: 0,  allergens: null },
+  { name: 'jambon de Paris',          cat: 'charcuterie', unit: 'g',    price: 9.80,  priceUnit: 'kg',    waste: 0,  allergens: null },
+  { name: 'saucisson sec',            cat: 'charcuterie', unit: 'g',    price: 18.50, priceUnit: 'kg',    waste: 5,  allergens: null },
+  { name: 'chorizo doux',             cat: 'charcuterie', unit: 'g',    price: 16.80, priceUnit: 'kg',    waste: 0,  allergens: null },
+  { name: 'pâté de campagne',         cat: 'charcuterie', unit: 'g',    price: 14.50, priceUnit: 'kg',    waste: 0,  allergens: 'œuf' },
+  // ── Poissons & fruits de mer (10)
+  { name: 'pavé de saumon',                cat: 'poissons', unit: 'g', price: 22.00, priceUnit: 'kg',  waste: 8,  allergens: 'poisson' },
+  { name: 'saumon extra-frais sashimi',    cat: 'poissons', unit: 'g', price: 32.00, priceUnit: 'kg',  waste: 15, allergens: 'poisson' },
+  { name: 'cabillaud',                     cat: 'poissons', unit: 'g', price: 16.00, priceUnit: 'kg',  waste: 12, allergens: 'poisson' },
+  { name: 'dorade royale',                 cat: 'poissons', unit: 'g', price: 18.50, priceUnit: 'kg',  waste: 30, allergens: 'poisson' },
+  { name: 'lieu jaune',                    cat: 'poissons', unit: 'g', price: 16.00, priceUnit: 'kg',  waste: 15, allergens: 'poisson' },
+  { name: 'noix de Saint-Jacques',         cat: 'poissons', unit: 'g', price: 38.00, priceUnit: 'kg',  waste: 0,  allergens: 'mollusques' },
+  { name: 'gambas',                        cat: 'poissons', unit: 'g', price: 22.00, priceUnit: 'kg',  waste: 30, allergens: 'crustacés' },
+  { name: 'crevettes roses cuites',        cat: 'poissons', unit: 'g', price: 14.90, priceUnit: 'kg',  waste: 25, allergens: 'crustacés' },
+  { name: 'moules de bouchot',             cat: 'poissons', unit: 'g', price: 4.50,  priceUnit: 'kg',  waste: 30, allergens: 'mollusques' },
+  { name: 'huîtres n°3',                   cat: 'poissons', unit: 'pièce', price: 0.95, priceUnit: 'pièce', waste: 0, allergens: 'mollusques' },
+  // ── Légumes (16)
+  { name: 'pomme de terre bintje',    cat: 'légumes', unit: 'g',     price: 1.40,  priceUnit: 'kg',    waste: 18, allergens: null },
+  { name: 'carotte',                  cat: 'légumes', unit: 'g',     price: 1.40,  priceUnit: 'kg',    waste: 12, allergens: null },
+  { name: 'oignon jaune',             cat: 'légumes', unit: 'g',     price: 1.50,  priceUnit: 'kg',    waste: 10, allergens: null },
+  { name: 'échalote grise',           cat: 'légumes', unit: 'g',     price: 5.50,  priceUnit: 'kg',    waste: 10, allergens: null },
+  { name: 'ail rose',                 cat: 'légumes', unit: 'g',     price: 9.00,  priceUnit: 'kg',    waste: 20, allergens: null },
+  { name: 'poireau',                  cat: 'légumes', unit: 'g',     price: 2.50,  priceUnit: 'kg',    waste: 25, allergens: null },
+  { name: 'courgette',                cat: 'légumes', unit: 'g',     price: 2.50,  priceUnit: 'kg',    waste: 8,  allergens: null },
+  { name: 'aubergine',                cat: 'légumes', unit: 'g',     price: 2.40,  priceUnit: 'kg',    waste: 8,  allergens: null },
+  { name: 'poivron rouge',            cat: 'légumes', unit: 'g',     price: 3.20,  priceUnit: 'kg',    waste: 15, allergens: null },
+  { name: 'tomate cœur de bœuf',      cat: 'légumes', unit: 'g',     price: 4.20,  priceUnit: 'kg',    waste: 5,  allergens: null },
+  { name: 'champignons de Paris',     cat: 'légumes', unit: 'g',     price: 5.80,  priceUnit: 'kg',    waste: 10, allergens: null },
+  { name: 'cèpes frais',              cat: 'légumes', unit: 'g',     price: 38.00, priceUnit: 'kg',    waste: 15, allergens: null },
+  { name: 'haricots verts',           cat: 'légumes', unit: 'g',     price: 5.50,  priceUnit: 'kg',    waste: 8,  allergens: null },
+  { name: 'endive',                   cat: 'légumes', unit: 'g',     price: 2.80,  priceUnit: 'kg',    waste: 5,  allergens: null },
+  { name: 'fenouil',                  cat: 'légumes', unit: 'g',     price: 3.00,  priceUnit: 'kg',    waste: 15, allergens: null },
+  { name: 'cœur de romaine',          cat: 'légumes', unit: 'pièce', price: 1.80,  priceUnit: 'pièce', waste: 15, allergens: null },
+  // ── Fruits (6)
+  { name: 'pomme golden',             cat: 'fruits', unit: 'g',     price: 2.40,  priceUnit: 'kg', waste: 10, allergens: null },
+  { name: 'poire conférence',         cat: 'fruits', unit: 'g',     price: 3.20,  priceUnit: 'kg', waste: 12, allergens: null },
+  { name: 'fraise gariguette',        cat: 'fruits', unit: 'g',     price: 9.50,  priceUnit: 'kg', waste: 10, allergens: null },
+  { name: 'framboise',                cat: 'fruits', unit: 'g',     price: 17.50, priceUnit: 'kg', waste: 5,  allergens: null },
+  { name: 'citron',                   cat: 'fruits', unit: 'g',     price: 2.50,  priceUnit: 'kg', waste: 30, allergens: null },
+  { name: 'orange',                   cat: 'fruits', unit: 'g',     price: 2.20,  priceUnit: 'kg', waste: 35, allergens: null },
+  // ── Produits laitiers (9)
+  { name: 'beurre AOP Charentes',     cat: 'produits laitiers', unit: 'g',     price: 12.00, priceUnit: 'kg', waste: 0, allergens: 'lait' },
+  { name: 'crème liquide 35% MG',     cat: 'produits laitiers', unit: 'ml',    price: 5.20,  priceUnit: 'l',  waste: 0, allergens: 'lait' },
+  { name: 'crème fraîche épaisse',    cat: 'produits laitiers', unit: 'g',     price: 6.20,  priceUnit: 'kg', waste: 0, allergens: 'lait' },
+  { name: 'lait entier',              cat: 'produits laitiers', unit: 'ml',    price: 1.10,  priceUnit: 'l',  waste: 0, allergens: 'lait' },
+  { name: 'parmesan reggiano',        cat: 'produits laitiers', unit: 'g',     price: 28.00, priceUnit: 'kg', waste: 5, allergens: 'lait' },
+  { name: 'gruyère râpé',             cat: 'produits laitiers', unit: 'g',     price: 14.50, priceUnit: 'kg', waste: 0, allergens: 'lait' },
+  { name: 'mozzarella di bufala',     cat: 'produits laitiers', unit: 'g',     price: 18.00, priceUnit: 'kg', waste: 0, allergens: 'lait' },
+  { name: 'œuf fermier',              cat: 'produits laitiers', unit: 'pièce', price: 0.42,  priceUnit: 'pièce', waste: 12, allergens: 'œuf' },
+  { name: 'mascarpone',               cat: 'produits laitiers', unit: 'g',     price: 7.80,  priceUnit: 'kg', waste: 0, allergens: 'lait' },
+  // ── Épicerie (16)
+  { name: 'pain de mie brioché',      cat: 'épicerie', unit: 'g',  price: 6.00,  priceUnit: 'kg', waste: 5,  allergens: 'gluten,lait,œuf' },
+  { name: 'farine T55',               cat: 'épicerie', unit: 'g',  price: 1.10,  priceUnit: 'kg', waste: 0,  allergens: 'gluten' },
+  { name: 'riz arborio',              cat: 'épicerie', unit: 'g',  price: 3.80,  priceUnit: 'kg', waste: 0,  allergens: null },
+  { name: 'pâtes penne',              cat: 'épicerie', unit: 'g',  price: 1.50,  priceUnit: 'kg', waste: 0,  allergens: 'gluten' },
+  { name: 'pâtes spaghetti',          cat: 'épicerie', unit: 'g',  price: 1.50,  priceUnit: 'kg', waste: 0,  allergens: 'gluten' },
+  { name: 'lentilles vertes du Puy',  cat: 'épicerie', unit: 'g',  price: 3.50,  priceUnit: 'kg', waste: 0,  allergens: null },
+  { name: 'bouillon de volaille',     cat: 'épicerie', unit: 'ml', price: 4.50,  priceUnit: 'l',  waste: 0,  allergens: null },
+  { name: 'fond de veau',             cat: 'épicerie', unit: 'ml', price: 12.00, priceUnit: 'l',  waste: 0,  allergens: null },
+  { name: 'vin blanc de cuisson',     cat: 'épicerie', unit: 'ml', price: 3.80,  priceUnit: 'l',  waste: 0,  allergens: 'sulfites' },
+  { name: 'vin rouge de cuisson',     cat: 'épicerie', unit: 'ml', price: 3.80,  priceUnit: 'l',  waste: 0,  allergens: 'sulfites' },
+  { name: 'huile d\'olive vierge extra', cat: 'épicerie', unit: 'ml', price: 6.50, priceUnit: 'l', waste: 0,  allergens: null },
+  { name: 'huile de tournesol',       cat: 'épicerie', unit: 'ml', price: 2.80,  priceUnit: 'l',  waste: 0,  allergens: null },
+  { name: 'vinaigre balsamique',      cat: 'épicerie', unit: 'ml', price: 4.80,  priceUnit: 'l',  waste: 0,  allergens: 'sulfites' },
+  { name: 'moutarde de Dijon',        cat: 'épicerie', unit: 'g',  price: 3.20,  priceUnit: 'kg', waste: 0,  allergens: 'moutarde' },
+  { name: 'sel de Guérande',          cat: 'épicerie', unit: 'g',  price: 3.50,  priceUnit: 'kg', waste: 0,  allergens: null },
+  { name: 'poivre noir moulu',        cat: 'épicerie', unit: 'g',  price: 28.00, priceUnit: 'kg', waste: 0,  allergens: null },
+  // ── Sucré (6)
+  { name: 'sucre semoule',            cat: 'épicerie', unit: 'g',     price: 1.20,  priceUnit: 'kg', waste: 0, allergens: null },
+  { name: 'sucre cassonade',          cat: 'épicerie', unit: 'g',     price: 1.80,  priceUnit: 'kg', waste: 0, allergens: null },
+  { name: 'chocolat noir 70%',        cat: 'épicerie', unit: 'g',     price: 14.00, priceUnit: 'kg', waste: 0, allergens: 'lait,soja' },
+  { name: 'gousse de vanille',        cat: 'épicerie', unit: 'pièce', price: 2.80,  priceUnit: 'pièce', waste: 0, allergens: null },
+  { name: 'miel de Provence',         cat: 'épicerie', unit: 'g',     price: 18.00, priceUnit: 'kg', waste: 0, allergens: null },
+  { name: 'amandes effilées',         cat: 'épicerie', unit: 'g',     price: 16.00, priceUnit: 'kg', waste: 0, allergens: 'fruits à coque' },
+  // ── Herbes (5)
+  { name: 'thym frais',               cat: 'herbes', unit: 'botte', price: 1.50, priceUnit: 'botte', waste: 40, allergens: null },
+  { name: 'persil plat',              cat: 'herbes', unit: 'botte', price: 0.80, priceUnit: 'botte', waste: 30, allergens: null },
+  { name: 'ciboulette',               cat: 'herbes', unit: 'botte', price: 1.00, priceUnit: 'botte', waste: 25, allergens: null },
+  { name: 'basilic frais',            cat: 'herbes', unit: 'botte', price: 1.20, priceUnit: 'botte', waste: 30, allergens: null },
+  { name: 'estragon frais',           cat: 'herbes', unit: 'botte', price: 1.80, priceUnit: 'botte', waste: 30, allergens: null },
 ];
 
 const insertIng = db.prepare(
@@ -1226,31 +1204,33 @@ function ingId(name) {
   return id;
 }
 
-// ─── 4b. Supplier prices (varied per supplier for ≥10 staples) ─────────────
+// ─── 4b. Supplier prices ───────────────────────────────────────────────────
 section('Supplier prices');
 const supplierPrices = [
-  // product,                         supplier,                  price, unit
-  ['entrecôte de bœuf',              'Bigard Boucherie Pro',    32.00, 'kg'],
-  ['entrecôte de bœuf',              'Metro Paris Nation',      34.50, 'kg'],
-  ['suprême de volaille',            'Bigard Boucherie Pro',    12.50, 'kg'],
-  ['suprême de volaille',            'Metro Paris Nation',      13.20, 'kg'],
-  ['cuisse de canard confite',       'Metro Paris Nation',       4.50, 'pièce'],
-  ['pavé de saumon',                 'Marée du Jour',           24.00, 'kg'],
-  ['pavé de saumon',                 'Brake France',            22.50, 'kg'],
-  ['saumon extra-frais sashimi',     'Marée du Jour',           32.00, 'kg'],
-  ['pomme de terre bintje',          'Pomona TerreAzur',         1.40, 'kg'],
-  ['pomme de terre bintje',          'Metro Paris Nation',       1.55, 'kg'],
-  ['champignons de Paris',           'Pomona TerreAzur',         5.80, 'kg'],
-  ['cèpes frais',                    'Pomona TerreAzur',        38.00, 'kg'],
-  ['oignon jaune',                   'Pomona TerreAzur',         1.50, 'kg'],
-  ['cœur de romaine',                'Pomona TerreAzur',         1.80, 'pièce'],
-  ['tomate cœur de bœuf',            'Pomona TerreAzur',         4.20, 'kg'],
-  ['beurre AOP Charentes',           'Metro Paris Nation',      12.00, 'kg'],
-  ['crème liquide 35% MG',           'Metro Paris Nation',       5.20, 'l'],
-  ['parmesan reggiano',              'Metro Paris Nation',      28.00, 'kg'],
-  ['œuf fermier',                    'Pomona TerreAzur',         0.42, 'pièce'],
-  ['vin blanc de cuisson',           'France Boissons',          3.80, 'l'],
-  ['chocolat noir 70%',              'Metro Paris Nation',      14.00, 'kg'],
+  ['entrecôte de bœuf',              'Metro Paris Nation',  18.90, 'kg'],
+  ['entrecôte de bœuf',              'PassionFroid',        20.50, 'kg'],
+  ['onglet de bœuf',                 'PassionFroid',        21.50, 'kg'],
+  ['suprême de volaille',            'PassionFroid',        12.50, 'kg'],
+  ['suprême de volaille',            'Metro Paris Nation',  13.20, 'kg'],
+  ['cuisse de canard confite',       'PassionFroid',         4.20, 'pièce'],
+  ['pavé de saumon',                 'PassionFroid',        22.00, 'kg'],
+  ['pavé de saumon',                 'Metro Paris Nation',  19.00, 'kg'],
+  ['saumon extra-frais sashimi',     'PassionFroid',        32.00, 'kg'],
+  ['noix de Saint-Jacques',          'PassionFroid',        38.00, 'kg'],
+  ['pomme de terre bintje',          'TerreAzur',            1.10, 'kg'],
+  ['pomme de terre bintje',          'Metro Paris Nation',   1.20, 'kg'],
+  ['champignons de Paris',           'TerreAzur',            5.80, 'kg'],
+  ['cèpes frais',                    'TerreAzur',           38.00, 'kg'],
+  ['oignon jaune',                   'TerreAzur',            1.50, 'kg'],
+  ['cœur de romaine',                'TerreAzur',            1.80, 'pièce'],
+  ['tomate cœur de bœuf',            'TerreAzur',            4.20, 'kg'],
+  ['estragon frais',                 'TerreAzur',            1.80, 'botte'],
+  ['beurre AOP Charentes',           'PassionFroid',        12.00, 'kg'],
+  ['crème liquide 35% MG',           'PassionFroid',         5.20, 'l'],
+  ['parmesan reggiano',              'Metro Paris Nation',  28.00, 'kg'],
+  ['œuf fermier',                    'PassionFroid',         0.42, 'pièce'],
+  ['vin blanc de cuisson',           'Metro Paris Nation',   3.80, 'l'],
+  ['chocolat noir 70%',              'Metro Paris Nation',  14.00, 'kg'],
 ];
 const insertSP = db.prepare(
   `INSERT OR IGNORE INTO supplier_prices (ingredient_id, supplier_id, price, unit, restaurant_id)
@@ -1267,12 +1247,97 @@ for (const [name, supplier, price, unit] of supplierPrices) {
 }
 log(`${spCount} supplier prices`);
 
-// ─── 5. Recipes ────────────────────────────────────────────────────────────
+// ─── 5. Sub-recipes (3 — fond de veau, sauce béarnaise, crème anglaise) ───
+section('Sub-recipes');
+const subRecipes = [
+  {
+    name: 'Fond de veau maison', cat: 'Bases', type: 'plat', portions: 8, prep: 30, cook: 240, sell: null,
+    desc: 'Fond brun corsé pour sauces et jus. Yields ~2L.',
+    ingredients: [
+      ['oignon jaune', 200, 'g'],
+      ['carotte', 200, 'g'],
+      ['vin rouge de cuisson', 250, 'ml'],
+      ['fond de veau', 2000, 'ml'],
+      ['thym frais', 0.3, 'botte'],
+    ],
+    steps: [
+      'Faire colorer parures de veau et os au four 200°C 30 min.',
+      'Suer la garniture aromatique, déglacer au vin rouge.',
+      'Mouiller au fond + 4L d\'eau, mijoter 4h à frémissement.',
+      'Passer au chinois fin, dégraisser, réduire à 2L.',
+    ],
+  },
+  {
+    name: 'Sauce béarnaise', cat: 'Bases', type: 'plat', portions: 4, prep: 20, cook: 5, sell: null,
+    desc: 'Sauce émulsionnée chaude, échalote, vinaigre, estragon.',
+    ingredients: [
+      ['échalote grise', 30, 'g'],
+      ['estragon frais', 0.3, 'botte'],
+      ['vinaigre balsamique', 50, 'ml'],
+      ['œuf fermier', 3, 'pièce'],
+      ['beurre AOP Charentes', 200, 'g'],
+    ],
+    steps: [
+      'Réduire échalote ciselée + vinaigre + estragon haché aux 2/3.',
+      'Hors du feu, ajouter jaunes, fouetter au bain-marie 60°C.',
+      'Incorporer beurre clarifié en filet en fouettant constamment.',
+      'Rectifier avec sel, poivre et estragon frais.',
+    ],
+  },
+  {
+    name: 'Crème anglaise', cat: 'Bases', type: 'dessert', portions: 6, prep: 10, cook: 15, sell: null,
+    desc: 'Crème vanillée à la nappe, base pour îles flottantes et glaces.',
+    ingredients: [
+      ['lait entier', 500, 'ml'],
+      ['crème liquide 35% MG', 100, 'ml'],
+      ['gousse de vanille', 1, 'pièce'],
+      ['œuf fermier', 4, 'pièce'],
+      ['sucre semoule', 80, 'g'],
+    ],
+    steps: [
+      'Infuser la vanille dans le lait + crème chauds.',
+      'Blanchir jaunes + sucre, verser le lait infusé.',
+      'Cuire à la nappe 83°C en remuant constamment.',
+      'Passer au chinois, refroidir rapidement.',
+    ],
+  },
+];
+
+const insertRecipe = db.prepare(
+  `INSERT INTO recipes (name, category, recipe_type, portions, prep_time_min, cooking_time_min, selling_price, description, restaurant_id)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+);
+const insertRI = db.prepare(
+  `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, gross_quantity, unit, restaurant_id)
+   VALUES (?, ?, ?, ?, ?)`
+);
+const insertSubRI = db.prepare(
+  `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, sub_recipe_id, gross_quantity, unit, restaurant_id)
+   VALUES (?, NULL, ?, ?, ?, ?)`
+);
+const insertStep = db.prepare(
+  `INSERT INTO recipe_steps (recipe_id, step_number, instruction) VALUES (?, ?, ?)`
+);
+
+const subRecipeId = {};
+const seedSubRecipes = db.transaction(() => {
+  for (const r of subRecipes) {
+    const rec = insertRecipe.run(r.name, r.cat, r.type, r.portions, r.prep, r.cook, r.sell, r.desc, RID);
+    const rid = rec.lastInsertRowid;
+    subRecipeId[r.name] = rid;
+    for (const [iname, qty, unit] of r.ingredients) {
+      insertRI.run(rid, ingId(iname), qty, unit, RID);
+    }
+    r.steps.forEach((s, i) => insertStep.run(rid, i + 1, s));
+  }
+});
+seedSubRecipes();
+log(`${subRecipes.length} sub-recipes (${Object.keys(subRecipeId).join(', ')})`);
+
+// ─── 5b. Recipes (15 — 5 entrées + 5 plats + 5 desserts) ───────────────────
 section('Recipes');
-// name, category, type, portions, prep, cook, sell, description, ingredients[]
-// Each ingredient: [name, gross_qty, unit]
 const recipes = [
-  // ───── Entrées ─────
+  // ───── Entrées (5) ─────
   {
     name: 'Salade César', cat: 'Entrées', type: 'entrée', portions: 1, prep: 10, cook: 5, sell: 12.50,
     desc: 'Romaine, copeaux de parmesan, croûtons maison, sauce César anchois.',
@@ -1316,6 +1381,7 @@ const recipes = [
       ['échalote grise', 15, 'g'],
       ['œuf fermier', 1, 'pièce'],
       ['pain de mie brioché', 40, 'g'],
+      ['citron', 30, 'g'],
     ],
     steps: [
       'Tailler le saumon au couteau (jamais hachoir).',
@@ -1341,28 +1407,47 @@ const recipes = [
       'Presser 24h au frais avant service.',
     ],
   },
-
-  // ───── Plats ─────
   {
-    name: 'Entrecôte grillée, frites maison', cat: 'Plats', type: 'plat', portions: 1, prep: 10, cook: 15, sell: 26.50,
-    desc: 'Entrecôte bœuf race à viande, frites bintje, beurre maître d\'hôtel.',
+    name: 'Œufs mayonnaise', cat: 'Entrées', type: 'entrée', portions: 1, prep: 15, cook: 10, sell: 6.50,
+    desc: 'Classique du bistrot : œufs durs, mayonnaise maison, salade.',
+    ingredients: [
+      ['œuf fermier', 2, 'pièce'],
+      ['huile de tournesol', 80, 'ml'],
+      ['moutarde de Dijon', 10, 'g'],
+      ['cœur de romaine', 0.3, 'pièce'],
+      ['ciboulette', 0.1, 'botte'],
+    ],
+    steps: [
+      'Cuire les œufs durs 9 min dans l\'eau bouillante salée.',
+      'Monter la mayonnaise au fouet (jaune, moutarde, huile en filet).',
+      'Refroidir les œufs, les écaler, les couper en deux.',
+      'Dresser sur un lit de salade, napper de mayonnaise, ciboulette.',
+    ],
+  },
+
+  // ───── Plats (5) ─────
+  {
+    name: 'Entrecôte grillée, sauce béarnaise', cat: 'Plats', type: 'plat', portions: 1, prep: 10, cook: 15, sell: 27.50,
+    desc: 'Entrecôte bœuf race à viande, frites bintje maison, sauce béarnaise.',
     ingredients: [
       ['entrecôte de bœuf', 250, 'g'],
       ['pomme de terre bintje', 300, 'g'],
       ['beurre AOP Charentes', 25, 'g'],
       ['persil plat', 0.1, 'botte'],
-      ['ail rose', 3, 'g'],
+    ],
+    subRecipes: [
+      ['Sauce béarnaise', 1, 'portion'],
     ],
     steps: [
       'Tailler les pommes de terre en frites, double cuisson (160°C puis 180°C).',
       'Saisir l\'entrecôte 2 min par face (saignant), reposer 5 min.',
-      'Monter beurre maître d\'hôtel (beurre, persil, citron, échalote).',
-      'Dresser viande, beurre posé sur le dessus, frites.',
+      'Préparer la sauce béarnaise (cf. fiche dédiée).',
+      'Dresser viande, frites, sauce en saucière.',
     ],
   },
   {
     name: 'Pavé de saumon beurre blanc', cat: 'Plats', type: 'plat', portions: 1, prep: 15, cook: 15, sell: 24.00,
-    desc: 'Saumon rôti peau croustillante, beurre blanc, riz sauvage.',
+    desc: 'Saumon rôti peau croustillante, beurre blanc, riz pilaf.',
     ingredients: [
       ['pavé de saumon', 160, 'g'],
       ['riz arborio', 80, 'g'],
@@ -1379,20 +1464,22 @@ const recipes = [
     ],
   },
   {
-    name: 'Suprême de volaille, jus au fond de veau', cat: 'Plats', type: 'plat', portions: 1, prep: 10, cook: 20, sell: 19.80,
-    desc: 'Suprême fermier rôti, jus corsé, pommes grenaille.',
+    name: 'Suprême de volaille au fond de veau', cat: 'Plats', type: 'plat', portions: 1, prep: 10, cook: 20, sell: 19.80,
+    desc: 'Suprême fermier rôti, jus corsé maison, pommes grenaille.',
     ingredients: [
       ['suprême de volaille', 200, 'g'],
       ['pomme de terre bintje', 250, 'g'],
       ['beurre AOP Charentes', 20, 'g'],
       ['échalote grise', 20, 'g'],
-      ['bouillon de volaille', 150, 'ml'],
       ['thym frais', 0.1, 'botte'],
+    ],
+    subRecipes: [
+      ['Fond de veau maison', 0.15, 'portion'],
     ],
     steps: [
       'Sauter les pommes grenaille avec ail et thym.',
       'Saisir suprême côté peau 5 min, finir au four 10 min à 180°C.',
-      'Déglacer la poêle au bouillon, réduire, monter au beurre.',
+      'Déglacer la poêle au fond de veau, réduire, monter au beurre.',
       'Dresser, napper de jus.',
     ],
   },
@@ -1431,26 +1518,8 @@ const recipes = [
       'Incorporer cèpes, beurre et parmesan, rectifier.',
     ],
   },
-  {
-    name: 'Burger maison bœuf fermier', cat: 'Plats', type: 'plat', portions: 1, prep: 10, cook: 10, sell: 17.50,
-    desc: 'Steak haché 15% MG, pain brioché, gruyère fondu, lardons.',
-    ingredients: [
-      ['bœuf haché 15% MG', 180, 'g'],
-      ['pain de mie brioché', 120, 'g'],
-      ['gruyère râpé', 40, 'g'],
-      ['lardons fumés', 40, 'g'],
-      ['tomate cœur de bœuf', 50, 'g'],
-      ['cœur de romaine', 0.3, 'pièce'],
-    ],
-    steps: [
-      'Façonner le steak haché, saisir 3 min par face.',
-      'Ajouter gruyère en fin de cuisson.',
-      'Toaster le pain, garnir : salade, tomate, steak, lardons.',
-      'Servir avec frites maison.',
-    ],
-  },
 
-  // ───── Desserts ─────
+  // ───── Desserts (5) ─────
   {
     name: 'Crème brûlée à la vanille', cat: 'Desserts', type: 'dessert', portions: 1, prep: 15, cook: 60, sell: 8.50,
     desc: 'Crème onctueuse à la vanille bourbon, caramel craquant.',
@@ -1476,6 +1545,7 @@ const recipes = [
       ['beurre AOP Charentes', 80, 'g'],
       ['farine T55', 200, 'g'],
       ['œuf fermier', 1, 'pièce'],
+      ['crème fraîche épaisse', 100, 'g'],
     ],
     steps: [
       'Caraméliser sucre + beurre en moule à Tatin.',
@@ -1505,13 +1575,14 @@ const recipes = [
     desc: 'Blancs pochés, crème anglaise vanille, caramel.',
     ingredients: [
       ['œuf fermier', 2, 'pièce'],
-      ['sucre semoule', 40, 'g'],
-      ['crème liquide 35% MG', 120, 'ml'],
-      ['gousse de vanille', 0.25, 'pièce'],
+      ['sucre cassonade', 40, 'g'],
       ['beurre AOP Charentes', 15, 'g'],
     ],
+    subRecipes: [
+      ['Crème anglaise', 0.2, 'portion'],
+    ],
     steps: [
-      'Crème anglaise : jaunes + sucre + crème vanillée à 83°C.',
+      'Préparer la crème anglaise (cf. fiche dédiée), réserver au frais.',
       'Monter blancs fermes, pocher 1 min en cuillères au lait frémissant.',
       'Caramel au beurre salé : sucre brun, beurre, crème.',
       'Dresser crème, île, filet de caramel.',
@@ -1535,68 +1606,95 @@ const recipes = [
   },
 ];
 
-const insertRecipe = db.prepare(
-  `INSERT INTO recipes (name, category, recipe_type, portions, prep_time_min, cooking_time_min, selling_price, description, restaurant_id)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-);
-const insertRI = db.prepare(
-  `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, gross_quantity, unit, restaurant_id)
-   VALUES (?, ?, ?, ?, ?)`
-);
-const insertStep = db.prepare(
-  `INSERT INTO recipe_steps (recipe_id, step_number, instruction) VALUES (?, ?, ?)`
-);
-
+const recipeIdByName = {};
 const seedRecipes = db.transaction(() => {
   for (const r of recipes) {
     const rec = insertRecipe.run(r.name, r.cat, r.type, r.portions, r.prep, r.cook, r.sell, r.desc, RID);
     const rid = rec.lastInsertRowid;
+    recipeIdByName[r.name] = rid;
     for (const [iname, qty, unit] of r.ingredients) {
       insertRI.run(rid, ingId(iname), qty, unit, RID);
+    }
+    if (Array.isArray(r.subRecipes)) {
+      for (const [subName, qty, unit] of r.subRecipes) {
+        const subId = subRecipeId[subName];
+        if (!subId) throw new Error(`Sub-recipe not found: ${subName}`);
+        insertSubRI.run(rid, subId, qty, unit, RID);
+      }
     }
     r.steps.forEach((s, i) => insertStep.run(rid, i + 1, s));
   }
 });
 seedRecipes();
-log(`${recipes.length} recipes + ingredients + steps`);
+log(`${recipes.length} recipes (5 entrées + 5 plats + 5 desserts) — 3 use sub-recipes`);
 
-// ─── 5b. Stock quantities (realistic brasserie levels) ─────────────────────
+// ─── 6. Stock quantities + 2-week movement history ─────────────────────────
 section('Stock quantities');
 const stockItems = [
-  ['entrecôte de bœuf',        5000, 'g',      1000],
-  ['suprême de volaille',      4000, 'g',      1000],
-  ['cuisse de canard confite',   20, 'pièce',     5],
-  ['bœuf haché 15% MG',        3000, 'g',       500],
-  ['lardons fumés',            2000, 'g',       500],
-  ['foie de porc',             1500, 'g',         0],
-  ['pavé de saumon',           3000, 'g',      1000],
+  ['entrecôte de bœuf',          5000, 'g',     1000],
+  ['onglet de bœuf',             3000, 'g',      500],
+  ['bavette d\'aloyau',          2500, 'g',      500],
+  ['bœuf haché 15% MG',          3000, 'g',      500],
+  ['suprême de volaille',        4000, 'g',     1000],
+  ['cuisse de canard confite',     20, 'pièce',    5],
+  ['magret de canard',           1500, 'g',      300],
+  ['saucisse de Toulouse',       2000, 'g',      500],
+  ['lardons fumés',              2000, 'g',      500],
+  ['foie de porc',               1500, 'g',        0],
+  ['pavé de saumon',             3000, 'g',     1000],
   ['saumon extra-frais sashimi', 1500, 'g',      500],
-  ['pomme de terre bintje',   15000, 'g',      3000],
-  ['champignons de Paris',     2000, 'g',       500],
-  ['cèpes frais',               800, 'g',         0],
-  ['oignon jaune',             5000, 'g',      1000],
-  ['échalote grise',           1500, 'g',       300],
-  ['ail rose',                 1000, 'g',       200],
-  ['cœur de romaine',            20, 'pièce',     5],
-  ['tomate cœur de bœuf',      3000, 'g',       500],
-  ['pomme golden',             5000, 'g',      1000],
-  ['beurre AOP Charentes',     3000, 'g',       500],
-  ['crème liquide 35% MG',     5000, 'ml',     1000],
-  ['parmesan reggiano',        1500, 'g',       300],
-  ['gruyère râpé',             2000, 'g',       500],
-  ['œuf fermier',                60, 'pièce',    12],
-  ['mascarpone',               1000, 'g',         0],
-  ['pain de mie brioché',      2000, 'g',       500],
-  ['farine T55',               5000, 'g',      1000],
-  ['riz arborio',              3000, 'g',       500],
-  ['bouillon de volaille',     5000, 'ml',     1000],
-  ['vin blanc de cuisson',     3000, 'ml',      500],
-  ['sucre semoule',            3000, 'g',       500],
-  ['chocolat noir 70%',        1500, 'g',       300],
-  ['gousse de vanille',          10, 'pièce',     2],
-  ['miel de Provence',         1000, 'g',         0],
-  ['thym frais',                  5, 'botte',     1],
-  ['persil plat',                 5, 'botte',     1],
+  ['cabillaud',                  1500, 'g',      300],
+  ['noix de Saint-Jacques',       400, 'g',      100],
+  ['gambas',                      800, 'g',        0],
+  ['pomme de terre bintje',     15000, 'g',     3000],
+  ['carotte',                    4000, 'g',      500],
+  ['oignon jaune',               5000, 'g',     1000],
+  ['échalote grise',             1500, 'g',      300],
+  ['ail rose',                   1000, 'g',      200],
+  ['poireau',                    2000, 'g',      500],
+  ['courgette',                  3000, 'g',      500],
+  ['tomate cœur de bœuf',        3000, 'g',      500],
+  ['champignons de Paris',       2000, 'g',      500],
+  ['cèpes frais',                 800, 'g',        0],
+  ['haricots verts',             2000, 'g',      300],
+  ['cœur de romaine',              20, 'pièce',    5],
+  ['fenouil',                    1500, 'g',      300],
+  ['pomme golden',               5000, 'g',     1000],
+  ['fraise gariguette',          1500, 'g',      300],
+  ['citron',                     2000, 'g',      300],
+  ['orange',                     2000, 'g',      300],
+  ['beurre AOP Charentes',       3000, 'g',      500],
+  ['crème liquide 35% MG',       5000, 'ml',    1000],
+  ['crème fraîche épaisse',      2000, 'g',      500],
+  ['lait entier',                6000, 'ml',    1000],
+  ['parmesan reggiano',          1500, 'g',      300],
+  ['gruyère râpé',               2000, 'g',      500],
+  ['mozzarella di bufala',       1000, 'g',      200],
+  ['œuf fermier',                  60, 'pièce',   12],
+  ['mascarpone',                 1000, 'g',        0],
+  ['pain de mie brioché',        2000, 'g',      500],
+  ['farine T55',                 5000, 'g',     1000],
+  ['riz arborio',                3000, 'g',      500],
+  ['pâtes penne',                3000, 'g',      500],
+  ['lentilles vertes du Puy',    2000, 'g',      500],
+  ['bouillon de volaille',       5000, 'ml',    1000],
+  ['fond de veau',               2000, 'ml',      500],
+  ['vin blanc de cuisson',       3000, 'ml',     500],
+  ['vin rouge de cuisson',       3000, 'ml',     500],
+  ['huile d\'olive vierge extra', 4000, 'ml',    1000],
+  ['huile de tournesol',         5000, 'ml',    1000],
+  ['vinaigre balsamique',        1000, 'ml',     200],
+  ['moutarde de Dijon',           800, 'g',      200],
+  ['sucre semoule',              3000, 'g',      500],
+  ['sucre cassonade',            1000, 'g',      200],
+  ['chocolat noir 70%',          1500, 'g',      300],
+  ['gousse de vanille',            10, 'pièce',    2],
+  ['miel de Provence',           1000, 'g',        0],
+  ['amandes effilées',            500, 'g',      100],
+  ['thym frais',                    5, 'botte',    1],
+  ['persil plat',                   5, 'botte',    1],
+  ['ciboulette',                    3, 'botte',    1],
+  ['estragon frais',                3, 'botte',    1],
 ];
 const upsertStock = db.prepare(
   `INSERT OR IGNORE INTO stock (restaurant_id, ingredient_id, quantity, unit, min_quantity) VALUES (?, ?, ?, ?, ?)`
@@ -1612,140 +1710,408 @@ for (const [name, qty, unit, minQty] of stockItems) {
   updateStock.run(qty, unit, minQty, RID, iid);
   stockCount++;
 }
-log(`${stockCount} stock items with realistic quantities`);
+log(`${stockCount} stock items (some near threshold for low-stock alerts)`);
 
-// ─── 5c. Sales data (orders + order_items, last 30 days) ────────────────────
-section('Sales data (orders)');
-// Lookup recipe IDs by name (inserted in section 5)
-const recipeRow = (name) => get('SELECT id FROM recipes WHERE name = ? AND restaurant_id = ?', [name, RID]);
+section('Stock movements (2 weeks of receptions, consumptions, losses)');
+const insertMovement = db.prepare(
+  `INSERT INTO stock_movements (restaurant_id, ingredient_id, movement_type, quantity, unit, reason, supplier_id, batch_number, dlc, unit_price, recorded_by, recorded_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+);
+const seedMovements = db.transaction(() => {
+  let count = 0;
+  // Receptions tied to recent supplier orders (~3-13 days ago).
+  const receptions = [
+    { name: 'pavé de saumon',           qty: 5000,  unit: 'g',  supplier: 'PassionFroid',       batch: 'PF-SAU-2604', dlc_days: 3,  daysAgo: 3,  price: 0.022 },
+    { name: 'beurre AOP Charentes',     qty: 4000,  unit: 'g',  supplier: 'PassionFroid',       batch: 'PF-BEU-2604', dlc_days: 30, daysAgo: 3,  price: 0.012 },
+    { name: 'crème liquide 35% MG',     qty: 5000,  unit: 'ml', supplier: 'PassionFroid',       batch: 'PF-CRE-2604', dlc_days: 14, daysAgo: 3,  price: 0.0052 },
+    { name: 'pomme de terre bintje',    qty: 20000, unit: 'g',  supplier: 'TerreAzur',          batch: 'TA-PdT-2604', dlc_days: 14, daysAgo: 4,  price: 0.0011 },
+    { name: 'tomate cœur de bœuf',      qty: 4000,  unit: 'g',  supplier: 'TerreAzur',          batch: 'TA-TOM-2604', dlc_days: 5,  daysAgo: 4,  price: 0.0042 },
+    { name: 'cèpes frais',              qty: 2000,  unit: 'g',  supplier: 'TerreAzur',          batch: 'TA-CEP-2603', dlc_days: 4,  daysAgo: 6,  price: 0.038 },
+    { name: 'farine T55',               qty: 5000,  unit: 'g',  supplier: 'Metro Paris Nation', batch: 'MET-FAR-2603', dlc_days: 180, daysAgo: 13, price: 0.0009 },
+    { name: 'riz arborio',              qty: 5000,  unit: 'g',  supplier: 'Metro Paris Nation', batch: 'MET-RIZ-2603', dlc_days: 365, daysAgo: 13, price: 0.0038 },
+    { name: 'huile d\'olive vierge extra', qty: 5000, unit: 'ml', supplier: 'Metro Paris Nation', batch: 'MET-OLI-2603', dlc_days: 270, daysAgo: 13, price: 0.0065 },
+  ];
+  for (const it of receptions) {
+    const iid = ingId(it.name);
+    const supId = supplierIds[it.supplier] || null;
+    const ts = daysAgo(it.daysAgo, 8, 30);
+    const dlc = sqlDate(new Date(ts.getTime() + it.dlc_days * 86_400_000));
+    insertMovement.run(
+      RID, iid, 'in', it.qty, it.unit, `Réception ${it.supplier}`, supId,
+      it.batch, dlc, it.price, ownerId, sqlDateTime(ts)
+    );
+    count++;
+  }
+  // Daily consumptions (production) for the last 14 days — a few key items
+  const consumeKeys = ['entrecôte de bœuf', 'pavé de saumon', 'pomme de terre bintje', 'beurre AOP Charentes', 'œuf fermier'];
+  for (let d = 14; d >= 1; d--) {
+    for (const name of consumeKeys) {
+      const iid = ingId(name);
+      const baseQty = name === 'œuf fermier'
+        ? (4 + Math.floor(Math.random() * 4))
+        : (200 + Math.floor(Math.random() * 600));
+      const unit = name === 'œuf fermier' ? 'pièce' : 'g';
+      const ts = daysAgo(d, 11 + Math.floor(Math.random() * 10), Math.floor(Math.random() * 60));
+      insertMovement.run(
+        RID, iid, 'out', baseQty, unit, 'Production service', null,
+        null, null, null, ownerId, sqlDateTime(ts)
+      );
+      count++;
+    }
+  }
+  // 3 losses over the past 2 weeks
+  const losses = [
+    { name: 'fraise gariguette', qty: 250, unit: 'g',  reason: 'DLC dépassée — lot moisi',  daysAgo: 8 },
+    { name: 'cèpes frais',       qty: 150, unit: 'g',  reason: 'Vermine, lot écarté',        daysAgo: 5 },
+    { name: 'lait entier',       qty: 500, unit: 'ml', reason: 'Brique tombée, casse',       daysAgo: 2 },
+  ];
+  for (const l of losses) {
+    const iid = ingId(l.name);
+    const ts = daysAgo(l.daysAgo, 16, 30);
+    insertMovement.run(
+      RID, iid, 'loss', l.qty, l.unit, l.reason, null,
+      null, null, null, ownerId, sqlDateTime(ts)
+    );
+    count++;
+  }
+  return count;
+});
+const movementCount = seedMovements();
+log(`${movementCount} stock movements (receptions + consumptions + 3 losses)`);
+
+// ─── 7. Sales: 30 orders + 10 service sessions over 14 days ────────────────
+section('Sales: orders + covers + service sessions');
 const popularPlats = [
-  { name: 'Burger maison bœuf fermier',          weight: 8 },
-  { name: 'Entrecôte grillée, frites maison',    weight: 7 },
-  { name: 'Confit de canard, pommes sarladaises', weight: 6 },
+  { name: 'Entrecôte grillée, sauce béarnaise',   weight: 8 },
+  { name: 'Suprême de volaille au fond de veau',  weight: 6 },
+  { name: 'Confit de canard, pommes sarladaises', weight: 7 },
   { name: 'Pavé de saumon beurre blanc',          weight: 5 },
   { name: 'Risotto aux cèpes',                    weight: 4 },
-  { name: 'Suprême de volaille, jus au fond de veau', weight: 3 },
-].map(r => ({ ...r, row: recipeRow(r.name) })).filter(r => r.row);
+].map(r => ({ ...r, id: recipeIdByName[r.name] })).filter(r => r.id);
 
 const popularEntrees = [
   { name: 'Soupe à l\'oignon gratinée',  weight: 5 },
   { name: 'Salade César',                weight: 4 },
   { name: 'Tartare de saumon à l\'aneth', weight: 3 },
+  { name: 'Œufs mayonnaise',             weight: 3 },
   { name: 'Terrine de campagne maison',  weight: 2 },
-].map(r => ({ ...r, row: recipeRow(r.name) })).filter(r => r.row);
+].map(r => ({ ...r, id: recipeIdByName[r.name] })).filter(r => r.id);
 
 const popularDesserts = [
   { name: 'Crème brûlée à la vanille',          weight: 5 },
   { name: 'Tiramisu au café',                   weight: 4 },
   { name: 'Tarte Tatin, crème épaisse',         weight: 3 },
+  { name: 'Mousse au chocolat noir',            weight: 3 },
   { name: 'Île flottante, caramel au beurre salé', weight: 2 },
-].map(r => ({ ...r, row: recipeRow(r.name) })).filter(r => r.row);
+].map(r => ({ ...r, id: recipeIdByName[r.name] })).filter(r => r.id);
 
 function weightedPick(items) {
   const total = items.reduce((s, i) => s + i.weight, 0);
   let r = Math.random() * total;
-  for (const item of items) {
-    r -= item.weight;
-    if (r <= 0) return item.row.id;
+  for (const it of items) {
+    r -= it.weight;
+    if (r <= 0) return it.id;
   }
-  return items[0].row.id;
+  return items[0].id;
 }
 
 const insertOrder = db.prepare(
-  `INSERT INTO orders (restaurant_id, table_number, status, total_cost, created_at) VALUES (?, ?, 'servi', 0, ?)`
+  `INSERT INTO orders (restaurant_id, table_number, status, total_cost, covers, notes, created_at)
+   VALUES (?, ?, 'servi', 0, ?, ?, ?)`
 );
 const insertOrderItem = db.prepare(
   `INSERT INTO order_items (order_id, recipe_id, quantity, status, restaurant_id) VALUES (?, ?, ?, 'servi', ?)`
 );
+const insertSession = db.prepare(
+  `INSERT INTO service_sessions (restaurant_id, started_at, ended_at, scheduled_start, scheduled_end, total_orders, total_items, total_revenue, total_covers, status, recap_sent)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ended', 1)`
+);
 
-const seedOrders = db.transaction(() => {
-  let orderCount = 0, itemCount = 0;
-  const now = Date.now();
-  for (let d = 29; d >= 0; d--) {
-    // ~10-18 covers per service (midi + soir) depending on day of week
-    const dayOfWeek = new Date(now - d * 86400000).getDay(); // 0=Sun
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6;
-    const ordersPerDay = isWeekend ? 14 + Math.floor(Math.random() * 6) : 8 + Math.floor(Math.random() * 6);
-
-    for (let o = 0; o < ordersPerDay; o++) {
-      const isMidi = o < ordersPerDay / 2;
+// 5 most-recent service days (Tue-Sat) within last 14 days × 2 services
+// each = 10 sessions. Aim for 3 orders/service ≈ 30 orders total.
+const seedOrdersAndSessions = db.transaction(() => {
+  let orderCount = 0;
+  let itemCount = 0;
+  let sessionCount = 0;
+  const sessions = [];
+  const serviceDays = [];
+  for (let d = 13; d >= 0 && serviceDays.length < 5; d--) {
+    const date = daysAgo(d, 12, 0);
+    const wd = date.getDay();
+    if (wd >= 2 && wd <= 6) serviceDays.push(d);
+  }
+  for (const d of serviceDays) {
+    for (const isMidi of [true, false]) {
+      const ordersThisService = 2 + Math.floor(Math.random() * 3); // 2-4
       const baseHour = isMidi ? 12 : 20;
-      const ts = new Date(now - d * 86400000);
-      ts.setHours(baseHour, Math.floor(Math.random() * 90), 0, 0);
-      const tableNum = 1 + Math.floor(Math.random() * 12);
-      const ord = insertOrder.run(RID, tableNum, ts.toISOString().replace('T', ' ').slice(0, 19));
-      const orderId = ord.lastInsertRowid;
+      const sessionStart = daysAgo(d, isMidi ? 11 : 18, 30);
+      const sessionEnd = daysAgo(d, isMidi ? 15 : 23, isMidi ? 0 : 30);
+      let sessionRevenue = 0;
+      let sessionItems = 0;
+      let sessionCovers = 0;
 
-      // Entrée (40% chance)
-      if (Math.random() < 0.4 && popularEntrees.length > 0) {
-        insertOrderItem.run(orderId, weightedPick(popularEntrees), 1, RID);
-        itemCount++;
+      for (let o = 0; o < ordersThisService; o++) {
+        const ts = daysAgo(d, baseHour, Math.floor(Math.random() * 90));
+        const tableNum = 1 + Math.floor(Math.random() * 12);
+        const tableCovers = 2 + Math.floor(Math.random() * 5); // 2-6
+        const noteOptions = [null, null, null, 'Allergie noix table', 'Cuisson saignante', 'Sans gluten'];
+        const note = noteOptions[Math.floor(Math.random() * noteOptions.length)];
+        const ord = insertOrder.run(RID, tableNum, tableCovers, note, sqlDateTime(ts));
+        const orderId = ord.lastInsertRowid;
+        let orderItems = 0;
+        let orderRevenue = 0;
+
+        // Entrée (40% chance per order)
+        if (Math.random() < 0.4 && popularEntrees.length > 0) {
+          const qty = 1 + Math.floor(Math.random() * Math.min(2, tableCovers));
+          const recipeId = weightedPick(popularEntrees);
+          insertOrderItem.run(orderId, recipeId, qty, RID);
+          itemCount++;
+          orderItems += qty;
+          const r = recipes.find(x => recipeIdByName[x.name] === recipeId);
+          if (r) orderRevenue += qty * (r.sell || 0);
+        }
+        // Plat: roughly one per cover
+        if (popularPlats.length > 0) {
+          const qty = Math.max(1, tableCovers - Math.floor(Math.random() * 2));
+          const recipeId = weightedPick(popularPlats);
+          insertOrderItem.run(orderId, recipeId, qty, RID);
+          itemCount++;
+          orderItems += qty;
+          const r = recipes.find(x => recipeIdByName[x.name] === recipeId);
+          if (r) orderRevenue += qty * (r.sell || 0);
+        }
+        // Dessert (35% chance)
+        if (Math.random() < 0.35 && popularDesserts.length > 0) {
+          const qty = 1 + Math.floor(Math.random() * Math.min(2, tableCovers));
+          const recipeId = weightedPick(popularDesserts);
+          insertOrderItem.run(orderId, recipeId, qty, RID);
+          itemCount++;
+          orderItems += qty;
+          const r = recipes.find(x => recipeIdByName[x.name] === recipeId);
+          if (r) orderRevenue += qty * (r.sell || 0);
+        }
+        sessionRevenue += orderRevenue;
+        sessionItems += orderItems;
+        sessionCovers += tableCovers;
+        orderCount++;
       }
-      // Plat (always)
-      if (popularPlats.length > 0) {
-        const qty = Math.random() < 0.15 ? 2 : 1; // 15% chance of 2 same dish
-        insertOrderItem.run(orderId, weightedPick(popularPlats), qty, RID);
-        itemCount++;
-      }
-      // Dessert (35% chance)
-      if (Math.random() < 0.35 && popularDesserts.length > 0) {
-        insertOrderItem.run(orderId, weightedPick(popularDesserts), 1, RID);
-        itemCount++;
-      }
-      orderCount++;
+
+      sessions.push({
+        started_at: sqlDateTime(sessionStart),
+        ended_at: sqlDateTime(sessionEnd),
+        scheduled_start: isMidi ? '11:30' : '19:00',
+        scheduled_end: isMidi ? '15:00' : '23:30',
+        total_orders: ordersThisService,
+        total_items: sessionItems,
+        total_revenue: Math.round(sessionRevenue * 100) / 100,
+        total_covers: sessionCovers,
+      });
     }
   }
-  return { orderCount, itemCount };
+  for (const s of sessions) {
+    insertSession.run(
+      RID, s.started_at, s.ended_at, s.scheduled_start, s.scheduled_end,
+      s.total_orders, s.total_items, s.total_revenue, s.total_covers
+    );
+    sessionCount++;
+  }
+  return { orderCount, itemCount, sessionCount };
 });
-const { orderCount, itemCount } = seedOrders();
-log(`${orderCount} orders + ${itemCount} order items (30 days)`);
+const { orderCount, itemCount, sessionCount } = seedOrdersAndSessions();
+log(`${orderCount} orders + ${itemCount} order items + ${sessionCount} service sessions (past 14 days)`);
 
-// ─── 6. Temperature zones & logs (30 days) ─────────────────────────────────
-section('Temperature logs (30 days)');
-// Ensure we have the 7 zones (the boot seed creates 4). Upsert gracefully.
-const demoZones = [
-  { name: 'Frigo cuisine 1',          type: 'fridge',    min: 0, max: 4 },
-  { name: 'Frigo cuisine 2',          type: 'fridge',    min: 0, max: 4 },
-  { name: 'Chambre froide positive',  type: 'cold_room', min: 0, max: 3 },
-  { name: 'Chambre froide négative',  type: 'freezer',   min: -25, max: -18 },
-  { name: 'Congélateur desserts',     type: 'freezer',   min: -25, max: -18 },
-  { name: 'Vitrine entrées',          type: 'fridge',    min: 0, max: 4 },
-  { name: 'Cave à vin',               type: 'fridge',    min: 10, max: 14 },
+// ─── 8. Delivery notes (5) ─────────────────────────────────────────────────
+section('Delivery notes (5 receptions)');
+const insertDelivery = db.prepare(
+  `INSERT INTO delivery_notes (supplier_id, status, delivery_date, notes, created_at, received_at, received_by, reception_notes, total_amount, restaurant_id)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+);
+const insertDeliveryItem = db.prepare(
+  `INSERT INTO delivery_note_items (delivery_note_id, ingredient_id, product_name, quantity, unit, price_per_unit, batch_number, dlc, temperature_required, temperature_measured, origin, status, restaurant_id)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+);
+
+const deliveries = [
+  {
+    supplier: 'PassionFroid', daysAgo: 3, status: 'received', notes: 'Livraison froid OK, sondes OK.', total: 245.40,
+    items: [
+      { name: 'pavé de saumon',         qty: 5, unit: 'kg', price: 22.00, batch: 'PF-SAU-2604', dlc_days: 3, temp_req: 4, temp_mes: 1.8, origin: 'Norvège' },
+      { name: 'beurre AOP Charentes',   qty: 4, unit: 'kg', price: 12.00, batch: 'PF-BEU-2604', dlc_days: 30, temp_req: 4, temp_mes: 3.2, origin: 'France' },
+      { name: 'crème liquide 35% MG',   qty: 5, unit: 'L',  price: 5.20,  batch: 'PF-CRE-2604', dlc_days: 14, temp_req: 4, temp_mes: 3.0, origin: 'France' },
+    ],
+  },
+  {
+    supplier: 'TerreAzur', daysAgo: 1, status: 'received', notes: 'Tomates un peu mûres, à utiliser rapidement.', total: 87.40,
+    items: [
+      { name: 'pomme de terre bintje', qty: 20, unit: 'kg', price: 1.10, batch: 'TA-PdT-2604', dlc_days: 14, temp_req: null, temp_mes: null, origin: 'France (Bretagne)' },
+      { name: 'tomate cœur de bœuf',   qty: 4,  unit: 'kg', price: 4.20, batch: 'TA-TOM-2604', dlc_days: 4, temp_req: null, temp_mes: null, origin: 'France (Provence)' },
+      { name: 'persil plat',            qty: 5,  unit: 'botte', price: 0.80, batch: 'TA-PER-2604', dlc_days: 4, temp_req: null, temp_mes: null, origin: 'France' },
+    ],
+  },
+  {
+    supplier: 'Metro Paris Nation', daysAgo: 8, status: 'received', notes: 'Cartons OK.', total: 168.40,
+    items: [
+      { name: 'farine T55',           qty: 5, unit: 'kg', price: 0.90, batch: 'MET-FAR-2603', dlc_days: 180, temp_req: null, temp_mes: null, origin: 'France' },
+      { name: 'huile d\'olive vierge extra', qty: 2, unit: 'L', price: 6.50, batch: 'MET-OLI-2603', dlc_days: 270, temp_req: null, temp_mes: null, origin: 'Italie' },
+      { name: 'pâtes penne',          qty: 4, unit: 'kg', price: 1.50, batch: 'MET-PEN-2603', dlc_days: 365, temp_req: null, temp_mes: null, origin: 'Italie' },
+    ],
+  },
+  {
+    supplier: 'PassionFroid', daysAgo: 4, status: 'received', notes: 'Foie gras conforme, traçabilité OK.', total: 318.50,
+    items: [
+      { name: 'onglet de bœuf',                qty: 4, unit: 'kg', price: 21.50, batch: 'PF-ONG-2604', dlc_days: 5, temp_req: 4, temp_mes: 2.6, origin: 'France' },
+      { name: 'suprême de volaille',           qty: 5, unit: 'kg', price: 12.50, batch: 'PF-VOL-2604', dlc_days: 5, temp_req: 4, temp_mes: 2.8, origin: 'France (Loué)' },
+      { name: 'cuisse de canard confite',      qty: 12, unit: 'pièce', price: 4.20, batch: 'PF-CAN-2604', dlc_days: 30, temp_req: 4, temp_mes: 3.1, origin: 'France (Sud-Ouest)' },
+    ],
+  },
+  {
+    supplier: 'TerreAzur', daysAgo: 0, status: 'pending', notes: 'Livraison annoncée 14h.', total: 96.20,
+    items: [
+      { name: 'cèpes frais',           qty: 1.5, unit: 'kg', price: 38.00, batch: 'TA-CEP-2604', dlc_days: 4, temp_req: null, temp_mes: null, origin: 'France (Limousin)' },
+      { name: 'salade laitue batavia', qty: 12,  unit: 'pièce', price: 1.10, batch: 'TA-SAL-2604', dlc_days: 5, temp_req: null, temp_mes: null, origin: 'France' },
+      { name: 'fraise gariguette',     qty: 3,   unit: 'kg', price: 9.50, batch: 'TA-FRA-2604', dlc_days: 3, temp_req: null, temp_mes: null, origin: 'France (Lot-et-Garonne)' },
+    ],
+  },
 ];
-// Wipe any demo zones for idempotency correctness then re-insert.
-// The boot-seeded default zones (Frigo 1/2/Congélateur/Chambre froide positive)
-// may already exist — we leave them and add the missing ones.
+const deliveryNoteIds = [];
+for (const d of deliveries) {
+  const sid = supplierIds[d.supplier];
+  const created = daysAgo(d.daysAgo, 7, 30);
+  const received = d.status === 'received' ? daysAgo(d.daysAgo, 9, 15) : null;
+  const dnId = insertDelivery.run(
+    sid, d.status, sqlDate(created), d.notes,
+    sqlDateTime(created),
+    received ? sqlDateTime(received) : null,
+    received ? ownerId : null,
+    received ? d.notes : null,
+    d.total, RID
+  ).lastInsertRowid;
+  deliveryNoteIds.push({ id: dnId, supplier: d.supplier, daysAgo: d.daysAgo, total: d.total });
+  for (const it of d.items) {
+    const iid = ingredientId[it.name.toLowerCase()] || null;
+    const dlc = it.dlc_days != null ? sqlDate(new Date(created.getTime() + it.dlc_days * 86_400_000)) : null;
+    insertDeliveryItem.run(
+      dnId, iid, it.name, it.qty, it.unit, it.price,
+      it.batch, dlc, it.temp_req, it.temp_mes, it.origin,
+      d.status === 'received' ? 'accepted' : 'pending',
+      RID
+    );
+  }
+}
+log(`${deliveries.length} delivery_notes (4 received + 1 pending)`);
+
+// ─── 9. Supplier invoices (3 — 1 pending, 1 validated, 1 paid) ─────────────
+section('Supplier invoices (3)');
+const insertInvoice = db.prepare(
+  `INSERT INTO supplier_invoices (restaurant_id, supplier_id, invoice_number, invoice_date, due_date, total_ht, tva_amount, total_ttc, status, payment_date, payment_method, notes, delivery_note_id, created_at, updated_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+);
+const insertInvoiceItem = db.prepare(
+  `INSERT INTO supplier_invoice_items (invoice_id, restaurant_id, description, quantity, unit_price_ht, tva_rate, total_ht, ingredient_id)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+);
+
+const invoiceData = [
+  {
+    supplier: 'PassionFroid', status: 'pending', daysAgo: 3, deliveryIdx: 0,
+    invoice_number: 'PF-2026-0428', total_ht: 232.61, tva: 12.79, total_ttc: 245.40,
+    notes: 'À valider — paiement 30j fin de mois.',
+    items: [
+      { description: 'Pavé de saumon Norvège — 5 kg', qty: 5, price_ht: 20.85, tva: 5.5, ingredient: 'pavé de saumon' },
+      { description: 'Beurre AOP Charentes — 4 kg',   qty: 4, price_ht: 11.37, tva: 5.5, ingredient: 'beurre AOP Charentes' },
+      { description: 'Crème liquide 35% MG — 5 L',    qty: 5, price_ht: 4.93,  tva: 5.5, ingredient: 'crème liquide 35% MG' },
+    ],
+  },
+  {
+    supplier: 'TerreAzur', status: 'validated', daysAgo: 8, deliveryIdx: 2,
+    invoice_number: 'TA-2026-0421', total_ht: 159.62, tva: 8.78, total_ttc: 168.40,
+    notes: 'Validé, en attente de paiement.',
+    items: [
+      { description: 'Pommes de terre Bintje — 20 kg', qty: 20, price_ht: 1.04, tva: 5.5, ingredient: 'pomme de terre bintje' },
+      { description: 'Tomates anciennes — 4 kg',       qty: 4,  price_ht: 4.55, tva: 5.5, ingredient: 'tomate cœur de bœuf' },
+      { description: 'Persil plat — 5 bottes',         qty: 5,  price_ht: 0.76, tva: 5.5, ingredient: 'persil plat' },
+    ],
+  },
+  {
+    supplier: 'Metro Paris Nation', status: 'paid', daysAgo: 13, paidDaysAgo: 8,
+    invoice_number: 'MET-2026-0416', total_ht: 102.60, tva: 5.64, total_ttc: 108.24,
+    notes: 'Réglé par virement.',
+    items: [
+      { description: 'Farine T55 — 5 kg',                  qty: 5, price_ht: 0.85, tva: 5.5, ingredient: 'farine T55' },
+      { description: 'Riz arborio — 5 kg',                 qty: 5, price_ht: 3.60, tva: 5.5, ingredient: 'riz arborio' },
+      { description: 'Huile d\'olive vierge extra — 2 L',  qty: 2, price_ht: 6.16, tva: 5.5, ingredient: 'huile d\'olive vierge extra' },
+      { description: 'Pâtes penne — 4 kg',                 qty: 4, price_ht: 1.42, tva: 5.5, ingredient: 'pâtes penne' },
+    ],
+  },
+];
+
+for (const inv of invoiceData) {
+  const sid = supplierIds[inv.supplier];
+  const invoiceDate = daysAgo(inv.daysAgo, 9, 0);
+  const dueDate = sqlDate(new Date(invoiceDate.getTime() + 30 * 86_400_000));
+  const paymentDate = inv.status === 'paid' && inv.paidDaysAgo != null
+    ? sqlDateTime(daysAgo(inv.paidDaysAgo, 11, 0)) : null;
+  const paymentMethod = inv.status === 'paid' ? 'virement' : null;
+  const dnId = inv.deliveryIdx != null && deliveryNoteIds[inv.deliveryIdx]
+    ? deliveryNoteIds[inv.deliveryIdx].id : null;
+
+  const invId = insertInvoice.run(
+    RID, sid, inv.invoice_number, sqlDate(invoiceDate), dueDate,
+    inv.total_ht, inv.tva, inv.total_ttc, inv.status,
+    paymentDate, paymentMethod, inv.notes, dnId,
+    sqlDateTime(invoiceDate), sqlDateTime(invoiceDate)
+  ).lastInsertRowid;
+  for (const it of inv.items) {
+    const iid = it.ingredient ? (ingredientId[it.ingredient.toLowerCase()] || null) : null;
+    const total_ht_line = Math.round(it.qty * it.price_ht * 100) / 100;
+    insertInvoiceItem.run(invId, RID, it.description, it.qty, it.price_ht, it.tva, total_ht_line, iid);
+  }
+}
+log(`3 supplier invoices: pending (PassionFroid), validated (TerreAzur), paid (Metro)`);
+
+// ─── 10. Temperature zones (3) + 14 days of logs ───────────────────────────
+section('Temperature logs (14 days, 3 zones)');
+const demoZones = [
+  { name: 'Chambre froide positive', type: 'cold_room', min: 2,   max: 4 },
+  { name: 'Chambre froide négative', type: 'freezer',   min: -20, max: -18 },
+  { name: 'Zone de stockage',        type: 'cold_room', min: 18,  max: 22 },
+];
 const existingZoneNames = new Set(
   all('SELECT name FROM temperature_zones WHERE restaurant_id = ?', [RID]).map(z => z.name)
 );
 const insertZone = db.prepare(
   `INSERT INTO temperature_zones (name, type, min_temp, max_temp, restaurant_id) VALUES (?, ?, ?, ?, ?)`
 );
+const updateZone = db.prepare(
+  `UPDATE temperature_zones SET type = ?, min_temp = ?, max_temp = ? WHERE name = ? AND restaurant_id = ?`
+);
 for (const z of demoZones) {
-  if (!existingZoneNames.has(z.name)) {
+  if (existingZoneNames.has(z.name)) {
+    updateZone.run(z.type, z.min, z.max, z.name, RID);
+  } else {
     insertZone.run(z.name, z.type, z.min, z.max, RID);
   }
 }
-const allZones = all('SELECT id, name, min_temp, max_temp FROM temperature_zones WHERE restaurant_id = ?', [RID]);
+const allZones = all(
+  'SELECT id, name, min_temp, max_temp FROM temperature_zones WHERE restaurant_id = ? AND name IN (?, ?, ?)',
+  [RID, demoZones[0].name, demoZones[1].name, demoZones[2].name]
+);
 
 const insertTempLog = db.prepare(
   `INSERT INTO temperature_logs (zone_id, temperature, recorded_by, recorded_at, is_alert, operator_name, restaurant_id)
    VALUES (?, ?, ?, ?, ?, ?, ?)`
 );
-
+const operators = ['Thomas Moreau', 'Pierre Lefèvre', 'Julie Dubois'];
 const seedTempLogs = db.transaction(() => {
-  const now = Date.now();
   let total = 0;
   let alerts = 0;
   for (const zone of allZones) {
     const target = (zone.min_temp + zone.max_temp) / 2;
     const tolerance = (zone.max_temp - zone.min_temp) / 2;
-    for (let d = 30; d >= 0; d--) {
-      // two reads per day: 09:00 and 18:00
+    for (let d = 13; d >= 0; d--) {
       for (const hour of [9, 18]) {
-        const ts = new Date(now - d * 86400000);
-        ts.setHours(hour, Math.floor(Math.random() * 30), 0, 0);
-        // Normal distribution around target ±tolerance, with ~3% chance of a breach
+        const ts = daysAgo(d, hour, Math.floor(Math.random() * 30));
         const breach = Math.random() < 0.03;
         let temp;
         if (breach) {
@@ -1756,8 +2122,8 @@ const seedTempLogs = db.transaction(() => {
         }
         temp = Math.round(temp * 10) / 10;
         const isAlert = (temp < zone.min_temp - 0.3 || temp > zone.max_temp + 0.3) ? 1 : 0;
-        const operator = staff[Math.floor(Math.random() * staff.length)].name;
-        insertTempLog.run(zone.id, temp, ownerId, ts.toISOString().replace('T', ' ').slice(0, 19), isAlert, operator, RID);
+        const operator = operators[Math.floor(Math.random() * operators.length)];
+        insertTempLog.run(zone.id, temp, ownerId, sqlDateTime(ts), isAlert, operator, RID);
         total++;
       }
     }
@@ -1767,69 +2133,78 @@ const seedTempLogs = db.transaction(() => {
 const { total: logTotal, alerts: logAlerts } = seedTempLogs();
 log(`${logTotal} temperature readings across ${allZones.length} zones (${logAlerts} alerts)`);
 
-// ─── 7. Cleaning logs (last 14 days) ───────────────────────────────────────
-section('Cleaning logs (14 days)');
-const cleaningTasks = all('SELECT id, frequency FROM cleaning_tasks WHERE restaurant_id = ?', [RID]);
+// ─── 11. Cleaning logs (some completed, some pending) ──────────────────────
+section('Cleaning logs (mix completed + pending)');
+// Boot seed already creates cleaning_tasks. We log completions for ~70% of
+// the daily/weekly tasks over the past 14 days, intentionally leaving some
+// recent slots empty so the dashboard shows "à faire" entries.
+const cleaningTasks = all('SELECT id, name, frequency FROM cleaning_tasks WHERE restaurant_id = ?', [RID]);
 const insertCleanLog = db.prepare(
   `INSERT INTO cleaning_logs (task_id, completed_by, completed_at, notes, restaurant_id) VALUES (?, ?, ?, ?, ?)`
 );
 const seedCleanLogs = db.transaction(() => {
-  const now = Date.now();
   let total = 0;
   for (const task of cleaningTasks) {
     const freq = task.frequency || 'daily';
-    // daily = every day for 14 days; weekly = every 7 days; monthly = once
     const interval = freq === 'daily' ? 1 : freq === 'weekly' ? 7 : 14;
-    for (let d = 14; d >= 0; d -= interval) {
-      const ts = new Date(now - d * 86400000);
-      ts.setHours(22 + Math.floor(Math.random() * 2), Math.floor(Math.random() * 60), 0, 0);
-      insertCleanLog.run(task.id, ownerId, ts.toISOString().replace('T', ' ').slice(0, 19), 'Fait conformément au plan', RID);
+    // Leave the most-recent daily slot empty for ~1/3 of tasks
+    const startD = (freq === 'daily' && task.id % 3 === 0) ? 12 : 13;
+    for (let d = startD; d >= 0; d -= interval) {
+      // Skip yesterday/today for some tasks to leave gaps
+      if (d <= 1 && task.id % 4 === 0) continue;
+      const ts = daysAgo(d, 22 + Math.floor(Math.random() * 2), Math.floor(Math.random() * 60));
+      insertCleanLog.run(task.id, ownerId, sqlDateTime(ts), 'Fait conformément au plan', RID);
       total++;
     }
   }
   return total;
 });
 const cleanTotal = seedCleanLogs();
-log(`${cleanTotal} cleaning executions across ${cleaningTasks.length} tasks`);
+log(`${cleanTotal} cleaning executions across ${cleaningTasks.length} tasks (some slots intentionally empty)`);
 
-// ─── 8. Traceability: 5 recent deliveries ──────────────────────────────────
-section('Traceability (5 entries)');
+// ─── 12. Traceability (2 — 1 beef lot, 1 salmon lot) ───────────────────────
+section('Traceability (2 entries)');
 const tracEntries = [
-  { product: 'Entrecôte de bœuf (origine France)', supplier: 'Bigard Boucherie Pro', batch: 'BG-2026-0412', daysAgo: 3, dlc: 5, temp: 2.8, qty: 6, unit: 'kg', notes: 'Lot conforme, chaîne du froid respectée.' },
-  { product: 'Saumon frais Norvège', supplier: 'Marée du Jour', batch: 'MJ-SAUM-0416', daysAgo: 2, dlc: 3, temp: 1.6, qty: 4.5, unit: 'kg', notes: 'Emballage sous glace, aspect parfait.' },
-  { product: 'Pommes de terre bintje', supplier: 'Pomona TerreAzur', batch: 'PTA-BT-0411', daysAgo: 5, dlc: 14, temp: 8.0, qty: 25, unit: 'kg', notes: 'Livraison en cageots, pas de germination.' },
-  { product: 'Œufs fermiers plein air', supplier: 'Pomona TerreAzur', batch: 'PTA-OE-0417', daysAgo: 1, dlc: 21, temp: 6.5, qty: 120, unit: 'pièce', notes: 'Calibre M, catégorie A.' },
-  { product: 'Crème liquide 35% MG', supplier: 'Metro Paris Nation', batch: 'MET-CR-0415', daysAgo: 4, dlc: 18, temp: 3.2, qty: 5, unit: 'l', notes: 'Bon état, scellés intacts.' },
+  {
+    product: 'Onglet de bœuf (origine France)', supplier: 'PassionFroid',
+    batch: 'PF-ONG-2604', daysAgo: 4, dlc: 5, temp: 2.6, qty: 4, unit: 'kg',
+    notes: 'Lot conforme, chaîne du froid respectée. Origine: France.',
+    bl: 'BL-PF-2604',
+  },
+  {
+    product: 'Pavé de saumon Norvège', supplier: 'PassionFroid',
+    batch: 'PF-SAU-2604', daysAgo: 3, dlc: 3, temp: 1.8, qty: 5, unit: 'kg',
+    notes: 'Saumon emballé sous glace, aspect parfait. Approbation sanitaire FR-22-209-001.',
+    bl: 'BL-PF-2604-2',
+  },
 ];
 const insertTrac = db.prepare(
   `INSERT INTO traceability_logs (product_name, supplier, batch_number, dlc, temperature_at_reception, quantity, unit, received_by, received_at, notes, etat_emballage, conformite_organoleptique, numero_bl, restaurant_id)
-   VALUES (?, ?, ?, date('now', ?), ?, ?, ?, ?, datetime('now', ?), ?, 'intact', 'conforme', ?, ?)`
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'intact', 'conforme', ?, ?)`
 );
 for (const t of tracEntries) {
+  const received = daysAgo(t.daysAgo, 9, 30);
+  const dlc = sqlDate(new Date(received.getTime() + t.dlc * 86_400_000));
   insertTrac.run(
-    t.product, t.supplier, t.batch,
-    `+${t.dlc} days`,
-    t.temp, t.qty, t.unit, ownerId,
-    `-${t.daysAgo} days`,
-    t.notes, `BL-${t.batch}`, RID
+    t.product, t.supplier, t.batch, dlc,
+    t.temp, t.qty, t.unit, ownerId, sqlDateTime(received),
+    t.notes, t.bl, RID
   );
 }
-log(`${tracEntries.length} traceability entries`);
+log(`${tracEntries.length} traceability entries (1 beef + 1 salmon)`);
 
-// ─── 9. HACCP plan — ensure 3 CCPs are scoped to this restaurant ───────────
+// ─── 13. HACCP plan check ──────────────────────────────────────────────────
 section('HACCP plan');
-// The boot seed inserts default haccp_hazard_analysis and 3 haccp_ccp rows
-// without restaurant_id; Phase 2 backfilled them to RID=1. Confirm and log.
 const ccpCount = get('SELECT COUNT(*) as c FROM haccp_ccp WHERE restaurant_id = ?', [RID]);
 const hazardCount = get('SELECT COUNT(*) as c FROM haccp_hazard_analysis WHERE restaurant_id = ?', [RID]);
 log(`${hazardCount.c} dangers analysés, ${ccpCount.c} CCP (étape critique) en place`);
 
-// ─── 10. Alto AI preferences ───────────────────────────────────────────────
+// ─── 14. Alto AI preferences ───────────────────────────────────────────────
 section('Alto AI preferences');
 const aiPrefs = [
-  { key: 'establishment_type', value: 'brasserie' },
+  { key: 'establishment_type', value: 'bistrot gastronomique' },
   { key: 'tone',               value: 'tu' },
-  { key: 'cuisine_style',      value: 'française traditionnelle' },
+  { key: 'cuisine_style',      value: 'française traditionnelle revisitée' },
   { key: 'covers_target',      value: '45' },
   { key: 'service_hours',      value: '11:30-14:30, 19:00-23:00' },
 ];
@@ -1843,16 +2218,18 @@ log(`${aiPrefs.length} préférences Alto`);
 
 // ─── Done ──────────────────────────────────────────────────────────────────
 console.log(`
-✅ Demo seed complete for "Chez Laurent — Paris 11" (restaurant_id=${RID}).
+✅ Demo seed complete for "${RESTAURANT_NAME}" (restaurant_id=${RID}).
 
    Login restaurant :
      Gérant     → ${OWNER_EMAIL}   /  ${OWNER_PASSWORD}
      Cuisinier  → Thomas Moreau    PIN 1234
-     Équipier   → Julie Dubois     PIN 5678
+     Cuisinier  → Julie Dubois     PIN 5678
      Salle      → Marc Bernard     PIN 9012
 
    Login fournisseur (portail Metro Paris Nation) :
      Email      → ${SUPPLIER_DEMO_EMAIL}
      Mot de passe → ${SUPPLIER_DEMO_PASSWORD}
      PIN membre  → ${SUPPLIER_DEMO_PIN}  (Jean Dupont)
+
+   Ouvrir l'app sur http://localhost:3000 et se connecter pour démarrer.
 `);
