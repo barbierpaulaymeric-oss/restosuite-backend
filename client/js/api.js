@@ -370,6 +370,12 @@ const API = {
 
   // Allergens INCO
   getAllergenMenuDisplay() { return this.request('/allergens/menu-display'); },
+  async getAllergenCardPdfUrl() {
+    const res = await fetch(`${this.base}/allergens/card-pdf`, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('Erreur génération fiche allergènes');
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  },
 
   // HACCP PDF exports — returns blob URL
   async getHACCPExportUrl(type, from, to) {

@@ -1,11 +1,11 @@
-// Bumped 2026-04-28 (v15): accountant-friendly monthly exports
-// (/api/exports/* + #/exports view under new "Gestion" nav group;
-// bundle now includes js/views/exports.js). v14 shipped covers
-// (couverts) tracking — orders.covers + service_sessions.total_covers,
-// /api/analytics/covers with food_cost_per_cover, covers KPI in service
-// + dashboard + pilotage. (v13 shipped RGPD export +12 tables and
-// /waste-analytics view.)
-const CACHE_NAME = 'restosuite-v15';
+// Bumped 2026-04-29 (v16): customer-facing allergen card PDF export.
+// New GET /api/allergens/card-pdf (PDFKit, A4) + "Télécharger la
+// fiche allergènes" button on /haccp/allergens. Letter codes
+// (G/C/O/P/A/S/L/FC/Cé/Mo/Sé/Su/Lu/Mol) replace emoji since Helvetica
+// has no emoji glyphs; full INCO legend on last page.
+// (v15 shipped accountant-friendly monthly exports; v14 shipped covers
+// tracking; v13 shipped RGPD export +12 tables and /waste-analytics.)
+const CACHE_NAME = 'restosuite-v16';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

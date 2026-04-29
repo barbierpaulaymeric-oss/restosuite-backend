@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const PDFDocument = require('pdfkit');
 const { db, all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
 const router = Router();
@@ -216,6 +217,223 @@ router.get('/menu-display', requireAuth, (req, res) => {
     res.json({ items: result, total: result.length });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// ─── INCO: Fiche allergènes PDF (carte client / inspecteur) ───
+// Letter codes used in the PDF in place of emoji (PDFKit's default Helvetica
+// has no emoji glyphs). Standard French INCO single/double-letter shorthand.
+const INCO_PDF_CODES = {
+  gluten:       'G',
+  crustaces:    'C',
+  oeufs:        'O',
+  poissons:     'P',
+  arachides:    'A',
+  soja:         'S',
+  lait:         'L',
+  fruits_coque: 'FC',
+  celeri:       'Cé',
+  moutarde:     'Mo',
+  sesame:       'Sé',
+  sulfites:     'Su',
+  lupin:        'Lu',
+  mollusques:   'Mol'
+};
+
+router.get('/card-pdf', requireAuth, (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const restaurant = get('SELECT name FROM restaurants WHERE id = ?', [rid]) || {};
+    const recipes = all(
+      'SELECT id, name, category FROM recipes WHERE restaurant_id = ? ORDER BY category, name',
+      [rid]
+    );
+
+    const items = recipes.map(r => ({
+      id: r.id,
+      name: r.name,
+      category: r.category || 'Sans catégorie',
+      allergens: getRecipeAllergens(r.id)
+    }));
+    const byCategory = {};
+    for (const it of items) (byCategory[it.category] ||= []).push(it);
+
+    const restaurantName = (restaurant.name || 'Restaurant').slice(0, 80);
+    const slug = restaurantName
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'restaurant';
+    const today = new Date();
+    const isoDate = today.toISOString().slice(0, 10);
+    const dateFr = today.toLocaleDateString('fr-FR', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="fiche-allergenes-${slug}-${isoDate}.pdf"`
+    );
+
+    const MARGIN = 42;
+    const PAGE_W = 595.28;
+    const PAGE_H = 841.89;
+    const CONTENT_W = PAGE_W - 2 * MARGIN;
+    const FOOTER_Y = PAGE_H - 32;
+    const BODY_BOTTOM = PAGE_H - 60;
+
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: MARGIN, bottom: 60, left: MARGIN, right: MARGIN },
+      bufferPages: true
+    });
+    doc.pipe(res);
+
+    // ─── Header (page 1) ───
+    doc.font('Times-Bold').fontSize(22).fillColor('#1a1a1a');
+    doc.text(restaurantName, MARGIN, MARGIN, { width: CONTENT_W });
+
+    doc.font('Helvetica').fontSize(9).fillColor('#666');
+    doc.text(`Fiche allergènes — Édition du ${dateFr}`, MARGIN, doc.y + 4, {
+      width: CONTENT_W
+    });
+
+    doc.moveDown(0.6);
+    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666');
+    doc.text(
+      "Conformément au Règlement (UE) n°1169/2011 (INCO), les 14 allergènes majeurs susceptibles d'être présents dans nos plats sont indiqués ci-dessous. N'hésitez pas à demander conseil à notre équipe.",
+      MARGIN,
+      doc.y,
+      { width: CONTENT_W }
+    );
+
+    let y = doc.y + 8;
+    doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_W, y)
+       .lineWidth(0.5).strokeColor('#1a1a1a').stroke();
+    y += 14;
+
+    // ─── Body ───
+    const ensureSpace = (need) => {
+      if (y + need > BODY_BOTTOM) {
+        doc.addPage();
+        y = MARGIN;
+      }
+    };
+
+    if (items.length === 0) {
+      doc.font('Helvetica-Oblique').fontSize(10).fillColor('#666');
+      doc.text(
+        "Aucun plat enregistré. Renseignez vos recettes et leurs allergènes pour générer la fiche.",
+        MARGIN,
+        y,
+        { width: CONTENT_W }
+      );
+      y = doc.y + 4;
+    }
+
+    for (const [category, list] of Object.entries(byCategory)) {
+      ensureSpace(46);
+      doc.font('Times-Bold').fontSize(13).fillColor('#1a1a1a');
+      doc.text(category, MARGIN, y, { width: CONTENT_W });
+      y = doc.y + 4;
+      doc.moveTo(MARGIN, y).lineTo(MARGIN + 64, y)
+         .lineWidth(1.2).strokeColor('#C45A18').stroke();
+      y += 10;
+
+      for (const item of list) {
+        doc.font('Helvetica-Bold').fontSize(10);
+        const nameH = doc.heightOfString(item.name, { width: CONTENT_W });
+        const allergenLine = item.allergens.length === 0
+          ? 'Aucun allergène déclaré'
+          : item.allergens
+              .map(a => INCO_PDF_CODES[a.code] || a.code)
+              .join('  ·  ');
+        doc.font('Helvetica').fontSize(9);
+        const allergenH = doc.heightOfString(allergenLine, { width: CONTENT_W });
+        const blockH = nameH + 2 + allergenH + 14;
+
+        ensureSpace(blockH);
+
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('#222');
+        doc.text(item.name, MARGIN, y, { width: CONTENT_W });
+        y += nameH + 2;
+
+        doc.font('Helvetica').fontSize(9)
+           .fillColor(item.allergens.length === 0 ? '#999' : '#444');
+        doc.text(allergenLine, MARGIN, y, { width: CONTENT_W });
+        y += allergenH + 12;
+      }
+      y += 6;
+    }
+
+    // ─── Legend page ───
+    doc.addPage();
+    y = MARGIN;
+    doc.font('Times-Bold').fontSize(16).fillColor('#1a1a1a');
+    doc.text('Légende — Les 14 allergènes INCO', MARGIN, y, { width: CONTENT_W });
+    y = doc.y + 6;
+    doc.moveTo(MARGIN, y).lineTo(MARGIN + 90, y)
+       .lineWidth(1.2).strokeColor('#C45A18').stroke();
+    y += 14;
+
+    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666');
+    doc.text(
+      "Chaque code ci-dessous correspond à l'un des 14 allergènes à déclaration obligatoire (Règlement UE n°1169/2011, Annexe II).",
+      MARGIN,
+      y,
+      { width: CONTENT_W }
+    );
+    y = doc.y + 12;
+
+    const colW = (CONTENT_W - 16) / 2;
+    const colXs = [MARGIN, MARGIN + colW + 16];
+    const half = Math.ceil(INCO_ALLERGENS.length / 2);
+    let yL = y;
+    let yR = y;
+
+    for (let i = 0; i < INCO_ALLERGENS.length; i++) {
+      const a = INCO_ALLERGENS[i];
+      const code = INCO_PDF_CODES[a.code] || a.code;
+      const isLeft = i < half;
+      const colX = colXs[isLeft ? 0 : 1];
+      const cy = isLeft ? yL : yR;
+
+      doc.font('Helvetica-Bold').fontSize(11).fillColor('#C45A18');
+      doc.text(code, colX, cy, { width: 32 });
+
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#1a1a1a');
+      doc.text(a.name, colX + 32, cy, { width: colW - 32 });
+      const nameH2 = doc.heightOfString(a.name, { width: colW - 32 });
+
+      doc.font('Helvetica').fontSize(8).fillColor('#555');
+      doc.text(a.description, colX + 32, cy + nameH2 + 1, { width: colW - 32 });
+      const descH = doc.heightOfString(a.description, { width: colW - 32 });
+
+      const blockH = nameH2 + 1 + descH + 12;
+      if (isLeft) yL += blockH; else yR += blockH;
+    }
+
+    // ─── Footer on every page ───
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      doc.font('Helvetica-Oblique').fontSize(7).fillColor('#888');
+      doc.text(
+        `${restaurantName} — Conforme INCO Règlement (UE) n°1169/2011 — Page ${i - range.start + 1}/${range.count}`,
+        MARGIN,
+        FOOTER_Y,
+        { width: CONTENT_W, align: 'center', lineBreak: false }
+      );
+    }
+
+    doc.end();
+  } catch (e) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erreur génération PDF allergènes' });
+    } else {
+      try { res.end(); } catch {}
+    }
   }
 });
 

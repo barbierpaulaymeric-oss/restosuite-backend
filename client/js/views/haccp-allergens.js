@@ -23,6 +23,34 @@ const ALLERGEN_LABELS = {
   mollusques:   { label: 'Mollusques',     icon: '🐚' },
 };
 
+async function downloadAllergenCard() {
+  const btn = document.getElementById('btn-allergen-pdf');
+  const original = btn ? btn.innerHTML : null;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader" style="width:18px;height:18px"></i> Génération...';
+    if (window.lucide) lucide.createIcons();
+  }
+  try {
+    const url = await API.getAllergenCardPdfUrl();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fiche-allergenes-${new Date().toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (err) {
+    alert('Erreur lors de la génération du PDF : ' + (err && err.message ? err.message : err));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = original;
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+}
+
 async function renderHACCPAllergens() {
   const app = document.getElementById('app');
   app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
@@ -39,9 +67,14 @@ async function renderHACCPAllergens() {
       <div class="haccp-page">
         <div class="page-header">
           <h1><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Allergènes — Affichage INCO</h1>
-          <button class="btn btn-secondary" onclick="window.print()">
-            <i data-lucide="printer" style="width:18px;height:18px"></i> Imprimer
-          </button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary" onclick="downloadAllergenCard()" id="btn-allergen-pdf">
+              <i data-lucide="file-down" style="width:18px;height:18px"></i> Télécharger la fiche allergènes
+            </button>
+            <button class="btn btn-secondary" onclick="window.print()">
+              <i data-lucide="printer" style="width:18px;height:18px"></i> Imprimer
+            </button>
+          </div>
         </div>
         ${haccpBreadcrumb('tracabilite')}
         <div style="background:#e8f4fd;border:1px solid #3b9ede;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
