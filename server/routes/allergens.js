@@ -335,7 +335,7 @@ const INCO_PDF_CODES = {
 router.get('/card-pdf', requireAuth, (req, res) => {
   try {
     const rid = req.user.restaurant_id;
-    const restaurant = get('SELECT name FROM restaurants WHERE id = ?', [rid]) || {};
+    const restaurant = get('SELECT name, address, city FROM restaurants WHERE id = ?', [rid]) || {};
     const recipes = all(
       'SELECT id, name, category FROM recipes WHERE restaurant_id = ? ORDER BY category, name',
       [rid]
@@ -351,6 +351,7 @@ router.get('/card-pdf', requireAuth, (req, res) => {
     for (const it of items) (byCategory[it.category] ||= []).push(it);
 
     const restaurantName = (restaurant.name || 'Restaurant').slice(0, 80);
+    const restaurantLocation = [restaurant.address, restaurant.city].filter(Boolean).join(' · ');
     const slug = restaurantName
       .toLowerCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -368,118 +369,266 @@ router.get('/card-pdf', requireAuth, (req, res) => {
       `attachment; filename="fiche-allergenes-${slug}-${isoDate}.pdf"`
     );
 
-    const MARGIN = 42;
+    const MARGIN = 36;
     const PAGE_W = 595.28;
     const PAGE_H = 841.89;
     const CONTENT_W = PAGE_W - 2 * MARGIN;
+    const HEADER_BOTTOM_Y = 56;
     const FOOTER_Y = PAGE_H - 32;
-    const BODY_BOTTOM = PAGE_H - 60;
+    const BODY_TOP = HEADER_BOTTOM_Y + 18;
+    const BODY_BOTTOM = PAGE_H - 64;
+    const ACCENT = '#C45A18';
+    const HEADING = '#1a1a1a';
 
     const doc = new PDFDocument({
       size: 'A4',
-      margins: { top: MARGIN, bottom: 60, left: MARGIN, right: MARGIN },
+      margins: { top: MARGIN, bottom: 64, left: MARGIN, right: MARGIN },
       bufferPages: true
     });
     doc.pipe(res);
 
-    // ─── Header (page 1) ───
-    doc.font('Times-Bold').fontSize(22).fillColor('#1a1a1a');
-    doc.text(restaurantName, MARGIN, MARGIN, { width: CONTENT_W });
+    // ═══════════════════════════════════════════
+    // PAGE 1 — Cover
+    // ═══════════════════════════════════════════
+    let y = MARGIN + 80;
 
-    doc.font('Helvetica').fontSize(9).fillColor('#666');
-    doc.text(`Fiche allergènes — Édition du ${dateFr}`, MARGIN, doc.y + 4, {
-      width: CONTENT_W
+    // Small branded eyebrow
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(ACCENT);
+    doc.text('FICHE D’INFORMATION ALLERGÈNES', MARGIN, y, {
+      width: CONTENT_W, characterSpacing: 1.5
     });
+    y = doc.y + 10;
 
-    doc.moveDown(0.6);
-    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666');
+    // Restaurant name — large serif, the visual anchor
+    doc.font('Times-Bold').fontSize(34).fillColor(HEADING);
+    doc.text(restaurantName, MARGIN, y, { width: CONTENT_W });
+    y = doc.y + 6;
+
+    // Optional address line
+    if (restaurantLocation) {
+      doc.font('Helvetica').fontSize(10).fillColor('#666');
+      doc.text(restaurantLocation, MARGIN, y, { width: CONTENT_W });
+      y = doc.y + 4;
+    }
+
+    // Date
+    doc.font('Helvetica-Oblique').fontSize(10).fillColor('#888');
+    doc.text(`Édition du ${dateFr}`, MARGIN, y, { width: CONTENT_W });
+    y = doc.y + 24;
+
+    // Decorative rule
+    doc.moveTo(MARGIN, y).lineTo(MARGIN + 80, y)
+       .lineWidth(2).strokeColor(ACCENT).stroke();
+    y += 20;
+
+    // Intro block
+    doc.font('Times-Roman').fontSize(11).fillColor('#333');
     doc.text(
-      "Conformément au Règlement (UE) n°1169/2011 (INCO), les 14 allergènes majeurs susceptibles d'être présents dans nos plats sont indiqués ci-dessous. N'hésitez pas à demander conseil à notre équipe.",
-      MARGIN,
-      doc.y,
-      { width: CONTENT_W }
+      "Conformément au Règlement (UE) n°1169/2011 (INCO), les 14 allergènes à déclaration obligatoire pouvant être présents dans nos plats sont listés ci-dessous, plat par plat.",
+      MARGIN, y, { width: CONTENT_W, lineGap: 2 }
+    );
+    y = doc.y + 8;
+
+    doc.font('Helvetica-Oblique').fontSize(9).fillColor('#666');
+    doc.text(
+      "En cas de doute ou d'allergie déclarée, demandez conseil à un membre de l'équipe avant de commander. Les traces dues à des contacts en cuisine ne peuvent pas toujours être garanties absentes.",
+      MARGIN, y, { width: CONTENT_W, lineGap: 2 }
+    );
+    y = doc.y + 22;
+
+    // Quick stats card
+    const totalDishes = items.length;
+    const dishesWithAllergens = items.filter(i => i.allergens.length > 0).length;
+    const cardH = 72;
+    doc.roundedRect(MARGIN, y, CONTENT_W, cardH, 6)
+       .fillAndStroke('#FAF7F2', '#E8DFD2');
+    doc.fillColor(HEADING);
+
+    const cellW = CONTENT_W / 3;
+    const drawStat = (n, label, x) => {
+      doc.font('Times-Bold').fontSize(22).fillColor(ACCENT);
+      doc.text(String(n), x, y + 14, { width: cellW, align: 'center' });
+      doc.font('Helvetica').fontSize(8).fillColor('#666');
+      doc.text(label, x, y + 44, { width: cellW, align: 'center', characterSpacing: 0.5 });
+    };
+    drawStat(totalDishes, 'PLATS À LA CARTE', MARGIN);
+    drawStat(dishesWithAllergens, 'AVEC ALLERGÈNES DÉCLARÉS', MARGIN + cellW);
+    drawStat(INCO_ALLERGENS.length, 'ALLERGÈNES SUIVIS', MARGIN + cellW * 2);
+
+    y += cardH + 28;
+
+    // Footer-style note (kept on cover page, separate from page footer)
+    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#999');
+    doc.text(
+      "Ce document tient lieu d'information allergènes au sens de l'art. R412-14 du Code de la consommation. Conservez-le à disposition des inspecteurs de la DDPP.",
+      MARGIN, FOOTER_Y - 18, { width: CONTENT_W, align: 'left' }
     );
 
-    let y = doc.y + 8;
-    doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_W, y)
-       .lineWidth(0.5).strokeColor('#1a1a1a').stroke();
-    y += 14;
+    // ═══════════════════════════════════════════
+    // BODY PAGES — Tabular per category
+    // ═══════════════════════════════════════════
+    const ALLERGEN_CODES = INCO_ALLERGENS.map(a => INCO_PDF_CODES[a.code] || a.code);
+    const NAME_COL_W = 158;
+    const ALLERGEN_AREA_W = CONTENT_W - NAME_COL_W;
+    const CELL_W = ALLERGEN_AREA_W / INCO_ALLERGENS.length;
+    const ROW_H = 18;
+    const HEADER_ROW_H = 22;
 
-    // ─── Body ───
-    const ensureSpace = (need) => {
-      if (y + need > BODY_BOTTOM) {
-        doc.addPage();
-        y = MARGIN;
+    const drawPageHeader = (extraTitle) => {
+      // Page header strip — restaurant + section
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(ACCENT);
+      doc.text(restaurantName.toUpperCase(), MARGIN, MARGIN, {
+        width: CONTENT_W / 2, characterSpacing: 1, lineBreak: false
+      });
+      doc.font('Helvetica').fontSize(8).fillColor('#888');
+      doc.text(extraTitle || 'Fiche allergènes', MARGIN + CONTENT_W / 2, MARGIN, {
+        width: CONTENT_W / 2, align: 'right', lineBreak: false
+      });
+      doc.moveTo(MARGIN, HEADER_BOTTOM_Y - 6).lineTo(MARGIN + CONTENT_W, HEADER_BOTTOM_Y - 6)
+         .lineWidth(0.5).strokeColor('#DDD').stroke();
+    };
+
+    const drawTableHeader = (yPos) => {
+      // Background bar
+      doc.rect(MARGIN, yPos, CONTENT_W, HEADER_ROW_H).fill(HEADING);
+      doc.fillColor('#fff').font('Helvetica-Bold').fontSize(9);
+      doc.text('Plat', MARGIN + 8, yPos + 7, { width: NAME_COL_W - 8, lineBreak: false });
+      for (let i = 0; i < ALLERGEN_CODES.length; i++) {
+        const cellX = MARGIN + NAME_COL_W + i * CELL_W;
+        doc.text(ALLERGEN_CODES[i], cellX, yPos + 7, {
+          width: CELL_W, align: 'center', lineBreak: false
+        });
       }
+      return yPos + HEADER_ROW_H;
+    };
+
+    const newBodyPage = (title) => {
+      doc.addPage();
+      drawPageHeader(title);
+      y = BODY_TOP;
     };
 
     if (items.length === 0) {
-      doc.font('Helvetica-Oblique').fontSize(10).fillColor('#666');
+      newBodyPage('Liste des plats');
+      doc.font('Helvetica-Oblique').fontSize(11).fillColor('#666');
       doc.text(
         "Aucun plat enregistré. Renseignez vos recettes et leurs allergènes pour générer la fiche.",
-        MARGIN,
-        y,
-        { width: CONTENT_W }
+        MARGIN, y, { width: CONTENT_W }
       );
-      y = doc.y + 4;
-    }
+    } else {
+      newBodyPage('Liste des plats');
+      let isFirstCategory = true;
 
-    for (const [category, list] of Object.entries(byCategory)) {
-      ensureSpace(46);
-      doc.font('Times-Bold').fontSize(13).fillColor('#1a1a1a');
-      doc.text(category, MARGIN, y, { width: CONTENT_W });
-      y = doc.y + 4;
-      doc.moveTo(MARGIN, y).lineTo(MARGIN + 64, y)
-         .lineWidth(1.2).strokeColor('#C45A18').stroke();
-      y += 10;
+      for (const [category, list] of Object.entries(byCategory)) {
+        const categoryHeaderH = isFirstCategory ? 22 : 30;
+        // Need category title + table header + at least one row
+        if (y + categoryHeaderH + HEADER_ROW_H + ROW_H > BODY_BOTTOM) {
+          newBodyPage('Liste des plats (suite)');
+        }
 
-      for (const item of list) {
-        doc.font('Helvetica-Bold').fontSize(10);
-        const nameH = doc.heightOfString(item.name, { width: CONTENT_W });
-        const allergenLine = item.allergens.length === 0
-          ? 'Aucun allergène déclaré'
-          : item.allergens
-              .map(a => INCO_PDF_CODES[a.code] || a.code)
-              .join('  ·  ');
-        doc.font('Helvetica').fontSize(9);
-        const allergenH = doc.heightOfString(allergenLine, { width: CONTENT_W });
-        const blockH = nameH + 2 + allergenH + 14;
+        // Category title
+        if (!isFirstCategory) y += 8;
+        doc.font('Times-Bold').fontSize(13).fillColor(HEADING);
+        doc.text(category, MARGIN, y, { width: CONTENT_W });
+        y = doc.y + 3;
+        doc.moveTo(MARGIN, y).lineTo(MARGIN + 36, y)
+           .lineWidth(1.5).strokeColor(ACCENT).stroke();
+        y += 8;
 
-        ensureSpace(blockH);
+        // Table header
+        y = drawTableHeader(y);
 
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#222');
-        doc.text(item.name, MARGIN, y, { width: CONTENT_W });
-        y += nameH + 2;
+        // Rows
+        for (let idx = 0; idx < list.length; idx++) {
+          if (y + ROW_H > BODY_BOTTOM) {
+            newBodyPage('Liste des plats (suite)');
+            // Re-draw category continuation + table header
+            doc.font('Times-Bold').fontSize(11).fillColor('#666');
+            doc.text(`${category} (suite)`, MARGIN, y, { width: CONTENT_W });
+            y = doc.y + 6;
+            y = drawTableHeader(y);
+          }
 
-        doc.font('Helvetica').fontSize(9)
-           .fillColor(item.allergens.length === 0 ? '#999' : '#444');
-        doc.text(allergenLine, MARGIN, y, { width: CONTENT_W });
-        y += allergenH + 12;
+          const item = list[idx];
+          // Zebra row
+          if (idx % 2 === 1) {
+            doc.rect(MARGIN, y, CONTENT_W, ROW_H).fill('#FAF7F2');
+          }
+
+          // Name cell
+          doc.fillColor(HEADING).font('Helvetica').fontSize(9);
+          // Truncate to fit single line if too long
+          let displayName = item.name;
+          while (
+            doc.widthOfString(displayName) > NAME_COL_W - 12 &&
+            displayName.length > 6
+          ) {
+            displayName = displayName.slice(0, -1);
+          }
+          if (displayName !== item.name) displayName = displayName.replace(/.{3}$/, '...');
+          doc.text(displayName, MARGIN + 8, y + 5, {
+            width: NAME_COL_W - 8, lineBreak: false
+          });
+
+          // Allergen cells
+          const presentCodes = new Set(item.allergens.map(a => a.code));
+          for (let i = 0; i < INCO_ALLERGENS.length; i++) {
+            const code = INCO_ALLERGENS[i].code;
+            const present = presentCodes.has(code);
+            const cellX = MARGIN + NAME_COL_W + i * CELL_W;
+            if (present) {
+              doc.font('Helvetica-Bold').fontSize(11).fillColor(ACCENT);
+              doc.text('X', cellX, y + 4, {
+                width: CELL_W, align: 'center', lineBreak: false
+              });
+            } else {
+              doc.font('Helvetica').fontSize(10).fillColor('#CCC');
+              doc.text('–', cellX, y + 4, {
+                width: CELL_W, align: 'center', lineBreak: false
+              });
+            }
+          }
+
+          // Vertical separator after Plat column (every row)
+          doc.moveTo(MARGIN + NAME_COL_W, y).lineTo(MARGIN + NAME_COL_W, y + ROW_H)
+             .lineWidth(0.3).strokeColor('#DDD').stroke();
+
+          y += ROW_H;
+        }
+
+        // Bottom rule under last row of this category
+        doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_W, y)
+           .lineWidth(0.5).strokeColor('#CCC').stroke();
+        y += 4;
+
+        isFirstCategory = false;
       }
-      y += 6;
     }
 
-    // ─── Legend page ───
+    // ═══════════════════════════════════════════
+    // LEGEND PAGE
+    // ═══════════════════════════════════════════
     doc.addPage();
-    y = MARGIN;
-    doc.font('Times-Bold').fontSize(16).fillColor('#1a1a1a');
-    doc.text('Légende — Les 14 allergènes INCO', MARGIN, y, { width: CONTENT_W });
+    drawPageHeader('Légende des allergènes INCO');
+    y = BODY_TOP;
+
+    doc.font('Times-Bold').fontSize(20).fillColor(HEADING);
+    doc.text('Légende des 14 allergènes INCO', MARGIN, y, { width: CONTENT_W });
     y = doc.y + 6;
-    doc.moveTo(MARGIN, y).lineTo(MARGIN + 90, y)
-       .lineWidth(1.2).strokeColor('#C45A18').stroke();
-    y += 14;
+    doc.moveTo(MARGIN, y).lineTo(MARGIN + 80, y)
+       .lineWidth(2).strokeColor(ACCENT).stroke();
+    y += 16;
 
-    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#666');
+    doc.font('Helvetica').fontSize(9).fillColor('#444');
     doc.text(
-      "Chaque code ci-dessous correspond à l'un des 14 allergènes à déclaration obligatoire (Règlement UE n°1169/2011, Annexe II).",
-      MARGIN,
-      y,
-      { width: CONTENT_W }
+      "Chaque code de la grille ci-dessus correspond à l’un des 14 allergènes à déclaration obligatoire au sens du Règlement (UE) n°1169/2011, Annexe II — transposé en droit français par le Décret n°2015-447 du 17 avril 2015.",
+      MARGIN, y, { width: CONTENT_W, lineGap: 2 }
     );
-    y = doc.y + 12;
+    y = doc.y + 18;
 
-    const colW = (CONTENT_W - 16) / 2;
-    const colXs = [MARGIN, MARGIN + colW + 16];
+    const colGap = 18;
+    const colW = (CONTENT_W - colGap) / 2;
+    const colXs = [MARGIN, MARGIN + colW + colGap];
     const half = Math.ceil(INCO_ALLERGENS.length / 2);
     let yL = y;
     let yR = y;
@@ -491,31 +640,68 @@ router.get('/card-pdf', requireAuth, (req, res) => {
       const colX = colXs[isLeft ? 0 : 1];
       const cy = isLeft ? yL : yR;
 
-      doc.font('Helvetica-Bold').fontSize(11).fillColor('#C45A18');
-      doc.text(code, colX, cy, { width: 32 });
+      // Code badge
+      doc.roundedRect(colX, cy - 1, 32, 18, 3)
+         .fillAndStroke(ACCENT, ACCENT);
+      doc.fillColor('#fff').font('Helvetica-Bold').fontSize(10);
+      doc.text(code, colX, cy + 4, { width: 32, align: 'center', lineBreak: false });
 
-      doc.font('Helvetica-Bold').fontSize(9).fillColor('#1a1a1a');
-      doc.text(a.name, colX + 32, cy, { width: colW - 32 });
-      const nameH2 = doc.heightOfString(a.name, { width: colW - 32 });
+      // Name
+      doc.font('Helvetica-Bold').fontSize(10).fillColor(HEADING);
+      doc.text(a.name, colX + 40, cy, { width: colW - 40 });
+      const nameH2 = doc.heightOfString(a.name, { width: colW - 40 });
 
-      doc.font('Helvetica').fontSize(8).fillColor('#555');
-      doc.text(a.description, colX + 32, cy + nameH2 + 1, { width: colW - 32 });
-      const descH = doc.heightOfString(a.description, { width: colW - 32 });
+      // Description
+      doc.font('Helvetica').fontSize(8.5).fillColor('#555');
+      doc.text(a.description, colX + 40, cy + nameH2 + 1, { width: colW - 40, lineGap: 1 });
+      const descH = doc.heightOfString(a.description, { width: colW - 40 });
 
-      const blockH = nameH2 + 1 + descH + 12;
+      const blockH = Math.max(22, nameH2 + descH + 14);
       if (isLeft) yL += blockH; else yR += blockH;
     }
 
-    // ─── Footer on every page ───
+    y = Math.max(yL, yR) + 24;
+
+    // Regulatory reference block at bottom of legend page
+    if (y < BODY_BOTTOM - 80) {
+      doc.roundedRect(MARGIN, y, CONTENT_W, 64, 4)
+         .fillAndStroke('#FAF7F2', '#E8DFD2');
+      doc.fillColor(HEADING).font('Helvetica-Bold').fontSize(9);
+      doc.text('Référence réglementaire', MARGIN + 12, y + 10, {
+        width: CONTENT_W - 24, lineBreak: false
+      });
+      doc.font('Helvetica').fontSize(8.5).fillColor('#444');
+      doc.text(
+        "Règlement (UE) n°1169/2011 du Parlement européen et du Conseil du 25 octobre 2011 concernant l’information des consommateurs sur les denrées alimentaires (INCO) — Annexe II.",
+        MARGIN + 12, y + 24, { width: CONTENT_W - 24, lineGap: 1.5 }
+      );
+      doc.text(
+        "Décret n°2015-447 du 17 avril 2015 — information sur les allergènes pour les denrées non préemballées.",
+        MARGIN + 12, doc.y + 2, { width: CONTENT_W - 24, lineGap: 1.5 }
+      );
+    }
+
+    // ═══════════════════════════════════════════
+    // FOOTER on every page
+    // ═══════════════════════════════════════════
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
-      doc.font('Helvetica-Oblique').fontSize(7).fillColor('#888');
+      // Thin top rule above footer
+      doc.moveTo(MARGIN, FOOTER_Y - 8).lineTo(MARGIN + CONTENT_W, FOOTER_Y - 8)
+         .lineWidth(0.3).strokeColor('#DDD').stroke();
+      doc.font('Helvetica').fontSize(7).fillColor('#888');
       doc.text(
-        `${restaurantName} — Conforme INCO Règlement (UE) n°1169/2011 — Page ${i - range.start + 1}/${range.count}`,
-        MARGIN,
-        FOOTER_Y,
-        { width: CONTENT_W, align: 'center', lineBreak: false }
+        `${restaurantName}  ·  Conforme INCO Règlement (UE) n°1169/2011  ·  Édition ${dateFr}`,
+        MARGIN, FOOTER_Y, {
+          width: CONTENT_W * 0.7, align: 'left', lineBreak: false
+        }
+      );
+      doc.text(
+        `Page ${i - range.start + 1} / ${range.count}`,
+        MARGIN + CONTENT_W * 0.7, FOOTER_Y, {
+          width: CONTENT_W * 0.3, align: 'right', lineBreak: false
+        }
       );
     }
 

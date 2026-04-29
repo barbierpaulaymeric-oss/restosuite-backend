@@ -125,3 +125,67 @@ describe('Stock — Loss & Adjustment', () => {
     expect([200, 201]).toContain(res.status);
   });
 });
+
+describe('Stock — Service flow (createOrder + sendOrder deducts stock)', () => {
+  let ingredientId;
+  let recipeId;
+
+  beforeAll(async () => {
+    // orders.restaurant_id has FK to restaurants — seed restaurant id=1 (matches AUTH JWT)
+    const { run: dbRun } = require('../db');
+    try {
+      dbRun(`INSERT INTO restaurants (id, name, type, plan) VALUES (1, 'Stock Test Resto', 'brasserie', 'pro')`);
+    } catch (e) { /* may already exist from a parallel test seed */ }
+
+    // Fresh ingredient with known starting stock
+    const ing = await request(app)
+      .post('/api/ingredients')
+      .set(AUTH)
+      .send({ name: 'Tomate svc-flow', category: 'Légumes', default_unit: 'kg' });
+    ingredientId = ing.body.id;
+
+    await request(app)
+      .post('/api/stock/reception')
+      .set(AUTH)
+      .send({ lines: [{ ingredient_id: ingredientId, quantity: 10, unit: 'kg' }] });
+
+    // Recipe consumes 0.2 kg per portion
+    const recipe = await request(app)
+      .post('/api/recipes')
+      .set(AUTH)
+      .send({
+        name: 'Plat svc-flow',
+        portions: 1,
+        selling_price: 12,
+        ingredients: [{ ingredient_id: ingredientId, gross_quantity: 0.2, unit: 'kg' }]
+      });
+    recipeId = recipe.body.id;
+  });
+
+  it('POST /orders + POST /orders/:id/send → stock decrements by recipe usage', async () => {
+    // Snapshot stock before
+    const before = await request(app).get('/api/stock').set(AUTH);
+    const beforeRow = before.body.items.find(i => i.ingredient_id === ingredientId);
+    const startQty = beforeRow ? beforeRow.quantity : 0;
+
+    const order = await request(app)
+      .post('/api/orders')
+      .set(AUTH)
+      .send({ table_number: 99, items: [{ recipe_id: recipeId, quantity: 3 }] });
+    expect(order.status).toBe(201);
+
+    const sent = await request(app)
+      .post(`/api/orders/${order.body.id}/send`)
+      .set(AUTH)
+      .send();
+    expect(sent.status).toBe(200);
+    expect(sent.body.stock_deducted).toBe(true);
+
+    const after = await request(app).get('/api/stock').set(AUTH);
+    const afterRow = after.body.items.find(i => i.ingredient_id === ingredientId);
+    const endQty = afterRow ? afterRow.quantity : 0;
+
+    // 3 portions × 0.2 kg = 0.6 kg deducted
+    expect(startQty - endQty).toBeCloseTo(0.6, 5);
+  });
+});

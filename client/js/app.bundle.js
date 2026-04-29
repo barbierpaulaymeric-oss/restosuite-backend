@@ -2293,18 +2293,18 @@ function renderDailySummary(recipes, perms) {
   const summaryEl = document.getElementById("dashboard-summary");
   if (!summaryEl) return;
   let html = `
-    <a href="#/recipes" role="group" aria-label="Nombre de fiches techniques \u2014 voir la liste" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-accent)';this.style.boxShadow='0 0 0 2px var(--color-accent-light)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
+    <button type="button" data-scroll-to="recipe-list" aria-label="Nombre de fiches techniques \u2014 voir la liste" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;display:block;width:100%;cursor:pointer;font:inherit;color:inherit;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-accent)';this.style.boxShadow='0 0 0 2px var(--color-accent-light)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
       <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recipes.length}</div>
       <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Fiches techniques</div>
-    </a>
+    </button>
   `;
   if (perms.view_costs && recipes.length > 0) {
     const totalCost = recipes.reduce((sum, r) => sum + (r.total_cost || 0), 0);
     html += `
-      <a href="#/analytics" role="group" aria-label="Co\xFBt total mati\xE8re \u2014 voir l'analyse" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-success)';this.style.boxShadow='0 0 0 2px rgba(var(--color-success-rgb,34,197,94),0.15)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
+      <button type="button" data-scroll-to="recipe-list" aria-label="Co\xFBt total mati\xE8re \u2014 voir les fiches" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;display:block;width:100%;cursor:pointer;font:inherit;color:inherit;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-success)';this.style.boxShadow='0 0 0 2px rgba(var(--color-success-rgb,34,197,94),0.15)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
         <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-success)">${formatCurrency(totalCost)}</div>
         <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Co\xFBt total mati\xE8re</div>
-      </a>
+      </button>
     `;
   }
   html += `
@@ -2330,6 +2330,12 @@ function renderDailySummary(recipes, perms) {
     `;
   }
   summaryEl.innerHTML = html;
+  summaryEl.querySelectorAll("button[data-scroll-to]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = document.getElementById(btn.dataset.scrollTo);
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
   if (typeof API !== "undefined" && typeof API.getAnalyticsCovers === "function") {
     API.getAnalyticsCovers(30).then((c) => {
       const valEl = document.getElementById("dashboard-covers-value");
@@ -29603,25 +29609,30 @@ function renderTrialHeaderBadge() {
   const status = _trialStatus;
   if (!status || status.status !== "trial") return;
   const daysLeft = status.daysLeft;
-  let badgeClass, label;
+  let badgeClass, label, tooltip;
   if (daysLeft <= 3) {
     badgeClass = "trial-header-badge--red";
-    label = `Essai : ${daysLeft}j \u2014 Passer en Pro`;
+    label = `Essai : ${daysLeft}j`;
+    tooltip = `Essai gratuit : ${daysLeft} jour(s) restant(s) \u2014 passer en Pro`;
   } else if (daysLeft <= 14) {
     badgeClass = "trial-header-badge--yellow";
     label = `Essai : ${daysLeft}j`;
+    tooltip = `Essai gratuit : ${daysLeft} jours restants`;
   } else {
     badgeClass = "trial-header-badge--green";
-    label = `Essai : ${daysLeft}j restants`;
+    label = `${daysLeft}j`;
+    tooltip = `Essai gratuit : ${daysLeft} jours restants`;
   }
   const nav = document.getElementById("nav");
   if (!nav) return;
   const navLinks = nav.querySelector(".nav-links");
   if (!navLinks) return;
-  const badge = document.createElement("a");
-  badge.href = "#/subscribe";
+  const badge = document.createElement(daysLeft <= 3 ? "a" : "span");
+  if (daysLeft <= 3) badge.href = "#/subscribe";
   badge.className = `trial-header-badge ${badgeClass}`;
   badge.textContent = label;
+  badge.title = tooltip;
+  badge.setAttribute("aria-label", tooltip);
   navLinks.insertBefore(badge, navLinks.firstChild);
 }
 function registerRoutes() {
@@ -29682,6 +29693,9 @@ function registerRoutes() {
   Router.add(/^\/haccp\/hub\/autre$/, () => renderHACCPHub("autre"));
   Router.add(/^\/settings\/sanitary-approval$/, renderSanitaryApproval);
   Router.add(/^\/analytics$/, renderAnalytics);
+  Router.add(/^\/pilotage$/, () => {
+    location.hash = "#/analytics";
+  });
   Router.add(/^\/health$/, () => {
     location.hash = "#/analytics";
   });

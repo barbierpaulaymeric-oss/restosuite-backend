@@ -523,19 +523,19 @@ function renderDailySummary(recipes, perms) {
   if (!summaryEl) return;
 
   let html = `
-    <a href="#/recipes" role="group" aria-label="Nombre de fiches techniques — voir la liste" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-accent)';this.style.boxShadow='0 0 0 2px var(--color-accent-light)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
+    <button type="button" data-scroll-to="recipe-list" aria-label="Nombre de fiches techniques — voir la liste" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;display:block;width:100%;cursor:pointer;font:inherit;color:inherit;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-accent)';this.style.boxShadow='0 0 0 2px var(--color-accent-light)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
       <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recipes.length}</div>
       <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Fiches techniques</div>
-    </a>
+    </button>
   `;
 
   if (perms.view_costs && recipes.length > 0) {
     const totalCost = recipes.reduce((sum, r) => sum + (r.total_cost || 0), 0);
     html += `
-      <a href="#/analytics" role="group" aria-label="Coût total matière — voir l'analyse" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-success)';this.style.boxShadow='0 0 0 2px rgba(var(--color-success-rgb,34,197,94),0.15)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
+      <button type="button" data-scroll-to="recipe-list" aria-label="Coût total matière — voir les fiches" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;display:block;width:100%;cursor:pointer;font:inherit;color:inherit;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-success)';this.style.boxShadow='0 0 0 2px rgba(var(--color-success-rgb,34,197,94),0.15)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
         <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-success)">${formatCurrency(totalCost)}</div>
         <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Coût total matière</div>
-      </a>
+      </button>
     `;
   }
 
@@ -566,6 +566,15 @@ function renderDailySummary(recipes, perms) {
   }
 
   summaryEl.innerHTML = html;
+
+  // Wire up scroll-to-section on stat cards (#/recipes is the dashboard itself,
+  // so plain anchors looked like a no-op; smooth-scroll to the recipe list instead).
+  summaryEl.querySelectorAll('button[data-scroll-to]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.scrollTo);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
 
   // Populate covers KPI asynchronously so it doesn't block the rest
   if (typeof API !== 'undefined' && typeof API.getAnalyticsCovers === 'function') {

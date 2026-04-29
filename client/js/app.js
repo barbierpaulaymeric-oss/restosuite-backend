@@ -305,16 +305,20 @@ function renderTrialHeaderBadge() {
   if (!status || status.status !== 'trial') return;
 
   const daysLeft = status.daysLeft;
-  let badgeClass, label;
+  let badgeClass, label, tooltip;
   if (daysLeft <= 3) {
+    // Last few days — keep the action affordance so users can convert before lockout.
     badgeClass = 'trial-header-badge--red';
-    label = `Essai : ${daysLeft}j — Passer en Pro`;
+    label = `Essai : ${daysLeft}j`;
+    tooltip = `Essai gratuit : ${daysLeft} jour(s) restant(s) — passer en Pro`;
   } else if (daysLeft <= 14) {
     badgeClass = 'trial-header-badge--yellow';
     label = `Essai : ${daysLeft}j`;
+    tooltip = `Essai gratuit : ${daysLeft} jours restants`;
   } else {
     badgeClass = 'trial-header-badge--green';
-    label = `Essai : ${daysLeft}j restants`;
+    label = `${daysLeft}j`;
+    tooltip = `Essai gratuit : ${daysLeft} jours restants`;
   }
 
   const nav = document.getElementById('nav');
@@ -322,10 +326,14 @@ function renderTrialHeaderBadge() {
   const navLinks = nav.querySelector('.nav-links');
   if (!navLinks) return;
 
-  const badge = document.createElement('a');
-  badge.href = '#/subscribe';
+  // Only the urgent (≤3 days) badge stays clickable — otherwise it's a passive indicator
+  // with a tooltip, so users aren't pulled to the subscribe page on every click.
+  const badge = document.createElement(daysLeft <= 3 ? 'a' : 'span');
+  if (daysLeft <= 3) badge.href = '#/subscribe';
   badge.className = `trial-header-badge ${badgeClass}`;
   badge.textContent = label;
+  badge.title = tooltip;
+  badge.setAttribute('aria-label', tooltip);
   navLinks.insertBefore(badge, navLinks.firstChild);
 }
 
@@ -389,6 +397,7 @@ function registerRoutes() {
   Router.add(/^\/haccp\/hub\/autre$/,        () => renderHACCPHub('autre'));
   Router.add(/^\/settings\/sanitary-approval$/, renderSanitaryApproval);
   Router.add(/^\/analytics$/, renderAnalytics);
+  Router.add(/^\/pilotage$/, () => { location.hash = '#/analytics'; });
   Router.add(/^\/health$/, () => { location.hash = '#/analytics'; });
   Router.add(/^\/more$/, () => new MoreView().render());
   Router.add(/^\/team$/, renderTeam);
