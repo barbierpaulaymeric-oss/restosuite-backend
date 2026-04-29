@@ -409,7 +409,7 @@ function registerRoutes() {
   Router.add(/^\/crm$/, renderCRM);
   Router.add(/^\/api-keys$/, renderAPIKeys);
   Router.add(/^\/qrcodes$/, renderQRCodes);
-  Router.add(/^\/settings$/, () => { location.hash = '#/subscribe'; });
+  Router.add(/^\/settings$/, () => { location.hash = '#/more'; });
   Router.add(/^\/settings\/plans$/, () => { location.hash = '#/subscribe'; });
   Router.add(/^\/errors-log$/, () => new ErrorsLogView().render());
   Router.add(/^\/traceability\/downstream$/, renderTraceabilityDownstream);
@@ -636,7 +636,7 @@ function initMobileNav(role) {
 
   function buildMenu() {
     body.innerHTML = '';
-    const groupOrder = ['cuisine', 'operations', 'haccp', 'pilotage', 'documents', 'config'];
+    const groupOrder = ['cuisine', 'operations', 'haccp', 'gestion', 'pilotage', 'traceability', 'documents', 'config'];
     groupOrder.forEach(key => {
       const group = NAV_GROUPS[key];
       if (!group) return;

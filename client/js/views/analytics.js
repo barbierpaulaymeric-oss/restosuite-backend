@@ -496,6 +496,8 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
         <a href="#/orders" class="btn btn-secondary"><i data-lucide="clipboard-list" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Commandes fournisseurs</a>
         <a href="#/menu-engineering" class="btn btn-secondary"><i data-lucide="target" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Menu Engineering</a>
         <a href="#/predictions" class="btn btn-secondary"><i data-lucide="brain" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Prédictions IA</a>
+        <a href="#/waste-analytics" class="btn btn-secondary"><i data-lucide="trash-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Pertes &amp; gaspillage</a>
+        <a href="#/mercuriale" class="btn btn-secondary"><i data-lucide="trending-up" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Mercuriale</a>
         <a href="#/suppliers" class="btn btn-secondary"><i data-lucide="factory" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Fournisseurs</a>
       </div>
     </section>

@@ -370,11 +370,30 @@ const API = {
 
   // Allergens INCO
   getAllergenMenuDisplay() { return this.request('/allergens/menu-display'); },
-  async getAllergenCardPdfUrl() {
-    const res = await fetch(`${this.base}/allergens/card-pdf`, { credentials: 'same-origin' });
-    if (!res.ok) throw new Error('Erreur génération fiche allergènes');
+  // Triggers the actual download via blob+anchor (same pattern as downloadSupplierOrderPdf).
+  // Returning a blob URL to a separate caller meant non-OK responses became HTML
+  // blobs that browsers opened in about:blank instead of treating as a download.
+  async downloadAllergenCardPdf() {
+    const headers = {};
+    const legacyToken = localStorage.getItem('restosuite_token');
+    if (legacyToken) headers['Authorization'] = 'Bearer ' + legacyToken;
+    const res = await fetch(`${this.base}/allergens/card-pdf`, {
+      credentials: 'include',
+      headers,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || 'Erreur génération fiche allergènes');
+    }
     const blob = await res.blob();
-    return URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fiche-allergenes-${new Date().toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
 
   // HACCP PDF exports — returns blob URL

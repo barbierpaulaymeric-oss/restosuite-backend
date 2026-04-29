@@ -32,14 +32,7 @@ async function downloadAllergenCard() {
     if (window.lucide) lucide.createIcons();
   }
   try {
-    const url = await API.getAllergenCardPdfUrl();
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `fiche-allergenes-${new Date().toISOString().slice(0, 10)}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    await API.downloadAllergenCardPdf();
   } catch (err) {
     alert('Erreur lors de la génération du PDF : ' + (err && err.message ? err.message : err));
   } finally {

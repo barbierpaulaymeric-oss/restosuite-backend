@@ -1,12 +1,12 @@
-// Bumped 2026-04-29 (v18): three new features shipped — staff scheduling
-// (/api/planning + client/js/views/planning.js + "Planning" entry in
-// Opérations nav), cross-contamination allergen warnings (/api/allergens/
-// cross-contamination + recipe-detail badge), and the all-in-one accountant
-// monthly PDF report (/api/exports/monthly-report + button on /#/exports).
-// Cache bump forces clients to fetch the new bundle.
-// (v17 shipped supplier invoices; v16 shipped customer-facing allergen card
-// PDF export; v15 shipped accountant-friendly monthly CSV exports.)
-const CACHE_NAME = 'restosuite-v18';
+// Bumped 2026-04-29 (v19): integration-test bug-fix sweep — allergen card PDF
+// downloads now hit a blob+anchor pattern (was opening about:blank), the
+// Gestion nav group has a clickable button (the span was a label only, no
+// dropdown trigger), Pilotage's "Actions rapides" links to /waste-analytics
+// (the view existed but had no entry point), and /settings now redirects to
+// /more (the actual settings page) rather than /subscribe.
+// (v18 shipped planning + xcontamination + monthly PDF; v17 shipped supplier
+// invoices; v16 shipped customer-facing allergen card PDF.)
+const CACHE_NAME = 'restosuite-v19';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

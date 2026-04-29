@@ -416,11 +416,30 @@ const API = {
   getAllergenMenuDisplay() {
     return this.request("/allergens/menu-display");
   },
-  async getAllergenCardPdfUrl() {
-    const res = await fetch(`${this.base}/allergens/card-pdf`, { credentials: "same-origin" });
-    if (!res.ok) throw new Error("Erreur g\xE9n\xE9ration fiche allerg\xE8nes");
+  // Triggers the actual download via blob+anchor (same pattern as downloadSupplierOrderPdf).
+  // Returning a blob URL to a separate caller meant non-OK responses became HTML
+  // blobs that browsers opened in about:blank instead of treating as a download.
+  async downloadAllergenCardPdf() {
+    const headers = {};
+    const legacyToken = localStorage.getItem("restosuite_token");
+    if (legacyToken) headers["Authorization"] = "Bearer " + legacyToken;
+    const res = await fetch(`${this.base}/allergens/card-pdf`, {
+      credentials: "include",
+      headers
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || "Erreur g\xE9n\xE9ration fiche allerg\xE8nes");
+    }
     const blob = await res.blob();
-    return URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `fiche-allergenes-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1e3);
   },
   // HACCP PDF exports — returns blob URL
   async getHACCPExportUrl(type, from, to) {
@@ -8328,14 +8347,7 @@ async function downloadAllergenCard() {
     if (window.lucide) lucide.createIcons();
   }
   try {
-    const url = await API.getAllergenCardPdfUrl();
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `fiche-allergenes-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5e3);
+    await API.downloadAllergenCardPdf();
   } catch (err) {
     alert("Erreur lors de la g\xE9n\xE9ration du PDF : " + (err && err.message ? err.message : err));
   } finally {
@@ -17319,6 +17331,8 @@ function renderPilotageDashboard(kpis, foodCost, stockData, pricesData, haccpDat
         <a href="#/orders" class="btn btn-secondary"><i data-lucide="clipboard-list" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Commandes fournisseurs</a>
         <a href="#/menu-engineering" class="btn btn-secondary"><i data-lucide="target" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Menu Engineering</a>
         <a href="#/predictions" class="btn btn-secondary"><i data-lucide="brain" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Pr\xE9dictions IA</a>
+        <a href="#/waste-analytics" class="btn btn-secondary"><i data-lucide="trash-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Pertes &amp; gaspillage</a>
+        <a href="#/mercuriale" class="btn btn-secondary"><i data-lucide="trending-up" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Mercuriale</a>
         <a href="#/suppliers" class="btn btn-secondary"><i data-lucide="factory" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Fournisseurs</a>
       </div>
     </section>
@@ -29642,7 +29656,7 @@ function registerRoutes() {
   Router.add(/^\/api-keys$/, renderAPIKeys);
   Router.add(/^\/qrcodes$/, renderQRCodes);
   Router.add(/^\/settings$/, () => {
-    location.hash = "#/subscribe";
+    location.hash = "#/more";
   });
   Router.add(/^\/settings\/plans$/, () => {
     location.hash = "#/subscribe";
@@ -29828,7 +29842,7 @@ function initMobileNav(role) {
   const currentPath = () => location.hash.replace("#", "") || "/";
   function buildMenu() {
     body.innerHTML = "";
-    const groupOrder = ["cuisine", "operations", "haccp", "pilotage", "documents", "config"];
+    const groupOrder = ["cuisine", "operations", "haccp", "gestion", "pilotage", "traceability", "documents", "config"];
     groupOrder.forEach((key) => {
       const group = NAV_GROUPS[key];
       if (!group) return;
