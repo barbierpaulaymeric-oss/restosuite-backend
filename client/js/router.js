@@ -14,6 +14,8 @@ const ROUTE_ROLES = {
   '/stock/': ['gerant', 'cuisinier'],
   '/deliveries': ['gerant', 'cuisinier'],
   '/deliveries/': ['gerant', 'cuisinier'],
+  '/invoices': ['gerant'],
+  '/invoices/': ['gerant'],
   '/orders': ['gerant'],
   '/orders/': ['gerant'],
   '/haccp': ['gerant', 'cuisinier'],

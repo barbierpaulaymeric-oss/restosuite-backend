@@ -1,11 +1,11 @@
-// Bumped 2026-04-29 (v16): customer-facing allergen card PDF export.
-// New GET /api/allergens/card-pdf (PDFKit, A4) + "Télécharger la
-// fiche allergènes" button on /haccp/allergens. Letter codes
-// (G/C/O/P/A/S/L/FC/Cé/Mo/Sé/Su/Lu/Mol) replace emoji since Helvetica
-// has no emoji glyphs; full INCO legend on last page.
-// (v15 shipped accountant-friendly monthly exports; v14 shipped covers
-// tracking; v13 shipped RGPD export +12 tables and /waste-analytics.)
-const CACHE_NAME = 'restosuite-v16';
+// Bumped 2026-04-29 (v17): supplier invoices feature shipped — new
+// /api/invoices routes, client/js/views/invoices.js, "Factures" entry
+// in the Opérations nav group. Cache bump forces clients to fetch the
+// new app bundle that includes the view.
+// (v16 shipped customer-facing allergen card PDF export; v15 shipped
+// accountant-friendly monthly exports; v14 shipped covers tracking;
+// v13 shipped RGPD export +12 tables and /waste-analytics.)
+const CACHE_NAME = 'restosuite-v17';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

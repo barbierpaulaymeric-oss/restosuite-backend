@@ -979,6 +979,40 @@ const API = {
   createDelivery(data) {
     return this.request("/deliveries", { method: "POST", body: data });
   },
+  // ─── Supplier invoices ───
+  getInvoices(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.status) params.set("status", filters.status);
+    if (filters.supplier_id) params.set("supplier_id", filters.supplier_id);
+    if (filters.date_from) params.set("date_from", filters.date_from);
+    if (filters.date_to) params.set("date_to", filters.date_to);
+    const qs = params.toString() ? `?${params}` : "";
+    return this.request(`/invoices${qs}`, { noRedirectOn401: true });
+  },
+  getInvoice(id) {
+    return this.request(`/invoices/${id}`);
+  },
+  createInvoice(data) {
+    return this.request("/invoices", { method: "POST", body: data });
+  },
+  createInvoiceFromScan(data) {
+    return this.request("/invoices/from-scan", { method: "POST", body: data });
+  },
+  updateInvoice(id, data) {
+    return this.request(`/invoices/${id}`, { method: "PUT", body: data });
+  },
+  setInvoiceStatus(id, data) {
+    return this.request(`/invoices/${id}/status`, { method: "PUT", body: data });
+  },
+  deleteInvoice(id) {
+    return this.request(`/invoices/${id}`, { method: "DELETE" });
+  },
+  reconcileInvoice(id) {
+    return this.request(`/invoices/reconcile/${id}`);
+  },
+  getInvoiceStats() {
+    return this.request("/invoices/stats");
+  },
   // ─── Alerts ───
   getAlertsDailySummary() {
     return this.request("/alerts/daily-summary");
@@ -8593,8 +8627,8 @@ async function renderHACCPWater() {
             </thead>
             <tbody>
               ${items.length === 0 ? '<tr><td colspan="9" class="text-secondary text-center" style="padding:24px">Aucune analyse enregistr\xE9e</td></tr>' : items.map((item) => {
-      const isOverdue = item.next_analysis_date && item.next_analysis_date < today;
-      const isDueSoon = !isOverdue && item.next_analysis_date && item.next_analysis_date <= in30Days;
+      const isOverdue2 = item.next_analysis_date && item.next_analysis_date < today;
+      const isDueSoon = !isOverdue2 && item.next_analysis_date && item.next_analysis_date <= in30Days;
       return `
                     <tr${!item.conformity ? ' style="background:#fff8f8"' : ""}>
                       <td class="mono">${new Date(item.analysis_date).toLocaleDateString("fr-FR")}</td>
@@ -8605,9 +8639,9 @@ async function renderHACCPWater() {
                       <td style="text-align:center">
                         ${item.conformity ? '<span style="color:#27ae60;font-weight:700">\u2714 Oui</span>' : '<span style="color:#dc3545;font-weight:700">\u2718 Non</span>'}
                       </td>
-                      <td class="mono text-sm${isOverdue ? " text-danger" : isDueSoon ? " text-warning" : ""}">
+                      <td class="mono text-sm${isOverdue2 ? " text-danger" : isDueSoon ? " text-warning" : ""}">
                         ${item.next_analysis_date ? new Date(item.next_analysis_date).toLocaleDateString("fr-FR") : "\u2014"}
-                        ${isOverdue ? " \u26A0\uFE0F" : isDueSoon ? " \u23F0" : ""}
+                        ${isOverdue2 ? " \u26A0\uFE0F" : isDueSoon ? " \u23F0" : ""}
                       </td>
                       <td class="text-sm">${escapeHtml(item.report_ref || "\u2014")}</td>
                       <td style="white-space:nowrap">
@@ -11662,18 +11696,18 @@ async function renderHACCPMaintenance() {
             </thead>
             <tbody>
               ${items.length === 0 ? '<tr><td colspan="10" class="text-secondary text-center" style="padding:24px">Aucun \xE9quipement enregistr\xE9</td></tr>' : items.map((item) => {
-      const isOverdue = overdue.some((o) => o.id === item.id);
+      const isOverdue2 = overdue.some((o) => o.id === item.id);
       let statusBadge2 = "";
       if (item.status === "\xE0_jour") statusBadge2 = '<span class="badge badge--success">\u2713 \xC0 jour</span>';
       else if (item.status === "planifi\xE9") statusBadge2 = '<span class="badge" style="background:#e0f0ff;color:#1a6fb5">Planifi\xE9</span>';
       else statusBadge2 = '<span class="badge badge--danger">En retard</span>';
       return `
-                  <tr${isOverdue ? ' style="background:#fff8f8"' : ""}>
+                  <tr${isOverdue2 ? ' style="background:#fff8f8"' : ""}>
                     <td style="font-weight:500">${EQUIPMENT_TYPE_ICONS[item.equipment_type] || "\u{1F527}"} ${escapeHtml(item.equipment_name)}</td>
                     <td class="text-secondary text-sm">${escapeHtml(item.equipment_type)}</td>
                     <td class="text-secondary text-sm">${escapeHtml(item.location || "\u2014")}</td>
                     <td class="mono text-sm">${item.last_maintenance_date ? new Date(item.last_maintenance_date).toLocaleDateString("fr-FR") : "\u2014"}</td>
-                    <td class="mono text-sm${isOverdue ? " text-danger" : ""}">${item.next_maintenance_date ? new Date(item.next_maintenance_date).toLocaleDateString("fr-FR") : "\u2014"}</td>
+                    <td class="mono text-sm${isOverdue2 ? " text-danger" : ""}">${item.next_maintenance_date ? new Date(item.next_maintenance_date).toLocaleDateString("fr-FR") : "\u2014"}</td>
                     <td class="text-secondary text-sm">${escapeHtml(item.maintenance_type || "\u2014")}</td>
                     <td class="text-secondary text-sm">${escapeHtml(item.provider || "\u2014")}</td>
                     <td class="mono text-sm">${item.cost ? item.cost.toLocaleString("fr-FR") + " \u20AC" : "\u2014"}</td>
@@ -11908,18 +11942,18 @@ async function renderHACCPWaste() {
             </thead>
             <tbody>
               ${items.length === 0 ? '<tr><td colspan="8" class="text-secondary text-center" style="padding:24px">Aucune fili\xE8re enregistr\xE9e</td></tr>' : items.map((item) => {
-      const isOverdue = item.next_collection_date && item.next_collection_date < today;
-      const isDueSoon = !isOverdue && item.next_collection_date && item.next_collection_date <= in7Days;
+      const isOverdue2 = item.next_collection_date && item.next_collection_date < today;
+      const isDueSoon = !isOverdue2 && item.next_collection_date && item.next_collection_date <= in7Days;
       return `
-                  <tr${isOverdue ? ' style="background:#fff8f8"' : isDueSoon ? ' style="background:#fffbf0"' : ""}>
+                  <tr${isOverdue2 ? ' style="background:#fff8f8"' : isDueSoon ? ' style="background:#fffbf0"' : ""}>
                     <td style="font-weight:500">${WASTE_TYPE_ICONS[item.waste_type] || "\u{1F5D1}\uFE0F"} ${escapeHtml(item.waste_type)}</td>
                     <td>${escapeHtml(item.collection_provider || "\u2014")}</td>
                     <td class="text-secondary text-sm">${escapeHtml(item.collection_frequency || "\u2014")}</td>
                     <td class="mono text-sm">${item.last_collection_date ? new Date(item.last_collection_date).toLocaleDateString("fr-FR") : "\u2014"}</td>
-                    <td class="mono text-sm${isOverdue ? " text-danger" : isDueSoon ? " text-warning" : ""}">
+                    <td class="mono text-sm${isOverdue2 ? " text-danger" : isDueSoon ? " text-warning" : ""}">
                       ${item.next_collection_date ? new Date(item.next_collection_date).toLocaleDateString("fr-FR") : "\u2014"}
-                      ${isOverdue ? ' <span class="badge badge--danger" style="font-size:0.65rem">En retard</span>' : ""}
-                      ${isDueSoon && !isOverdue ? ' <span class="badge badge--warning" style="font-size:0.65rem">Cette semaine</span>' : ""}
+                      ${isOverdue2 ? ' <span class="badge badge--danger" style="font-size:0.65rem">En retard</span>' : ""}
+                      ${isDueSoon && !isOverdue2 ? ' <span class="badge badge--warning" style="font-size:0.65rem">Cette semaine</span>' : ""}
                     </td>
                     <td class="text-secondary text-sm">${escapeHtml(item.contract_ref || "\u2014")}</td>
                     <td class="text-secondary text-sm" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(item.notes || "")}">${escapeHtml(item.notes || "\u2014")}</td>
@@ -17365,15 +17399,15 @@ async function _loadWasteData() {
     lucide.createIcons();
     return;
   }
-  const fmtEur = (n) => `${(Math.round(Number(n) * 100) / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC`;
+  const fmtEur2 = (n) => `${(Math.round(Number(n) * 100) / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} \u20AC`;
   const fmtNum = (n) => Number(n).toLocaleString("fr-FR");
   container.innerHTML = `
     <!-- KPIs -->
     <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3);margin-bottom:var(--space-5)">
-      ${_wasteKpiCard("Co\xFBt total des pertes", fmtEur(data.total_cost), "banknote", "var(--color-danger)")}
+      ${_wasteKpiCard("Co\xFBt total des pertes", fmtEur2(data.total_cost), "banknote", "var(--color-danger)")}
       ${_wasteKpiCard("% du co\xFBt mati\xE8re", `${(data.waste_pct_of_food_cost || 0).toFixed(1)} %`, "percent", data.waste_pct_of_food_cost > 5 ? "var(--color-danger)" : data.waste_pct_of_food_cost > 2 ? "var(--color-warning)" : "var(--color-success)")}
       ${_wasteKpiCard("Mouvements de perte", fmtNum(data.total_count), "list", "var(--color-accent)")}
-      ${_wasteKpiCard("R\xE9ceptions sur la p\xE9riode", fmtEur(data.reception_cost), "truck", "var(--text-secondary)")}
+      ${_wasteKpiCard("R\xE9ceptions sur la p\xE9riode", fmtEur2(data.reception_cost), "truck", "var(--text-secondary)")}
     </div>
 
     <!-- Weekly trend chart -->
@@ -24514,6 +24548,532 @@ async function createDeliveryFromScan(data) {
     showToast(e.message || "Erreur cr\xE9ation r\xE9ception", "error");
   }
 }
+const INVOICE_STATUS_LABELS = {
+  pending: "En attente",
+  validated: "Valid\xE9e",
+  paid: "Pay\xE9e",
+  disputed: "Litige"
+};
+const INVOICE_STATUS_COLORS = {
+  pending: "#E8722A",
+  validated: "#2563eb",
+  paid: "#22c55e",
+  disputed: "#ef4444"
+};
+function fmtEur(n) {
+  const v = Number(n) || 0;
+  return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " \u20AC";
+}
+function fmtDate(s) {
+  if (!s) return "\u2014";
+  try {
+    const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(s) ? s + "T12:00:00" : s);
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  } catch (e) {
+    return s;
+  }
+}
+function isOverdue(inv) {
+  if (!inv.due_date) return false;
+  if (inv.status === "paid") return false;
+  return /* @__PURE__ */ new Date(inv.due_date + "T23:59:59") < /* @__PURE__ */ new Date();
+}
+function statusBadge(status) {
+  const label = INVOICE_STATUS_LABELS[status] || status || "\u2014";
+  const color = INVOICE_STATUS_COLORS[status] || "#6b7280";
+  return `<span class="badge" style="background:${color};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md)">${escapeHtml(label)}</span>`;
+}
+async function renderInvoices() {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="view-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-4)">
+      <div>
+        <h1><i data-lucide="receipt" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Factures fournisseurs</h1>
+        <p class="text-secondary">Suivi des factures, rapprochement BL, paiements</p>
+      </div>
+      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+        <a href="#/scan-invoice" class="btn btn-secondary" style="display:flex;align-items:center;gap:var(--space-2)">
+          <i data-lucide="scan-line" style="width:16px;height:16px"></i>
+          Scanner une facture
+        </a>
+        <button id="invoice-new-btn" class="btn btn-primary" style="display:flex;align-items:center;gap:var(--space-2)">
+          <i data-lucide="plus" style="width:16px;height:16px"></i>
+          Nouvelle facture
+        </button>
+      </div>
+    </div>
+
+    <div id="invoices-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3);margin-bottom:var(--space-5)"></div>
+
+    <div class="invoice-tabs" style="display:flex;gap:var(--space-2);margin-bottom:var(--space-4);flex-wrap:wrap">
+      <button class="btn btn-accent invoice-tab active" data-status="">Toutes</button>
+      <button class="btn btn-secondary invoice-tab" data-status="pending">En attente</button>
+      <button class="btn btn-secondary invoice-tab" data-status="validated">Valid\xE9es</button>
+      <button class="btn btn-secondary invoice-tab" data-status="paid">Pay\xE9es</button>
+      <button class="btn btn-secondary invoice-tab" data-status="disputed">Litige</button>
+    </div>
+
+    <div id="invoices-content">
+      <div class="skeleton skeleton-row"></div>
+      <div class="skeleton skeleton-row"></div>
+      <div class="skeleton skeleton-row"></div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+  document.getElementById("invoice-new-btn").addEventListener("click", () => openInvoiceFormModal());
+  document.querySelectorAll(".invoice-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".invoice-tab").forEach((t) => {
+        t.classList.remove("active", "btn-accent");
+        t.classList.add("btn-secondary");
+      });
+      tab.classList.add("active", "btn-accent");
+      tab.classList.remove("btn-secondary");
+      loadInvoices(tab.dataset.status || null);
+    });
+  });
+  loadInvoiceStats();
+  loadInvoices();
+}
+async function loadInvoiceStats() {
+  const wrap = document.getElementById("invoices-stats");
+  if (!wrap) return;
+  try {
+    const stats = await API.getInvoiceStats();
+    const month = stats.monthly && stats.monthly.length ? stats.monthly[stats.monthly.length - 1] : { total_ttc: 0, invoice_count: 0 };
+    wrap.innerHTML = `
+      ${statCard("Mois en cours", fmtEur(month.total_ttc), `${month.invoice_count} factures`, "#E8722A")}
+      ${statCard("\xC0 payer", fmtEur(stats.unpaid.total_ttc), `${stats.unpaid.count} factures`, "#2563eb")}
+      ${statCard("En retard", fmtEur(stats.overdue.total_ttc), `${stats.overdue.count} factures`, "#ef4444")}
+      ${statCard(
+      "Top fournisseur",
+      stats.by_supplier[0] ? escapeHtml(stats.by_supplier[0].supplier_name || "\u2014") : "\u2014",
+      stats.by_supplier[0] ? fmtEur(stats.by_supplier[0].total_ttc) : "0 \u20AC",
+      "#22c55e"
+    )}
+    `;
+  } catch (e) {
+    wrap.innerHTML = `<p class="text-secondary text-sm">Statistiques indisponibles</p>`;
+  }
+}
+function statCard(label, value, sub, color) {
+  return `
+    <div class="card" style="padding:var(--space-4);border-left:4px solid ${color};border-radius:var(--radius-lg);background:var(--bg-elevated)">
+      <div class="text-secondary text-sm" style="margin-bottom:var(--space-1)">${escapeHtml(label)}</div>
+      <div style="font-size:var(--text-xl);font-weight:600;line-height:1.2">${value}</div>
+      <div class="text-secondary text-sm" style="margin-top:var(--space-1)">${sub}</div>
+    </div>
+  `;
+}
+async function loadInvoices(status) {
+  const content = document.getElementById("invoices-content");
+  if (!content) return;
+  try {
+    const invoices = await API.getInvoices({ status: status || void 0 });
+    if (!invoices.length) {
+      content.innerHTML = `
+        <div class="empty-state" style="text-align:center;padding:var(--space-8)">
+          <div style="font-size:3rem;margin-bottom:var(--space-3)">\u{1F9FE}</div>
+          <h3>Aucune facture</h3>
+          <p class="text-secondary">Scannez ou ajoutez une facture pour commencer.</p>
+        </div>
+      `;
+      return;
+    }
+    content.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--space-4)">
+        ${invoices.map(renderInvoiceCard).join("")}
+      </div>
+    `;
+    content.querySelectorAll(".invoice-card").forEach((card) => {
+      card.addEventListener("click", (e) => {
+        if (e.target.closest("button")) return;
+        location.hash = "#/invoices/" + card.dataset.id;
+      });
+    });
+    if (window.lucide) lucide.createIcons({ nodes: [content] });
+  } catch (e) {
+    content.innerHTML = `<p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message || "chargement impossible")}</p>`;
+  }
+}
+function renderInvoiceCard(inv) {
+  const overdue = isOverdue(inv);
+  const borderColor = overdue ? "#ef4444" : INVOICE_STATUS_COLORS[inv.status] || "#666";
+  return `
+    <div class="card invoice-card" data-id="${inv.id}" data-ui="custom"
+         style="padding:var(--space-4);border-left:4px solid ${borderColor};border-radius:var(--radius-lg);background:var(--bg-elevated);cursor:pointer;transition:transform 0.15s">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-2);margin-bottom:var(--space-3)">
+        <div style="min-width:0;flex:1">
+          <h3 style="font-size:var(--text-base);font-weight:600;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            ${escapeHtml(inv.supplier_name || "Fournisseur inconnu")}
+          </h3>
+          <div class="text-secondary text-sm">
+            ${escapeHtml(inv.invoice_number || `Facture #${inv.id}`)}
+          </div>
+        </div>
+        ${statusBadge(inv.status)}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div>
+          <div class="text-secondary text-xs">Date</div>
+          <div class="text-sm">${fmtDate(inv.invoice_date)}</div>
+          ${inv.due_date ? `<div class="text-secondary text-xs" style="margin-top:var(--space-2)">\xC9ch\xE9ance</div>
+          <div class="text-sm" style="${overdue ? "color:#ef4444;font-weight:600" : ""}">${fmtDate(inv.due_date)}${overdue ? " (en retard)" : ""}</div>` : ""}
+        </div>
+        <div style="text-align:right">
+          <div class="text-secondary text-xs">Total TTC</div>
+          <div style="font-size:var(--text-lg);font-weight:600">${fmtEur(inv.total_ttc)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+async function renderInvoiceDetail(id) {
+  const app = document.getElementById("app");
+  app.innerHTML = `<div id="invoice-detail-content"><div class="skeleton skeleton-row"></div></div>`;
+  const content = document.getElementById("invoice-detail-content");
+  let inv;
+  try {
+    inv = await API.getInvoice(id);
+  } catch (e) {
+    content.innerHTML = `<p style="color:var(--color-danger)">${escapeHtml(e.message || "Facture introuvable")}</p>
+      <a href="#/invoices" class="btn btn-secondary" style="margin-top:var(--space-3)">\u2190 Retour</a>`;
+    return;
+  }
+  const overdue = isOverdue(inv);
+  content.innerHTML = `
+    <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+      <a href="#/invoices" class="btn btn-secondary" style="display:flex;align-items:center;gap:var(--space-2)">
+        <i data-lucide="arrow-left" style="width:14px;height:14px"></i>Retour
+      </a>
+    </div>
+
+    <div class="card" style="padding:var(--space-5);border-radius:var(--radius-lg);background:var(--bg-elevated);margin-bottom:var(--space-4)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-4)">
+        <div>
+          <h1 style="margin:0">${escapeHtml(inv.invoice_number || `Facture #${inv.id}`)}</h1>
+          <p class="text-secondary" style="margin:var(--space-1) 0 0">${escapeHtml(inv.supplier_name || "Fournisseur inconnu")}</p>
+        </div>
+        ${statusBadge(inv.status)}
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)">
+        <div><div class="text-secondary text-xs">Date facture</div><div>${fmtDate(inv.invoice_date)}</div></div>
+        <div><div class="text-secondary text-xs">\xC9ch\xE9ance</div>
+          <div style="${overdue ? "color:#ef4444;font-weight:600" : ""}">${fmtDate(inv.due_date)}${overdue ? " (en retard)" : ""}</div>
+        </div>
+        <div><div class="text-secondary text-xs">Total HT</div><div>${fmtEur(inv.total_ht)}</div></div>
+        <div><div class="text-secondary text-xs">TVA</div><div>${fmtEur(inv.tva_amount)}</div></div>
+        <div><div class="text-secondary text-xs">Total TTC</div><div style="font-size:var(--text-lg);font-weight:600">${fmtEur(inv.total_ttc)}</div></div>
+        ${inv.payment_date ? `<div><div class="text-secondary text-xs">Pay\xE9e le</div><div>${fmtDate(inv.payment_date.slice(0, 10))}</div></div>` : ""}
+        ${inv.payment_method ? `<div><div class="text-secondary text-xs">Mode</div><div>${escapeHtml(inv.payment_method)}</div></div>` : ""}
+      </div>
+
+      ${inv.delivery_note_id || inv.purchase_order_id ? `
+        <div class="text-secondary text-sm" style="margin-bottom:var(--space-3)">
+          ${inv.delivery_note_id ? `BL li\xE9 : <a href="#/deliveries/${inv.delivery_note_id}">#${inv.delivery_note_id}</a> \xB7 ` : ""}
+          ${inv.purchase_order_id ? `Commande : #${inv.purchase_order_id}` : ""}
+        </div>
+      ` : ""}
+
+      ${inv.notes ? `<div style="margin-bottom:var(--space-3);padding:var(--space-3);background:var(--bg-base);border-radius:var(--radius-md)">
+        <div class="text-secondary text-xs">Notes</div>
+        <div style="white-space:pre-wrap">${escapeHtml(inv.notes)}</div>
+      </div>` : ""}
+
+      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+        ${renderStatusActions(inv)}
+        ${inv.delivery_note_id ? `<a href="#/invoices/${inv.id}/reconcile" class="btn btn-secondary">Rapprocher BL</a>` : ""}
+        ${inv.status !== "paid" ? `<button id="invoice-edit-btn" class="btn btn-secondary">Modifier</button>` : ""}
+        <button id="invoice-delete-btn" class="btn btn-secondary" style="color:#ef4444">Supprimer</button>
+      </div>
+    </div>
+
+    <div class="card" style="padding:var(--space-5);border-radius:var(--radius-lg);background:var(--bg-elevated)">
+      <h3 style="margin:0 0 var(--space-3)">Lignes</h3>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="text-align:left;border-bottom:1px solid var(--border-color)">
+              <th style="padding:var(--space-2)">Description</th>
+              <th style="padding:var(--space-2);text-align:right">Quantit\xE9</th>
+              <th style="padding:var(--space-2);text-align:right">PU HT</th>
+              <th style="padding:var(--space-2);text-align:right">TVA</th>
+              <th style="padding:var(--space-2);text-align:right">Total HT</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(inv.items || []).map((it) => `
+              <tr style="border-bottom:1px solid var(--border-color-soft, var(--border-color))">
+                <td style="padding:var(--space-2)">
+                  ${escapeHtml(it.description || "\u2014")}
+                  ${it.ingredient_name ? `<div class="text-secondary text-xs">${escapeHtml(it.ingredient_name)}</div>` : ""}
+                </td>
+                <td style="padding:var(--space-2);text-align:right">${Number(it.quantity || 0)}</td>
+                <td style="padding:var(--space-2);text-align:right">${fmtEur(it.unit_price_ht)}</td>
+                <td style="padding:var(--space-2);text-align:right">${Number(it.tva_rate || 0)}%</td>
+                <td style="padding:var(--space-2);text-align:right">${fmtEur(it.total_ht)}</td>
+              </tr>
+            `).join("")}
+            ${(inv.items || []).length === 0 ? `<tr><td colspan="5" style="padding:var(--space-3);text-align:center" class="text-secondary">Aucune ligne</td></tr>` : ""}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  bindStatusActions(inv);
+  const editBtn = document.getElementById("invoice-edit-btn");
+  if (editBtn) editBtn.addEventListener("click", () => openInvoiceFormModal(inv));
+  const delBtn = document.getElementById("invoice-delete-btn");
+  if (delBtn) delBtn.addEventListener("click", async () => {
+    if (!confirm("Supprimer cette facture ?")) return;
+    try {
+      await API.deleteInvoice(inv.id);
+      showToast && showToast("Facture supprim\xE9e", "success");
+      location.hash = "#/invoices";
+    } catch (e) {
+      showToast && showToast(e.message || "Erreur", "error");
+    }
+  });
+  if (window.lucide) lucide.createIcons({ nodes: [content] });
+}
+function renderStatusActions(inv) {
+  const buttons = [];
+  if (inv.status === "pending") {
+    buttons.push(`<button class="btn btn-primary invoice-status-btn" data-target="validated">Valider</button>`);
+  }
+  if (inv.status === "pending" || inv.status === "validated") {
+    buttons.push(`<button class="btn btn-primary invoice-status-btn" data-target="paid">Marquer pay\xE9e</button>`);
+  }
+  if (inv.status !== "disputed" && inv.status !== "paid") {
+    buttons.push(`<button class="btn btn-secondary invoice-status-btn" data-target="disputed" style="color:#ef4444">Litige</button>`);
+  }
+  if (inv.status === "disputed") {
+    buttons.push(`<button class="btn btn-primary invoice-status-btn" data-target="pending">Rouvrir</button>`);
+    buttons.push(`<button class="btn btn-primary invoice-status-btn" data-target="validated">Valider</button>`);
+  }
+  return buttons.join("");
+}
+function bindStatusActions(inv) {
+  document.querySelectorAll(".invoice-status-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const target = btn.dataset.target;
+      let payload = { status: target };
+      if (target === "paid") {
+        const method = prompt("Mode de paiement (virement, CB, ch\xE8que\u2026)", inv.payment_method || "virement");
+        if (method === null) return;
+        payload.payment_method = method;
+      }
+      try {
+        btn.disabled = true;
+        await API.setInvoiceStatus(inv.id, payload);
+        showToast && showToast("Statut mis \xE0 jour", "success");
+        renderInvoiceDetail(inv.id);
+      } catch (e) {
+        btn.disabled = false;
+        showToast && showToast(e.message || "Erreur", "error");
+      }
+    });
+  });
+}
+async function renderInvoiceReconcile(id) {
+  const app = document.getElementById("app");
+  app.innerHTML = `<div id="invoice-reconcile-content"><div class="skeleton skeleton-row"></div></div>`;
+  const content = document.getElementById("invoice-reconcile-content");
+  let result;
+  try {
+    result = await API.reconcileInvoice(id);
+  } catch (e) {
+    content.innerHTML = `<p style="color:var(--color-danger)">${escapeHtml(e.message || "Rapprochement impossible")}</p>
+      <a href="#/invoices/${id}" class="btn btn-secondary" style="margin-top:var(--space-3)">\u2190 Retour</a>`;
+    return;
+  }
+  const s = result.summary;
+  const cleanColor = s.clean ? "#22c55e" : "#E8722A";
+  content.innerHTML = `
+    <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+      <a href="#/invoices/${id}" class="btn btn-secondary" style="display:flex;align-items:center;gap:var(--space-2)">
+        <i data-lucide="arrow-left" style="width:14px;height:14px"></i>Retour
+      </a>
+    </div>
+
+    <h1 style="margin-bottom:var(--space-3)">Rapprochement BL \u2194 Facture</h1>
+
+    <div class="card" style="padding:var(--space-4);border-left:4px solid ${cleanColor};border-radius:var(--radius-lg);background:var(--bg-elevated);margin-bottom:var(--space-4)">
+      <strong style="color:${cleanColor}">${s.clean ? "\u2705 Rapprochement OK" : "\u26A0\uFE0F \xC9carts d\xE9tect\xE9s"}</strong>
+      <div class="text-secondary text-sm" style="margin-top:var(--space-1)">
+        ${s.matched} OK \xB7 ${s.qty_discrepancies} qt\xE9 \xB7 ${s.price_discrepancies} prix \xB7 ${s.missing_in_invoice} manquant facture \xB7 ${s.missing_in_delivery} manquant BL
+      </div>
+    </div>
+
+    ${s.qty_discrepancies > 0 ? sectionTable(
+    "\xC9carts de quantit\xE9",
+    "#E8722A",
+    ["Produit", "BL", "Facture", "\xC9cart"],
+    result.qty_discrepancies.map((d) => [
+      escapeHtml(d.description || "\u2014"),
+      Number(d.delivery_quantity || 0),
+      Number(d.invoice_quantity || 0),
+      `<span style="color:${d.qty_delta > 0 ? "#ef4444" : "#22c55e"}">${d.qty_delta > 0 ? "+" : ""}${d.qty_delta}</span>`
+    ])
+  ) : ""}
+
+    ${s.price_discrepancies > 0 ? sectionTable(
+    "\xC9carts de prix unitaire HT",
+    "#2563eb",
+    ["Produit", "BL", "Facture", "\xC9cart"],
+    result.price_discrepancies.map((d) => [
+      escapeHtml(d.description || "\u2014"),
+      fmtEur(d.delivery_unit_price),
+      fmtEur(d.invoice_unit_price),
+      `<span style="color:${d.price_delta > 0 ? "#ef4444" : "#22c55e"}">${d.price_delta > 0 ? "+" : ""}${fmtEur(d.price_delta)}</span>`
+    ])
+  ) : ""}
+
+    ${s.missing_in_delivery > 0 ? sectionTable(
+    "Lignes facture sans BL",
+    "#ef4444",
+    ["Produit", "Quantit\xE9", "PU HT"],
+    result.missing_in_delivery.map((d) => [
+      escapeHtml(d.description || "\u2014"),
+      Number(d.quantity || 0),
+      fmtEur(d.unit_price_ht)
+    ])
+  ) : ""}
+
+    ${s.missing_in_invoice > 0 ? sectionTable(
+    "Lignes BL sans facture",
+    "#ef4444",
+    ["Produit", "Quantit\xE9", "PU HT"],
+    result.missing_in_invoice.map((d) => [
+      escapeHtml(d.product_name || "\u2014"),
+      Number(d.quantity || 0),
+      fmtEur(d.price_per_unit)
+    ])
+  ) : ""}
+
+    ${s.matched > 0 ? sectionTable(
+    "Lignes correspondantes",
+    "#22c55e",
+    ["Produit", "Quantit\xE9", "PU HT", "Total HT"],
+    result.matched.map((d) => [
+      escapeHtml(d.description || "\u2014"),
+      Number(d.invoice_quantity || 0),
+      fmtEur(d.invoice_unit_price),
+      fmtEur((Number(d.invoice_quantity) || 0) * (Number(d.invoice_unit_price) || 0))
+    ])
+  ) : ""}
+  `;
+  if (window.lucide) lucide.createIcons({ nodes: [content] });
+}
+function sectionTable(title, color, headers, rows) {
+  return `
+    <div class="card" style="padding:var(--space-4);border-left:4px solid ${color};border-radius:var(--radius-lg);background:var(--bg-elevated);margin-bottom:var(--space-3)">
+      <h3 style="margin:0 0 var(--space-3)">${escapeHtml(title)}</h3>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="text-align:left;border-bottom:1px solid var(--border-color)">
+              ${headers.map((h) => `<th style="padding:var(--space-2)">${escapeHtml(h)}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((r) => `<tr style="border-bottom:1px solid var(--border-color-soft, var(--border-color))">${r.map((c, i) => `<td style="padding:var(--space-2);${i === 0 ? "" : "text-align:right"}">${c}</td>`).join("")}</tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+async function openInvoiceFormModal(existing) {
+  let suppliers = [];
+  try {
+    suppliers = await API.getSuppliers();
+  } catch (e) {
+  }
+  const isEdit = !!existing;
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:720px;width:95%">
+      <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
+        <h2>${isEdit ? "Modifier la facture" : "Nouvelle facture"}</h2>
+        <button class="btn btn-secondary modal-close-btn">\xD7</button>
+      </div>
+      <div class="modal-body">
+        <form id="invoice-form" style="display:grid;gap:var(--space-3)">
+          <label>Fournisseur
+            <select name="supplier_id" data-ui="custom" required>
+              <option value="">\u2014 Choisir \u2014</option>
+              ${suppliers.map((s) => `<option value="${s.id}" ${existing && existing.supplier_id === s.id ? "selected" : ""}>${escapeHtml(s.name)}</option>`).join("")}
+            </select>
+          </label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+            <label>N\xB0 de facture
+              <input type="text" name="invoice_number" data-ui="custom" value="${existing ? escapeHtml(existing.invoice_number || "") : ""}">
+            </label>
+            <label>Date facture
+              <input type="date" name="invoice_date" data-ui="custom" value="${existing ? existing.invoice_date || "" : ""}">
+            </label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3)">
+            <label>Total HT
+              <input type="number" step="0.01" name="total_ht" data-ui="custom" value="${existing ? existing.total_ht || 0 : 0}">
+            </label>
+            <label>TVA
+              <input type="number" step="0.01" name="tva_amount" data-ui="custom" value="${existing ? existing.tva_amount || 0 : 0}">
+            </label>
+            <label>Total TTC
+              <input type="number" step="0.01" name="total_ttc" data-ui="custom" value="${existing ? existing.total_ttc || 0 : 0}">
+            </label>
+          </div>
+          <label>\xC9ch\xE9ance
+            <input type="date" name="due_date" data-ui="custom" value="${existing ? existing.due_date || "" : ""}">
+          </label>
+          <label>Notes
+            <textarea name="notes" data-ui="custom" rows="3">${existing ? escapeHtml(existing.notes || "") : ""}</textarea>
+          </label>
+          <div style="display:flex;gap:var(--space-2);justify-content:flex-end">
+            <button type="button" class="btn btn-secondary modal-close-btn">Annuler</button>
+            <button type="submit" class="btn btn-primary">${isEdit ? "Enregistrer" : "Cr\xE9er"}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelectorAll(".modal-close-btn").forEach((b) => b.addEventListener("click", () => overlay.remove()));
+  overlay.querySelector("#invoice-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = {
+      supplier_id: fd.get("supplier_id") ? Number(fd.get("supplier_id")) : null,
+      invoice_number: fd.get("invoice_number") || null,
+      invoice_date: fd.get("invoice_date") || null,
+      due_date: fd.get("due_date") || null,
+      total_ht: Number(fd.get("total_ht")) || 0,
+      tva_amount: Number(fd.get("tva_amount")) || 0,
+      total_ttc: Number(fd.get("total_ttc")) || 0,
+      notes: fd.get("notes") || null
+    };
+    try {
+      if (isEdit) {
+        await API.updateInvoice(existing.id, data);
+        overlay.remove();
+        showToast && showToast("Facture mise \xE0 jour", "success");
+        renderInvoiceDetail(existing.id);
+      } else {
+        const created = await API.createInvoice(data);
+        overlay.remove();
+        showToast && showToast("Facture cr\xE9\xE9e", "success");
+        location.hash = "#/invoices/" + created.id;
+      }
+    } catch (err) {
+      showToast && showToast(err.message || "Erreur", "error");
+    }
+  });
+  if (window.lucide) lucide.createIcons({ nodes: [overlay] });
+}
 async function renderMercuriale() {
   const app = document.getElementById("app");
   app.innerHTML = `
@@ -28061,6 +28621,8 @@ const ROUTE_ROLES = {
   "/stock/": ["gerant", "cuisinier"],
   "/deliveries": ["gerant", "cuisinier"],
   "/deliveries/": ["gerant", "cuisinier"],
+  "/invoices": ["gerant"],
+  "/invoices/": ["gerant"],
   "/orders": ["gerant"],
   "/orders/": ["gerant"],
   "/haccp": ["gerant", "cuisinier"],
@@ -28201,6 +28763,7 @@ const NAV_GROUPS = {
       { label: "Commandes", route: "/orders", icon: "clipboard-pen", roles: ["gerant"] },
       { label: "Fournisseurs", route: "/suppliers", icon: "truck", roles: ["gerant"] },
       { label: "Livraisons", route: "/deliveries", icon: "package-check", roles: ["gerant", "cuisinier"] },
+      { label: "Factures", route: "/invoices", icon: "receipt", roles: ["gerant"] },
       { label: "Messages", route: "/messages", icon: "message-square", roles: ["gerant", "cuisinier"], badgeKey: "messages" },
       { label: "Service (Salle)", route: "/service", icon: "concierge-bell", roles: ["gerant", "salle"] },
       { label: "Cuisine (\xE9cran)", route: "/kitchen", icon: "chef-hat", roles: ["gerant", "cuisinier"] }
@@ -28279,6 +28842,7 @@ const ROUTE_TO_GROUP = {
   "/messages": "operations",
   "/kitchen": "operations",
   "/scan-invoice": "operations",
+  "/invoices": "operations",
   "/analytics": "pilotage",
   "/menu-engineering": "pilotage",
   "/predictions": "pilotage",
@@ -28479,6 +29043,9 @@ function registerRoutes() {
   Router.add(/^\/stock$/, renderStockDashboard);
   Router.add(/^\/deliveries$/, renderDeliveries);
   Router.add(/^\/deliveries\/(\d+)$/, (id) => renderDeliveryDetail(parseInt(id)));
+  Router.add(/^\/invoices$/, renderInvoices);
+  Router.add(/^\/invoices\/(\d+)$/, (id) => renderInvoiceDetail(parseInt(id)));
+  Router.add(/^\/invoices\/(\d+)\/reconcile$/, (id) => renderInvoiceReconcile(parseInt(id)));
   Router.add(/^\/messages$/, renderMessagesConversations);
   Router.add(/^\/messages\/(\d+)$/, (id) => renderMessagesThread(parseInt(id)));
   Router.add(/^\/stock\/reception$/, renderStockReception);

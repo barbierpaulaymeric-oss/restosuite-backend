@@ -820,6 +820,25 @@ const API = {
   // ─── Deliveries (extra) ───
   createDelivery(data) { return this.request('/deliveries', { method: 'POST', body: data }); },
 
+  // ─── Supplier invoices ───
+  getInvoices(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.status) params.set('status', filters.status);
+    if (filters.supplier_id) params.set('supplier_id', filters.supplier_id);
+    if (filters.date_from) params.set('date_from', filters.date_from);
+    if (filters.date_to) params.set('date_to', filters.date_to);
+    const qs = params.toString() ? `?${params}` : '';
+    return this.request(`/invoices${qs}`, { noRedirectOn401: true });
+  },
+  getInvoice(id) { return this.request(`/invoices/${id}`); },
+  createInvoice(data) { return this.request('/invoices', { method: 'POST', body: data }); },
+  createInvoiceFromScan(data) { return this.request('/invoices/from-scan', { method: 'POST', body: data }); },
+  updateInvoice(id, data) { return this.request(`/invoices/${id}`, { method: 'PUT', body: data }); },
+  setInvoiceStatus(id, data) { return this.request(`/invoices/${id}/status`, { method: 'PUT', body: data }); },
+  deleteInvoice(id) { return this.request(`/invoices/${id}`, { method: 'DELETE' }); },
+  reconcileInvoice(id) { return this.request(`/invoices/reconcile/${id}`); },
+  getInvoiceStats() { return this.request('/invoices/stats'); },
+
   // ─── Alerts ───
   getAlertsDailySummary() { return this.request('/alerts/daily-summary'); },
 

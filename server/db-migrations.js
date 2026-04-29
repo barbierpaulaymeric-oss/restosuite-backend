@@ -1925,6 +1925,66 @@ try {
   console.error('Migration covers error:', e.message);
 }
 
+// ─── Migration: supplier_invoices + items ───
+// Persistence layer behind /api/ai/scan-invoice. No FK REFERENCES on
+// supplier_id/delivery_note_id/purchase_order_id/ingredient_id — matches the
+// no-FK convention used by cooling_logs/witness_meals so :memory: test DBs
+// don't break (per feedback_fk_references_test_db.md). Tenant scope enforced
+// in routes via restaurant_id; soft delete via deleted_at IS NULL.
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS supplier_invoices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      supplier_id INTEGER,
+      invoice_number TEXT,
+      invoice_date DATE,
+      due_date DATE,
+      total_ht REAL DEFAULT 0,
+      tva_amount REAL DEFAULT 0,
+      total_ttc REAL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending',
+      payment_date DATETIME,
+      payment_method TEXT,
+      notes TEXT,
+      pdf_path TEXT,
+      delivery_note_id INTEGER,
+      purchase_order_id INTEGER,
+      deleted_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_supplier_invoices_restaurant_id
+      ON supplier_invoices(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_supplier_invoices_restaurant_status
+      ON supplier_invoices(restaurant_id, status);
+    CREATE INDEX IF NOT EXISTS idx_supplier_invoices_restaurant_supplier
+      ON supplier_invoices(restaurant_id, supplier_id);
+    CREATE INDEX IF NOT EXISTS idx_supplier_invoices_restaurant_date
+      ON supplier_invoices(restaurant_id, invoice_date DESC);
+
+    CREATE TABLE IF NOT EXISTS supplier_invoice_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_id INTEGER NOT NULL,
+      restaurant_id INTEGER NOT NULL,
+      description TEXT,
+      quantity REAL DEFAULT 0,
+      unit_price_ht REAL DEFAULT 0,
+      tva_rate REAL DEFAULT 5.5,
+      total_ht REAL DEFAULT 0,
+      ingredient_id INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_supplier_invoice_items_invoice
+      ON supplier_invoice_items(invoice_id);
+    CREATE INDEX IF NOT EXISTS idx_supplier_invoice_items_restaurant_id
+      ON supplier_invoice_items(restaurant_id);
+  `);
+  console.log('✅ Migration: supplier_invoices + supplier_invoice_items ready');
+} catch (e) {
+  console.warn('⚠️ supplier_invoices migration error:', e.message);
+}
+
 }
 
 module.exports = { runMigrations };

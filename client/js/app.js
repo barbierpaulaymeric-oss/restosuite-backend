@@ -41,6 +41,7 @@ const NAV_GROUPS = {
       { label: 'Commandes',              route: '/orders',    icon: 'clipboard-pen',  roles: ['gerant'] },
       { label: 'Fournisseurs',          route: '/suppliers',  icon: 'truck',         roles: ['gerant'] },
       { label: 'Livraisons',             route: '/deliveries',icon: 'package-check',  roles: ['gerant','cuisinier'] },
+      { label: 'Factures',               route: '/invoices',  icon: 'receipt',        roles: ['gerant'] },
       { label: 'Messages',               route: '/messages',  icon: 'message-square', roles: ['gerant','cuisinier'], badgeKey: 'messages' },
       { label: 'Service (Salle)',        route: '/service',   icon: 'concierge-bell', roles: ['gerant','salle'] },
       { label: 'Cuisine (écran)',        route: '/kitchen',   icon: 'chef-hat',       roles: ['gerant','cuisinier'] },
@@ -111,6 +112,7 @@ const ROUTE_TO_GROUP = {
   '/orders': 'operations', '/suppliers': 'operations',
   '/deliveries': 'operations', '/service': 'operations', '/messages': 'operations',
   '/kitchen': 'operations', '/scan-invoice': 'operations',
+  '/invoices': 'operations',
   '/analytics': 'pilotage',
   '/menu-engineering': 'pilotage', '/predictions': 'pilotage',
   '/mercuriale': 'pilotage', '/import-mercuriale': 'pilotage',
@@ -338,6 +340,9 @@ function registerRoutes() {
   Router.add(/^\/stock$/, renderStockDashboard);
   Router.add(/^\/deliveries$/, renderDeliveries);
   Router.add(/^\/deliveries\/(\d+)$/, (id) => renderDeliveryDetail(parseInt(id)));
+  Router.add(/^\/invoices$/, renderInvoices);
+  Router.add(/^\/invoices\/(\d+)$/, (id) => renderInvoiceDetail(parseInt(id)));
+  Router.add(/^\/invoices\/(\d+)\/reconcile$/, (id) => renderInvoiceReconcile(parseInt(id)));
   Router.add(/^\/messages$/, renderMessagesConversations);
   Router.add(/^\/messages\/(\d+)$/, (id) => renderMessagesThread(parseInt(id)));
   Router.add(/^\/stock\/reception$/, renderStockReception);

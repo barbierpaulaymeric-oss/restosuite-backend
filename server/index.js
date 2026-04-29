@@ -217,6 +217,7 @@ app.use(require('./lib/soft-auth').softAuth);
     '/api/ingredients', '/api/recipes', '/api/stock', '/api/prices', '/api/variance',
     '/api/allergens',
     '/api/haccp', '/api/suppliers', '/api/orders', '/api/deliveries', '/api/purchase-orders',
+    '/api/invoices',
     '/api/qrcode', '/api/menu', '/api/alerts', '/api/service', '/api/crm',
     '/api/haccp-plan', '/api/analytics', '/api/ai', '/api/predictions', '/api/carbon',
     '/api/integrations', '/api/training', '/api/pest-control', '/api/maintenance',
@@ -250,6 +251,7 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/deliveries', require('./routes/deliveries'));
 app.use('/api/purchase-orders', require('./routes/purchase-orders'));
+app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/qrcode', require('./routes/qrcode'));
 app.use('/api/menu', require('./routes/menu'));
 app.use('/api/alerts', require('./routes/alerts'));
