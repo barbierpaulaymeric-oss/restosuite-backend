@@ -2293,10 +2293,10 @@ function renderDailySummary(recipes, perms) {
   const summaryEl = document.getElementById("dashboard-summary");
   if (!summaryEl) return;
   let html = `
-    <button type="button" data-scroll-to="recipe-list" aria-label="Nombre de fiches techniques \u2014 voir la liste" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;display:block;width:100%;cursor:pointer;font:inherit;color:inherit;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-accent)';this.style.boxShadow='0 0 0 2px var(--color-accent-light)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
+    <a href="#/recipes" role="group" aria-label="Voir la liste des fiches techniques" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;color:inherit;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-accent)';this.style.boxShadow='0 0 0 2px var(--color-accent-light)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
       <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recipes.length}</div>
       <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Fiches techniques</div>
-    </button>
+    </a>
   `;
   if (perms.view_costs && recipes.length > 0) {
     const totalCost = recipes.reduce((sum, r) => sum + (r.total_cost || 0), 0);
@@ -15934,12 +15934,12 @@ function _svcRenderConfigScreen(app) {
           <h3 style="font-size:var(--text-base);margin-bottom:var(--space-4)">Horaires du service</h3>
           <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-3)">
             <div style="flex:1">
-              <label style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">D\xE9but</label>
-              <input type="time" class="form-control" id="svc-start-time" lang="fr" value="${config.service_start || "11:30"}" style="font-size:var(--text-lg);text-align:center">
+              <label for="svc-start-time" style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">D\xE9but (HH:MM)</label>
+              <input type="text" inputmode="numeric" pattern="[0-2][0-9]:[0-5][0-9]" maxlength="5" placeholder="11:30" class="form-control" id="svc-start-time" value="${config.service_start || "11:30"}" style="font-size:var(--text-lg);text-align:center;font-variant-numeric:tabular-nums">
             </div>
             <div style="flex:1">
-              <label style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">Fin</label>
-              <input type="time" class="form-control" id="svc-end-time" lang="fr" value="${config.service_end || "14:30"}" style="font-size:var(--text-lg);text-align:center">
+              <label for="svc-end-time" style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">Fin (HH:MM)</label>
+              <input type="text" inputmode="numeric" pattern="[0-2][0-9]:[0-5][0-9]" maxlength="5" placeholder="23:00" class="form-control" id="svc-end-time" value="${config.service_end || "14:30"}" style="font-size:var(--text-lg);text-align:center;font-variant-numeric:tabular-nums">
             </div>
           </div>
           <button class="btn btn-ghost btn-sm" id="svc-save-config" style="width:100%">Enregistrer les horaires</button>
@@ -15957,26 +15957,43 @@ function _svcRenderConfigScreen(app) {
       </div>
     </div>
   `;
+  const TIME_RE = /^[0-2][0-9]:[0-5][0-9]$/;
   document.getElementById("svc-save-config").addEventListener("click", async () => {
     const start = document.getElementById("svc-start-time").value;
     const end = document.getElementById("svc-end-time").value;
+    if (!TIME_RE.test(start) || !TIME_RE.test(end)) {
+      showToast("Horaires invalides \u2014 utilisez le format HH:MM (ex. 11:30)", "error");
+      return;
+    }
     try {
       await API.updateServiceConfig({ service_start: start, service_end: end });
       showToast("Horaires enregistr\xE9s", "success");
     } catch (e) {
-      showToast(e.message, "error");
+      showToast((e == null ? void 0 : e.message) || "Erreur lors de l\u2019enregistrement des horaires", "error");
     }
   });
   document.getElementById("svc-start-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("svc-start-btn");
     const start = document.getElementById("svc-start-time").value;
     const end = document.getElementById("svc-end-time").value;
+    if (!TIME_RE.test(start) || !TIME_RE.test(end)) {
+      showToast("Horaires invalides \u2014 utilisez le format HH:MM (ex. 11:30)", "error");
+      return;
+    }
+    btn.disabled = true;
+    const originalLabel = btn.innerHTML;
+    btn.innerHTML = "\u23F3 D\xE9marrage\u2026";
     try {
       await API.updateServiceConfig({ service_start: start, service_end: end });
       await API.startService();
       _serviceState.serviceActive = true;
       renderServiceView();
     } catch (e) {
-      showToast(e.message, "error");
+      btn.disabled = false;
+      btn.innerHTML = originalLabel;
+      const msg = (e == null ? void 0 : e.message) || "Impossible de lancer le service";
+      showToast(msg, "error");
+      console.error("[service] startService failed:", e);
     }
   });
 }
@@ -28950,6 +28967,7 @@ let _bubbleState = {
 function initFloatingAIBubble() {
   const token = localStorage.getItem("restosuite_token");
   if (!token) return;
+  if (document.getElementById("floating-ai-bubble-container")) return;
   const ICON_MIC = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
   const ICON_CLOSE = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
   const ICON_STOP = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>`;
@@ -28996,13 +29014,16 @@ function initFloatingAIBubble() {
     }
   }
 }
-function toggleBubblePanel() {
+function toggleBubblePanel(event) {
+  if (event) event.stopPropagation();
   const panel = document.getElementById("bubble-panel");
   const fab = document.getElementById("bubble-fab");
-  const visible = panel.style.display !== "none";
+  if (!panel || !fab) return;
+  const visible = !!_bubbleState.open;
   if (visible) {
     closeBubblePanel();
   } else {
+    _bubbleState.open = true;
     panel.style.display = "flex";
     fab.classList.add("expanded");
     setTimeout(() => {
@@ -29014,8 +29035,9 @@ function toggleBubblePanel() {
 function closeBubblePanel() {
   const panel = document.getElementById("bubble-panel");
   const fab = document.getElementById("bubble-fab");
-  panel.style.display = "none";
-  fab.classList.remove("expanded");
+  _bubbleState.open = false;
+  if (panel) panel.style.display = "none";
+  if (fab) fab.classList.remove("expanded");
 }
 function toggleVoiceRecording() {
   const recognition2 = window.webkitSpeechRecognition || window.SpeechRecognition;
@@ -29649,6 +29671,9 @@ function registerRoutes() {
   Router.add(/^\/invoices$/, renderInvoices);
   Router.add(/^\/invoices\/(\d+)$/, (id) => renderInvoiceDetail(parseInt(id)));
   Router.add(/^\/invoices\/(\d+)\/reconcile$/, (id) => renderInvoiceReconcile(parseInt(id)));
+  Router.add(/^\/factures$/, () => {
+    location.hash = "#/invoices";
+  });
   Router.add(/^\/messages$/, renderMessagesConversations);
   Router.add(/^\/messages\/(\d+)$/, (id) => renderMessagesThread(parseInt(id)));
   Router.add(/^\/stock\/reception$/, renderStockReception);

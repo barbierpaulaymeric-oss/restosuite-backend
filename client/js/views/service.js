@@ -93,12 +93,12 @@ function _svcRenderConfigScreen(app) {
           <h3 style="font-size:var(--text-base);margin-bottom:var(--space-4)">Horaires du service</h3>
           <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-3)">
             <div style="flex:1">
-              <label style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">Début</label>
-              <input type="time" class="form-control" id="svc-start-time" lang="fr" value="${config.service_start || '11:30'}" style="font-size:var(--text-lg);text-align:center">
+              <label for="svc-start-time" style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">Début (HH:MM)</label>
+              <input type="text" inputmode="numeric" pattern="[0-2][0-9]:[0-5][0-9]" maxlength="5" placeholder="11:30" class="form-control" id="svc-start-time" value="${config.service_start || '11:30'}" style="font-size:var(--text-lg);text-align:center;font-variant-numeric:tabular-nums">
             </div>
             <div style="flex:1">
-              <label style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">Fin</label>
-              <input type="time" class="form-control" id="svc-end-time" lang="fr" value="${config.service_end || '14:30'}" style="font-size:var(--text-lg);text-align:center">
+              <label for="svc-end-time" style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">Fin (HH:MM)</label>
+              <input type="text" inputmode="numeric" pattern="[0-2][0-9]:[0-5][0-9]" maxlength="5" placeholder="23:00" class="form-control" id="svc-end-time" value="${config.service_end || '14:30'}" style="font-size:var(--text-lg);text-align:center;font-variant-numeric:tabular-nums">
             </div>
           </div>
           <button class="btn btn-ghost btn-sm" id="svc-save-config" style="width:100%">Enregistrer les horaires</button>
@@ -117,27 +117,45 @@ function _svcRenderConfigScreen(app) {
     </div>
   `;
 
+  const TIME_RE = /^[0-2][0-9]:[0-5][0-9]$/;
+
   document.getElementById('svc-save-config').addEventListener('click', async () => {
     const start = document.getElementById('svc-start-time').value;
     const end = document.getElementById('svc-end-time').value;
+    if (!TIME_RE.test(start) || !TIME_RE.test(end)) {
+      showToast('Horaires invalides — utilisez le format HH:MM (ex. 11:30)', 'error');
+      return;
+    }
     try {
       await API.updateServiceConfig({ service_start: start, service_end: end });
       showToast('Horaires enregistrés', 'success');
     } catch (e) {
-      showToast(e.message, 'error');
+      showToast(e?.message || 'Erreur lors de l’enregistrement des horaires', 'error');
     }
   });
 
   document.getElementById('svc-start-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('svc-start-btn');
     const start = document.getElementById('svc-start-time').value;
     const end = document.getElementById('svc-end-time').value;
+    if (!TIME_RE.test(start) || !TIME_RE.test(end)) {
+      showToast('Horaires invalides — utilisez le format HH:MM (ex. 11:30)', 'error');
+      return;
+    }
+    btn.disabled = true;
+    const originalLabel = btn.innerHTML;
+    btn.innerHTML = '⏳ Démarrage…';
     try {
       await API.updateServiceConfig({ service_start: start, service_end: end });
       await API.startService();
       _serviceState.serviceActive = true;
       renderServiceView();
     } catch (e) {
-      showToast(e.message, 'error');
+      btn.disabled = false;
+      btn.innerHTML = originalLabel;
+      const msg = e?.message || 'Impossible de lancer le service';
+      showToast(msg, 'error');
+      console.error('[service] startService failed:', e);
     }
   });
 }

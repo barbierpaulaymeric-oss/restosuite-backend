@@ -11,7 +11,7 @@
 //    table with X marks, refined typography, page header strip, paginated
 //    footer with INCO 1169/2011 + Décret 2015-447 references. (v20 was the
 //    service-module carte browser fix.)
-const CACHE_NAME = 'restosuite-v21';
+const CACHE_NAME = 'restosuite-v22';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

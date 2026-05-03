@@ -353,6 +353,7 @@ function registerRoutes() {
   Router.add(/^\/invoices$/, renderInvoices);
   Router.add(/^\/invoices\/(\d+)$/, (id) => renderInvoiceDetail(parseInt(id)));
   Router.add(/^\/invoices\/(\d+)\/reconcile$/, (id) => renderInvoiceReconcile(parseInt(id)));
+  Router.add(/^\/factures$/, () => { location.hash = '#/invoices'; });
   Router.add(/^\/messages$/, renderMessagesConversations);
   Router.add(/^\/messages\/(\d+)$/, (id) => renderMessagesThread(parseInt(id)));
   Router.add(/^\/stock\/reception$/, renderStockReception);

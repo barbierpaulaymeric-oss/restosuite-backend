@@ -16,6 +16,11 @@ function initFloatingAIBubble() {
   const token = localStorage.getItem('restosuite_token');
   if (!token) return;
 
+  // Idempotency guard — prevent double-init (which double-binds the FAB
+  // click handler, making the panel toggle twice per click and appear
+  // never to open until the second tap).
+  if (document.getElementById('floating-ai-bubble-container')) return;
+
   // SVG icons (inline, no lucide dependency for the bubble itself)
   const ICON_MIC = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
   const ICON_CLOSE = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
@@ -75,14 +80,21 @@ function initFloatingAIBubble() {
   }
 }
 
-function toggleBubblePanel() {
+function toggleBubblePanel(event) {
+  // Stop propagation so any outer listener (e.g. click-outside-to-close)
+  // can't immediately reverse our state change.
+  if (event) event.stopPropagation();
   const panel = document.getElementById('bubble-panel');
   const fab = document.getElementById('bubble-fab');
-  const visible = panel.style.display !== 'none';
-
+  if (!panel || !fab) return;
+  // Use a state flag as the source of truth instead of reading the
+  // computed/inline display, which can race with CSS transitions and
+  // produce the "two clicks to open" behavior on first interaction.
+  const visible = !!_bubbleState.open;
   if (visible) {
     closeBubblePanel();
   } else {
+    _bubbleState.open = true;
     panel.style.display = 'flex';
     fab.classList.add('expanded');
     setTimeout(() => document.getElementById('bubble-text-input')?.focus(), 100);
@@ -92,8 +104,9 @@ function toggleBubblePanel() {
 function closeBubblePanel() {
   const panel = document.getElementById('bubble-panel');
   const fab = document.getElementById('bubble-fab');
-  panel.style.display = 'none';
-  fab.classList.remove('expanded');
+  _bubbleState.open = false;
+  if (panel) panel.style.display = 'none';
+  if (fab) fab.classList.remove('expanded');
 }
 
 function toggleVoiceRecording() {

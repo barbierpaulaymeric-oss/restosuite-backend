@@ -41,6 +41,12 @@ if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO !== 'true') {
 const bcrypt = require('bcryptjs');
 const { db, get, run, all } = require('./db');
 
+// --force flag: wipe and re-seed restaurant_id=1 even if the demo owner
+// already exists. Use to refresh stale demo DBs (e.g., on Render after a
+// schema/data change). Without --force, idempotent path only refreshes
+// supplier catalogs / orders / messages.
+const FORCE = process.argv.includes('--force');
+
 const RID = 1;
 const OWNER_EMAIL = 'demo@restosuite.fr';
 const OWNER_PASSWORD = 'Demo2026!';
@@ -811,7 +817,78 @@ function ensureDemoMessages() {
 
 // ─── Idempotency guard ─────────────────────────────────────────────────────
 const existing = get('SELECT id FROM accounts WHERE email = ?', [OWNER_EMAIL]);
-if (existing) {
+if (existing && FORCE) {
+  // --force: wipe everything for RID=1 + extra demo restos and re-seed below.
+  console.log(`🔥 --force: wiping all data for restaurant_id=${RID} (and extra demo restos) before re-seed…`);
+  const wipeTx = db.transaction(() => {
+    // Tables that have a restaurant_id column. Order doesn't matter much here
+    // because we're not relying on FK cascades — we delete all rows belonging
+    // to RID=1 directly. Extra demo restos (Marie, Sakura) get nuked too via
+    // their own RID values; deleted at the end by name lookup.
+    const RID_TABLES = [
+      'staff_shifts', 'staff_members',
+      'temperature_logs', 'cleaning_logs', 'cooking_records', 'witness_meals',
+      'fryer_oil_changes', 'reheating_logs', 'cooling_logs',
+      'haccp_calibrations', 'haccp_training', 'pest_control_logs',
+      'maintenance_logs', 'corrective_actions',
+      'traceability_logs', 'traceability_downstream', 'recall_events',
+      'allergen_plan',
+      'supplier_invoice_items', 'supplier_invoices',
+      'delivery_note_items', 'delivery_notes',
+      'order_items', 'orders',
+      'service_sessions',
+      'stock_movements', 'stock', 'price_history', 'prices',
+      'recipe_ingredients', 'recipe_allergens', 'recipes',
+      'ingredient_allergens', 'ingredients',
+      'supplier_catalog', 'supplier_messages', 'supplier_notifications',
+      'purchase_order_items', 'purchase_orders',
+      'supplier_accounts', 'suppliers',
+      'messages',
+      'audit_log', 'subscriptions', 'ai_preferences', 'ai_context',
+      'temperature_zones', 'cleaning_tasks',
+      'haccp_ccp', 'haccp_hazard_analysis',
+      'crm_contacts', 'crm_interactions',
+      'menu_items', 'menus', 'qrcodes',
+      'water_tests', 'sanitary_settings', 'staff_health',
+      'fabrication_diagrams', 'pms_audit',
+      'accounts',
+    ];
+    let deleted = 0;
+    for (const t of RID_TABLES) {
+      try {
+        const r = run(`DELETE FROM ${t} WHERE restaurant_id = ?`, [RID]);
+        if (r && r.changes) deleted += r.changes;
+      } catch (e) {
+        // table may not exist in this schema version — silent skip
+      }
+    }
+    // Wipe extra demo restos by name (Le Bistrot de Marie, Sakura)
+    const extraRestos = all(
+      `SELECT id FROM restaurants WHERE name IN ('Le Bistrot de Marie', 'Sakura')`
+    );
+    for (const er of extraRestos) {
+      for (const t of RID_TABLES) {
+        try { run(`DELETE FROM ${t} WHERE restaurant_id = ?`, [er.id]); } catch {}
+      }
+      try { run('DELETE FROM restaurants WHERE id = ?', [er.id]); } catch {}
+    }
+    // Wipe restaurant row for RID itself; restaurant gets re-created below.
+    try { run('DELETE FROM restaurants WHERE id = ?', [RID]); } catch {}
+    return deleted;
+  });
+  const wiped = wipeTx();
+  console.log(`   ↳ ${wiped} rows deleted across tenant tables. Re-seeding from scratch…`);
+  // Fall through into the FRESH SEED block below.
+} else if (existing) {
+  // Backfill trial_start if NULL — older seeds (pre-bug-1 fix) created the
+  // account without it, which makes the trial-status calc fall back to
+  // created_at. If created_at is also NULL/old, every gated PUT 403s with
+  // TRIAL_EXPIRED. Cheap to set unconditionally when missing.
+  run(
+    `UPDATE accounts SET trial_start = datetime('now')
+      WHERE id = ? AND (trial_start IS NULL OR trial_start = '')`,
+    [existing.id]
+  );
   const ensured = ensureSupplierDemoLogin();
   const catalog = ensureSupplierCatalogs();
   const extras = ensureExtraDemoRestaurants();
@@ -820,7 +897,7 @@ if (existing) {
   if (ensured) {
     console.log(`✅ Demo data already present (${OWNER_EMAIL} exists, account id=${existing.id}). Refreshed supplier-portal demo login: ${SUPPLIER_DEMO_EMAIL} / ${SUPPLIER_DEMO_PASSWORD} (PIN ${SUPPLIER_DEMO_PIN}).`);
   } else {
-    console.log(`✅ Demo data already present (${OWNER_EMAIL} exists, account id=${existing.id}). Nothing to do.`);
+    console.log(`✅ Demo data already present (${OWNER_EMAIL} exists, account id=${existing.id}). Nothing to do. (Pass --force to wipe and re-seed.)`);
   }
   if (catalog.touchedSuppliers > 0) {
     console.log(`   ↳ Refreshed supplier catalogs: ${catalog.totalInserted} products across ${catalog.touchedSuppliers} suppliers.`);
@@ -2203,6 +2280,70 @@ section('HACCP plan');
 const ccpCount = get('SELECT COUNT(*) as c FROM haccp_ccp WHERE restaurant_id = ?', [RID]);
 const hazardCount = get('SELECT COUNT(*) as c FROM haccp_hazard_analysis WHERE restaurant_id = ?', [RID]);
 log(`${hazardCount.c} dangers analysés, ${ccpCount.c} CCP (étape critique) en place`);
+
+// ─── 13b. Today's HACCP completions (explicit) ─────────────────────────────
+// The historical loops above include d=0 (today), but the timestamp depends
+// on host TZ — on a UTC server this can land on yesterday in Paris. Insert
+// a few unambiguous "today in Paris" rows so "Ma journée HACCP" always
+// shows real progress (temperatures + cleaning + cooking + witness meal).
+section('HACCP — today snapshot (Ma journée)');
+const todayParis = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+// Build a "this morning, 09:00 Paris" datetime in UTC ISO so SQLite stores
+// it as Paris-midnight + 9h converted to UTC. ma-journee compares with
+// `date(recorded_at, +1/+2 hours)` so any timestamp on the Paris day works.
+function parisDateTime(hours, minutes = 0) {
+  // Parse today's Paris date components, build a UTC instant that matches
+  // local Paris hour:minute by subtracting the current Paris UTC offset.
+  const utcH = new Date().getUTCHours();
+  const parisH = parseInt(new Intl.DateTimeFormat('en', {
+    timeZone: 'Europe/Paris', hour: '2-digit', hour12: false,
+  }).format(new Date()), 10);
+  const offset = (parisH - utcH + 24) % 24; // 1 (CET) or 2 (CEST)
+  const [y, m, d] = todayParis.split('-').map(Number);
+  const utcDate = new Date(Date.UTC(y, m - 1, d, hours - offset, minutes, 0));
+  return sqlDateTime(utcDate);
+}
+let todayTempCount = 0;
+for (const zone of allZones) {
+  const target = (zone.min_temp + zone.max_temp) / 2;
+  const morning = parisDateTime(9, 15);
+  const evening = parisDateTime(18, 30);
+  insertTempLog.run(zone.id, Math.round(target * 10) / 10, ownerId, morning, 0, 'Thomas Moreau', RID);
+  insertTempLog.run(zone.id, Math.round((target + 0.4) * 10) / 10, ownerId, evening, 0, 'Julie Dubois', RID);
+  todayTempCount += 2;
+}
+let todayCleanCount = 0;
+const dailyCleaningTasks = cleaningTasks.filter(t => (t.frequency || 'daily') === 'daily').slice(0, 4);
+for (const task of dailyCleaningTasks) {
+  insertCleanLog.run(task.id, ownerId, parisDateTime(22, 30), 'Fait ce soir, conforme au plan', RID);
+  todayCleanCount++;
+}
+// Cooking record for today (cooking_date = local Paris date string)
+try {
+  run(
+    `INSERT INTO cooking_records
+       (restaurant_id, product_name, cooking_date, cooking_time_start, cooking_time_end,
+        target_temperature, measured_temperature, is_compliant, operator, notes, product_category)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+    [RID, 'Magret de canard rosé', todayParis, '12:00', '12:08',
+     63, 75.2, 'Thomas Moreau', 'Cuisson conforme — relevé centre filet', 'viande_volaille']
+  );
+} catch (e) { console.warn('  cooking_records insert skipped:', e.message); }
+// Witness meal for today (kept 5 days for DDPP)
+try {
+  const keptUntil = sqlDate(new Date(Date.now() + 5 * 86_400_000));
+  run(
+    `INSERT INTO witness_meals
+       (restaurant_id, meal_date, meal_type, service_type, samples,
+        storage_temperature, storage_location, kept_until, quantity_per_sample, operator, notes)
+     VALUES (?, ?, 'dejeuner', 'sur_place', ?, ?, ?, ?, ?, ?, ?)`,
+    [RID, todayParis,
+     JSON.stringify([{ name: 'Bavette à l’échalote', weight_g: 110 }]),
+     3.1, 'Chambre froide positive', keptUntil, '110g',
+     'Julie Dubois', 'Échantillon DLC J+5 — chambre froide positive']
+  );
+} catch (e) { console.warn('  witness_meals insert skipped:', e.message); }
+log(`${todayTempCount} relevés température + ${todayCleanCount} nettoyages + 1 cuisson + 1 plat témoin (aujourd’hui)`);
 
 // ─── 14. Alto AI preferences ───────────────────────────────────────────────
 section('Alto AI preferences');
