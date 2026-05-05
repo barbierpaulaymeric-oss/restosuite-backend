@@ -409,6 +409,23 @@ router.put('/:id', (req, res) => {
         } catch (e) {
           console.warn('purchase-orders → provider dispatch failed:', e.message);
         }
+
+        // Email dispatch (parallel path): if the supplier has an email and the
+        // mercuriale mailbox is configured, send the PO Excel via OVH SMTP.
+        // Fire-and-forget so a slow SMTP server can't stall the HTTP response.
+        if (process.env.MERCURIALE_EMAIL && process.env.MERCURIALE_PASSWORD) {
+          try {
+            const { dispatchOrderEmail } = require('../lib/mercuriale-mail');
+            dispatchOrderEmail({ rid, supplier_id: po.supplier_id, po_id: id })
+              .then(r => {
+                if (r.ok) console.log(`📧 Order email sent to ${r.to} for PO ${po.reference}`);
+                else console.warn(`📧 Order email skipped (PO ${po.reference}): ${r.error}`);
+              })
+              .catch(e => console.warn('📧 Order email error:', e.message));
+          } catch (e) {
+            console.warn('📧 Order email dispatch wiring failed:', e.message);
+          }
+        }
       }
     }
 

@@ -383,6 +383,14 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     }, 14 * 60 * 1000);
     console.log('🏓 Keep-alive enabled (14min interval)');
   }
+
+  // Mercuriale email poller (IMAP). Self-disables when MERCURIALE_EMAIL/PASSWORD
+  // are unset, so dev machines without OVH creds boot silently.
+  try {
+    require('./lib/mercuriale-mail/poller').startPoller();
+  } catch (e) {
+    console.warn('📧 Mercuriale poller failed to start:', e.message);
+  }
 });
 
 function gracefulShutdown(signal) {
