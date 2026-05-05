@@ -13,14 +13,71 @@
 // are loaded lazily so that simply requiring this module never opens a socket.
 
 const { db, get, all, run } = require('../../db');
-const { processInbound } = require('./process-inbound');
+const { processInbound, pickAttachment } = require('./process-inbound');
 const { buildOrderXlsx } = require('./build-outbound');
+const { matchRestaurant } = require('./match-restaurant');
+
+const ADMIN_ALERT_EMAIL = 'barbierpaulaymeric@gmail.com';
 
 function defaultLookupSupplier(senderEmail, restaurantId) {
   return get(
     'SELECT id FROM suppliers WHERE LOWER(email) = LOWER(?) AND restaurant_id = ?',
     [senderEmail, restaurantId]
   );
+}
+
+function dbLookups() {
+  return {
+    byExternalId: (id) => get(
+      `SELECT restaurant_id AS restaurantId, supplier_id AS supplierId
+         FROM supplier_integrations
+        WHERE LOWER(external_id) = LOWER(?)
+          AND provider = 'foodflow'
+          AND status = 'connected'
+        ORDER BY id DESC LIMIT 1`,
+      [id]
+    ) || null,
+    byEmail: (e) => get(
+      `SELECT restaurant_id AS restaurantId
+         FROM accounts
+        WHERE LOWER(email) = LOWER(?)
+          AND restaurant_id IS NOT NULL
+        ORDER BY id DESC LIMIT 1`,
+      [e]
+    ) || null,
+    byName: (n) => get(
+      `SELECT id AS restaurantId
+         FROM restaurants
+        WHERE LOWER(name) = LOWER(?)
+        ORDER BY id DESC LIMIT 1`,
+      [n]
+    ) || null,
+  };
+}
+
+function buildUnmatchedAlert(email) {
+  const subject = email.subject ? String(email.subject) : '(sans objet)';
+  const from = email.from ? String(email.from) : '(expéditeur inconnu)';
+  const date = email.date ? new Date(email.date).toISOString() : '(sans date)';
+  const att = pickAttachment(email.attachments);
+  const attachmentName = att ? att.filename : '(aucune pièce jointe XLSX)';
+  const body = String(email.text || '').slice(0, 4000);
+
+  return {
+    to: ADMIN_ALERT_EMAIL,
+    subject: `[RestoSuite] Mercuriale non rattachée — ${from}`,
+    text: [
+      `Une mercuriale reçue n'a pas pu être rattachée à un restaurant.`,
+      ``,
+      `Expéditeur : ${from}`,
+      `Sujet : ${subject}`,
+      `Date : ${date}`,
+      `Pièce jointe : ${attachmentName}`,
+      ``,
+      `--- Contenu de l'email ---`,
+      body,
+    ].join('\n'),
+  };
 }
 
 function upsertCatalog(rid, supplierId, items) {
@@ -63,21 +120,64 @@ function upsertCatalog(rid, supplierId, items) {
   return n;
 }
 
-async function runInboundCycle({ fetchFn } = {}) {
+async function runInboundCycle({ fetchFn, sendAlertFn } = {}) {
   const fetcher = fetchFn || (async () => {
     const { fetchUnseen } = require('./imap-client');
     return fetchUnseen({ markSeen: true });
   });
+  const alerter = sendAlertFn || (async (args) => {
+    const { sendPlainEmail } = require('./smtp-client');
+    return sendPlainEmail(args);
+  });
   const emails = await fetcher();
-  const result = { processed: 0, matched: 0, items_upserted: 0, errors: [] };
-
-  // Suppliers can belong to any tenant — we resolve by sender email across all
-  // restaurants. Most installs share one inbox per tenant, but multi-site
-  // setups could share one mailbox; iterate restaurants until a match is found.
-  const restaurants = all('SELECT id FROM restaurants');
+  const result = { processed: 0, matched: 0, items_upserted: 0, unmatched_alerts: 0, errors: [] };
 
   for (const email of emails) {
     result.processed++;
+
+    // Step 1: try identifier-based match (external_id, account email,
+    // restaurant name found in subject/body/Excel banner). FoodFlow and
+    // similar wholesalers send from one shared address for many clients,
+    // so the sender alone can't pick the right tenant.
+    const att = pickAttachment(email.attachments);
+    const excelBuffer = att && Buffer.isBuffer(att.content) ? att.content : null;
+    let match = null;
+    try {
+      match = matchRestaurant({ email, excelBuffer, lookups: dbLookups() });
+    } catch (e) {
+      result.errors.push({ uid: email.uid, error: e.message });
+    }
+
+    if (match && match.restaurantId) {
+      try {
+        const out = processInbound({
+          email,
+          restaurantId: match.restaurantId,
+          lookupSupplier: (sender, rid) => match.supplierId
+            ? { id: match.supplierId }
+            : defaultLookupSupplier(sender, rid),
+        });
+        if (out.ok) {
+          const n = upsertCatalog(match.restaurantId, out.supplierId, out.items);
+          result.items_upserted += n;
+          result.matched++;
+          console.log(
+            `📧 Mercuriale matched uid=${email.uid} restaurant=${match.restaurantId}`
+              + ` via ${match.matchedBy}=${match.matchedValue}`
+              + ` supplier=${out.supplierId} items=${n}`
+          );
+          continue;
+        }
+      } catch (e) {
+        result.errors.push({ uid: email.uid, error: e.message });
+      }
+    }
+
+    // Step 2: legacy fallback — sender email → suppliers.email across all
+    // restaurants. Single-tenant installs and pre-existing flows still rely
+    // on this path.
+    let legacyHit = false;
+    const restaurants = all('SELECT id FROM restaurants');
     for (const r of restaurants) {
       let out;
       try {
@@ -95,11 +195,30 @@ async function runInboundCycle({ fetchFn } = {}) {
           const n = upsertCatalog(r.id, out.supplierId, out.items);
           result.items_upserted += n;
           result.matched++;
+          legacyHit = true;
+          console.log(
+            `📧 Mercuriale matched uid=${email.uid} restaurant=${r.id}`
+              + ` via sender=${email.from} supplier=${out.supplierId} items=${n}`
+          );
         } catch (e) {
           result.errors.push({ uid: email.uid, error: e.message });
         }
         break;
       }
+    }
+    if (legacyHit) continue;
+
+    // Step 3: nothing matched — alert the platform admin so the routing
+    // mapping can be added (or to flag the email as junk).
+    try {
+      await alerter(buildUnmatchedAlert(email));
+      result.unmatched_alerts++;
+      console.warn(
+        `📧 Mercuriale unmatched uid=${email.uid} from=${email.from}`
+          + ` subject="${(email.subject || '').slice(0, 80)}" — alert sent`
+      );
+    } catch (e) {
+      result.errors.push({ uid: email.uid, error: `alert: ${e.message}` });
     }
   }
   return result;

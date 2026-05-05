@@ -16,16 +16,28 @@ beforeAll(() => {
   // Use a high restaurant id to dodge any seeded rows from other tests.
   run(`INSERT INTO restaurants (id, name) VALUES (4242, 'TestZ')`);
   run(`INSERT INTO suppliers (id, name, email, restaurant_id) VALUES (9001, 'SupZ', 'supz@x.com', 4242)`);
+
+  // FoodFlow scenario: shared sender, restaurants identified by name/email/external_id
+  run(`INSERT INTO restaurants (id, name) VALUES (4243, 'TestRestoFlow')`);
+  run(`INSERT INTO accounts (id, name, pin, role, email, restaurant_id) VALUES (9100, 'Owner', 'x', 'patron', 'owner@testrestoflow.com', 4243)`);
+  run(`INSERT INTO suppliers (id, name, email, restaurant_id) VALUES (9101, 'FoodFlow', 'julie@foodflow.com', 4243)`);
+  run(`INSERT INTO supplier_integrations (restaurant_id, supplier_id, provider, external_id, status) VALUES (4243, 9101, 'foodflow', 'FF-TRF-1', 'connected')`);
+
+  // Second restaurant — same FoodFlow sender but different external_id
+  run(`INSERT INTO restaurants (id, name) VALUES (4244, 'BistrotPi')`);
+  run(`INSERT INTO suppliers (id, name, email, restaurant_id) VALUES (9201, 'FoodFlow', 'julie@foodflow.com', 4244)`);
+  run(`INSERT INTO supplier_integrations (restaurant_id, supplier_id, provider, external_id, status) VALUES (4244, 9201, 'foodflow', 'FF-BPI-2', 'connected')`);
 });
 
 afterAll(() => {
   // Best-effort cleanup so this file is rerunnable in --watch mode.
-  try { run('DELETE FROM supplier_catalog WHERE supplier_id IN (9001, 9002)'); } catch {}
-  try { run('DELETE FROM supplier_integrations WHERE restaurant_id = 4242'); } catch {}
+  try { run('DELETE FROM supplier_catalog WHERE supplier_id IN (9001, 9002, 9101, 9201)'); } catch {}
+  try { run('DELETE FROM supplier_integrations WHERE restaurant_id IN (4242, 4243, 4244)'); } catch {}
   try { run('DELETE FROM purchase_order_items WHERE restaurant_id = 4242'); } catch {}
   try { run('DELETE FROM purchase_orders WHERE restaurant_id = 4242'); } catch {}
-  try { run('DELETE FROM suppliers WHERE id IN (9001, 9002)'); } catch {}
-  try { run('DELETE FROM restaurants WHERE id = 4242'); } catch {}
+  try { run('DELETE FROM suppliers WHERE id IN (9001, 9002, 9101, 9201)'); } catch {}
+  try { run('DELETE FROM accounts WHERE id = 9100'); } catch {}
+  try { run('DELETE FROM restaurants WHERE id IN (4242, 4243, 4244)'); } catch {}
 });
 
 describe('runInboundCycle', () => {
@@ -65,6 +77,117 @@ describe('runInboundCycle', () => {
     const r = await runInboundCycle({ fetchFn });
     expect(r.processed).toBe(2);
     expect(r.matched).toBe(1);
+  });
+
+  test('FoodFlow shared sender: routes by external_id in subject to TestRestoFlow', async () => {
+    const fetchFn = async () => [{
+      uid: 100,
+      from: 'julie@foodflow.com',
+      subject: 'Mercuriale FF-TRF-1 — semaine 18',
+      text: '',
+      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
+        ['Produit', 'Unité', 'Prix HT'],
+        ['Croustimorglu', 'kg', '7,40'],
+      ]) }],
+    }];
+    const r = await runInboundCycle({ fetchFn });
+    expect(r.processed).toBe(1);
+    expect(r.matched).toBe(1);
+    expect(r.items_upserted).toBe(1);
+
+    const row = get(
+      `SELECT product_name FROM supplier_catalog WHERE supplier_id = 9101 AND restaurant_id = 4243 AND product_name = 'Croustimorglu'`
+    );
+    expect(row).toBeTruthy();
+
+    // Wrong restaurant must NOT receive this catalog
+    const wrongRow = get(
+      `SELECT product_name FROM supplier_catalog WHERE supplier_id = 9201 AND restaurant_id = 4244 AND product_name = 'Croustimorglu'`
+    );
+    expect(wrongRow).toBeFalsy();
+  });
+
+  test('FoodFlow shared sender: external_id in Excel banner routes to BistrotPi', async () => {
+    const fetchFn = async () => [{
+      uid: 101,
+      from: 'julie@foodflow.com',
+      subject: 'Mercuriale',
+      text: '',
+      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
+        ['Tarifs FoodFlow — Restaurant: BistrotPi (FF-BPI-2)'],
+        [''],
+        ['Produit', 'Unité', 'Prix HT'],
+        ['Splazmagork bleu', 'kg', '9,90'],
+      ]) }],
+    }];
+    const r = await runInboundCycle({ fetchFn });
+    expect(r.matched).toBe(1);
+    const row = get(
+      `SELECT product_name FROM supplier_catalog WHERE supplier_id = 9201 AND restaurant_id = 4244 AND product_name = 'Splazmagork bleu'`
+    );
+    expect(row).toBeTruthy();
+  });
+
+  test('FoodFlow shared sender: account email in body routes to TestRestoFlow', async () => {
+    const fetchFn = async () => [{
+      uid: 102,
+      from: 'julie@foodflow.com',
+      subject: 'Mercuriale',
+      text: 'Bonjour, voici la mercuriale pour owner@testrestoflow.com',
+      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
+        ['Produit', 'Unité', 'Prix HT'],
+        ['Tarte Frumblegrumble', 'pce', '4,20'],
+      ]) }],
+    }];
+    const r = await runInboundCycle({ fetchFn });
+    expect(r.matched).toBe(1);
+    const row = get(
+      `SELECT product_name FROM supplier_catalog WHERE supplier_id = 9101 AND restaurant_id = 4243 AND product_name = 'Tarte Frumblegrumble'`
+    );
+    expect(row).toBeTruthy();
+  });
+
+  test('no match: forwards alert to admin via sendAlertFn', async () => {
+    const alerts = [];
+    const fetchFn = async () => [{
+      uid: 200,
+      from: 'someone@unknown.com',
+      subject: 'Mercuriale mystère',
+      text: 'Aucun identifiant ici',
+      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
+        ['Produit', 'Prix HT'], ['Foo', '1,00'],
+      ]) }],
+    }];
+    const r = await runInboundCycle({
+      fetchFn,
+      sendAlertFn: async (args) => { alerts.push(args); return { ok: true }; },
+    });
+    expect(r.processed).toBe(1);
+    expect(r.matched).toBe(0);
+    expect(r.unmatched_alerts).toBe(1);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].to).toBe('barbierpaulaymeric@gmail.com');
+    expect(alerts[0].subject).toMatch(/mercuriale|rattach|match/i);
+    expect(String(alerts[0].text || alerts[0].html)).toContain('someone@unknown.com');
+  });
+
+  test('legacy sender match still works (no identifiers, sender → suppliers.email)', async () => {
+    const fetchFn = async () => [{
+      uid: 300,
+      from: 'supz@x.com',
+      subject: 'Mercuriale',
+      text: '',
+      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
+        ['Produit', 'Unité', 'Prix HT'],
+        ['Wibblepop', 'kg', '2,00'],
+      ]) }],
+    }];
+    const r = await runInboundCycle({ fetchFn });
+    expect(r.matched).toBe(1);
+    const row = get(
+      `SELECT product_name FROM supplier_catalog WHERE supplier_id = 9001 AND restaurant_id = 4242 AND product_name = 'Wibblepop'`
+    );
+    expect(row).toBeTruthy();
   });
 });
 
