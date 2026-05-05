@@ -1,11 +1,10 @@
-// Bumped 2026-05-05 (v24): onboarding polish — Avancé tab now shows
-// active orange state, counter input numbers visible, cold-zone temperature
-// ranges redesigned (min °C → max °C with clear arrow separator, no -/+
-// button confusion), new Fournisseurs partenaires section with FoodFlow
-// quick-add card, API Publique hidden from main nav (still in Modules
-// avancés toggle on /more for power users).
-// (v23 was the FoodFlow supplier integration on main.)
-const CACHE_NAME = 'restosuite-v24';
+// Bumped 2026-05-05 (v25): integrations page shows "Bientôt disponible"
+// for placeholder integrations (TheFork, POS, Comptabilité, Deliveroo,
+// Uber Eats) with disabled buttons; Multi-Sites "Nouvel établissement"
+// rebuilt as a 5-step wizard matching the onboarding visual language
+// (info → tables Rapide/Avancé → cold zones → suppliers → recap), all
+// inputs use .form-control instead of unstyled .input.
+const CACHE_NAME = 'restosuite-v25';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

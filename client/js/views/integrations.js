@@ -3,11 +3,11 @@
 // ═══════════════════════════════════════════
 
 const PROVIDER_META = {
-  thefork: { name: 'TheFork / LaFourchette', icon: '🍴', color: '#00B37E', desc: 'Synchronisation des réservations TheFork en temps réel' },
-  pos_caisse: { name: 'Caisse / POS', icon: '💳', color: '#3B82F6', desc: 'Connectez votre système de caisse pour synchroniser les ventes' },
-  comptabilite: { name: 'Comptabilité', icon: '📊', color: '#8B5CF6', desc: 'Export automatique vers votre logiciel comptable (Pennylane, Cegid…)' },
-  deliveroo: { name: 'Deliveroo', icon: '🛵', color: '#00CCBC', desc: 'Recevez les commandes Deliveroo directement dans RestoSuite' },
-  ubereats: { name: 'Uber Eats', icon: '🥡', color: '#06C167', desc: 'Recevez les commandes Uber Eats directement dans RestoSuite' }
+  thefork: { name: 'TheFork / LaFourchette', icon: '🍴', color: '#00B37E', desc: 'Synchronisation des réservations TheFork en temps réel', comingSoon: true },
+  pos_caisse: { name: 'Caisse / POS', icon: '💳', color: '#3B82F6', desc: 'Connectez votre système de caisse pour synchroniser les ventes', comingSoon: true },
+  comptabilite: { name: 'Comptabilité', icon: '📊', color: '#8B5CF6', desc: 'Export automatique vers votre logiciel comptable (Pennylane, Cegid…)', comingSoon: true },
+  deliveroo: { name: 'Deliveroo', icon: '🛵', color: '#00CCBC', desc: 'Recevez les commandes Deliveroo directement dans RestoSuite', comingSoon: true },
+  ubereats: { name: 'Uber Eats', icon: '🥡', color: '#06C167', desc: 'Recevez les commandes Uber Eats directement dans RestoSuite', comingSoon: true }
 };
 
 async function renderIntegrations() {
@@ -64,24 +64,38 @@ function renderIntegrationsList(integrations) {
       ${integrations.map(integ => {
         const meta = PROVIDER_META[integ.provider] || { name: integ.provider, icon: '🔌', color: '#666', desc: '' };
         const enabled = integ.enabled;
-        const statusLabel = enabled ? 'Connecté' : integ.has_credentials ? 'Configuré (désactivé)' : 'Non configuré';
-        const statusColor = enabled ? 'var(--color-success)' : integ.has_credentials ? 'var(--color-warning)' : 'var(--text-tertiary)';
+        const comingSoon = !!meta.comingSoon;
+        const statusLabel = comingSoon
+          ? 'Bientôt disponible'
+          : enabled ? 'Connecté' : integ.has_credentials ? 'Configuré (désactivé)' : 'Non configuré';
+        const statusColor = comingSoon
+          ? 'var(--text-tertiary)'
+          : enabled ? 'var(--color-success)' : integ.has_credentials ? 'var(--color-warning)' : 'var(--text-tertiary)';
+        const statusBg = comingSoon
+          ? 'background:rgba(148,163,184,0.12);padding:2px 8px;border-radius:999px;'
+          : '';
 
         return `
-        <div class="card" style="padding:var(--space-4)">
+        <div class="card" style="padding:var(--space-4);${comingSoon ? 'opacity:0.75' : ''}">
           <div style="display:flex;align-items:center;gap:var(--space-3)">
             <div style="width:48px;height:48px;border-radius:12px;background:${meta.color}20;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">${meta.icon}</div>
             <div style="flex:1">
-              <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
                 <h3 style="margin:0">${meta.name}</h3>
-                <span style="font-size:var(--text-xs);color:${statusColor};font-weight:600">${statusLabel}</span>
+                <span style="font-size:var(--text-xs);color:${statusColor};font-weight:600;${statusBg}">${statusLabel}</span>
               </div>
               <p class="text-secondary text-sm" style="margin:4px 0 0">${meta.desc}</p>
-              ${integ.last_sync ? `<p class="text-secondary" style="font-size:10px;margin:4px 0 0">Dernière synchro : ${new Date(integ.last_sync).toLocaleString('fr-FR')}</p>` : ''}
+              ${!comingSoon && integ.last_sync ? `<p class="text-secondary" style="font-size:10px;margin:4px 0 0">Dernière synchro : ${new Date(integ.last_sync).toLocaleString('fr-FR')}</p>` : ''}
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="configureIntegration('${integ.provider}')" style="flex-shrink:0">
-              ${enabled ? 'Gérer' : 'Configurer'}
-            </button>
+            ${comingSoon ? `
+              <button class="btn btn-secondary btn-sm" disabled aria-disabled="true" title="Cette intégration n'est pas encore disponible" style="flex-shrink:0;opacity:0.55;cursor:not-allowed">
+                Bientôt disponible
+              </button>
+            ` : `
+              <button class="btn btn-secondary btn-sm" onclick="configureIntegration('${integ.provider}')" style="flex-shrink:0">
+                ${enabled ? 'Gérer' : 'Configurer'}
+              </button>
+            `}
           </div>
         </div>`;
       }).join('')}
@@ -89,8 +103,7 @@ function renderIntegrationsList(integrations) {
 
     <div class="card" style="padding:var(--space-3);margin-top:var(--space-4);background:rgba(59,130,246,0.05);border-color:rgba(59,130,246,0.2)">
       <p class="text-secondary text-sm" style="margin:0">
-        💡 <strong>TheFork :</strong> RestoSuite s'intègre avec TheFork pour synchroniser vos réservations automatiquement.
-        Contactez votre account manager TheFork pour obtenir vos clés API, puis configurez-les ici.
+        💡 Ces intégrations seront disponibles dans une prochaine version. En attendant, vous pouvez gérer vos réservations manuellement dans l'onglet « Réservations » et synchroniser vos fournisseurs depuis l'écran <a href="#/supplier-integrations">Fournisseurs externes</a>.
       </p>
     </div>
   `;

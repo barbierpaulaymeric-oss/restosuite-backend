@@ -63,9 +63,11 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /api/sites — Créer un nouveau site
+// Optionally accepts tables[], zones[], suppliers[] for one-shot full setup
+// (mirroring the onboarding wizard for the user's first restaurant).
 router.post('/', (req, res) => {
   try {
-    const { name, type, address, city, postal_code, phone, covers, siret } = req.body;
+    const { name, type, address, city, postal_code, phone, covers, siret, tables, zones, suppliers } = req.body;
     if (!name) return res.status(400).json({ error: 'Nom requis' });
 
     const result = run(`INSERT INTO restaurants (name, type, address, city, postal_code, phone, covers, siret)
@@ -73,7 +75,39 @@ router.post('/', (req, res) => {
       [name, type || null, address || null, city || null, postal_code || null, phone || null, covers || 30, siret || null]
     );
 
-    res.json({ ok: true, id: Number(result.lastInsertRowid) });
+    const newId = Number(result.lastInsertRowid);
+
+    if (Array.isArray(tables)) {
+      for (const t of tables) {
+        if (!t) continue;
+        run(
+          'INSERT INTO tables (restaurant_id, table_number, zone, seats) VALUES (?, ?, ?, ?)',
+          [newId, t.table_number || 1, t.zone || 'Salle', t.seats || 4]
+        );
+      }
+    }
+
+    if (Array.isArray(zones)) {
+      for (const z of zones) {
+        if (!z || !z.name) continue;
+        run(
+          'INSERT INTO temperature_zones (restaurant_id, name, type, min_temp, max_temp) VALUES (?, ?, ?, ?, ?)',
+          [newId, z.name, z.type || 'fridge', z.min_temp ?? 0, z.max_temp ?? 4]
+        );
+      }
+    }
+
+    if (Array.isArray(suppliers)) {
+      for (const s of suppliers) {
+        if (!s || !s.name || !s.name.trim()) continue;
+        run(
+          'INSERT INTO suppliers (restaurant_id, name, contact, phone, email) VALUES (?, ?, ?, ?, ?)',
+          [newId, s.name.trim(), (s.contact || '').trim(), (s.phone || '').trim(), (s.email || '').trim()]
+        );
+      }
+    }
+
+    res.json({ ok: true, id: newId });
   } catch (e) {
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
