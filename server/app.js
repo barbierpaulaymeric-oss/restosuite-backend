@@ -224,7 +224,7 @@ if (!IS_TEST) {
     '/api/planning',
     '/api/qrcode', '/api/menu', '/api/alerts', '/api/service', '/api/crm',
     '/api/haccp-plan', '/api/analytics', '/api/ai', '/api/predictions', '/api/carbon',
-    '/api/integrations', '/api/training', '/api/pest-control', '/api/maintenance',
+    '/api/integrations', '/api/supplier-integrations', '/api/training', '/api/pest-control', '/api/maintenance',
     '/api/waste', '/api/corrective-actions', '/api/pms-audit', '/api/pms',
     '/api/sanitary', '/api/water',
     '/api/traceability', '/api/recall', '/api/allergen-plan', '/api/fabrication-diagrams',
@@ -266,6 +266,7 @@ app.use('/api/allergens', require('./routes/allergens'));
 app.use('/api/variance', require('./routes/variance'));
 app.use('/api/carbon', require('./routes/carbon'));
 app.use('/api/integrations', require('./routes/integrations'));
+app.use('/api/supplier-integrations', require('./routes/supplier-integrations'));
 app.use('/api/sites', require('./routes/multi-site'));
 app.use('/api/predictions', require('./routes/predictions'));
 app.use('/api/health', require('./routes/health'));

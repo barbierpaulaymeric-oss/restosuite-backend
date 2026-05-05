@@ -25,6 +25,7 @@ const JS_FILES = [
   'js/views/stock-movements.js',
   'js/views/stock-variance.js',
   'js/views/suppliers.js',
+  'js/views/supplier-integrations.js',
   'js/views/haccp-dashboard.js',
   'js/views/haccp-hub.js',
   'js/views/haccp-ma-journee.js',

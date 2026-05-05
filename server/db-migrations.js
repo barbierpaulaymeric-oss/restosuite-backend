@@ -2034,6 +2034,38 @@ try {
   console.warn('⚠️ planning migration error:', e.message);
 }
 
+// ─── Migration: supplier_integrations (FoodFlow + future Metro/Transgourmet) ───
+// Per-(supplier, provider) connection record. Tenant-scoped by restaurant_id —
+// the same supplier row could in principle be linked to multiple providers
+// (UNIQUE on supplier_id + provider). Credentials are stored as plaintext
+// for v1 since the file-import shim doesn't actually call any remote API;
+// when a real HTTP client lands, swap to AES-wrapped storage in lib/integrations.
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS supplier_integrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      supplier_id INTEGER NOT NULL,
+      provider TEXT NOT NULL,
+      external_id TEXT NOT NULL,
+      credentials TEXT,
+      status TEXT NOT NULL DEFAULT 'connected',
+      last_sync_at DATETIME,
+      last_sync_error TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(supplier_id, provider)
+    );
+    CREATE INDEX IF NOT EXISTS idx_supplier_integrations_restaurant
+      ON supplier_integrations(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_supplier_integrations_supplier
+      ON supplier_integrations(supplier_id);
+  `);
+  console.log('✅ Migration: supplier_integrations ready');
+} catch (e) {
+  console.warn('⚠️ supplier_integrations migration error:', e.message);
+}
+
 }
 
 module.exports = { runMigrations };

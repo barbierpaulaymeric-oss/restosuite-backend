@@ -165,6 +165,20 @@ const API = {
     return this.request(`/suppliers/${id}/prices`);
   },
 
+  // Supplier integrations (FoodFlow + future Metro/Transgourmet)
+  getSupplierIntegrations() {
+    return this.request('/supplier-integrations');
+  },
+  createSupplierIntegration(data) {
+    return this.request('/supplier-integrations', { method: 'POST', body: data });
+  },
+  syncSupplierIntegration(id, items) {
+    return this.request(`/supplier-integrations/${id}/sync`, { method: 'POST', body: { items } });
+  },
+  deleteSupplierIntegration(id) {
+    return this.request(`/supplier-integrations/${id}`, { method: 'DELETE' });
+  },
+
   // Prices
   setPrice(data) {
     return this.request('/prices', { method: 'POST', body: data });

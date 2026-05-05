@@ -146,6 +146,19 @@ const API = {
   getSupplierPrices(id) {
     return this.request(`/suppliers/${id}/prices`);
   },
+  // Supplier integrations (FoodFlow + future Metro/Transgourmet)
+  getSupplierIntegrations() {
+    return this.request("/supplier-integrations");
+  },
+  createSupplierIntegration(data) {
+    return this.request("/supplier-integrations", { method: "POST", body: data });
+  },
+  syncSupplierIntegration(id, items) {
+    return this.request(`/supplier-integrations/${id}/sync`, { method: "POST", body: { items } });
+  },
+  deleteSupplierIntegration(id) {
+    return this.request(`/supplier-integrations/${id}`, { method: "DELETE" });
+  },
   // Prices
   setPrice(data) {
     return this.request("/prices", { method: "POST", body: data });
@@ -4847,6 +4860,208 @@ async function showSupplierDetail(id) {
   const sup = suppliers.find((s) => s.id === id);
   if (!sup) return;
   showSupplierModal(sup);
+}
+function closeSupplierIntegrationModal() {
+  const overlay = document.querySelector(".modal-overlay");
+  if (overlay) overlay.remove();
+}
+async function renderSupplierIntegrations() {
+  const app = document.getElementById("app");
+  const isGerant = getRole() === "gerant";
+  if (!isGerant) {
+    app.innerHTML = `<section role="region" aria-label="R\xE9serv\xE9 au g\xE9rant"><div class="empty-state"><p>R\xE9serv\xE9 au g\xE9rant</p></div></section>`;
+    return;
+  }
+  app.innerHTML = `
+    <section role="region" aria-label="Int\xE9grations fournisseurs">
+      <div class="page-header">
+        <h1>Int\xE9grations fournisseurs</h1>
+        <a href="#/suppliers" class="btn btn-secondary">
+          <i data-lucide="truck" style="width:18px;height:18px"></i>
+          <span class="btn-label-desktop">Fournisseurs</span>
+        </a>
+      </div>
+
+      <p style="color:var(--text-secondary);margin-bottom:var(--space-4)">
+        Connectez vos fournisseurs \xE0 <strong>FoodFlow</strong> pour synchroniser
+        automatiquement leur mercuriale et notifier vos commandes. Les
+        identifiants externes ressemblent \xE0 <code>FF-METRO-42</code>.
+      </p>
+
+      <div id="si-list" aria-live="polite" aria-busy="true">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </section>
+  `;
+  lucide.createIcons();
+  let suppliers = [];
+  let integrations = [];
+  try {
+    [suppliers, integrations] = await Promise.all([
+      API.getSuppliers(),
+      API.getSupplierIntegrations()
+    ]);
+  } catch (e) {
+    showToast("Erreur de chargement", "error");
+    return;
+  }
+  const integBySupplier = /* @__PURE__ */ new Map();
+  for (const i of integrations) integBySupplier.set(i.supplier_id, i);
+  const listEl = document.getElementById("si-list");
+  listEl.setAttribute("aria-busy", "false");
+  if (suppliers.length === 0) {
+    listEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon"><i data-lucide="truck"></i></div>
+        <p>Aucun fournisseur enregistr\xE9.</p>
+        <a href="#/suppliers" class="btn btn-primary">Ajouter un fournisseur</a>
+      </div>`;
+    lucide.createIcons();
+    return;
+  }
+  listEl.innerHTML = suppliers.map((s) => {
+    const integ = integBySupplier.get(s.id);
+    if (integ) {
+      const last = integ.last_sync_at ? `Derni\xE8re synchro&nbsp;: ${escapeHtml(integ.last_sync_at)}` : "Jamais synchronis\xE9e";
+      const statusBadge2 = integ.status === "error" ? `<span class="badge badge-warn" data-ui="custom">Erreur</span>` : `<span class="badge badge-ok" data-ui="custom">Connect\xE9</span>`;
+      return `
+        <div class="card" data-ui="custom">
+          <div class="card-header">
+            <span class="card-title">${escapeHtml(s.name)}</span>
+            ${statusBadge2}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:var(--space-1);font-size:var(--text-sm);color:var(--text-secondary)">
+            <div>FoodFlow&nbsp;: <code>${escapeHtml(integ.external_id)}</code></div>
+            <div>${last}</div>
+            ${integ.last_sync_error ? `<div style="color:var(--color-warn)">${escapeHtml(integ.last_sync_error)}</div>` : ""}
+          </div>
+          <div style="display:flex;gap:var(--space-2);margin-top:var(--space-3);flex-wrap:wrap">
+            <button class="btn btn-secondary" onclick="showSupplierIntegrationSync(${integ.id}, '${escapeHtml(s.name)}')">
+              <i data-lucide="refresh-ccw" style="width:16px;height:16px"></i> Synchroniser
+            </button>
+            <button class="btn btn-secondary" onclick="disconnectSupplierIntegration(${integ.id})">
+              <i data-lucide="unplug" style="width:16px;height:16px"></i> D\xE9connecter
+            </button>
+          </div>
+        </div>
+      `;
+    }
+    return `
+      <div class="card" data-ui="custom">
+        <div class="card-header">
+          <span class="card-title">${escapeHtml(s.name)}</span>
+          <span class="badge badge-muted" data-ui="custom">Non connect\xE9</span>
+        </div>
+        <div style="margin-top:var(--space-3)">
+          <button class="btn btn-primary" onclick="showSupplierIntegrationConnect(${s.id}, '${escapeHtml(s.name)}')">
+            <i data-lucide="plug" style="width:16px;height:16px"></i> Connecter \xE0 FoodFlow
+          </button>
+        </div>
+      </div>
+    `;
+  }).join("");
+  lucide.createIcons();
+}
+function showSupplierIntegrationConnect(supplierId, supplierName) {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" data-ui="custom">
+      <h2>Connecter ${escapeHtml(supplierName)} \xE0 FoodFlow</h2>
+      <p style="color:var(--text-secondary);margin-bottom:var(--space-3)">
+        Saisissez l'identifiant FoodFlow communiqu\xE9 par ce fournisseur (ex.
+        <code>FF-METRO-42</code>).
+      </p>
+      <div class="form-group">
+        <label for="si-extid">Identifiant FoodFlow</label>
+        <input type="text" id="si-extid" class="form-control" placeholder="FF-..." data-ui="custom" autofocus>
+      </div>
+      <div style="display:flex;gap:var(--space-2);justify-content:flex-end">
+        <button class="btn btn-secondary" onclick="closeSupplierIntegrationModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="submitSupplierIntegrationConnect(${supplierId})">Connecter</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  lucide.createIcons();
+}
+async function submitSupplierIntegrationConnect(supplierId) {
+  const externalId = (document.getElementById("si-extid").value || "").trim();
+  if (!externalId) {
+    showToast("Identifiant FoodFlow requis", "error");
+    return;
+  }
+  try {
+    await API.createSupplierIntegration({
+      supplier_id: supplierId,
+      provider: "foodflow",
+      external_id: externalId
+    });
+    showToast("Fournisseur connect\xE9 \xE0 FoodFlow");
+    closeSupplierIntegrationModal();
+    renderSupplierIntegrations();
+  } catch (e) {
+    showToast(e.message || "Erreur", "error");
+  }
+}
+function showSupplierIntegrationSync(integId, supplierName) {
+  const existing = document.querySelector(".modal-overlay");
+  if (existing) existing.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal" data-ui="custom">
+      <h2>Synchroniser ${escapeHtml(supplierName)}</h2>
+      <p style="color:var(--text-secondary);margin-bottom:var(--space-3)">
+        Mode v1 (file-import)&nbsp;: collez la mercuriale au format JSON
+        (<code>[{"name":"\u2026","unit":"kg","price":1.2}]</code>) ou demandez au
+        fournisseur de la t\xE9l\xE9verser via le portail. La synchronisation directe
+        FoodFlow API arrivera plus tard.
+      </p>
+      <div class="form-group">
+        <label for="si-items">Items JSON</label>
+        <textarea id="si-items" class="form-control" rows="8" data-ui="custom"
+                  placeholder='[{"name":"Tomate grappe","category":"L\xE9gumes","unit":"kg","price":3.20}]'></textarea>
+      </div>
+      <div style="display:flex;gap:var(--space-2);justify-content:flex-end">
+        <button class="btn btn-secondary" onclick="closeSupplierIntegrationModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="submitSupplierIntegrationSync(${integId})">Synchroniser</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  lucide.createIcons();
+}
+async function submitSupplierIntegrationSync(integId) {
+  const raw = (document.getElementById("si-items").value || "").trim();
+  let items;
+  try {
+    items = JSON.parse(raw);
+    if (!Array.isArray(items)) throw new Error("Le JSON doit \xEAtre un tableau");
+  } catch (e) {
+    showToast("JSON invalide : " + e.message, "error");
+    return;
+  }
+  try {
+    const r = await API.syncSupplierIntegration(integId, items);
+    showToast(`Synchronis\xE9 : ${r.created} cr\xE9\xE9s, ${r.updated} mis \xE0 jour`);
+    closeSupplierIntegrationModal();
+    renderSupplierIntegrations();
+  } catch (e) {
+    showToast(e.message || "Erreur", "error");
+  }
+}
+async function disconnectSupplierIntegration(integId) {
+  if (!confirm("D\xE9connecter ce fournisseur de FoodFlow ?")) return;
+  try {
+    await API.deleteSupplierIntegration(integId);
+    showToast("D\xE9connect\xE9");
+    renderSupplierIntegrations();
+  } catch (e) {
+    showToast(e.message || "Erreur", "error");
+  }
 }
 async function renderHACCPDashboard() {
   const app = document.getElementById("app");
@@ -29380,6 +29595,7 @@ const NAV_GROUPS = {
       // already shows orders + has a "Fournisseurs" button to drill back.
       { label: "Commandes", route: "/orders", icon: "clipboard-pen", roles: ["gerant"] },
       { label: "Fournisseurs", route: "/suppliers", icon: "truck", roles: ["gerant"] },
+      { label: "Int\xE9grations", route: "/supplier-integrations", icon: "plug", roles: ["gerant"] },
       { label: "Livraisons", route: "/deliveries", icon: "package-check", roles: ["gerant", "cuisinier"] },
       { label: "Factures", route: "/invoices", icon: "receipt", roles: ["gerant"] },
       { label: "Planning", route: "/planning", icon: "calendar-clock", roles: ["gerant"] },
@@ -29456,6 +29672,7 @@ const ROUTE_TO_GROUP = {
   "/edit": "cuisine",
   "/orders": "operations",
   "/suppliers": "operations",
+  "/supplier-integrations": "operations",
   "/deliveries": "operations",
   "/service": "operations",
   "/messages": "operations",
@@ -29684,6 +29901,7 @@ function registerRoutes() {
   Router.add(/^\/orders\/(\d+)$/, (id) => renderOrderDetail(parseInt(id)));
   Router.add(/^\/kitchen$/, renderKitchenView);
   Router.add(/^\/suppliers$/, renderSuppliers);
+  Router.add(/^\/supplier-integrations$/, renderSupplierIntegrations);
   Router.add(/^\/ia$/, renderAIAssistant);
   Router.add(/^\/haccp$/, renderHACCPDashboard);
   Router.add(/^\/haccp\/ma-journee$/, renderHACCPMaJournee);

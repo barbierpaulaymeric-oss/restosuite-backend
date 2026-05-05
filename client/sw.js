@@ -1,17 +1,10 @@
-// Bumped 2026-04-29 (v21): integration-test polish #2.
-// 1) #/pilotage now redirects to #/analytics (was 404 via direct URL).
-// 2) Dashboard "Fiches Techniques" + "Coût total matière" stats scroll to
-//    the recipe-list section (were anchors to /recipes, which IS the
-//    dashboard, so they looked like a no-op).
-// 3) Trial-remaining badge in nav is now a passive <span> with a tooltip
-//    instead of an <a> to /subscribe — only the urgent ≤3-day variant stays
-//    clickable so users can convert before lockout.
-// 4) Allergen PDF (/api/allergens/card-pdf) redesigned: cover page with
-//    restaurant name + address + KPI card, full 14-column allergen matrix
-//    table with X marks, refined typography, page header strip, paginated
-//    footer with INCO 1169/2011 + Décret 2015-447 references. (v20 was the
-//    service-module carte browser fix.)
-const CACHE_NAME = 'restosuite-v22';
+// Bumped 2026-05-05 (v23): FoodFlow supplier integration — pluggable
+// per-(supplier, provider) external link. New /api/supplier-integrations
+// CRUD + per-supplier sync that upserts into supplier_catalog. Order
+// dispatch hook fires on PO transition to 'envoyée'. New nav entry
+// "Intégrations" under Opérations + #/supplier-integrations view.
+// (v22 was the 9-bug audit fix on main; v21 was integration-test polish #2.)
+const CACHE_NAME = 'restosuite-v23';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

@@ -370,6 +370,46 @@ router.put('/:id', (req, res) => {
         `UPDATE purchase_orders SET status = ?, updated_at = CURRENT_TIMESTAMP${extra} WHERE id = ? AND restaurant_id = ?`,
         [status, id, rid]
       );
+
+      // FoodFlow / external provider dispatch — fire when the PO is sent. Failures
+      // are swallowed (logged as audit) so they cannot roll back the transition.
+      if (status === 'envoyée') {
+        try {
+          const { dispatchOrder } = require('./supplier-integrations');
+          const items = all(
+            `SELECT product_name, quantity, unit, unit_price, total_price
+               FROM purchase_order_items
+              WHERE purchase_order_id = ? AND restaurant_id = ?`,
+            [id, rid]
+          );
+          const dispatch = dispatchOrder({
+            rid,
+            supplier_id: po.supplier_id,
+            order: { reference: po.reference, total_amount: po.total_amount, items },
+          });
+          if (dispatch) {
+            const { writeAudit } = require('../lib/audit-log');
+            writeAudit({
+              restaurant_id: rid,
+              account_id: req.user && req.user.id,
+              table_name: 'purchase_orders',
+              record_id: id,
+              action: 'update',
+              new_values: {
+                dispatch: {
+                  provider: dispatch.provider,
+                  ok: dispatch.ok === true,
+                  external_ref: dispatch.external_ref || null,
+                  status: dispatch.status || null,
+                  error: dispatch.error || null,
+                },
+              },
+            });
+          }
+        } catch (e) {
+          console.warn('purchase-orders → provider dispatch failed:', e.message);
+        }
+      }
     }
 
     if (notes !== undefined) {

@@ -40,6 +40,7 @@ const NAV_GROUPS = {
       // already shows orders + has a "Fournisseurs" button to drill back.
       { label: 'Commandes',              route: '/orders',    icon: 'clipboard-pen',  roles: ['gerant'] },
       { label: 'Fournisseurs',          route: '/suppliers',  icon: 'truck',         roles: ['gerant'] },
+      { label: 'Intégrations',          route: '/supplier-integrations', icon: 'plug', roles: ['gerant'] },
       { label: 'Livraisons',             route: '/deliveries',icon: 'package-check',  roles: ['gerant','cuisinier'] },
       { label: 'Factures',               route: '/invoices',  icon: 'receipt',        roles: ['gerant'] },
       { label: 'Planning',               route: '/planning',  icon: 'calendar-clock', roles: ['gerant'] },
@@ -110,7 +111,7 @@ const NAV_GROUPS = {
 const ROUTE_TO_GROUP = {
   '/': 'cuisine', '/recipes': 'cuisine', '/new': 'cuisine', '/ingredients': 'cuisine',
   '/stock': 'cuisine', '/recipe': 'cuisine', '/edit': 'cuisine',
-  '/orders': 'operations', '/suppliers': 'operations',
+  '/orders': 'operations', '/suppliers': 'operations', '/supplier-integrations': 'operations',
   '/deliveries': 'operations', '/service': 'operations', '/messages': 'operations',
   '/kitchen': 'operations', '/scan-invoice': 'operations',
   '/invoices': 'operations',
@@ -364,6 +365,7 @@ function registerRoutes() {
   Router.add(/^\/orders\/(\d+)$/, (id) => renderOrderDetail(parseInt(id)));
   Router.add(/^\/kitchen$/, renderKitchenView);
   Router.add(/^\/suppliers$/, renderSuppliers);
+  Router.add(/^\/supplier-integrations$/, renderSupplierIntegrations);
   Router.add(/^\/ia$/, renderAIAssistant);
   Router.add(/^\/haccp$/, renderHACCPDashboard);
   Router.add(/^\/haccp\/ma-journee$/, renderHACCPMaJournee);
