@@ -34,4 +34,15 @@ async function sendOrderEmail({ to, subject, text, xlsxBuffer, filename }) {
   });
 }
 
-module.exports = { sendOrderEmail, getTransport };
+async function sendPlainEmail({ to, subject, text, html }) {
+  const transport = getTransport();
+  return transport.sendMail({
+    from: process.env.MERCURIALE_EMAIL,
+    to,
+    subject,
+    text,
+    html,
+  });
+}
+
+module.exports = { sendOrderEmail, sendPlainEmail, getTransport };

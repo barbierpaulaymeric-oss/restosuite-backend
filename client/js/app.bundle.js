@@ -553,6 +553,9 @@ const API = {
   inviteSupplier(data) {
     return this.request("/supplier-portal/invite", { method: "POST", body: data });
   },
+  inviteSupplierByContact(data) {
+    return this.request("/supplier-portal/invite-by-contact", { method: "POST", body: data });
+  },
   getSupplierAccounts() {
     return this.request("/supplier-portal/accounts");
   },
@@ -1559,6 +1562,39 @@ function trapFocus(container) {
         else if (r.top < dr.top) target.scrollIntoView({ block: "start" });
       }
     }
+    function hasClippingAncestor() {
+      let n = wrap.parentElement;
+      while (n && n !== document.body && n !== document.documentElement) {
+        const cs = getComputedStyle(n);
+        if (cs.overflowY === "auto" || cs.overflowY === "scroll" || cs.overflowY === "hidden" || cs.overflowX === "auto" || cs.overflowX === "scroll" || cs.overflowX === "hidden") {
+          return true;
+        }
+        n = n.parentElement;
+      }
+      return false;
+    }
+    function applyFixedPosition() {
+      const r = trigger.getBoundingClientRect();
+      dropdown.style.position = "fixed";
+      dropdown.style.left = r.left + "px";
+      dropdown.style.width = r.width + "px";
+      dropdown.style.right = "auto";
+      if (wrap.classList.contains("is-drop-up")) {
+        dropdown.style.top = "auto";
+        dropdown.style.bottom = window.innerHeight - r.top + 4 + "px";
+      } else {
+        dropdown.style.top = r.bottom + 4 + "px";
+        dropdown.style.bottom = "auto";
+      }
+    }
+    function clearInlinePosition() {
+      dropdown.style.position = "";
+      dropdown.style.top = "";
+      dropdown.style.bottom = "";
+      dropdown.style.left = "";
+      dropdown.style.right = "";
+      dropdown.style.width = "";
+    }
     function open() {
       if (isOpen || sel.disabled) return;
       isOpen = true;
@@ -1568,6 +1604,11 @@ function trapFocus(container) {
       const spaceBelow = window.innerHeight - r.bottom;
       const spaceAbove = r.top;
       wrap.classList.toggle("is-drop-up", spaceBelow < 200 && spaceAbove > spaceBelow);
+      if (hasClippingAncestor()) {
+        applyFixedPosition();
+        window.addEventListener("scroll", applyFixedPosition, true);
+        window.addEventListener("resize", applyFixedPosition);
+      }
       const opts = options();
       const sel0 = opts.findIndex((o) => o.classList.contains("is-selected"));
       setHighlight(sel0 >= 0 ? sel0 : 0);
@@ -1579,6 +1620,9 @@ function trapFocus(container) {
       wrap.classList.remove("is-open", "is-drop-up");
       trigger.setAttribute("aria-expanded", "false");
       options().forEach((o) => o.classList.remove("is-active"));
+      clearInlinePosition();
+      window.removeEventListener("scroll", applyFixedPosition, true);
+      window.removeEventListener("resize", applyFixedPosition);
       document.removeEventListener("mousedown", onDocClick, true);
     }
     function onDocClick(e) {
@@ -23836,11 +23880,14 @@ async function loadPortalAccounts() {
     if (accounts.length === 0) {
       container.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon"><i data-lucide="link"></i></div>
-          <p>Aucun fournisseur connect\xE9 au portail</p>
-          <p class="text-secondary text-sm">Invitez vos fournisseurs pour qu'ils mettent \xE0 jour leurs catalogues directement</p>
-          <button class="btn btn-primary" onclick="showInviteSupplierModal()">
-            <i data-lucide="user-plus" style="width:18px;height:18px"></i> Inviter un fournisseur
+          <div class="empty-icon"><i data-lucide="user-plus"></i></div>
+          <p>Invitez vos fournisseurs \xE0 rejoindre RestoSuite</p>
+          <p class="text-secondary text-sm" style="max-width:480px;margin:0 auto">
+            Entrez leurs coordonn\xE9es et nous les contacterons pour cr\xE9er leur compte portail \u2014
+            ils pourront alors mettre \xE0 jour leur catalogue et recevoir vos commandes directement.
+          </p>
+          <button class="btn btn-primary" onclick="showInviteSupplierModal()" style="margin-top:var(--space-3)">
+            <i data-lucide="send" style="width:18px;height:18px"></i> Inviter un fournisseur
           </button>
         </div>`;
       lucide.createIcons();
@@ -23884,48 +23931,37 @@ async function loadPortalAccounts() {
   }
 }
 async function showInviteSupplierModal() {
-  let suppliers = [];
-  try {
-    suppliers = await API.getSuppliers();
-  } catch (e) {
-  }
-  let existingAccounts = [];
-  try {
-    existingAccounts = await API.getSupplierAccounts();
-  } catch (e) {
-  }
-  const existingSupplierIds = new Set(existingAccounts.map((a) => a.supplier_id));
-  const availableSuppliers = suppliers.filter((s) => !existingSupplierIds.has(s.id));
-  if (availableSuppliers.length === 0) {
-    showToast("Tous vos fournisseurs ont d\xE9j\xE0 un acc\xE8s portail", "info");
-    return;
-  }
-  const randomPin = String(Math.floor(1e3 + Math.random() * 9e3));
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal">
       <h2>Inviter un fournisseur</h2>
       <p class="text-secondary text-sm" style="margin-bottom:var(--space-4)">
-        Cr\xE9ez un acc\xE8s portail pour que votre fournisseur puisse g\xE9rer son catalogue directement.
+        Entrez les coordonn\xE9es de votre fournisseur. S'il a un email, nous lui enverrons une invitation
+        automatiquement. Sinon, notre \xE9quipe le contactera par t\xE9l\xE9phone pour cr\xE9er son acc\xE8s.
       </p>
       <div class="form-group">
-        <label>Fournisseur</label>
-        <select class="form-control" id="m-invite-supplier" data-ui="custom">
-          <option value="">\u2014 Choisir \u2014</option>
-          ${availableSuppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("")}
-        </select>
+        <label for="m-invite-name">Nom de l'entreprise *</label>
+        <input type="text" class="form-control" id="m-invite-name" placeholder="Ex: Metro, Pomona, Terre Azur" autocomplete="off" data-ui="custom">
       </div>
       <div class="form-group">
-        <label>Code PIN \xE0 communiquer</label>
-        <input type="text" class="form-control" id="m-invite-pin" value="${randomPin}"
-               style="font-family:var(--font-mono);font-size:var(--text-xl);text-align:center;letter-spacing:0.3em"
-               maxlength="6" inputmode="numeric" data-ui="custom">
-        <small class="text-secondary">Communiquez ce code au fournisseur par t\xE9l\xE9phone ou email</small>
+        <label for="m-invite-contact">Personne de contact</label>
+        <input type="text" class="form-control" id="m-invite-contact" placeholder="Ex: Jean Dupont (optionnel)" autocomplete="off" data-ui="custom">
       </div>
+      <div class="form-group">
+        <label for="m-invite-email">Email du fournisseur</label>
+        <input type="email" class="form-control" id="m-invite-email" placeholder="contact@fournisseur.fr" autocomplete="off" data-ui="custom">
+        <small class="text-secondary">Si renseign\xE9, une invitation est envoy\xE9e automatiquement.</small>
+      </div>
+      <div class="form-group">
+        <label for="m-invite-phone">T\xE9l\xE9phone du fournisseur</label>
+        <input type="tel" class="form-control" id="m-invite-phone" placeholder="01 23 45 67 89" autocomplete="off" data-ui="custom">
+        <small class="text-secondary">Si seul le t\xE9l\xE9phone est fourni, nous le contacterons par appel.</small>
+      </div>
+      <div id="m-invite-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
       <div class="actions-row">
         <button class="btn btn-primary" id="m-invite-save">
-          <i data-lucide="send" style="width:18px;height:18px"></i> Cr\xE9er l'acc\xE8s
+          <i data-lucide="send" style="width:18px;height:18px"></i> Envoyer l'invitation
         </button>
         <button class="btn btn-secondary" id="m-invite-cancel">Annuler</button>
       </div>
@@ -23938,25 +23974,47 @@ async function showInviteSupplierModal() {
     if (e.target === overlay) overlay.remove();
   });
   overlay.querySelector("#m-invite-save").onclick = async () => {
-    const supplier_id = document.getElementById("m-invite-supplier").value;
-    const pin = document.getElementById("m-invite-pin").value.trim();
-    if (!supplier_id) {
-      showToast("S\xE9lectionnez un fournisseur", "error");
+    const name = document.getElementById("m-invite-name").value.trim();
+    const contact_name = document.getElementById("m-invite-contact").value.trim();
+    const email = document.getElementById("m-invite-email").value.trim();
+    const phone = document.getElementById("m-invite-phone").value.trim();
+    const errorEl = document.getElementById("m-invite-error");
+    if (!name) {
+      errorEl.textContent = "Le nom de l'entreprise est requis";
       return;
     }
-    if (!/^\d{4,6}$/.test(pin)) {
-      showToast("Le PIN doit \xEAtre entre 4 et 6 chiffres", "error");
+    if (!email && !phone) {
+      errorEl.textContent = "Veuillez renseigner au moins un email ou un t\xE9l\xE9phone";
       return;
     }
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      errorEl.textContent = "Email invalide";
+      return;
+    }
+    const btn = document.getElementById("m-invite-save");
+    btn.disabled = true;
+    btn.textContent = "Envoi\u2026";
     try {
-      await API.inviteSupplier({ supplier_id: parseInt(supplier_id), pin });
-      showToast("Acc\xE8s cr\xE9\xE9 ! Communiquez le PIN au fournisseur.", "success");
+      const res = await API.inviteSupplierByContact({ name, contact_name, email, phone });
       overlay.remove();
+      if (res.email_status === "sent_to_supplier") {
+        showToast(`Invitation envoy\xE9e \xE0 ${email}`, "success");
+      } else if (res.email_status === "sent_to_admin") {
+        showToast("Notre \xE9quipe va contacter le fournisseur par t\xE9l\xE9phone", "success");
+      } else if (res.email_status === "error") {
+        showToast(`Fournisseur cr\xE9\xE9, mais email non envoy\xE9 : ${res.email_error || "erreur SMTP"}`, "warning");
+      } else {
+        showToast("Fournisseur cr\xE9\xE9", "success");
+      }
       loadPortalAccounts();
     } catch (e) {
-      showToast(e.message, "error");
+      errorEl.textContent = e.message || "Erreur lors de l'envoi de l'invitation";
+      btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="send" style="width:18px;height:18px"></i> Envoyer l'invitation`;
+      if (window.lucide) lucide.createIcons();
     }
   };
+  document.getElementById("m-invite-name").focus();
 }
 async function revokeSupplierAccess(id, name) {
   showConfirmModal("R\xE9voquer l'acc\xE8s", `\xCAtes-vous s\xFBr de vouloir r\xE9voquer l'acc\xE8s portail de "${name}" ?`, async () => {

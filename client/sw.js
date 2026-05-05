@@ -1,10 +1,12 @@
-// Bumped 2026-05-05 (v25): integrations page shows "Bientôt disponible"
-// for placeholder integrations (TheFork, POS, Comptabilité, Deliveroo,
-// Uber Eats) with disabled buttons; Multi-Sites "Nouvel établissement"
-// rebuilt as a 5-step wizard matching the onboarding visual language
-// (info → tables Rapide/Avancé → cold zones → suppliers → recap), all
-// inputs use .form-control instead of unstyled .input.
-const CACHE_NAME = 'restosuite-v25';
+// Bumped 2026-05-05 (v26): four UX fixes — (1) ui-select dropdowns inside
+// modals no longer get clipped by overflow:auto (fixed-positioning escape
+// when any ancestor clips); (2) supplier-portal empty state rewritten as
+// invitation CTA + new modal collecting name/email/phone (email → SMTP
+// invite to supplier; phone-only → SMTP alert to ADMIN_NOTIFY_EMAIL);
+// (3) admin route hardcodes barbierpaulaymeric@gmail.com as default
+// (matches client allowlist) + falls back to DB email lookup for legacy
+// JWTs; (4) integrations + multi-site wizard from v25 carry forward.
+const CACHE_NAME = 'restosuite-v26';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

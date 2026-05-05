@@ -156,6 +156,46 @@
       }
     }
 
+    function hasClippingAncestor() {
+      // If any ancestor scrolls/clips (e.g. .modal with overflow-y:auto),
+      // an absolutely-positioned dropdown gets cut off. Detect that and
+      // switch to fixed positioning so the dropdown escapes the clip.
+      let n = wrap.parentElement;
+      while (n && n !== document.body && n !== document.documentElement) {
+        const cs = getComputedStyle(n);
+        if (cs.overflowY === 'auto' || cs.overflowY === 'scroll' || cs.overflowY === 'hidden' ||
+            cs.overflowX === 'auto' || cs.overflowX === 'scroll' || cs.overflowX === 'hidden') {
+          return true;
+        }
+        n = n.parentElement;
+      }
+      return false;
+    }
+
+    function applyFixedPosition() {
+      const r = trigger.getBoundingClientRect();
+      dropdown.style.position = 'fixed';
+      dropdown.style.left = r.left + 'px';
+      dropdown.style.width = r.width + 'px';
+      dropdown.style.right = 'auto';
+      if (wrap.classList.contains('is-drop-up')) {
+        dropdown.style.top = 'auto';
+        dropdown.style.bottom = (window.innerHeight - r.top + 4) + 'px';
+      } else {
+        dropdown.style.top = (r.bottom + 4) + 'px';
+        dropdown.style.bottom = 'auto';
+      }
+    }
+
+    function clearInlinePosition() {
+      dropdown.style.position = '';
+      dropdown.style.top = '';
+      dropdown.style.bottom = '';
+      dropdown.style.left = '';
+      dropdown.style.right = '';
+      dropdown.style.width = '';
+    }
+
     function open() {
       if (isOpen || sel.disabled) return;
       isOpen = true;
@@ -166,6 +206,15 @@
       const spaceBelow = window.innerHeight - r.bottom;
       const spaceAbove = r.top;
       wrap.classList.toggle('is-drop-up', spaceBelow < 200 && spaceAbove > spaceBelow);
+      // If inside a modal or other clipped container, switch to fixed
+      // positioning so the popup escapes the overflow:auto clip.
+      if (hasClippingAncestor()) {
+        applyFixedPosition();
+        // Reposition on scroll/resize while open (rare in modals, but
+        // keeps the popup glued to the trigger if anything moves).
+        window.addEventListener('scroll', applyFixedPosition, true);
+        window.addEventListener('resize', applyFixedPosition);
+      }
       const opts = options();
       const sel0 = opts.findIndex(o => o.classList.contains('is-selected'));
       setHighlight(sel0 >= 0 ? sel0 : 0);
@@ -178,6 +227,9 @@
       wrap.classList.remove('is-open', 'is-drop-up');
       trigger.setAttribute('aria-expanded', 'false');
       options().forEach(o => o.classList.remove('is-active'));
+      clearInlinePosition();
+      window.removeEventListener('scroll', applyFixedPosition, true);
+      window.removeEventListener('resize', applyFixedPosition);
       document.removeEventListener('mousedown', onDocClick, true);
     }
 

@@ -129,11 +129,14 @@ async function loadPortalAccounts() {
     if (accounts.length === 0) {
       container.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon"><i data-lucide="link"></i></div>
-          <p>Aucun fournisseur connecté au portail</p>
-          <p class="text-secondary text-sm">Invitez vos fournisseurs pour qu'ils mettent à jour leurs catalogues directement</p>
-          <button class="btn btn-primary" onclick="showInviteSupplierModal()">
-            <i data-lucide="user-plus" style="width:18px;height:18px"></i> Inviter un fournisseur
+          <div class="empty-icon"><i data-lucide="user-plus"></i></div>
+          <p>Invitez vos fournisseurs à rejoindre RestoSuite</p>
+          <p class="text-secondary text-sm" style="max-width:480px;margin:0 auto">
+            Entrez leurs coordonnées et nous les contacterons pour créer leur compte portail —
+            ils pourront alors mettre à jour leur catalogue et recevoir vos commandes directement.
+          </p>
+          <button class="btn btn-primary" onclick="showInviteSupplierModal()" style="margin-top:var(--space-3)">
+            <i data-lucide="send" style="width:18px;height:18px"></i> Inviter un fournisseur
           </button>
         </div>`;
       lucide.createIcons();
@@ -179,48 +182,37 @@ async function loadPortalAccounts() {
 }
 
 async function showInviteSupplierModal() {
-  let suppliers = [];
-  try { suppliers = await API.getSuppliers(); } catch (e) { /* ignore */ }
-
-  // Filter out suppliers that already have portal accounts
-  let existingAccounts = [];
-  try { existingAccounts = await API.getSupplierAccounts(); } catch (e) { /* ignore */ }
-  const existingSupplierIds = new Set(existingAccounts.map(a => a.supplier_id));
-  const availableSuppliers = suppliers.filter(s => !existingSupplierIds.has(s.id));
-
-  if (availableSuppliers.length === 0) {
-    showToast('Tous vos fournisseurs ont déjà un accès portail', 'info');
-    return;
-  }
-
-  // Generate random 4-digit PIN
-  const randomPin = String(Math.floor(1000 + Math.random() * 9000));
-
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal">
       <h2>Inviter un fournisseur</h2>
       <p class="text-secondary text-sm" style="margin-bottom:var(--space-4)">
-        Créez un accès portail pour que votre fournisseur puisse gérer son catalogue directement.
+        Entrez les coordonnées de votre fournisseur. S'il a un email, nous lui enverrons une invitation
+        automatiquement. Sinon, notre équipe le contactera par téléphone pour créer son accès.
       </p>
       <div class="form-group">
-        <label>Fournisseur</label>
-        <select class="form-control" id="m-invite-supplier" data-ui="custom">
-          <option value="">— Choisir —</option>
-          ${availableSuppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
-        </select>
+        <label for="m-invite-name">Nom de l'entreprise *</label>
+        <input type="text" class="form-control" id="m-invite-name" placeholder="Ex: Metro, Pomona, Terre Azur" autocomplete="off" data-ui="custom">
       </div>
       <div class="form-group">
-        <label>Code PIN à communiquer</label>
-        <input type="text" class="form-control" id="m-invite-pin" value="${randomPin}"
-               style="font-family:var(--font-mono);font-size:var(--text-xl);text-align:center;letter-spacing:0.3em"
-               maxlength="6" inputmode="numeric" data-ui="custom">
-        <small class="text-secondary">Communiquez ce code au fournisseur par téléphone ou email</small>
+        <label for="m-invite-contact">Personne de contact</label>
+        <input type="text" class="form-control" id="m-invite-contact" placeholder="Ex: Jean Dupont (optionnel)" autocomplete="off" data-ui="custom">
       </div>
+      <div class="form-group">
+        <label for="m-invite-email">Email du fournisseur</label>
+        <input type="email" class="form-control" id="m-invite-email" placeholder="contact@fournisseur.fr" autocomplete="off" data-ui="custom">
+        <small class="text-secondary">Si renseigné, une invitation est envoyée automatiquement.</small>
+      </div>
+      <div class="form-group">
+        <label for="m-invite-phone">Téléphone du fournisseur</label>
+        <input type="tel" class="form-control" id="m-invite-phone" placeholder="01 23 45 67 89" autocomplete="off" data-ui="custom">
+        <small class="text-secondary">Si seul le téléphone est fourni, nous le contacterons par appel.</small>
+      </div>
+      <div id="m-invite-error" style="color:var(--color-danger);font-size:var(--text-sm);min-height:20px;margin-bottom:var(--space-3)"></div>
       <div class="actions-row">
         <button class="btn btn-primary" id="m-invite-save">
-          <i data-lucide="send" style="width:18px;height:18px"></i> Créer l'accès
+          <i data-lucide="send" style="width:18px;height:18px"></i> Envoyer l'invitation
         </button>
         <button class="btn btn-secondary" id="m-invite-cancel">Annuler</button>
       </div>
@@ -234,21 +226,40 @@ async function showInviteSupplierModal() {
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
   overlay.querySelector('#m-invite-save').onclick = async () => {
-    const supplier_id = document.getElementById('m-invite-supplier').value;
-    const pin = document.getElementById('m-invite-pin').value.trim();
+    const name = document.getElementById('m-invite-name').value.trim();
+    const contact_name = document.getElementById('m-invite-contact').value.trim();
+    const email = document.getElementById('m-invite-email').value.trim();
+    const phone = document.getElementById('m-invite-phone').value.trim();
+    const errorEl = document.getElementById('m-invite-error');
 
-    if (!supplier_id) { showToast('Sélectionnez un fournisseur', 'error'); return; }
-    if (!/^\d{4,6}$/.test(pin)) { showToast('Le PIN doit être entre 4 et 6 chiffres', 'error'); return; }
+    if (!name) { errorEl.textContent = 'Le nom de l\'entreprise est requis'; return; }
+    if (!email && !phone) { errorEl.textContent = 'Veuillez renseigner au moins un email ou un téléphone'; return; }
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { errorEl.textContent = 'Email invalide'; return; }
+
+    const btn = document.getElementById('m-invite-save');
+    btn.disabled = true; btn.textContent = 'Envoi…';
 
     try {
-      await API.inviteSupplier({ supplier_id: parseInt(supplier_id), pin });
-      showToast('Accès créé ! Communiquez le PIN au fournisseur.', 'success');
+      const res = await API.inviteSupplierByContact({ name, contact_name, email, phone });
       overlay.remove();
+      if (res.email_status === 'sent_to_supplier') {
+        showToast(`Invitation envoyée à ${email}`, 'success');
+      } else if (res.email_status === 'sent_to_admin') {
+        showToast('Notre équipe va contacter le fournisseur par téléphone', 'success');
+      } else if (res.email_status === 'error') {
+        showToast(`Fournisseur créé, mais email non envoyé : ${res.email_error || 'erreur SMTP'}`, 'warning');
+      } else {
+        showToast('Fournisseur créé', 'success');
+      }
       loadPortalAccounts();
     } catch (e) {
-      showToast(e.message, 'error');
+      errorEl.textContent = e.message || 'Erreur lors de l\'envoi de l\'invitation';
+      btn.disabled = false; btn.innerHTML = '<i data-lucide="send" style="width:18px;height:18px"></i> Envoyer l\'invitation';
+      if (window.lucide) lucide.createIcons();
     }
   };
+
+  document.getElementById('m-invite-name').focus();
 }
 
 async function revokeSupplierAccess(id, name) {

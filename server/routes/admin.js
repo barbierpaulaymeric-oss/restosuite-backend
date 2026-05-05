@@ -11,21 +11,27 @@ const { requireAuth } = require('./auth');
 
 const router = express.Router();
 
-if (!process.env.ADMIN_EMAILS) {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('❌ FATAL: ADMIN_EMAILS env var not set. Refusing to start without admin access config.');
-    process.exit(1);
-  } else {
-    console.warn('⚠️  WARNING: ADMIN_EMAILS not set. No one will have admin access.');
-  }
-}
+// Default platform admin always recognized (matches the client-side hardcoded
+// allowlist in client/js/views/admin.js). Additional admins can be added via
+// the ADMIN_EMAILS env var (comma-separated). Without this default, a
+// missing/misconfigured env var on prod locks out the platform owner.
+const DEFAULT_ADMIN_EMAILS = ['barbierpaulaymeric@gmail.com'];
 
-const ADMIN_EMAILS = process.env.ADMIN_EMAILS
-  ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase())
-  : [];
+const ADMIN_EMAILS = (() => {
+  const fromEnv = process.env.ADMIN_EMAILS
+    ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+    : [];
+  return Array.from(new Set([...DEFAULT_ADMIN_EMAILS, ...fromEnv]));
+})();
 
 function requireAdmin(req, res, next) {
-  const email = (req.user.email || '').toLowerCase();
+  let email = (req.user && req.user.email || '').toLowerCase();
+  // Older JWTs (pre-email-claim) only carry { id }; fall back to DB lookup so
+  // a stale token doesn't lock the platform admin out.
+  if (!email && req.user && req.user.id) {
+    const row = get('SELECT email FROM accounts WHERE id = ?', [req.user.id]);
+    email = (row && row.email || '').toLowerCase();
+  }
   if (!ADMIN_EMAILS.includes(email)) {
     return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
   }

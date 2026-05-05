@@ -473,6 +473,9 @@ const API = {
   inviteSupplier(data) {
     return this.request('/supplier-portal/invite', { method: 'POST', body: data });
   },
+  inviteSupplierByContact(data) {
+    return this.request('/supplier-portal/invite-by-contact', { method: 'POST', body: data });
+  },
   getSupplierAccounts() {
     return this.request('/supplier-portal/accounts');
   },

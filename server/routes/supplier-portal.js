@@ -156,6 +156,117 @@ try {
 // RESTAURANT SIDE (gérant)
 // ═════════════════════════════════════════
 
+// POST /invite-by-contact — Invite a brand-new supplier by name + email/phone.
+// Creates the supplier row and notifies them (or PA if no email).
+// This is the "I don't have any suppliers yet" path used by the empty
+// state in the supplier-portal management view.
+router.post('/invite-by-contact', requireAuth, async (req, res) => {
+  const rid = req.user.restaurant_id;
+  const { name, email, phone, contact_name } = req.body || {};
+
+  const cleanName = (name || '').trim();
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanPhone = (phone || '').trim();
+  const cleanContact = (contact_name || '').trim();
+
+  if (!cleanName) {
+    return res.status(400).json({ error: 'Le nom du fournisseur est requis' });
+  }
+  if (!cleanEmail && !cleanPhone) {
+    return res.status(400).json({ error: 'Email ou téléphone requis' });
+  }
+  if (cleanEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
+    return res.status(400).json({ error: 'Email invalide' });
+  }
+
+  // Upsert supplier row (per-tenant)
+  let supplier = get(
+    'SELECT * FROM suppliers WHERE restaurant_id = ? AND LOWER(name) = LOWER(?)',
+    [rid, cleanName]
+  );
+  if (!supplier) {
+    const result = run(
+      'INSERT INTO suppliers (restaurant_id, name, contact, phone, email) VALUES (?, ?, ?, ?, ?)',
+      [rid, cleanName, cleanContact || null, cleanPhone || null, cleanEmail || null]
+    );
+    supplier = get('SELECT * FROM suppliers WHERE id = ?', [Number(result.lastInsertRowid)]);
+  } else {
+    // fill in missing contact info
+    run(
+      `UPDATE suppliers SET
+         contact = COALESCE(NULLIF(?, ''), contact),
+         phone = COALESCE(NULLIF(?, ''), phone),
+         email = COALESCE(NULLIF(?, ''), email)
+       WHERE id = ? AND restaurant_id = ?`,
+      [cleanContact, cleanPhone, cleanEmail, supplier.id, rid]
+    );
+  }
+
+  // Restaurant info for the email body
+  const restaurant = get('SELECT name FROM restaurants WHERE id = ?', [rid]);
+  const restaurantName = restaurant && restaurant.name ? restaurant.name : 'un client RestoSuite';
+
+  let emailStatus = 'skipped';
+  let emailError = null;
+
+  // If SMTP isn't configured, queue is best-effort and never blocks creation.
+  const smtpReady = !!(process.env.MERCURIALE_EMAIL && process.env.MERCURIALE_PASSWORD);
+
+  if (smtpReady) {
+    try {
+      const { sendPlainEmail } = require('../lib/mercuriale-mail/smtp-client');
+      if (cleanEmail) {
+        // Direct invitation to the supplier
+        await sendPlainEmail({
+          to: cleanEmail,
+          subject: `${restaurantName} vous invite sur RestoSuite`,
+          text:
+`Bonjour ${cleanContact || ''},
+
+${restaurantName} utilise RestoSuite pour gérer ses commandes et son catalogue. Ils vous invitent à rejoindre leur portail fournisseur pour mettre à jour vos prix et recevoir leurs commandes directement par email.
+
+Pour activer votre accès, répondez à ce mail ou contactez ${restaurantName}. Nous reviendrons vers vous avec vos identifiants.
+
+— L'équipe RestoSuite
+https://restosuite.fr`,
+        });
+        emailStatus = 'sent_to_supplier';
+      } else {
+        // Phone-only — alert the platform admin so they can call manually.
+        const adminTo = process.env.ADMIN_NOTIFY_EMAIL || 'barbierpaulaymeric@gmail.com';
+        await sendPlainEmail({
+          to: adminTo,
+          subject: `[RestoSuite] Nouveau fournisseur à contacter — ${cleanName}`,
+          text:
+`Salut,
+
+Un restaurateur (${restaurantName}, restaurant_id=${rid}) souhaite inviter un fournisseur qui n'a pas d'email.
+
+Détails à appeler :
+- Nom : ${cleanName}
+- Téléphone : ${cleanPhone}
+- Contact : ${cleanContact || '—'}
+
+Le fournisseur a été créé en base (suppliers.id=${supplier.id}) côté ${restaurantName}.
+
+— RestoSuite`,
+        });
+        emailStatus = 'sent_to_admin';
+      }
+    } catch (e) {
+      emailError = e.message;
+      emailStatus = 'error';
+    }
+  }
+
+  res.status(201).json({
+    success: true,
+    supplier_id: supplier.id,
+    email_status: emailStatus,
+    email_error: emailError,
+  });
+});
+
 // POST /invite — Create supplier portal access
 router.post('/invite', requireAuth, (req, res) => {
   const rid = req.user.restaurant_id;
