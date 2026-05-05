@@ -1,10 +1,11 @@
-// Bumped 2026-05-05 (v23): FoodFlow supplier integration — pluggable
-// per-(supplier, provider) external link. New /api/supplier-integrations
-// CRUD + per-supplier sync that upserts into supplier_catalog. Order
-// dispatch hook fires on PO transition to 'envoyée'. New nav entry
-// "Intégrations" under Opérations + #/supplier-integrations view.
-// (v22 was the 9-bug audit fix on main; v21 was integration-test polish #2.)
-const CACHE_NAME = 'restosuite-v23';
+// Bumped 2026-05-05 (v24): onboarding polish — Avancé tab now shows
+// active orange state, counter input numbers visible, cold-zone temperature
+// ranges redesigned (min °C → max °C with clear arrow separator, no -/+
+// button confusion), new Fournisseurs partenaires section with FoodFlow
+// quick-add card, API Publique hidden from main nav (still in Modules
+// avancés toggle on /more for power users).
+// (v23 was the FoodFlow supplier integration on main.)
+const CACHE_NAME = 'restosuite-v24';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

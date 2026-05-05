@@ -184,23 +184,27 @@ class OnboardingWizard {
         <h2 class="ob-title" id="ob-dialog-title">Ma salle</h2>
         <p class="ob-desc">Configurez vos tables par zone</p>
         <div class="ob-form">
-          <div role="tablist" aria-label="Mode de configuration des tables" style="display:flex;gap:var(--space-3);margin-bottom:var(--space-4)">
-            <button class="btn ${this.tableMode === 'quick' ? 'btn-primary' : 'btn-secondary'} btn-sm" id="ob-mode-quick" role="tab" aria-selected="${this.tableMode === 'quick'}">Rapide</button>
-            <button class="btn ${this.tableMode === 'advanced' ? 'btn-primary' : 'btn-secondary'} btn-sm" id="ob-mode-advanced" role="tab" aria-selected="${this.tableMode === 'advanced'}">Avancé</button>
+          <div role="tablist" aria-label="Mode de configuration des tables" class="ob-tabs">
+            <button class="ob-tab ${this.tableMode === 'quick' ? 'is-active' : ''}" id="ob-mode-quick" role="tab" aria-selected="${this.tableMode === 'quick'}" type="button">Rapide</button>
+            <button class="ob-tab ${this.tableMode === 'advanced' ? 'is-active' : ''}" id="ob-mode-advanced" role="tab" aria-selected="${this.tableMode === 'advanced'}" type="button">Avancé</button>
           </div>
           <div id="ob-tables-content" role="region" aria-label="Configuration des tables"></div>
         </div>
       </div>
     `;
 
-    document.getElementById('ob-mode-quick').addEventListener('click', () => {
-      this.tableMode = 'quick';
+    const setMode = (mode) => {
+      this.tableMode = mode;
+      const quick = document.getElementById('ob-mode-quick');
+      const adv = document.getElementById('ob-mode-advanced');
+      quick.classList.toggle('is-active', mode === 'quick');
+      adv.classList.toggle('is-active', mode === 'advanced');
+      quick.setAttribute('aria-selected', mode === 'quick' ? 'true' : 'false');
+      adv.setAttribute('aria-selected', mode === 'advanced' ? 'true' : 'false');
       this.renderTablesContent();
-    });
-    document.getElementById('ob-mode-advanced').addEventListener('click', () => {
-      this.tableMode = 'advanced';
-      this.renderTablesContent();
-    });
+    };
+    document.getElementById('ob-mode-quick').addEventListener('click', () => setMode('quick'));
+    document.getElementById('ob-mode-advanced').addEventListener('click', () => setMode('advanced'));
 
     this.renderTablesContent();
     this.renderNavButtons(footer, true);
@@ -433,12 +437,17 @@ class OnboardingWizard {
 
     container.innerHTML = this.zones.map((z, i) => `
       <div class="ob-zone-row" data-index="${i}" role="listitem">
-        <input type="text" class="ob-zone-name" value="${escapeHtml(z.name)}" data-field="name" data-index="${i}" aria-label="Nom de la zone ${i + 1}" data-ui="custom">
+        <input type="text" class="ob-zone-name" value="${escapeHtml(z.name)}" data-field="name" data-index="${i}" aria-label="Nom de la zone ${i + 1}">
         <div class="ob-zone-range">
-          <input type="number" class="ob-zone-input" value="${z.min_temp}" data-field="min_temp" data-index="${i}" step="1" aria-label="Température minimum" inputmode="numeric" data-ui="custom">
-          <span class="ob-zone-sep" aria-hidden="true">°C —</span>
-          <input type="number" class="ob-zone-input" value="${z.max_temp}" data-field="max_temp" data-index="${i}" step="1" aria-label="Température maximum" inputmode="numeric" data-ui="custom">
-          <span class="ob-zone-unit" aria-hidden="true">°C</span>
+          <span class="ob-temp-pair">
+            <input type="number" class="ob-zone-input" value="${z.min_temp}" data-field="min_temp" data-index="${i}" step="1" aria-label="Température minimum" inputmode="numeric">
+            <span class="ob-zone-unit" aria-hidden="true">°C</span>
+          </span>
+          <span class="ob-zone-arrow" aria-hidden="true">→</span>
+          <span class="ob-temp-pair">
+            <input type="number" class="ob-zone-input" value="${z.max_temp}" data-field="max_temp" data-index="${i}" step="1" aria-label="Température maximum" inputmode="numeric">
+            <span class="ob-zone-unit" aria-hidden="true">°C</span>
+          </span>
         </div>
         <button class="ob-zone-delete" data-index="${i}" title="Supprimer" aria-label="Supprimer la zone ${escapeHtml(z.name)}">✕</button>
       </div>
@@ -469,11 +478,16 @@ class OnboardingWizard {
         <div class="ob-icon" aria-hidden="true">🚚</div>
         <h2 class="ob-title" id="ob-dialog-title">Mes fournisseurs</h2>
         <p class="ob-desc">Ajoutez vos fournisseurs habituels (optionnel)</p>
+        <div class="ob-partner-suppliers" role="region" aria-label="Fournisseurs partenaires">
+          <div class="ob-partner-label">Fournisseurs partenaires</div>
+          <div id="ob-partner-list"></div>
+        </div>
         <div id="ob-suppliers-list" role="list" aria-label="Fournisseurs"></div>
         <button class="btn btn-ghost" id="ob-add-supplier" style="margin-top:var(--space-3)" aria-label="Ajouter un nouveau fournisseur">+ Ajouter un fournisseur</button>
       </div>
     `;
 
+    this.renderPartnerSuppliers();
     this.renderSuppliersList();
 
     document.getElementById('ob-add-supplier').addEventListener('click', () => {
@@ -482,6 +496,51 @@ class OnboardingWizard {
     });
 
     this.renderNavButtons(footer, true);
+  }
+
+  // Hardcoded for now; later this can be sourced from a public
+  // /api/supplier-providers endpoint backed by server/lib/integrations registry.
+  _partnerSuppliers() {
+    return [
+      {
+        provider: 'foodflow',
+        icon: '🍱',
+        name: 'FoodFlow',
+        description: 'Grossiste multi-fournisseurs, mercuriale personnalisée',
+        prefill: { name: 'FoodFlow', contact: '', phone: '', email: '' },
+      },
+    ];
+  }
+
+  renderPartnerSuppliers() {
+    const container = document.getElementById('ob-partner-list');
+    if (!container) return;
+    const partners = this._partnerSuppliers();
+    container.innerHTML = partners.map((p, i) => {
+      const already = this.suppliers.some(s => s._partner === p.provider || (s.name || '').toLowerCase() === p.name.toLowerCase());
+      return `
+        <button class="ob-partner-card" data-partner-index="${i}" type="button" aria-label="Ajouter ${escapeHtml(p.name)} comme fournisseur partenaire" ${already ? 'disabled' : ''}>
+          <span class="ob-partner-card__icon" aria-hidden="true">${p.icon}</span>
+          <span class="ob-partner-card__body">
+            <span class="ob-partner-card__name">${escapeHtml(p.name)}</span>
+            <span class="ob-partner-card__desc">${escapeHtml(p.description)}</span>
+          </span>
+          <span class="ob-partner-card__plus" aria-hidden="true">${already ? '✓' : '+'}</span>
+        </button>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.ob-partner-card').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        const idx = parseInt(btn.dataset.partnerIndex, 10);
+        const p = partners[idx];
+        if (!p) return;
+        this.suppliers.push({ ...p.prefill, _partner: p.provider });
+        this.renderPartnerSuppliers();
+        this.renderSuppliersList();
+      });
+    });
   }
 
   renderSuppliersList() {
@@ -496,7 +555,7 @@ class OnboardingWizard {
     container.innerHTML = this.suppliers.map((s, i) => `
       <div role="listitem" style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-3)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2)">
-          <strong style="font-size:var(--text-sm)" id="ob-supplier-label-${i}">Fournisseur ${i + 1}</strong>
+          <strong style="font-size:var(--text-sm)" id="ob-supplier-label-${i}">Fournisseur ${i + 1}${s._partner ? `<span class="ob-partner-badge">★ Partenaire</span>` : ''}</strong>
           <button class="ob-supplier-delete" data-index="${i}" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px" aria-label="Supprimer le fournisseur ${i + 1}">✕</button>
         </div>
         <div class="form-group" style="margin-bottom:var(--space-2)">
@@ -526,6 +585,7 @@ class OnboardingWizard {
     container.querySelectorAll('.ob-supplier-delete').forEach(btn => {
       btn.addEventListener('click', () => {
         this.suppliers.splice(parseInt(btn.dataset.index), 1);
+        this.renderPartnerSuppliers();
         this.renderSuppliersList();
       });
     });
