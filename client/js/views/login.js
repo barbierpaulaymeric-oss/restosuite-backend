@@ -403,6 +403,11 @@ class LoginView {
           <button class="btn btn-primary" id="reg-submit" disabled aria-disabled="true" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             ${isSupplier ? 'Créer mon compte fournisseur' : 'Créer mon compte'}
           </button>
+
+          <p style="text-align:center;margin-top:var(--space-4);font-size:var(--text-sm);color:var(--text-secondary)">
+            Déjà un compte ?
+            <a href="#" id="reg-go-login" style="color:var(--color-accent);text-decoration:none;font-weight:600">Se connecter</a>
+          </p>
         </div>
       </div>
     `;
@@ -422,6 +427,15 @@ class LoginView {
       this.registerType = 'supplier';
       this.render();
     });
+    const goLoginLink = document.getElementById('reg-go-login');
+    if (goLoginLink) {
+      goLoginLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (location.hash === '#register') history.replaceState(null, '', location.pathname + location.search);
+        this.mode = 'restaurant';
+        this.render();
+      });
+    }
     if (hasResumeStash) {
       const resumeLink = document.getElementById('resume-stash-link');
       if (resumeLink) {

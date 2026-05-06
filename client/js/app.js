@@ -173,14 +173,28 @@ document.addEventListener('keydown', (e) => {
 
 // ─── PWA Install Prompt ───
 let deferredPrompt;
+function isRegisterView() {
+  return location.hash === '#register' || location.hash.startsWith('#register?');
+}
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
+  // Defer the banner while the user is on the registration screen — adding a
+  // PWA install prompt on top of an already-dense onboarding-style flow hurts
+  // conversion. We re-attempt as soon as they leave #register.
+  if (isRegisterView()) return;
   showInstallBanner();
+});
+window.addEventListener('hashchange', () => {
+  if (deferredPrompt && !isRegisterView() && !document.querySelector('.install-banner')) {
+    showInstallBanner();
+  }
 });
 
 function showInstallBanner() {
   if (localStorage.getItem('restosuite_install_dismissed')) return;
+  if (isRegisterView()) return;
+  if (document.querySelector('.install-banner')) return;
 
   const banner = document.createElement('div');
   banner.className = 'install-banner';
