@@ -27,21 +27,26 @@ beforeAll(() => {
   run(`INSERT INTO restaurants (id, name) VALUES (4244, 'BistrotPi')`);
   run(`INSERT INTO suppliers (id, name, email, restaurant_id) VALUES (9201, 'FoodFlow', 'julie@foodflow.com', 4244)`);
   run(`INSERT INTO supplier_integrations (restaurant_id, supplier_id, provider, external_id, status) VALUES (4244, 9201, 'foodflow', 'FF-BPI-2', 'connected')`);
+
+  // Third restaurant — content-only matching (no integration, no shared
+  // supplier email) to exercise auto-create from "Fournisseur" column.
+  run(`INSERT INTO restaurants (id, name) VALUES (4245, 'TestRestoSuite')`);
+  run(`INSERT INTO accounts (id, name, pin, role, email, restaurant_id) VALUES (9300, 'Owner', 'x', 'patron', 'pa@testrestosuite.com', 4245)`);
 });
 
 afterAll(() => {
   // Best-effort cleanup so this file is rerunnable in --watch mode.
-  try { run('DELETE FROM supplier_catalog WHERE supplier_id IN (9001, 9002, 9101, 9201)'); } catch {}
-  try { run('DELETE FROM supplier_integrations WHERE restaurant_id IN (4242, 4243, 4244)'); } catch {}
+  try { run('DELETE FROM supplier_catalog WHERE restaurant_id IN (4242, 4243, 4244, 4245)'); } catch {}
+  try { run('DELETE FROM supplier_integrations WHERE restaurant_id IN (4242, 4243, 4244, 4245)'); } catch {}
   try { run('DELETE FROM purchase_order_items WHERE restaurant_id = 4242'); } catch {}
   try { run('DELETE FROM purchase_orders WHERE restaurant_id = 4242'); } catch {}
-  try { run('DELETE FROM suppliers WHERE id IN (9001, 9002, 9101, 9201)'); } catch {}
-  try { run('DELETE FROM accounts WHERE id = 9100'); } catch {}
-  try { run('DELETE FROM restaurants WHERE id IN (4242, 4243, 4244)'); } catch {}
+  try { run('DELETE FROM suppliers WHERE restaurant_id IN (4242, 4243, 4244, 4245)'); } catch {}
+  try { run('DELETE FROM accounts WHERE id IN (9100, 9300)'); } catch {}
+  try { run('DELETE FROM restaurants WHERE id IN (4242, 4243, 4244, 4245)'); } catch {}
 });
 
-describe('runInboundCycle', () => {
-  test('upserts items into supplier_catalog when sender matches', async () => {
+describe('runInboundCycle — content-based routing', () => {
+  test('legacy sender match still works (no identifiers, sender → suppliers.email)', async () => {
     const fetchFn = async () => [{
       uid: 1, from: 'supz@x.com', subject: 'Mercu', date: new Date(),
       attachments: [{ filename: 'm.xlsx', content: makeXlsx([
@@ -60,13 +65,14 @@ describe('runInboundCycle', () => {
     expect(names).toEqual(expect.arrayContaining(['Splazmagork rouge', 'Zorglub bio']));
   });
 
-  test('skips email when no supplier matches', async () => {
+  test('skips email when no content match and no sender match', async () => {
     const fetchFn = async () => [{
       uid: 2, from: 'noone@x.com', attachments: [{ filename: 'm.xlsx', content: makeXlsx([['Produit', 'Prix HT'], ['x', '1']]) }],
     }];
-    const r = await runInboundCycle({ fetchFn });
+    const r = await runInboundCycle({ fetchFn, sendAlertFn: async () => ({}) });
     expect(r.processed).toBe(1);
     expect(r.matched).toBe(0);
+    expect(r.unmatched_alerts).toBe(1);
   });
 
   test('continues to next email when one has no attachment', async () => {
@@ -74,7 +80,7 @@ describe('runInboundCycle', () => {
       { uid: 3, from: 'supz@x.com', attachments: null },
       { uid: 4, from: 'supz@x.com', attachments: [{ filename: 'm.xlsx', content: makeXlsx([['Produit', 'Prix HT'], ['Zorglub bio', '5']]) }] },
     ];
-    const r = await runInboundCycle({ fetchFn });
+    const r = await runInboundCycle({ fetchFn, sendAlertFn: async () => ({}) });
     expect(r.processed).toBe(2);
     expect(r.matched).toBe(1);
   });
@@ -114,7 +120,7 @@ describe('runInboundCycle', () => {
       subject: 'Mercuriale',
       text: '',
       attachments: [{ filename: 'm.xlsx', content: makeXlsx([
-        ['Tarifs FoodFlow — Restaurant: BistrotPi (FF-BPI-2)'],
+        ['Tarifs FoodFlow — référence : FF-BPI-2'],
         [''],
         ['Produit', 'Unité', 'Prix HT'],
         ['Splazmagork bleu', 'kg', '9,90'],
@@ -147,15 +153,98 @@ describe('runInboundCycle', () => {
     expect(row).toBeTruthy();
   });
 
-  test('no match: forwards alert to admin via sendAlertFn', async () => {
-    const alerts = [];
+  test('content match auto-creates supplier from "Fournisseur" column when none exists', async () => {
+    // No integration, no existing "Foodflow" supplier on TestRestoSuite
+    // — restaurant matches by name in subject, supplier by Excel column.
     const fetchFn = async () => [{
       uid: 200,
+      from: 'anyone@can-send-this.com',
+      subject: 'Mercuriale TestRestoSuite',
+      text: 'Voici la mercuriale pour TestRestoSuite (référence client : 89764)',
+      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
+        ['Désignation', 'Fournisseur', 'Unité', 'Prix HT'],
+        ['Quibblesnort', 'Foodflow', 'kg', '12,80'],
+        ['Wibblepop', 'Foodflow', 'kg', '4,40'],
+      ]) }],
+    }];
+    const r = await runInboundCycle({ fetchFn });
+    expect(r.matched).toBe(1);
+    expect(r.suppliers_created).toBe(1);
+    expect(r.items_upserted).toBe(2);
+
+    const supplier = get(
+      `SELECT id, name FROM suppliers WHERE restaurant_id = 4245 AND LOWER(name) = 'foodflow'`
+    );
+    expect(supplier).toBeTruthy();
+
+    const rows = db.prepare(
+      `SELECT product_name FROM supplier_catalog WHERE restaurant_id = 4245 AND supplier_id = ? ORDER BY product_name`
+    ).all(supplier.id);
+    expect(rows.map(r => r.product_name)).toEqual(['Quibblesnort', 'Wibblepop']);
+  });
+
+  test('second mail with same supplier name reuses existing row (no double-create)', async () => {
+    const fetchFn = async () => [{
+      uid: 201,
+      from: 'still-anyone@can-send.com',
+      subject: 'Mercuriale TestRestoSuite — semaine 19',
+      text: 'pour TestRestoSuite',
+      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
+        ['Désignation', 'Fournisseur', 'Unité', 'Prix HT'],
+        ['Glomboflux', 'Foodflow', 'kg', '6,60'],
+      ]) }],
+    }];
+    const before = db.prepare(
+      `SELECT COUNT(*) AS n FROM suppliers WHERE restaurant_id = 4245 AND LOWER(name) = 'foodflow'`
+    ).get();
+    const r = await runInboundCycle({ fetchFn });
+    expect(r.matched).toBe(1);
+    expect(r.suppliers_created).toBe(0);
+    const after = db.prepare(
+      `SELECT COUNT(*) AS n FROM suppliers WHERE restaurant_id = 4245 AND LOWER(name) = 'foodflow'`
+    ).get();
+    expect(after.n).toBe(before.n);
+  });
+
+  test('content match wins over legacy sender — no double-import to TestZ', async () => {
+    // Sender is supz@x.com (matches TestZ supplier 9001 in legacy fallback)
+    // BUT body says "pour TestRestoSuite" → must route to TestRestoSuite,
+    // NOT TestZ. Catches the regression where step 1 fell through to step 2.
+    const before = db.prepare(
+      `SELECT COUNT(*) AS n FROM supplier_catalog WHERE restaurant_id = 4242 AND product_name = 'Plumblegrunt'`
+    ).get();
+    const fetchFn = async () => [{
+      uid: 202,
+      from: 'supz@x.com',
+      subject: 'Mercuriale',
+      text: 'pour TestRestoSuite',
+      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
+        ['Désignation', 'Fournisseur', 'Unité', 'Prix HT'],
+        ['Plumblegrunt', 'Foodflow', 'kg', '7,77'],
+      ]) }],
+    }];
+    const r = await runInboundCycle({ fetchFn });
+    expect(r.matched).toBe(1);
+    const after = db.prepare(
+      `SELECT COUNT(*) AS n FROM supplier_catalog WHERE restaurant_id = 4242 AND product_name = 'Plumblegrunt'`
+    ).get();
+    expect(after.n).toBe(before.n);
+    const trsRow = get(
+      `SELECT product_name FROM supplier_catalog WHERE restaurant_id = 4245 AND product_name = 'Plumblegrunt'`
+    );
+    expect(trsRow).toBeTruthy();
+  });
+
+  test('no match: forwards alert with extracted identifiers to admin', async () => {
+    const alerts = [];
+    const fetchFn = async () => [{
+      uid: 300,
       from: 'someone@unknown.com',
       subject: 'Mercuriale mystère',
-      text: 'Aucun identifiant ici',
+      text: 'Restaurant : NotARealRestaurant\nID: 99999',
       attachments: [{ filename: 'm.xlsx', content: makeXlsx([
-        ['Produit', 'Prix HT'], ['Foo', '1,00'],
+        ['Désignation', 'Fournisseur', 'Prix HT'],
+        ['Foo', 'GhostSupplier', '1,00'],
       ]) }],
     }];
     const r = await runInboundCycle({
@@ -168,26 +257,12 @@ describe('runInboundCycle', () => {
     expect(alerts).toHaveLength(1);
     expect(alerts[0].to).toBe('barbierpaulaymeric@gmail.com');
     expect(alerts[0].subject).toMatch(/mercuriale|rattach|match/i);
-    expect(String(alerts[0].text || alerts[0].html)).toContain('someone@unknown.com');
-  });
-
-  test('legacy sender match still works (no identifiers, sender → suppliers.email)', async () => {
-    const fetchFn = async () => [{
-      uid: 300,
-      from: 'supz@x.com',
-      subject: 'Mercuriale',
-      text: '',
-      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
-        ['Produit', 'Unité', 'Prix HT'],
-        ['Wibblepop', 'kg', '2,00'],
-      ]) }],
-    }];
-    const r = await runInboundCycle({ fetchFn });
-    expect(r.matched).toBe(1);
-    const row = get(
-      `SELECT product_name FROM supplier_catalog WHERE supplier_id = 9001 AND restaurant_id = 4242 AND product_name = 'Wibblepop'`
-    );
-    expect(row).toBeTruthy();
+    const body = String(alerts[0].text || alerts[0].html);
+    expect(body).toContain('someone@unknown.com');
+    expect(body).toContain('NotARealRestaurant');
+    expect(body).toContain('99999');
+    expect(body).toContain('GhostSupplier');
+    expect(body).toMatch(/identifiants? extraits?/i);
   });
 });
 

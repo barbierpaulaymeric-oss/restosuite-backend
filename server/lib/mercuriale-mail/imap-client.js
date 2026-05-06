@@ -109,6 +109,12 @@ async function fetchUnseen({ markSeen = true } = {}) {
           from: fromAddr,
           subject: parsed.subject || '',
           date: parsed.date || new Date(),
+          // text + html flow through to match-restaurant so content matching
+          // (restaurant name in body, account email in body, "référence
+          // client : 89764" external_id) can fire on real-world FoodFlow
+          // emails where the sender is a shared address.
+          text: parsed.text || '',
+          html: parsed.html || '',
           attachments: (parsed.attachments || []).map(a => ({
             filename: a.filename || '',
             content: a.content,

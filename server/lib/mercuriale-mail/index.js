@@ -1,12 +1,22 @@
 'use strict';
 
 // Orchestrator for the email-based mercuriale flow.
-//   runInboundCycle({ fetchFn? })   — pulls UNSEEN emails, matches sender to a
-//                                     supplier across all restaurants, upserts
-//                                     items into supplier_catalog.
+//   runInboundCycle({ fetchFn? })   — pulls UNSEEN emails, identifies the
+//                                     destination restaurant + supplier from
+//                                     the mail content (subject/body/Excel),
+//                                     auto-creating the supplier row when a
+//                                     restaurant is matched but the supplier
+//                                     is unknown, then upserts items into
+//                                     supplier_catalog.
 //   dispatchOrderEmail({ rid, supplier_id, po_id, sendFn? })
 //                                   — builds an XLSX from the PO + integration
 //                                     metadata, sends it to the supplier.
+//
+// Routing philosophy: WHO sent the mail is a fallback signal — WHAT's in the
+// mail (restaurant name / account email / external_id / supplier name in
+// the "Fournisseur" Excel column) is canonical. FoodFlow ships from one
+// shared address for many tenants and end users can forward their own
+// mercuriale, so sender-only routing is not enough.
 //
 // fetchFn / sendFn are injectable so tests don't need a live IMAP/SMTP server.
 // Production callers omit them; the wrappers in ./imap-client and ./smtp-client
@@ -15,7 +25,7 @@
 const { db, get, all, run } = require('../../db');
 const { processInbound, pickAttachment } = require('./process-inbound');
 const { buildOrderXlsx } = require('./build-outbound');
-const { matchRestaurant } = require('./match-restaurant');
+const { matchRestaurant, extractSupplierNamesFromXlsx } = require('./match-restaurant');
 
 const ADMIN_ALERT_EMAIL = 'barbierpaulaymeric@gmail.com';
 
@@ -55,7 +65,44 @@ function dbLookups() {
   };
 }
 
-function buildUnmatchedAlert(email) {
+// Resolve the supplier from the Excel "Fournisseur" column (case-insensitive
+// name match against suppliers WHERE restaurant_id = ?). Auto-creates a new
+// supplier row when no name matches, so a fresh tenant receiving its first
+// mercuriale doesn't bounce off an alert. Returns null only when the Excel
+// has no "Fournisseur" values at all.
+function resolveOrCreateSupplier(restaurantId, supplierNames) {
+  if (!supplierNames || !supplierNames.length) return null;
+  for (const name of supplierNames) {
+    const hit = get(
+      'SELECT id FROM suppliers WHERE LOWER(name) = LOWER(?) AND restaurant_id = ?',
+      [name, restaurantId]
+    );
+    if (hit && hit.id) {
+      return { id: hit.id, name, autoCreated: false };
+    }
+  }
+  const newName = supplierNames[0].slice(0, 120);
+  const info = run(
+    'INSERT INTO suppliers (restaurant_id, name) VALUES (?, ?)',
+    [restaurantId, newName]
+  );
+  return { id: info.lastInsertRowid, name: newName, autoCreated: true };
+}
+
+function formatIdentifiersBlock(identifiers, supplierResolution) {
+  const ids = identifiers || {};
+  const lines = ['--- Identifiants extraits ---'];
+  lines.push(`Noms de restaurant : ${(ids.names || []).join(', ') || '(aucun)'}`);
+  lines.push(`Emails : ${(ids.emails || []).join(', ') || '(aucun)'}`);
+  lines.push(`external_id / références : ${(ids.externalIds || []).join(', ') || '(aucun)'}`);
+  lines.push(`Fournisseurs (colonne Excel) : ${(ids.supplierNames || []).join(', ') || '(aucun)'}`);
+  if (supplierResolution) {
+    lines.push(`Résolution fournisseur : ${supplierResolution}`);
+  }
+  return lines.join('\n');
+}
+
+function buildUnmatchedAlert(email, identifiers) {
   const subject = email.subject ? String(email.subject) : '(sans objet)';
   const from = email.from ? String(email.from) : '(expéditeur inconnu)';
   const date = email.date ? new Date(email.date).toISOString() : '(sans date)';
@@ -73,6 +120,8 @@ function buildUnmatchedAlert(email) {
       `Sujet : ${subject}`,
       `Date : ${date}`,
       `Pièce jointe : ${attachmentName}`,
+      ``,
+      formatIdentifiersBlock(identifiers, null),
       ``,
       `--- Contenu de l'email ---`,
       body,
@@ -181,50 +230,82 @@ async function runInboundCycle({ fetchFn, sendAlertFn } = {}) {
     return sendPlainEmail(args);
   });
   const emails = await fetcher();
-  const result = { processed: 0, matched: 0, items_upserted: 0, unmatched_alerts: 0, errors: [] };
+  const result = {
+    processed: 0,
+    matched: 0,
+    items_upserted: 0,
+    suppliers_created: 0,
+    unmatched_alerts: 0,
+    errors: [],
+  };
 
   for (const email of emails) {
     result.processed++;
 
-    // Step 1: try identifier-based match (external_id, account email,
-    // restaurant name found in subject/body/Excel banner). FoodFlow and
-    // similar wholesalers send from one shared address for many clients,
-    // so the sender alone can't pick the right tenant.
     const att = pickAttachment(email.attachments);
     const excelBuffer = att && Buffer.isBuffer(att.content) ? att.content : null;
+
+    // Step 1: content-based restaurant match (name → email → external_id).
     let match = null;
     try {
       match = matchRestaurant({ email, excelBuffer, lookups: dbLookups() });
     } catch (e) {
-      result.errors.push({ uid: email.uid, error: e.message });
+      result.errors.push({ uid: email.uid, error: `match: ${e.message}` });
     }
+    const identifiers = (match && match.identifiers) || {
+      externalIds: [], emails: [], names: [], supplierNames: [],
+    };
 
     if (match && match.restaurantId) {
-      try {
-        const out = processInbound({
-          email,
-          restaurantId: match.restaurantId,
-          lookupSupplier: (sender, rid) => match.supplierId
-            ? { id: match.supplierId }
-            : defaultLookupSupplier(sender, rid),
-        });
-        if (out.ok) {
-          const n = upsertCatalog(match.restaurantId, out.supplierId, out.items);
-          result.items_upserted += n;
-          result.matched++;
-          console.log(
-            `📧 Mercuriale matched uid=${email.uid} restaurant=${match.restaurantId}`
-              + ` via ${match.matchedBy}=${match.matchedValue}`
-              + ` supplier=${out.supplierId} items=${Number(n)}`
-          );
-          continue;
+      // Step 2: resolve the supplier. external_id matches piggyback the
+      // supplier_integrations.supplier_id; otherwise look up by name in the
+      // Excel "Fournisseur" column (auto-create if absent).
+      let supplierId = match.supplierId || null;
+      let supplierMatchedBy = match.supplierId ? 'integration' : null;
+      let supplierResolution = null;
+
+      if (!supplierId) {
+        try {
+          const supRes = resolveOrCreateSupplier(match.restaurantId, identifiers.supplierNames);
+          if (supRes) {
+            supplierId = supRes.id;
+            supplierMatchedBy = supRes.autoCreated ? 'auto_created' : 'name';
+            supplierResolution = `${supplierMatchedBy}=${supRes.name}`;
+            if (supRes.autoCreated) result.suppliers_created++;
+          }
+        } catch (e) {
+          result.errors.push({ uid: email.uid, error: `supplier_resolve: ${e.message}` });
         }
-      } catch (e) {
-        result.errors.push({ uid: email.uid, error: e.message });
+      } else {
+        supplierResolution = `integration supplier_id=${supplierId}`;
+      }
+
+      if (supplierId) {
+        try {
+          const out = processInbound({
+            email,
+            restaurantId: match.restaurantId,
+            supplierId,
+          });
+          if (out.ok) {
+            const n = upsertCatalog(match.restaurantId, supplierId, out.items);
+            result.items_upserted += n;
+            result.matched++;
+            console.log(
+              `📧 Mercuriale matched uid=${email.uid} restaurant=${match.restaurantId}`
+                + ` via ${match.matchedBy}=${match.matchedValue}`
+                + ` supplier=${supplierId} (${supplierMatchedBy})`
+                + ` items=${Number(n)}`
+            );
+            continue;
+          }
+        } catch (e) {
+          result.errors.push({ uid: email.uid, error: e.message });
+        }
       }
     }
 
-    // Step 2: legacy fallback — sender email → suppliers.email across all
+    // Step 3: legacy fallback — sender email → suppliers.email across all
     // restaurants. Single-tenant installs and pre-existing flows still rely
     // on this path.
     let legacyHit = false;
@@ -259,14 +340,21 @@ async function runInboundCycle({ fetchFn, sendAlertFn } = {}) {
     }
     if (legacyHit) continue;
 
-    // Step 3: nothing matched — alert the platform admin so the routing
-    // mapping can be added (or to flag the email as junk).
+    // Step 4: nothing matched — alert the platform admin so the routing
+    // mapping can be added (or to flag the email as junk). Identifiers
+    // included so PA can paste them directly into supplier_integrations or
+    // create the missing restaurant/supplier rows.
     try {
-      await alerter(buildUnmatchedAlert(email));
+      await alerter(buildUnmatchedAlert(email, identifiers));
       result.unmatched_alerts++;
       console.warn(
         `📧 Mercuriale unmatched uid=${email.uid} from=${email.from}`
-          + ` subject="${(email.subject || '').slice(0, 80)}" — alert sent`
+          + ` subject="${(email.subject || '').slice(0, 80)}"`
+          + ` ids={names:[${(identifiers.names || []).join('|')}],`
+          + `emails:[${(identifiers.emails || []).join('|')}],`
+          + `ext:[${(identifiers.externalIds || []).join('|')}],`
+          + `suppliers:[${(identifiers.supplierNames || []).join('|')}]}`
+          + ` — alert sent`
       );
     } catch (e) {
       result.errors.push({ uid: email.uid, error: `alert: ${e.message}` });

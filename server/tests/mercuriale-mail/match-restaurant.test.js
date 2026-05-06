@@ -8,6 +8,7 @@ const xlsx = require('xlsx');
 const {
   extractIdentifiers,
   extractExcelBannerText,
+  extractSupplierNamesFromXlsx,
   matchRestaurant,
 } = require('../../lib/mercuriale-mail/match-restaurant');
 
@@ -35,6 +36,13 @@ describe('extractIdentifiers', () => {
     expect(r.externalIds.sort()).toEqual(['FF-ABC123', 'FF-XYZ-7']);
   });
 
+  test('extracts numeric external_ids labelled "référence client : 89764" / "ID 12345"', () => {
+    const r = extractIdentifiers({
+      text: 'Voici la mercuriale pour TestRestoSuite (référence client : 89764) email : test@x.com\nID: 41200',
+    });
+    expect(r.externalIds).toEqual(expect.arrayContaining(['89764', '41200']));
+  });
+
   test('extracts emails from body, lowercased, deduped, ignores mercuriale@/no-reply@', () => {
     const r = extractIdentifiers({
       subject: 'mercuriale@restosuite.fr',
@@ -54,6 +62,15 @@ describe('extractIdentifiers', () => {
     ]));
   });
 
+  test('extracts name from "pour X" with no separator (real FoodFlow body)', () => {
+    const r = extractIdentifiers({
+      text: 'Voici la mercuriale pour TestRestoSuite (référence client : 89764) email : barbierpaulaymeric@gmail.com',
+    });
+    expect(r.names).toContain('TestRestoSuite');
+    expect(r.emails).toContain('barbierpaulaymeric@gmail.com');
+    expect(r.externalIds).toContain('89764');
+  });
+
   test('handles HTML body by stripping tags', () => {
     const r = extractIdentifiers({
       html: '<p>Restaurant: <b>TestRestoSuite</b></p><p>ID: FF-99</p>',
@@ -67,6 +84,13 @@ describe('extractIdentifiers', () => {
       text: 'établissement: Café des Sports',
     });
     expect(r.names).toContain('Café des Sports');
+  });
+
+  test('drops generic stopwords like "Pour information"', () => {
+    const r = extractIdentifiers({
+      text: 'Pour information : tarifs en hausse cette semaine',
+    });
+    expect(r.names).not.toContain('information');
   });
 });
 
@@ -95,6 +119,44 @@ describe('extractExcelBannerText', () => {
   });
 });
 
+// ─── extractSupplierNamesFromXlsx ────────────────────────────────────
+
+describe('extractSupplierNamesFromXlsx', () => {
+  test('extracts distinct values from "Fournisseur" column (case-insensitive)', () => {
+    const buf = makeXlsx([
+      ['Désignation', 'Fournisseur', 'Prix HT'],
+      ['Tomate', 'Foodflow', '3,20'],
+      ['Oignon', 'foodflow', '1,80'],
+      ['Carotte', 'PassionFroid', '2,40'],
+    ]);
+    const names = extractSupplierNamesFromXlsx(buf);
+    expect(names).toEqual(expect.arrayContaining(['Foodflow', 'PassionFroid']));
+  });
+
+  test('skips the header row above the supplier column', () => {
+    const buf = makeXlsx([
+      ['Tarifs Q2 — exclusif TestRestoSuite'],
+      ['Désignation', 'Fournisseur', 'Prix'],
+      ['Burrata', 'Metro France', '4,90'],
+    ]);
+    const names = extractSupplierNamesFromXlsx(buf);
+    expect(names).toEqual(['Metro France']);
+  });
+
+  test('returns empty array when no supplier column exists', () => {
+    const buf = makeXlsx([
+      ['Désignation', 'Catégorie', 'Prix'],
+      ['Tomate', 'Légumes', '3,20'],
+    ]);
+    expect(extractSupplierNamesFromXlsx(buf)).toEqual([]);
+  });
+
+  test('returns empty array on null/garbage buffer', () => {
+    expect(extractSupplierNamesFromXlsx(null)).toEqual([]);
+    expect(extractSupplierNamesFromXlsx(Buffer.from('not-an-xlsx'))).toEqual([]);
+  });
+});
+
 // ─── matchRestaurant ─────────────────────────────────────────────────
 
 describe('matchRestaurant', () => {
@@ -104,36 +166,39 @@ describe('matchRestaurant', () => {
     byName: () => null,
   };
 
-  test('returns null when nothing matches', () => {
+  test('returns identifiers + null restaurantId when nothing matches', () => {
     const r = matchRestaurant({
       email: { subject: 'Hello', text: 'no identifiers here', from: 'x@y.com' },
       lookups: EMPTY_LOOKUPS,
     });
-    expect(r).toBeNull();
+    expect(r.restaurantId).toBeNull();
+    expect(r.identifiers).toEqual({
+      externalIds: [], emails: [], names: [], supplierNames: [],
+    });
   });
 
-  test('matches by external_id (FoodFlow) — priority 1', () => {
+  test('matches by restaurant name FIRST (priority 1) — beats sender, beats external_id', () => {
     const r = matchRestaurant({
       email: {
-        subject: 'Mercuriale FF-12345',
-        text: 'Restaurant: TestRestoSuite, contact: chef@x.com',
-        from: 'julie@foodflow.com',
+        subject: 'Mercuriale TestRestoSuite',
+        text: 'Voici la mercuriale pour TestRestoSuite (référence client : 89764) email : owner@x.com',
+        from: 'shared@foodflow.com',
       },
       lookups: {
-        byExternalId: (id) => id === 'FF-12345' ? { restaurantId: 7, supplierId: 33 } : null,
-        byEmail: () => ({ restaurantId: 9 }),
-        byName: () => ({ restaurantId: 11 }),
+        byExternalId: (id) => id === '89764' ? { restaurantId: 99, supplierId: 33 } : null,
+        byEmail: (e) => e === 'owner@x.com' ? { restaurantId: 88 } : null,
+        byName: (n) => n === 'TestRestoSuite' ? { restaurantId: 7 } : null,
       },
     });
-    expect(r).toEqual({
-      restaurantId: 7,
-      supplierId: 33,
-      matchedBy: 'external_id',
-      matchedValue: 'FF-12345',
-    });
+    expect(r.restaurantId).toBe(7);
+    expect(r.matchedBy).toBe('name');
+    expect(r.matchedValue).toBe('TestRestoSuite');
+    expect(r.identifiers.names).toContain('TestRestoSuite');
+    expect(r.identifiers.emails).toContain('owner@x.com');
+    expect(r.identifiers.externalIds).toContain('89764');
   });
 
-  test('matches by accounts email — priority 2 when no external_id hit', () => {
+  test('matches by account email (priority 2) when name miss', () => {
     const r = matchRestaurant({
       email: {
         subject: 'Mercuriale',
@@ -146,31 +211,27 @@ describe('matchRestaurant', () => {
         byName: () => null,
       },
     });
-    expect(r).toEqual({
-      restaurantId: 7,
-      matchedBy: 'email',
-      matchedValue: 'barbierpaulaymeric@gmail.com',
-    });
+    expect(r.restaurantId).toBe(7);
+    expect(r.matchedBy).toBe('email');
+    expect(r.matchedValue).toBe('barbierpaulaymeric@gmail.com');
   });
 
-  test('matches by restaurant name — priority 3 when no external_id and no email', () => {
+  test('matches by external_id (priority 3) when name + email miss', () => {
     const r = matchRestaurant({
       email: {
-        subject: 'Mercuriale',
-        text: 'Restaurant: TestRestoSuite',
+        subject: 'Mercuriale FF-12345',
+        text: '',
         from: 'julie@foodflow.com',
       },
       lookups: {
-        byExternalId: () => null,
+        byExternalId: (id) => id === 'FF-12345' ? { restaurantId: 7, supplierId: 33 } : null,
         byEmail: () => null,
-        byName: (n) => n === 'TestRestoSuite' ? { restaurantId: 7 } : null,
+        byName: () => null,
       },
     });
-    expect(r).toEqual({
-      restaurantId: 7,
-      matchedBy: 'name',
-      matchedValue: 'TestRestoSuite',
-    });
+    expect(r.restaurantId).toBe(7);
+    expect(r.supplierId).toBe(33);
+    expect(r.matchedBy).toBe('external_id');
   });
 
   test('uses Excel banner content when subject/body have no identifiers', () => {
@@ -186,15 +247,25 @@ describe('matchRestaurant', () => {
       lookups: {
         byExternalId: (id) => id === 'FF-12345' ? { restaurantId: 7, supplierId: 33 } : null,
         byEmail: () => null,
-        byName: () => null,
+        byName: (n) => n === 'TestRestoSuite' ? { restaurantId: 7 } : null,
       },
     });
-    expect(r).toEqual({
-      restaurantId: 7,
-      supplierId: 33,
-      matchedBy: 'external_id',
-      matchedValue: 'FF-12345',
+    // name comes first now
+    expect(r.restaurantId).toBe(7);
+    expect(r.matchedBy).toBe('name');
+  });
+
+  test('exposes Fournisseur column values in identifiers.supplierNames', () => {
+    const buf = makeXlsx([
+      ['Désignation', 'Fournisseur', 'Prix HT'],
+      ['Tomate', 'Foodflow', '3,20'],
+    ]);
+    const r = matchRestaurant({
+      email: { subject: 'Mercuriale', text: '', from: 'noone@x.com' },
+      excelBuffer: buf,
+      lookups: EMPTY_LOOKUPS,
     });
+    expect(r.identifiers.supplierNames).toEqual(['Foodflow']);
   });
 
   test('skips empty/missing fields without crashing', () => {
@@ -202,6 +273,6 @@ describe('matchRestaurant', () => {
       email: {},
       lookups: EMPTY_LOOKUPS,
     });
-    expect(r).toBeNull();
+    expect(r.restaurantId).toBeNull();
   });
 });
