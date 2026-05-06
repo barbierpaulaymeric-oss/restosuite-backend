@@ -1228,4 +1228,130 @@ router.get('/covers', (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// GET /api/analytics/mercuriale-catalog
+// Catalog browser: suppliers → categories → products, with the latest
+// price-change notification per product so the UI can render trend arrows.
+// ═══════════════════════════════════════════
+router.get('/mercuriale-catalog', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+
+    const products = all(`
+      SELECT sc.id, sc.supplier_id, sc.product_name, sc.category, sc.unit,
+             sc.price, sc.sku, sc.packaging, sc.tva_rate, sc.ingredient_id,
+             sc.available, sc.updated_at,
+             s.name as supplier_name
+      FROM supplier_catalog sc
+      JOIN suppliers s ON s.id = sc.supplier_id AND s.restaurant_id = ?
+      WHERE sc.restaurant_id = ?
+        AND COALESCE(sc.available, 1) != 0
+      ORDER BY s.name, sc.category, sc.product_name
+    `, [rid, rid]);
+
+    // Latest price change per (supplier_id, LOWER(product_name)) by created_at.
+    // We pull ordered then keep first occurrence per key in JS — simpler and
+    // correct even when rows are backfilled out of insert order.
+    const allChanges = all(`
+      SELECT pcn.supplier_id, LOWER(pcn.product_name) as key,
+             pcn.old_price, pcn.new_price, pcn.created_at, pcn.change_type
+      FROM price_change_notifications pcn
+      WHERE pcn.restaurant_id = ?
+      ORDER BY pcn.created_at DESC, pcn.id DESC
+    `, [rid]);
+    const seenKey = new Set();
+    const changes = [];
+    for (const c of allChanges) {
+      const k = c.supplier_id + '|' + c.key;
+      if (seenKey.has(k)) continue;
+      seenKey.add(k);
+      changes.push(c);
+    }
+
+    const changeIndex = new Map();
+    for (const c of changes) {
+      changeIndex.set(c.supplier_id + '|' + c.key, c);
+    }
+
+    // Group by supplier → category
+    const supplierMap = new Map();
+    let lastUpdate = null;
+
+    for (const p of products) {
+      const key = p.supplier_id + '|' + (p.product_name || '').toLowerCase();
+      const lastChange = changeIndex.get(key) || null;
+      let trend = null;
+      let pct = null;
+      if (lastChange && lastChange.old_price > 0 && lastChange.new_price != null) {
+        const diff = lastChange.new_price - lastChange.old_price;
+        pct = Math.round((diff / lastChange.old_price) * 1000) / 10;
+        trend = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
+      }
+
+      if (p.updated_at && (!lastUpdate || p.updated_at > lastUpdate)) {
+        lastUpdate = p.updated_at;
+      }
+
+      if (!supplierMap.has(p.supplier_id)) {
+        supplierMap.set(p.supplier_id, {
+          id: p.supplier_id,
+          name: p.supplier_name,
+          products_count: 0,
+          last_update: null,
+          categories: new Map()
+        });
+      }
+      const sup = supplierMap.get(p.supplier_id);
+      sup.products_count++;
+      if (p.updated_at && (!sup.last_update || p.updated_at > sup.last_update)) {
+        sup.last_update = p.updated_at;
+      }
+
+      const cat = p.category && p.category.trim() ? p.category : 'Divers';
+      if (!sup.categories.has(cat)) sup.categories.set(cat, []);
+      sup.categories.get(cat).push({
+        id: p.id,
+        product_name: p.product_name,
+        sku: p.sku || null,
+        unit: p.unit,
+        price: p.price,
+        packaging: p.packaging || null,
+        tva_rate: p.tva_rate || null,
+        ingredient_id: p.ingredient_id || null,
+        updated_at: p.updated_at,
+        last_change: lastChange ? {
+          old_price: lastChange.old_price,
+          new_price: lastChange.new_price,
+          change_pct: pct,
+          trend,
+          date: lastChange.created_at,
+          type: lastChange.change_type
+        } : null
+      });
+    }
+
+    const suppliers = Array.from(supplierMap.values()).map(s => ({
+      id: s.id,
+      name: s.name,
+      products_count: s.products_count,
+      last_update: s.last_update,
+      categories: Array.from(s.categories.entries())
+        .sort((a, b) => a[0].localeCompare(b[0], 'fr'))
+        .map(([name, items]) => ({ name, items }))
+    })).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+
+    res.json({
+      suppliers,
+      totals: {
+        suppliers: suppliers.length,
+        products: products.length,
+        last_update: lastUpdate
+      }
+    });
+  } catch (e) {
+    console.error('Mercuriale catalog error:', e);
+    res.status(500).json({ error: 'Erreur catalogue mercuriale' });
+  }
+});
+
 module.exports = router;

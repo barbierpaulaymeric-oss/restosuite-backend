@@ -1,9 +1,12 @@
-// Bumped 2026-05-06 (v33): PO form — Unit & Prix unitaire columns are now
-// read-only chips (slightly darker beige, no -/+ chrome) since both values
-// come from the supplier catalog/mercuriale and shouldn't be edited at order
-// time. Only Quantité remains editable.
-// (v32 was Mercuriale import accepts unmatched products.)
-const CACHE_NAME = 'restosuite-v33';
+// Bumped 2026-05-06 (v34): Mercuriale page redesign — replaces useless
+// "ingredients from fiches techniques" list with a supplier-organized
+// catalog browser (Fournisseurs → Catégories → Produits) backed by the
+// supplier_catalog table. Adds GET /api/analytics/mercuriale-catalog,
+// search filter, expandable supplier sections, trend arrows from
+// price_change_notifications, and a top summary line.
+// (v33 was PO form — read-only Unit & Prix unitaire chips. v32 was
+// Mercuriale import accepts unmatched products.)
+const CACHE_NAME = 'restosuite-v34';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

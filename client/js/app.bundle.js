@@ -26661,217 +26661,271 @@ async function renderMercuriale() {
   app.innerHTML = `
     <div class="page-header">
       <div>
-        <a href="#/analytics" class="btn btn-secondary btn-sm">\u2190 Analytics</a>
-        <h1 style="margin-top:4px"><i data-lucide="bar-chart-2" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Mercuriale</h1>
+        <a href="#/analytics" class="back-link" style="display:inline-flex;align-items:center;gap:4px;color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm);margin-bottom:var(--space-1)">
+          <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Analytics
+        </a>
+        <h1 style="margin-top:4px"><i data-lucide="book-open" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Mercuriale</h1>
+        <p class="text-secondary" style="margin:0;font-size:var(--text-sm)">Catalogue produits r\xE9f\xE9renc\xE9s par fournisseur</p>
       </div>
       <a href="#/import-mercuriale" class="btn btn-primary"><i data-lucide="camera" style="width:16px;height:16px"></i> Scanner une mercuriale</a>
     </div>
 
-    <div id="price-alerts-section">
-      <h2 style="margin-bottom:var(--space-3)"><i data-lucide="alert-triangle" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Alertes prix</h2>
-      <div id="price-alerts-list">
-        <div class="skeleton skeleton-card"></div>
-      </div>
+    <div id="merc-summary" class="card" style="padding:var(--space-3);margin-bottom:var(--space-4);display:flex;flex-wrap:wrap;gap:var(--space-4);align-items:center">
+      <div class="skeleton" style="height:24px;width:100%"></div>
     </div>
 
-    <div style="margin-top:var(--space-5)">
-      <h2 style="margin-bottom:var(--space-3)"><i data-lucide="clipboard-list" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>Tous les ingr\xE9dients</h2>
-      <div id="mercuriale-table">
+    <section style="margin-bottom:var(--space-5)">
+      <h2 style="margin-bottom:var(--space-3);display:flex;align-items:center;gap:6px">
+        <i data-lucide="alert-triangle" style="width:20px;height:20px"></i> Alertes prix
+      </h2>
+      <div id="merc-alerts">
         <div class="skeleton skeleton-card"></div>
       </div>
-    </div>
+    </section>
 
-    <div id="price-chart-modal" class="modal-overlay" style="display:none">
-      <div class="modal" style="max-width:600px">
-        <div class="modal-header">
-          <h3 id="chart-title">\xC9volution du prix</h3>
-          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('price-chart-modal').style.display='none'">\u2715</button>
-        </div>
-        <div id="price-chart-container" style="padding:var(--space-4)"></div>
-        <div style="padding:0 var(--space-4) var(--space-4);display:flex;gap:var(--space-2)">
-          <button class="btn btn-secondary btn-sm period-btn active" data-period="30d">30 jours</button>
-          <button class="btn btn-secondary btn-sm period-btn" data-period="90d">90 jours</button>
-          <button class="btn btn-secondary btn-sm period-btn" data-period="1y">1 an</button>
-        </div>
+    <section>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3);flex-wrap:wrap">
+        <h2 style="margin:0;display:flex;align-items:center;gap:6px">
+          <i data-lucide="building-2" style="width:20px;height:20px"></i> Fournisseurs
+        </h2>
+        <input type="search" id="merc-search" placeholder="Rechercher un produit\u2026" class="form-control" style="max-width:280px" data-ui="custom">
       </div>
+      <div id="merc-suppliers">
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card" style="margin-top:var(--space-2)"></div>
+      </div>
+    </section>
+  `;
+  if (window.lucide) lucide.createIcons();
+  let catalog = null;
+  let priceData = null;
+  try {
+    [catalog, priceData] = await Promise.all([
+      API.request("/analytics/mercuriale-catalog"),
+      API.request("/analytics/prices")
+    ]);
+  } catch (e) {
+    document.getElementById("merc-summary").innerHTML = '<div style="color:var(--color-danger)">Erreur de chargement</div>';
+    if (typeof showToast === "function") showToast("Erreur chargement mercuriale", "error");
+    return;
+  }
+  renderSummary(catalog.totals);
+  renderAlerts(priceData.recent_changes || []);
+  renderSuppliers(catalog.suppliers || []);
+  const search = document.getElementById("merc-search");
+  search.addEventListener("input", () => {
+    const q = search.value.trim().toLowerCase();
+    document.querySelectorAll(".merc-product-row").forEach((row) => {
+      const name = (row.dataset.name || "").toLowerCase();
+      row.style.display = !q || name.includes(q) ? "" : "none";
+    });
+    document.querySelectorAll(".merc-category").forEach((cat) => {
+      const visible = cat.querySelectorAll('.merc-product-row:not([style*="display: none"])').length;
+      cat.style.display = visible > 0 ? "" : "none";
+    });
+    document.querySelectorAll(".merc-supplier").forEach((sup) => {
+      const visible = sup.querySelectorAll('.merc-product-row:not([style*="display: none"])').length;
+      sup.style.display = !q || visible > 0 ? "" : "none";
+    });
+  });
+  if (window.lucide) lucide.createIcons();
+}
+function renderSummary(totals) {
+  const el = document.getElementById("merc-summary");
+  const supText = `${totals.suppliers} fournisseur${totals.suppliers > 1 ? "s" : ""}`;
+  const prodText = `${totals.products} produit${totals.products > 1 ? "s" : ""} r\xE9f\xE9renc\xE9${totals.products > 1 ? "s" : ""}`;
+  const updateText = totals.last_update ? `Derni\xE8re mise \xE0 jour: ${timeAgoFR(totals.last_update)}` : "Aucune mise \xE0 jour";
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:6px;font-weight:600">
+      <i data-lucide="building-2" style="width:18px;height:18px;color:var(--color-accent)"></i>
+      ${escapeHtml(supText)}
+    </div>
+    <span style="color:var(--text-tertiary)">\xB7</span>
+    <div style="display:flex;align-items:center;gap:6px;font-weight:600">
+      <i data-lucide="package" style="width:18px;height:18px;color:var(--color-accent)"></i>
+      ${escapeHtml(prodText)}
+    </div>
+    <span style="color:var(--text-tertiary)">\xB7</span>
+    <div style="display:flex;align-items:center;gap:6px;color:var(--text-secondary);font-size:var(--text-sm)">
+      <i data-lucide="clock" style="width:16px;height:16px"></i>
+      ${escapeHtml(updateText)}
     </div>
   `;
-  let alerts = [];
-  let ingredients = [];
-  try {
-    const results = await Promise.all([
-      API.request("/analytics/price-alerts"),
-      API.getIngredients()
-    ]);
-    alerts = results[0];
-    const ingredientsResponse = results[1];
-    ingredients = ingredientsResponse.ingredients || [];
-  } catch (e) {
-    showToast("Erreur chargement donn\xE9es", "error");
-  }
-  const alertsList = document.getElementById("price-alerts-list");
-  if (alerts.length === 0) {
-    alertsList.innerHTML = `<div class="card" style="padding:var(--space-3);text-align:center;color:var(--color-success)">
-      \u2705 Aucune variation significative d\xE9tect\xE9e
-    </div>`;
-  } else {
-    alertsList.innerHTML = alerts.map((a) => {
-      const isUp = a.variation_percent > 0;
-      const color = isUp ? "var(--color-danger)" : "var(--color-success)";
-      const arrow = isUp ? "\u2191" : "\u2193";
-      return `
-        <div class="card" style="padding:var(--space-3);margin-bottom:var(--space-2);border-left:4px solid ${color}">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <strong>${escapeHtml(a.ingredient_name)}</strong>
-              <span class="text-secondary text-sm"> \u2014 ${escapeHtml(a.supplier_name || "")}</span>
-            </div>
-            <div style="text-align:right">
-              <span style="color:${color};font-weight:600;font-size:1.1em">${arrow} ${Math.abs(a.variation_percent).toFixed(1)}%</span>
-              <div class="text-secondary text-sm">${a.current_price.toFixed(2)}\u20AC (moy: ${a.avg_price.toFixed(2)}\u20AC)</div>
-            </div>
-          </div>
-        </div>
-      `;
-    }).join("");
-  }
-  const enriched = [];
-  for (const ing of ingredients) {
-    const priceInfo = alerts.find((a) => a.ingredient_id === ing.id);
-    enriched.push({
-      id: ing.id,
-      name: ing.name,
-      category: ing.category,
-      current_price: priceInfo ? priceInfo.current_price : ing.price_per_unit || 0,
-      avg_price: priceInfo ? priceInfo.avg_price : null,
-      variation: priceInfo ? priceInfo.variation_percent : null,
-      supplier: priceInfo ? priceInfo.supplier_name : null
-    });
-  }
-  const tableDiv = document.getElementById("mercuriale-table");
-  if (enriched.length === 0) {
-    tableDiv.innerHTML = '<div class="empty-state"><p>Aucun ingr\xE9dient</p></div>';
-  } else {
-    tableDiv.innerHTML = `
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:0.9rem">
-          <thead>
-            <tr style="border-bottom:2px solid var(--color-border)">
-              <th style="text-align:left;padding:10px 6px">Ingr\xE9dient</th>
-              <th style="text-align:left;padding:10px 6px">Cat\xE9gorie</th>
-              <th style="text-align:right;padding:10px 6px">Prix actuel</th>
-              <th style="text-align:right;padding:10px 6px">Moy. 30j</th>
-              <th style="text-align:center;padding:10px 6px">Tendance</th>
-              <th style="text-align:center;padding:10px 6px">D\xE9tails</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${enriched.map((ing) => {
-      const trend = ing.variation == null ? "\u2192" : ing.variation > 2 ? "\u2191" : ing.variation < -2 ? "\u2193" : "\u2192";
-      const trendColor = trend === "\u2191" ? "var(--color-danger)" : trend === "\u2193" ? "var(--color-success)" : "var(--color-text-muted)";
-      return `
-                <tr style="border-bottom:1px solid var(--color-border)">
-                  <td style="padding:10px 6px"><strong>${escapeHtml(ing.name)}</strong></td>
-                  <td style="padding:10px 6px" class="text-secondary">${escapeHtml(ing.category || "\u2014")}</td>
-                  <td style="text-align:right;padding:10px 6px">${ing.current_price > 0 ? ing.current_price.toFixed(2) + "\u20AC" : "\u2014"}</td>
-                  <td style="text-align:right;padding:10px 6px">${ing.avg_price ? ing.avg_price.toFixed(2) + "\u20AC" : "\u2014"}</td>
-                  <td style="text-align:center;padding:10px 6px;color:${trendColor};font-size:1.3em;font-weight:bold">${trend}</td>
-                  <td style="text-align:center;padding:10px 6px">
-                    <button class="btn btn-secondary btn-sm btn-chart" data-id="${ing.id}" data-name="${escapeHtml(ing.name)}">\u{1F4C8}</button>
-                  </td>
-                </tr>
-              `;
-    }).join("")}
-          </tbody>
-        </table>
+  if (window.lucide) lucide.createIcons();
+}
+function renderAlerts(changes) {
+  const el = document.getElementById("merc-alerts");
+  if (!changes || changes.length === 0) {
+    el.innerHTML = `
+      <div class="card" style="padding:var(--space-3);text-align:center;color:var(--color-success);background:var(--bg-elevated)">
+        <i data-lucide="check-circle" style="width:18px;height:18px;vertical-align:middle"></i>
+        Aucune variation de prix r\xE9cente
       </div>
     `;
+    if (window.lucide) lucide.createIcons();
+    return;
   }
-  let currentChartIngredientId = null;
-  document.querySelectorAll(".btn-chart").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const id = parseInt(btn.dataset.id);
-      const name = btn.dataset.name;
-      currentChartIngredientId = id;
-      document.getElementById("chart-title").textContent = `\u{1F4C8} ${name}`;
-      document.getElementById("price-chart-modal").style.display = "flex";
-      document.querySelectorAll(".period-btn").forEach((b) => b.classList.remove("active"));
-      document.querySelector('.period-btn[data-period="30d"]').classList.add("active");
-      await loadChart(id, "30d");
-    });
-  });
-  document.querySelectorAll(".period-btn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      document.querySelectorAll(".period-btn").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      if (currentChartIngredientId) {
-        await loadChart(currentChartIngredientId, btn.dataset.period);
-      }
-    });
-  });
-  document.getElementById("price-chart-modal").addEventListener("click", (e) => {
-    if (e.target === e.currentTarget) e.target.style.display = "none";
-  });
-}
-async function loadChart(ingredientId, period) {
-  const container = document.getElementById("price-chart-container");
-  container.innerHTML = '<div class="skeleton" style="height:200px"></div>';
-  try {
-    const data = await API.request(`/analytics/price-trends?ingredient_id=${ingredientId}&period=${period}`);
-    if (!data || data.length === 0) {
-      container.innerHTML = '<p class="text-secondary" style="text-align:center;padding:var(--space-4)">Aucune donn\xE9e de prix pour cette p\xE9riode</p>';
-      return;
-    }
-    container.innerHTML = renderSVGChart(data);
-  } catch (e) {
-    container.innerHTML = '<p style="color:var(--color-danger);text-align:center">Erreur chargement donn\xE9es</p>';
-  }
-}
-function renderSVGChart(data) {
-  const W = 540, H = 220, PAD_L = 55, PAD_R = 15, PAD_T = 15, PAD_B = 35;
-  const chartW = W - PAD_L - PAD_R;
-  const chartH = H - PAD_T - PAD_B;
-  const prices = data.map((d) => d.price);
-  const minP = Math.min(...prices) * 0.95;
-  const maxP = Math.max(...prices) * 1.05;
-  const rangeP = maxP - minP || 1;
-  const dates = data.map((d) => new Date(d.date));
-  const minDate = Math.min(...dates);
-  const maxDate = Math.max(...dates);
-  const rangeDate = maxDate - minDate || 1;
-  const points = data.map((d, i) => {
-    const x = PAD_L + (dates[i] - minDate) / rangeDate * chartW;
-    const y = PAD_T + chartH - (d.price - minP) / rangeP * chartH;
-    return { x, y, price: d.price, date: d.date, supplier: d.supplier_name };
-  });
-  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
-  const yLabels = [];
-  for (let i = 0; i <= 4; i++) {
-    const val = minP + rangeP * i / 4;
-    const y = PAD_T + chartH - chartH * i / 4;
-    yLabels.push(`<text x="${PAD_L - 8}" y="${y + 4}" text-anchor="end" fill="var(--color-text-muted)" font-size="11">${val.toFixed(2)}\u20AC</text>`);
-    yLabels.push(`<line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" stroke="var(--color-border)" stroke-width="0.5" stroke-dasharray="4,4"/>`);
-  }
-  const xLabels = [];
-  const step = Math.max(1, Math.floor(data.length / 5));
-  for (let i = 0; i < data.length; i += step) {
-    const d = new Date(data[i].date);
-    const label = `${d.getDate()}/${d.getMonth() + 1}`;
-    xLabels.push(`<text x="${points[i].x}" y="${H - 5}" text-anchor="middle" fill="var(--color-text-muted)" font-size="11">${label}</text>`);
-  }
-  const circles = points.map(
-    (p) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="var(--color-accent)" stroke="#fff" stroke-width="1.5">
-      <title>${p.price.toFixed(2)}\u20AC \u2014 ${new Date(p.date).toLocaleDateString("fr-FR")}${p.supplier ? " (" + p.supplier + ")" : ""}</title>
-    </circle>`
-  ).join("");
-  return `
-    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;font-family:inherit">
-      ${yLabels.join("")}
-      ${xLabels.join("")}
-      <path d="${linePath}" fill="none" stroke="var(--color-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      ${circles}
-    </svg>
+  const sorted = [...changes].sort((a, b) => Math.abs(b.change_pct || 0) - Math.abs(a.change_pct || 0));
+  const top = sorted.slice(0, 5);
+  const rest = sorted.slice(5);
+  el.innerHTML = `
+    <div style="display:grid;gap:var(--space-2)" id="merc-alerts-grid">
+      ${top.map(renderAlertCard).join("")}
+      ${rest.length > 0 ? `
+        <details style="margin-top:var(--space-1)">
+          <summary style="cursor:pointer;color:var(--color-accent);font-size:var(--text-sm);user-select:none;padding:var(--space-2)">
+            Voir ${rest.length} variation${rest.length > 1 ? "s" : ""} de plus
+          </summary>
+          <div style="display:grid;gap:var(--space-2);margin-top:var(--space-2)">
+            ${rest.map(renderAlertCard).join("")}
+          </div>
+        </details>
+      ` : ""}
+    </div>
   `;
+  if (window.lucide) lucide.createIcons();
+}
+function renderAlertCard(c) {
+  const pct = Number(c.change_pct) || 0;
+  const isNew = c.old_price == null || c.old_price === 0;
+  const isUp = pct > 0;
+  const color = isNew ? "var(--color-info, var(--color-accent))" : isUp ? "var(--color-danger)" : pct < 0 ? "var(--color-success)" : "var(--text-tertiary)";
+  const iconName = isNew ? "sparkles" : isUp ? "trending-up" : pct < 0 ? "trending-down" : "minus";
+  const label = isNew ? "Nouveau" : `${isUp ? "+" : ""}${pct.toFixed(1)}%`;
+  const oldStr = c.old_price > 0 ? `${Number(c.old_price).toFixed(2)}\u20AC` : "\u2014";
+  const newStr = c.new_price != null ? `${Number(c.new_price).toFixed(2)}\u20AC` : "\u2014";
+  return `
+    <div class="card" style="padding:var(--space-3);border-left:3px solid ${color};display:flex;justify-content:space-between;align-items:center;gap:var(--space-3)">
+      <div style="min-width:0;flex:1">
+        <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(c.product || "\u2014")}</div>
+        <div style="color:var(--text-secondary);font-size:var(--text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${escapeHtml(c.supplier || "\u2014")} \xB7 ${timeAgoFR(c.date)}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="display:inline-flex;align-items:center;gap:4px;color:${color};font-weight:600">
+          <i data-lucide="${iconName}" style="width:16px;height:16px"></i>
+          ${escapeHtml(label)}
+        </div>
+        <div style="color:var(--text-secondary);font-size:var(--text-sm);font-variant-numeric:tabular-nums">
+          ${isNew ? newStr : `${oldStr} \u2192 ${newStr}`}
+        </div>
+      </div>
+    </div>
+  `;
+}
+function renderSuppliers(suppliers) {
+  const el = document.getElementById("merc-suppliers");
+  if (!suppliers || suppliers.length === 0) {
+    el.innerHTML = `
+      <div class="empty-state" style="text-align:center;padding:var(--space-6)">
+        <i data-lucide="package-x" style="width:40px;height:40px;color:var(--text-tertiary);margin-bottom:var(--space-2)"></i>
+        <p style="color:var(--text-secondary)">Aucun produit r\xE9f\xE9renc\xE9 pour le moment</p>
+        <a href="#/import-mercuriale" class="btn btn-primary" style="margin-top:var(--space-3)">
+          <i data-lucide="camera" style="width:16px;height:16px"></i> Scanner votre premi\xE8re mercuriale
+        </a>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+  const expandFirst = suppliers.length <= 2;
+  el.innerHTML = suppliers.map((sup, idx) => {
+    const open = expandFirst || idx === 0 ? "open" : "";
+    return `
+      <details class="merc-supplier card" ${open} style="padding:0;margin-bottom:var(--space-3);overflow:hidden">
+        <summary style="padding:var(--space-3);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:var(--space-2);background:var(--bg-elevated);border-bottom:1px solid var(--border-light)">
+          <div style="display:flex;align-items:center;gap:var(--space-2);min-width:0;flex:1">
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--color-accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">
+              ${escapeHtml((sup.name || "?").charAt(0).toUpperCase())}
+            </div>
+            <div style="min-width:0">
+              <div style="font-weight:600;font-size:var(--text-base);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(sup.name)}</div>
+              <div style="color:var(--text-secondary);font-size:var(--text-xs)">
+                ${sup.products_count} produit${sup.products_count > 1 ? "s" : ""}
+                \xB7 ${sup.categories.length} cat\xE9gorie${sup.categories.length > 1 ? "s" : ""}
+                ${sup.last_update ? " \xB7 maj " + timeAgoFR(sup.last_update) : ""}
+              </div>
+            </div>
+          </div>
+          <i data-lucide="chevron-down" class="merc-chevron" style="width:20px;height:20px;color:var(--text-secondary);flex-shrink:0"></i>
+        </summary>
+        <div style="padding:var(--space-3)">
+          ${sup.categories.map((cat) => renderCategory(cat)).join("")}
+        </div>
+      </details>
+    `;
+  }).join("");
+  if (window.lucide) lucide.createIcons();
+}
+function renderCategory(cat) {
+  return `
+    <div class="merc-category" style="margin-bottom:var(--space-4)">
+      <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2);padding-bottom:var(--space-1);border-bottom:1px solid var(--border-light)">
+        <span style="font-weight:600;font-size:var(--text-sm);text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary)">
+          ${escapeHtml(cat.name)}
+        </span>
+        <span style="color:var(--text-tertiary);font-size:var(--text-xs)">${cat.items.length}</span>
+      </div>
+      <div style="display:grid;gap:1px;background:var(--border-light);border-radius:var(--radius-md);overflow:hidden">
+        ${cat.items.map((p) => renderProductRow(p)).join("")}
+      </div>
+    </div>
+  `;
+}
+function renderProductRow(p) {
+  const tva = p.tva_rate != null ? ` \xB7 TVA ${p.tva_rate}%` : "";
+  const sku = p.sku ? ` \xB7 ${escapeHtml(p.sku)}` : "";
+  const pkg = p.packaging ? ` \xB7 ${escapeHtml(p.packaging)}` : "";
+  let trendBadge = "";
+  if (p.last_change && p.last_change.trend) {
+    const t = p.last_change.trend;
+    const pct = p.last_change.change_pct;
+    const isNew = p.last_change.old_price == null || p.last_change.old_price === 0;
+    if (isNew) {
+      trendBadge = `<span style="display:inline-flex;align-items:center;gap:3px;font-size:var(--text-xs);color:var(--color-accent);font-weight:600"><i data-lucide="sparkles" style="width:12px;height:12px"></i>nouveau</span>`;
+    } else {
+      const color = t === "up" ? "var(--color-danger)" : t === "down" ? "var(--color-success)" : "var(--text-tertiary)";
+      const icon = t === "up" ? "arrow-up" : t === "down" ? "arrow-down" : "minus";
+      const sign = pct > 0 ? "+" : "";
+      trendBadge = `<span style="display:inline-flex;align-items:center;gap:2px;font-size:var(--text-xs);color:${color};font-weight:600"><i data-lucide="${icon}" style="width:12px;height:12px"></i>${sign}${(pct || 0).toFixed(1)}%</span>`;
+    }
+  }
+  const ingrBadge = p.ingredient_id ? `<span title="Li\xE9 \xE0 un ingr\xE9dient" style="display:inline-flex;align-items:center;gap:2px;font-size:var(--text-xs);color:var(--color-success)"><i data-lucide="link" style="width:11px;height:11px"></i></span>` : "";
+  const updateText = p.updated_at ? timeAgoFR(p.updated_at) : "\u2014";
+  return `
+    <div class="merc-product-row" data-name="${escapeHtml(p.product_name || "")}" style="padding:var(--space-3);background:var(--bg-card, var(--bg-elevated));display:grid;grid-template-columns:1fr auto;gap:var(--space-2);align-items:center">
+      <div style="min-width:0">
+        <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+          <span style="font-weight:500">${escapeHtml(p.product_name || "\u2014")}</span>
+          ${ingrBadge}
+          ${trendBadge}
+        </div>
+        <div style="color:var(--text-tertiary);font-size:var(--text-xs);margin-top:2px">
+          ${escapeHtml("Maj " + updateText)}${sku}${pkg}${tva}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-weight:600;font-variant-numeric:tabular-nums">${(p.price || 0).toFixed(2)}\u20AC</div>
+        <div style="color:var(--text-secondary);font-size:var(--text-xs)">/ ${escapeHtml(p.unit || "\u2014")}</div>
+      </div>
+    </div>
+  `;
+}
+function timeAgoFR(dateStr) {
+  if (!dateStr) return "\u2014";
+  const d = new Date(dateStr);
+  const diffMs = Date.now() - d.getTime();
+  const diffMin = Math.floor(diffMs / 6e4);
+  if (diffMin < 1) return "\xE0 l\u2019instant";
+  if (diffMin < 60) return `il y a ${diffMin} min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `il y a ${diffH} h`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 7) return `il y a ${diffD} j`;
+  if (diffD < 30) return `il y a ${Math.floor(diffD / 7)} sem`;
+  if (diffD < 365) return `il y a ${Math.floor(diffD / 30)} mois`;
+  return `il y a ${Math.floor(diffD / 365)} an${Math.floor(diffD / 365) > 1 ? "s" : ""}`;
 }
 let _mercurialeData = null;
 async function renderImportMercuriale() {
