@@ -127,6 +127,77 @@ describe('buildEmail', () => {
   });
 });
 
+describe('integration external_id surfacing', () => {
+  // Suppliers — especially FoodFlow — receive returns from many tenants on a
+  // single mailbox. The client reference in subject + body lets their team
+  // route the claim to the right account without manual lookup.
+  const base = {
+    request: { id: 9, type: 'return', reference: 'RET-9' },
+    items: [{ product_name: 'Saumon', quantity: 1, unit: 'kg', reason: 'qualite' }],
+    restaurant: { name: 'Le Comptoir' },
+    supplier: { name: 'FoodFlow' },
+  };
+
+  it('appends [Réf client XXX] to the subject when integration has external_id', () => {
+    const subject = buildSubject({
+      ...base,
+      integration: { provider: 'foodflow', external_id: '89764' },
+    });
+    expect(subject).toContain('RET-9');
+    expect(subject).toContain('Le Comptoir');
+    expect(subject).toContain('Réf client 89764');
+  });
+
+  it('omits the client ref tag when no integration is present', () => {
+    const subject = buildSubject(base);
+    expect(subject).not.toMatch(/Réf client/i);
+  });
+
+  it('omits the client ref tag when integration has empty external_id', () => {
+    const subject = buildSubject({
+      ...base,
+      integration: { provider: 'foodflow', external_id: '' },
+    });
+    expect(subject).not.toMatch(/Réf client/i);
+  });
+
+  it('includes the FoodFlow client id in the text body header block', () => {
+    const text = buildText({
+      ...base,
+      integration: { provider: 'foodflow', external_id: '89764' },
+    });
+    expect(text).toContain('Réf. client FoodFlow');
+    expect(text).toContain('89764');
+  });
+
+  it('renders a generic provider label for non-foodflow integrations', () => {
+    const text = buildText({
+      ...base,
+      supplier: { name: 'Metro' },
+      integration: { provider: 'metro', external_id: 'METRO-42' },
+    });
+    expect(text).toContain('METRO-42');
+  });
+
+  it('includes the external_id in the HTML body header table', () => {
+    const html = buildHtml({
+      ...base,
+      integration: { provider: 'foodflow', external_id: '89764' },
+    });
+    expect(html).toContain('89764');
+    expect(html).toMatch(/r[ée]f.*client/i);
+  });
+
+  it('escapes the external_id in HTML to prevent injection', () => {
+    const html = buildHtml({
+      ...base,
+      integration: { provider: 'foodflow', external_id: '<x>' },
+    });
+    expect(html).not.toContain('<x>');
+    expect(html).toContain('&lt;x&gt;');
+  });
+});
+
 describe('resolveReturnsEmail', () => {
   it('prefers integration.returns_email over supplier email', () => {
     const out = resolveReturnsEmail({

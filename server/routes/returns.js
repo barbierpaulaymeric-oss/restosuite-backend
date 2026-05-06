@@ -373,7 +373,7 @@ router.post('/:id/send', async (req, res) => {
             [row.delivery_note_id, rid])
       : null;
 
-    const email = buildEmail({ request: row, items, restaurant, supplier, deliveryNote });
+    const email = buildEmail({ request: row, items, restaurant, supplier, deliveryNote, integration });
 
     // Resolve send transport — injectable for tests, real SMTP in prod.
     let sendFn = req.app && req.app.locals && req.app.locals.returnsSendFn;

@@ -1,8 +1,13 @@
 const { Router } = require('express');
 const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
+const { writeAudit } = require('../lib/audit-log');
 const router = Router();
 router.use(requireAuth);
+
+function ownedSupplier(supplierId, rid) {
+  return get('SELECT * FROM suppliers WHERE id = ? AND restaurant_id = ?', [supplierId, rid]);
+}
 
 router.get('/', (req, res) => {
   const rid = req.user.restaurant_id;
@@ -94,6 +99,87 @@ router.get('/:id/prices', (req, res) => {
   `, [supplierId, rid]);
 
   res.json([...priced, ...catalog]);
+});
+
+// DELETE /api/suppliers/:supplierId/catalog/:catalogId
+// Remove a single product from supplier_catalog. Tenant-scoped: cross-tenant
+// rows return 404 (not 403) per project convention. Mismatched supplier_id
+// also returns 404 — keeps the URL contract honest.
+router.delete('/:supplierId/catalog/:catalogId', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const supplierId = Number(req.params.supplierId);
+    const catalogId = Number(req.params.catalogId);
+    if (!Number.isFinite(supplierId) || !Number.isFinite(catalogId)) {
+      return res.status(404).json({ error: 'Produit introuvable' });
+    }
+    const row = get(
+      'SELECT * FROM supplier_catalog WHERE id = ? AND supplier_id = ? AND restaurant_id = ?',
+      [catalogId, supplierId, rid]
+    );
+    if (!row) return res.status(404).json({ error: 'Produit introuvable' });
+
+    run(
+      'DELETE FROM supplier_catalog WHERE id = ? AND restaurant_id = ?',
+      [catalogId, rid]
+    );
+
+    writeAudit({
+      restaurant_id: rid,
+      account_id: req.user.id,
+      table_name: 'supplier_catalog',
+      record_id: catalogId,
+      action: 'delete',
+      old_values: { supplier_id: supplierId, product_name: row.product_name, sku: row.sku, price: row.price },
+    });
+
+    res.json({ deleted: true });
+  } catch (e) {
+    console.error('supplier_catalog/delete error:', e.message);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// DELETE /api/suppliers/:supplierId/catalog
+// Bulk wipe — all catalog rows for this (supplier, tenant). Used by the UI
+// "Tout supprimer" action behind a confirmation modal. Returns count for
+// the success toast. Doesn't touch supplier_prices/price_history (those
+// belong to ingredient-mapped data and have their own deletion paths).
+router.delete('/:supplierId/catalog', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const supplierId = Number(req.params.supplierId);
+    if (!Number.isFinite(supplierId)) {
+      return res.status(404).json({ error: 'Fournisseur introuvable' });
+    }
+    const supplier = ownedSupplier(supplierId, rid);
+    if (!supplier) return res.status(404).json({ error: 'Fournisseur introuvable' });
+
+    const before = get(
+      'SELECT COUNT(*) AS n FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ?',
+      [supplierId, rid]
+    );
+    const count = (before && before.n) || 0;
+
+    run(
+      'DELETE FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ?',
+      [supplierId, rid]
+    );
+
+    writeAudit({
+      restaurant_id: rid,
+      account_id: req.user.id,
+      table_name: 'supplier_catalog',
+      record_id: supplierId,
+      action: 'delete',
+      old_values: { supplier_id: supplierId, bulk: true, count },
+    });
+
+    res.json({ deleted: true, count });
+  } catch (e) {
+    console.error('supplier_catalog/bulk-delete error:', e.message);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
 module.exports = router;

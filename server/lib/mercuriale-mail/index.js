@@ -65,6 +65,57 @@ function dbLookups() {
   };
 }
 
+// Pick the best external_id candidate to persist on supplier_integrations.
+// FoodFlow's canonical client reference is a 5-digit number ("référence
+// client : 89764") — those are extracted by the NUMERIC_ID_LABEL_RE in
+// match-restaurant.js. Older FF-XXXX SKU-style ids also surface in some
+// emails. Prefer the numeric form because that's what the FoodFlow modal
+// asks the user to enter; fall back to the first id otherwise.
+function pickExternalIdForSave(externalIds) {
+  if (!externalIds || !externalIds.length) return null;
+  const numeric = externalIds.find((x) => /^[0-9]+$/.test(String(x)));
+  return numeric || externalIds[0];
+}
+
+// Persist the FoodFlow client reference captured from the inbound email so
+// the next outbound PO can dispatch via the integration without manual
+// configuration. Three branches:
+//   1. No row for (restaurant, supplier) → INSERT a connected foodflow row
+//      with the captured id. The restaurateur skips the manual setup step.
+//   2. Row exists with NULL/empty external_id (typically a half-configured
+//      'pending' row from a UI flow) → UPDATE external_id and promote status
+//      to 'connected'. Picks up the user where the wizard left off.
+//   3. Row exists with a non-empty external_id → leave it alone. Never
+//      overwrite a manually set id with a body-extracted one (the user
+//      may have a reason their configured id differs from a one-off email).
+function autoSaveExternalId({ restaurantId, supplierId, externalId }) {
+  if (!externalId) return null;
+  const existing = get(
+    `SELECT * FROM supplier_integrations
+       WHERE supplier_id = ? AND restaurant_id = ?
+       ORDER BY id DESC LIMIT 1`,
+    [supplierId, restaurantId]
+  );
+  if (existing) {
+    const current = String(existing.external_id || '').trim();
+    if (current) return null;
+    run(
+      `UPDATE supplier_integrations
+          SET external_id = ?, status = 'connected', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?`,
+      [externalId, existing.id]
+    );
+    return { action: 'updated', id: existing.id, external_id: externalId };
+  }
+  const info = run(
+    `INSERT INTO supplier_integrations
+       (restaurant_id, supplier_id, provider, external_id, status)
+     VALUES (?, ?, 'foodflow', ?, 'connected')`,
+    [restaurantId, supplierId, externalId]
+  );
+  return { action: 'created', id: info.lastInsertRowid, external_id: externalId };
+}
+
 // Resolve the supplier from the Excel "Fournisseur" column (case-insensitive
 // name match against suppliers WHERE restaurant_id = ?). Auto-creates a new
 // supplier row when no name matches, so a fresh tenant receiving its first
@@ -291,11 +342,32 @@ async function runInboundCycle({ fetchFn, sendAlertFn } = {}) {
             const n = upsertCatalog(match.restaurantId, supplierId, out.items);
             result.items_upserted += n;
             result.matched++;
+
+            // Capture the FoodFlow client id from the email so the next PO
+            // can dispatch via the integration without manual setup. Skipped
+            // when the match itself was via external_id (already configured).
+            let savedExt = null;
+            if (match.matchedBy !== 'external_id') {
+              const candidate = pickExternalIdForSave(identifiers.externalIds);
+              if (candidate) {
+                try {
+                  savedExt = autoSaveExternalId({
+                    restaurantId: match.restaurantId,
+                    supplierId,
+                    externalId: candidate,
+                  });
+                } catch (e) {
+                  result.errors.push({ uid: email.uid, error: `autosave_external_id: ${e.message}` });
+                }
+              }
+            }
+
             console.log(
               `📧 Mercuriale matched uid=${email.uid} restaurant=${match.restaurantId}`
                 + ` via ${match.matchedBy}=${match.matchedValue}`
                 + ` supplier=${supplierId} (${supplierMatchedBy})`
                 + ` items=${Number(n)}`
+                + (savedExt ? ` integration_${savedExt.action}=${savedExt.external_id}` : '')
             );
             continue;
           }

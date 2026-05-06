@@ -297,6 +297,11 @@ describe('POST /api/returns/:id/send', () => {
     expect(res.body.email_target.email).toBe('retours@foodflow.fr');
     expect(res.body.email_target.source).toBe('integration');
     expect(captured[0].to).toBe('retours@foodflow.fr');
+    // Subject + body must surface the external_id so the supplier knows
+    // which restaurant the return is from when the mailbox is shared.
+    expect(captured[0].subject).toContain('99999');
+    expect(captured[0].text).toContain('99999');
+    expect(captured[0].html).toContain('99999');
   });
 });
 

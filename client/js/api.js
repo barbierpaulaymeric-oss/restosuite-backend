@@ -171,6 +171,12 @@ const API = {
   getSupplierPrices(id) {
     return this.request(`/suppliers/${id}/prices`);
   },
+  deleteSupplierCatalogProduct(supplierId, catalogId) {
+    return this.request(`/suppliers/${supplierId}/catalog/${catalogId}`, { method: 'DELETE' });
+  },
+  deleteSupplierCatalogAll(supplierId) {
+    return this.request(`/suppliers/${supplierId}/catalog`, { method: 'DELETE' });
+  },
 
   // Supplier integrations (FoodFlow + future Metro/Transgourmet)
   getSupplierIntegrations() {

@@ -50,22 +50,46 @@ function typeLabel(type) {
   return TYPE_LABELS[type] || 'Retour produit';
 }
 
-// Restaurant + supplier are plain { name, ... } objects — kept loose so the
-// caller doesn't need to load the full row, only the bits we render.
-function buildSubject({ request, restaurant }) {
-  const ref = request.reference || `RET-${request.id || ''}`;
-  const restoName = restaurant && restaurant.name ? restaurant.name : 'restaurant client';
-  return `[${typeLabel(request.type)}] ${ref} — ${restoName}`;
+// Provider-aware label for the supplier-side client reference. FoodFlow's
+// shared retours@foodflow.fr mailbox handles claims for many tenants, so the
+// id is critical for routing on their side. Other adapters get a generic
+// label until we add per-provider styling.
+function providerRefLabel(provider) {
+  if (provider === 'foodflow') return 'Réf. client FoodFlow';
+  if (provider) return `Réf. client ${provider}`;
+  return 'Réf. client';
 }
 
-function buildText({ request, items, restaurant, supplier, deliveryNote }) {
+// Pull a non-empty external_id off the integration row, normalizing whitespace
+// so a half-configured row (external_id = '   ') doesn't produce a blank tag.
+function pickIntegrationExternalId(integration) {
+  if (!integration || typeof integration !== 'object') return null;
+  const ext = String(integration.external_id || '').trim();
+  return ext || null;
+}
+
+// Restaurant + supplier are plain { name, ... } objects — kept loose so the
+// caller doesn't need to load the full row, only the bits we render.
+function buildSubject({ request, restaurant, integration }) {
   const ref = request.reference || `RET-${request.id || ''}`;
+  const restoName = restaurant && restaurant.name ? restaurant.name : 'restaurant client';
+  const ext = pickIntegrationExternalId(integration);
+  const tail = ext ? ` [Réf client ${ext}]` : '';
+  return `[${typeLabel(request.type)}] ${ref} — ${restoName}${tail}`;
+}
+
+function buildText({ request, items, restaurant, supplier, deliveryNote, integration }) {
+  const ref = request.reference || `RET-${request.id || ''}`;
+  const ext = pickIntegrationExternalId(integration);
   const lines = [];
   lines.push(`Bonjour,`);
   lines.push('');
   lines.push(`Nous vous adressons une ${typeLabel(request.type).toLowerCase()} relative à une livraison récente.`);
   lines.push('');
   lines.push(`Restaurant      : ${restaurant && restaurant.name ? restaurant.name : '—'}`);
+  if (ext) {
+    lines.push(`${providerRefLabel(integration && integration.provider).padEnd(16, ' ')}: ${ext}`);
+  }
   lines.push(`Référence       : ${ref}`);
   if (deliveryNote) {
     lines.push(`Bon de livraison: ${deliveryNote.id}${deliveryNote.delivery_date ? ` du ${fmtDate(deliveryNote.delivery_date)}` : ''}`);
@@ -88,8 +112,9 @@ function buildText({ request, items, restaurant, supplier, deliveryNote }) {
   return lines.filter(l => l !== undefined).join('\n');
 }
 
-function buildHtml({ request, items, restaurant, supplier, deliveryNote }) {
+function buildHtml({ request, items, restaurant, supplier, deliveryNote, integration }) {
   const ref = request.reference || `RET-${request.id || ''}`;
+  const ext = pickIntegrationExternalId(integration);
   const itemRows = (items || []).map(it => `
     <tr>
       <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb">${escapeHtml(it.product_name)}</td>
@@ -108,6 +133,7 @@ function buildHtml({ request, items, restaurant, supplier, deliveryNote }) {
 
   <table style="border-collapse:collapse;margin:16px 0">
     <tr><td style="padding:4px 12px 4px 0;color:#6b7280">Restaurant</td><td style="padding:4px 0"><strong>${escapeHtml(restaurant && restaurant.name ? restaurant.name : '—')}</strong></td></tr>
+    ${ext ? `<tr><td style="padding:4px 12px 4px 0;color:#6b7280">${escapeHtml(providerRefLabel(integration && integration.provider))}</td><td style="padding:4px 0"><strong>${escapeHtml(ext)}</strong></td></tr>` : ''}
     <tr><td style="padding:4px 12px 4px 0;color:#6b7280">Référence</td><td style="padding:4px 0">${escapeHtml(ref)}</td></tr>
     ${deliveryNote ? `<tr><td style="padding:4px 12px 4px 0;color:#6b7280">Bon de livraison</td><td style="padding:4px 0">N°${escapeHtml(deliveryNote.id)}${deliveryNote.delivery_date ? ` du ${escapeHtml(fmtDate(deliveryNote.delivery_date))}` : ''}</td></tr>` : ''}
     <tr><td style="padding:4px 12px 4px 0;color:#6b7280">Type</td><td style="padding:4px 0">${escapeHtml(typeLabel(request.type))}</td></tr>

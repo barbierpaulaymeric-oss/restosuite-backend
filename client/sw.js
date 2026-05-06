@@ -1,12 +1,9 @@
-// Bumped 2026-05-06 (v38): hotfix — Fournisseurs sidebar entry was
-// dead-clicking because client/js/views/mercuriale.js declared a
-// top-level `function renderSuppliers(suppliers)` that clobbered the
-// canonical `renderSuppliers()` from views/suppliers.js (concat bundle
-// = single global scope, last decl wins). Renamed mercuriale's helper
-// to `renderMercurialeSuppliers`. Router /suppliers now resolves to
-// the real list view again.
-// (v37 was Opérations sidebar cleanup.)
-const CACHE_NAME = 'restosuite-v38';
+// Bumped 2026-05-06 (v39): catalog cleanup tools + auto-save FoodFlow id
+// from inbound mercuriales + return-request emails now surface the
+// supplier-side external_id in subject + body (so retours@foodflow.fr
+// can route shared-mailbox claims back to the right tenant).
+// (v38 was renderSuppliers global-collision hotfix.)
+const CACHE_NAME = 'restosuite-v39';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

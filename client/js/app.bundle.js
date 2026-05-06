@@ -150,6 +150,12 @@ const API = {
   getSupplierPrices(id) {
     return this.request(`/suppliers/${id}/prices`);
   },
+  deleteSupplierCatalogProduct(supplierId, catalogId) {
+    return this.request(`/suppliers/${supplierId}/catalog/${catalogId}`, { method: "DELETE" });
+  },
+  deleteSupplierCatalogAll(supplierId) {
+    return this.request(`/suppliers/${supplierId}/catalog`, { method: "DELETE" });
+  },
   // Supplier integrations (FoodFlow + future Metro/Transgourmet)
   getSupplierIntegrations() {
     return this.request("/supplier-integrations");
@@ -27139,7 +27145,7 @@ function renderMercurialeSuppliers(suppliers) {
   el.innerHTML = suppliers.map((sup, idx) => {
     const open = expandFirst || idx === 0 ? "open" : "";
     return `
-      <details class="merc-supplier card" ${open} style="padding:0;margin-bottom:var(--space-3);overflow:hidden">
+      <details class="merc-supplier card" ${open} data-supplier-id="${sup.id}" data-supplier-name="${escapeHtml(sup.name || "")}" style="padding:0;margin-bottom:var(--space-3);overflow:hidden">
         <summary style="padding:var(--space-3);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:var(--space-2);background:var(--bg-elevated);border-bottom:1px solid var(--border-light)">
           <div style="display:flex;align-items:center;gap:var(--space-2);min-width:0;flex:1">
             <div style="width:36px;height:36px;border-radius:50%;background:var(--color-accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">
@@ -27154,17 +27160,75 @@ function renderMercurialeSuppliers(suppliers) {
               </div>
             </div>
           </div>
-          <i data-lucide="chevron-down" class="merc-chevron" style="width:20px;height:20px;color:var(--text-secondary);flex-shrink:0"></i>
+          <div style="display:flex;align-items:center;gap:var(--space-2);flex-shrink:0">
+            <button class="btn btn-ghost btn-sm" data-merc-wipe="${sup.id}" title="Supprimer tous les produits de ce fournisseur" aria-label="Supprimer tous les produits du fournisseur ${escapeHtml(sup.name)}" style="padding:6px 10px;color:var(--color-danger)">
+              <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+              <span class="btn-label-desktop">Tout supprimer</span>
+            </button>
+            <i data-lucide="chevron-down" class="merc-chevron" style="width:20px;height:20px;color:var(--text-secondary)"></i>
+          </div>
         </summary>
         <div style="padding:var(--space-3)">
-          ${sup.categories.map((cat) => renderCategory(cat)).join("")}
+          ${sup.categories.map((cat) => renderCategory(cat, sup.id)).join("")}
         </div>
       </details>
     `;
   }).join("");
+  el.querySelectorAll("[data-merc-wipe]").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const supplierId = Number(btn.dataset.mercWipe);
+      const card = btn.closest(".merc-supplier");
+      const supplierName = card && card.dataset.supplierName || "ce fournisseur";
+      const productCount = card ? card.querySelectorAll(".merc-product-row").length : 0;
+      if (typeof showConfirmModal === "function") {
+        showConfirmModal(
+          "Supprimer tous les produits ?",
+          `Vous \xEAtes sur le point de supprimer ${productCount} produit${productCount > 1 ? "s" : ""} r\xE9f\xE9renc\xE9${productCount > 1 ? "s" : ""} pour ${supplierName}. Cette action est irr\xE9versible.`,
+          async () => {
+            try {
+              const r = await API.deleteSupplierCatalogAll(supplierId);
+              if (typeof showToast === "function") showToast(`${r.count || 0} produit(s) supprim\xE9(s)`, "success");
+              renderMercuriale();
+            } catch (e) {
+              if (typeof showToast === "function") showToast(e.message || "Erreur de suppression", "error");
+            }
+          },
+          { confirmText: "Tout supprimer", confirmClass: "btn btn-danger" }
+        );
+      }
+    });
+  });
+  el.querySelectorAll("[data-merc-delete]").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const supplierId = Number(btn.dataset.supplierId);
+      const catalogId = Number(btn.dataset.mercDelete);
+      const productName = btn.dataset.productName || "ce produit";
+      const row = btn.closest(".merc-product-row");
+      if (typeof showConfirmModal === "function") {
+        showConfirmModal(
+          "Supprimer le produit ?",
+          `Retirer "${productName}" du catalogue. Cette action est irr\xE9versible \u2014 il faudra le r\xE9importer pour le retrouver.`,
+          async () => {
+            try {
+              await API.deleteSupplierCatalogProduct(supplierId, catalogId);
+              if (typeof showToast === "function") showToast("Produit supprim\xE9", "success");
+              if (row && row.parentElement) row.remove();
+            } catch (e) {
+              if (typeof showToast === "function") showToast(e.message || "Erreur de suppression", "error");
+            }
+          },
+          { confirmText: "Supprimer", confirmClass: "btn btn-danger" }
+        );
+      }
+    });
+  });
   if (window.lucide) lucide.createIcons();
 }
-function renderCategory(cat) {
+function renderCategory(cat, supplierId) {
   return `
     <div class="merc-category" style="margin-bottom:var(--space-4)">
       <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2);padding-bottom:var(--space-1);border-bottom:1px solid var(--border-light)">
@@ -27174,12 +27238,12 @@ function renderCategory(cat) {
         <span style="color:var(--text-tertiary);font-size:var(--text-xs)">${cat.items.length}</span>
       </div>
       <div style="display:grid;gap:1px;background:var(--border-light);border-radius:var(--radius-md);overflow:hidden">
-        ${cat.items.map((p) => renderProductRow(p)).join("")}
+        ${cat.items.map((p) => renderProductRow(p, supplierId)).join("")}
       </div>
     </div>
   `;
 }
-function renderProductRow(p) {
+function renderProductRow(p, supplierId) {
   const tva = p.tva_rate != null ? ` \xB7 TVA ${p.tva_rate}%` : "";
   const sku = p.sku ? ` \xB7 ${escapeHtml(p.sku)}` : "";
   const pkg = p.packaging ? ` \xB7 ${escapeHtml(p.packaging)}` : "";
@@ -27199,8 +27263,11 @@ function renderProductRow(p) {
   }
   const ingrBadge = p.ingredient_id ? `<span title="Li\xE9 \xE0 un ingr\xE9dient" style="display:inline-flex;align-items:center;gap:2px;font-size:var(--text-xs);color:var(--color-success)"><i data-lucide="link" style="width:11px;height:11px"></i></span>` : "";
   const updateText = p.updated_at ? timeAgoFR(p.updated_at) : "\u2014";
+  const deleteBtn = supplierId ? `<button data-merc-delete="${p.id}" data-supplier-id="${supplierId}" data-product-name="${escapeHtml(p.product_name || "")}" title="Supprimer ce produit du catalogue" aria-label="Supprimer ${escapeHtml(p.product_name || "produit")}" style="background:transparent;border:none;cursor:pointer;color:var(--text-tertiary);padding:6px;border-radius:var(--radius-sm);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:color 0.15s,background 0.15s" onmouseover="this.style.color='var(--color-danger)';this.style.background='var(--bg-elevated)'" onmouseout="this.style.color='var(--text-tertiary)';this.style.background='transparent'">
+      <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+    </button>` : "";
   return `
-    <div class="merc-product-row" data-name="${escapeHtml(p.product_name || "")}" style="padding:var(--space-3);background:var(--bg-card, var(--bg-elevated));display:grid;grid-template-columns:1fr auto;gap:var(--space-2);align-items:center">
+    <div class="merc-product-row" data-name="${escapeHtml(p.product_name || "")}" style="padding:var(--space-3);background:var(--bg-card, var(--bg-elevated));display:grid;grid-template-columns:1fr auto auto;gap:var(--space-2);align-items:center">
       <div style="min-width:0">
         <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
           <span style="font-weight:500">${escapeHtml(p.product_name || "\u2014")}</span>
@@ -27215,6 +27282,7 @@ function renderProductRow(p) {
         <div style="font-weight:600;font-variant-numeric:tabular-nums">${(p.price || 0).toFixed(2)}\u20AC</div>
         <div style="color:var(--text-secondary);font-size:var(--text-xs)">/ ${escapeHtml(p.unit || "\u2014")}</div>
       </div>
+      ${deleteBtn}
     </div>
   `;
 }

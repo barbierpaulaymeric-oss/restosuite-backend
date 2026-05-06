@@ -32,17 +32,35 @@ beforeAll(() => {
   // supplier email) to exercise auto-create from "Fournisseur" column.
   run(`INSERT INTO restaurants (id, name) VALUES (4245, 'TestRestoSuite')`);
   run(`INSERT INTO accounts (id, name, pin, role, email, restaurant_id) VALUES (9300, 'Owner', 'x', 'patron', 'pa@testrestosuite.com', 4245)`);
+
+  // Fourth restaurant — used to verify auto-save of external_id from inbound
+  // mail. Has a supplier but NO supplier_integrations row at all.
+  run(`INSERT INTO restaurants (id, name) VALUES (4246, 'AutoSaveResto')`);
+  run(`INSERT INTO suppliers (id, name, restaurant_id) VALUES (9401, 'FoodFlow', 4246)`);
+
+  // Fifth restaurant — has a supplier WITH a half-configured integration row
+  // (external_id = ''). The auto-save should fill it in.
+  run(`INSERT INTO restaurants (id, name) VALUES (4247, 'HalfConfigResto')`);
+  run(`INSERT INTO suppliers (id, name, restaurant_id) VALUES (9501, 'FoodFlow', 4247)`);
+  run(`INSERT INTO supplier_integrations (restaurant_id, supplier_id, provider, external_id, status) VALUES (4247, 9501, 'foodflow', '', 'pending')`);
+
+  // Sixth restaurant — has a supplier WITH a fully-configured integration row.
+  // Auto-save must NOT overwrite an existing external_id.
+  run(`INSERT INTO restaurants (id, name) VALUES (4248, 'FullConfigResto')`);
+  run(`INSERT INTO suppliers (id, name, restaurant_id) VALUES (9601, 'FoodFlow', 4248)`);
+  run(`INSERT INTO supplier_integrations (restaurant_id, supplier_id, provider, external_id, status) VALUES (4248, 9601, 'foodflow', 'EXISTING-ID-1', 'connected')`);
 });
 
 afterAll(() => {
   // Best-effort cleanup so this file is rerunnable in --watch mode.
-  try { run('DELETE FROM supplier_catalog WHERE restaurant_id IN (4242, 4243, 4244, 4245)'); } catch {}
-  try { run('DELETE FROM supplier_integrations WHERE restaurant_id IN (4242, 4243, 4244, 4245)'); } catch {}
+  const rids = '(4242, 4243, 4244, 4245, 4246, 4247, 4248)';
+  try { run(`DELETE FROM supplier_catalog WHERE restaurant_id IN ${rids}`); } catch {}
+  try { run(`DELETE FROM supplier_integrations WHERE restaurant_id IN ${rids}`); } catch {}
   try { run('DELETE FROM purchase_order_items WHERE restaurant_id = 4242'); } catch {}
   try { run('DELETE FROM purchase_orders WHERE restaurant_id = 4242'); } catch {}
-  try { run('DELETE FROM suppliers WHERE restaurant_id IN (4242, 4243, 4244, 4245)'); } catch {}
+  try { run(`DELETE FROM suppliers WHERE restaurant_id IN ${rids}`); } catch {}
   try { run('DELETE FROM accounts WHERE id IN (9100, 9300)'); } catch {}
-  try { run('DELETE FROM restaurants WHERE id IN (4242, 4243, 4244, 4245)'); } catch {}
+  try { run(`DELETE FROM restaurants WHERE id IN ${rids}`); } catch {}
 });
 
 describe('runInboundCycle — content-based routing', () => {
@@ -263,6 +281,100 @@ describe('runInboundCycle — content-based routing', () => {
     expect(body).toContain('99999');
     expect(body).toContain('GhostSupplier');
     expect(body).toMatch(/identifiants? extraits?/i);
+  });
+});
+
+describe('runInboundCycle — auto-save external_id from email body', () => {
+  test('auto-creates a supplier_integrations row when none exists and email yields a numeric external_id', async () => {
+    // Restaurant matched by name in subject, supplier matched by Excel column.
+    // No integration row exists yet — the email reveals "référence client : 70001".
+    const fetchFn = async () => [{
+      uid: 400,
+      from: 'julie@foodflow.com',
+      subject: 'Mercuriale AutoSaveResto',
+      text: 'Voici la mercuriale pour AutoSaveResto (référence client : 70001)',
+      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
+        ['Désignation', 'Fournisseur', 'Unité', 'Prix HT'],
+        ['Pamplemousse', 'FoodFlow', 'kg', '3,30'],
+      ]) }],
+    }];
+    const r = await runInboundCycle({ fetchFn });
+    expect(r.matched).toBe(1);
+
+    const integ = get(
+      `SELECT * FROM supplier_integrations WHERE restaurant_id = 4246 AND supplier_id = 9401`
+    );
+    expect(integ).toBeTruthy();
+    expect(integ.external_id).toBe('70001');
+    expect(integ.provider).toBe('foodflow');
+    expect(integ.status).toBe('connected');
+  });
+
+  test('updates external_id when an existing integration row has it empty', async () => {
+    const fetchFn = async () => [{
+      uid: 401,
+      from: 'julie@foodflow.com',
+      subject: 'Mercuriale HalfConfigResto',
+      text: 'Voici la mercuriale pour HalfConfigResto (référence client : 80002)',
+      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
+        ['Désignation', 'Fournisseur', 'Unité', 'Prix HT'],
+        ['Cumin', 'FoodFlow', 'kg', '12,00'],
+      ]) }],
+    }];
+    const r = await runInboundCycle({ fetchFn });
+    expect(r.matched).toBe(1);
+
+    const integ = get(
+      `SELECT * FROM supplier_integrations WHERE restaurant_id = 4247 AND supplier_id = 9501`
+    );
+    expect(integ).toBeTruthy();
+    expect(integ.external_id).toBe('80002');
+    // Status promoted from 'pending' to 'connected' once the id lands.
+    expect(integ.status).toBe('connected');
+  });
+
+  test('does NOT overwrite an existing non-empty external_id', async () => {
+    const fetchFn = async () => [{
+      uid: 402,
+      from: 'julie@foodflow.com',
+      subject: 'Mercuriale FullConfigResto',
+      text: 'Voici la mercuriale pour FullConfigResto (référence client : 90003)',
+      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
+        ['Désignation', 'Fournisseur', 'Unité', 'Prix HT'],
+        ['Curcuma', 'FoodFlow', 'kg', '14,00'],
+      ]) }],
+    }];
+    const r = await runInboundCycle({ fetchFn });
+    expect(r.matched).toBe(1);
+
+    const integ = get(
+      `SELECT * FROM supplier_integrations WHERE restaurant_id = 4248 AND supplier_id = 9601`
+    );
+    expect(integ).toBeTruthy();
+    expect(integ.external_id).toBe('EXISTING-ID-1');
+  });
+
+  test('does nothing when email yields no external_id', async () => {
+    // First clean up any auto-created row from earlier tests in this describe.
+    run(`DELETE FROM supplier_integrations WHERE restaurant_id = 4246 AND supplier_id = 9401`);
+
+    const fetchFn = async () => [{
+      uid: 403,
+      from: 'julie@foodflow.com',
+      subject: 'Mercuriale AutoSaveResto — sans réf',
+      text: 'pour AutoSaveResto', // no "référence" / no FF-* / no numeric id label
+      attachments: [{ filename: 'm.xlsx', content: makeXlsx([
+        ['Désignation', 'Fournisseur', 'Unité', 'Prix HT'],
+        ['Coriandre', 'FoodFlow', 'kg', '8,00'],
+      ]) }],
+    }];
+    const r = await runInboundCycle({ fetchFn });
+    expect(r.matched).toBe(1);
+
+    const integ = get(
+      `SELECT * FROM supplier_integrations WHERE restaurant_id = 4246 AND supplier_id = 9401`
+    );
+    expect(integ).toBeFalsy();
   });
 });
 
