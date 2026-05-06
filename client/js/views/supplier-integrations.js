@@ -32,8 +32,8 @@ async function renderSupplierIntegrations() {
 
       <p style="color:var(--text-secondary);margin-bottom:var(--space-4)">
         Connectez vos fournisseurs à <strong>FoodFlow</strong> pour synchroniser
-        automatiquement leur mercuriale et notifier vos commandes. Les
-        identifiants externes ressemblent à <code>FF-METRO-42</code>.
+        automatiquement leur mercuriale et notifier vos commandes. Saisissez
+        votre numéro client FoodFlow à 5 chiffres (ex. <code>89764</code>).
       </p>
 
       <div id="si-list" aria-live="polite" aria-busy="true">
@@ -128,14 +128,14 @@ function showSupplierIntegrationConnect(supplierId, supplierName) {
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
     <div class="modal" data-ui="custom">
-      <h2>Connecter ${escapeHtml(supplierName)} à FoodFlow</h2>
+      <h2>Connecter ${escapeHtml(supplierName)}</h2>
       <p style="color:var(--text-secondary);margin-bottom:var(--space-3)">
-        Saisissez l'identifiant FoodFlow communiqué par ce fournisseur (ex.
-        <code>FF-METRO-42</code>).
+        Saisissez votre numéro client FoodFlow à 5 chiffres (visible sur votre
+        compte FoodFlow ou communiqué par votre commercial, ex. <code>89764</code>).
       </p>
       <div class="form-group">
-        <label for="si-extid">Identifiant FoodFlow</label>
-        <input type="text" id="si-extid" class="form-control" placeholder="FF-..." data-ui="custom" autofocus>
+        <label for="si-extid">Référence client FoodFlow</label>
+        <input type="text" id="si-extid" class="form-control" placeholder="89764" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" data-ui="custom" autofocus>
       </div>
       <div style="display:flex;gap:var(--space-2);justify-content:flex-end">
         <button class="btn btn-secondary" onclick="closeSupplierIntegrationModal()">Annuler</button>
@@ -150,7 +150,7 @@ function showSupplierIntegrationConnect(supplierId, supplierName) {
 async function submitSupplierIntegrationConnect(supplierId) {
   const externalId = (document.getElementById('si-extid').value || '').trim();
   if (!externalId) {
-    showToast('Identifiant FoodFlow requis', 'error');
+    showToast('Référence client FoodFlow requise', 'error');
     return;
   }
   try {

@@ -1,12 +1,9 @@
-// Bumped 2026-05-05 (v26): four UX fixes — (1) ui-select dropdowns inside
-// modals no longer get clipped by overflow:auto (fixed-positioning escape
-// when any ancestor clips); (2) supplier-portal empty state rewritten as
-// invitation CTA + new modal collecting name/email/phone (email → SMTP
-// invite to supplier; phone-only → SMTP alert to ADMIN_NOTIFY_EMAIL);
-// (3) admin route hardcodes barbierpaulaymeric@gmail.com as default
-// (matches client allowlist) + falls back to DB email lookup for legacy
-// JWTs; (4) integrations + multi-site wizard from v25 carry forward.
-const CACHE_NAME = 'restosuite-v26';
+// Bumped 2026-05-06 (v27): FoodFlow connect modal copy fix — placeholder is
+// the 5-digit FoodFlow CLIENT/restaurant ID (e.g. 89764), not the product
+// SKU format "FF-METRO-42" that wrongly appeared in the UI. Title, label,
+// description, error toast, and intro paragraph all updated; numeric input
+// constraints (inputmode/pattern/maxlength=5) added to the field.
+const CACHE_NAME = 'restosuite-v27';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
