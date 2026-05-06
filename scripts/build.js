@@ -85,6 +85,7 @@ const JS_FILES = [
   'js/views/subscribe.js',
   'js/views/scan-invoice.js',
   'js/views/invoices.js',
+  'js/views/returns.js',
   'js/views/mercuriale.js',
   'js/views/import-mercuriale.js',
   'js/views/ai-chef.js',

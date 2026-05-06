@@ -224,7 +224,7 @@ app.use(require('./lib/soft-auth').softAuth);
     '/api/waste', '/api/corrective-actions', '/api/pms-audit', '/api/pms',
     '/api/sanitary', '/api/water',
     '/api/traceability', '/api/recall', '/api/allergen-plan', '/api/fabrication-diagrams',
-    '/api/tiac', '/api/sites',
+    '/api/tiac', '/api/sites', '/api/returns',
   ];
   for (const prefix of GATED_PREFIXES) app.use(prefix, requireActiveOrTrial);
 }
@@ -260,6 +260,7 @@ app.use('/api/orders', require('./routes/orders'));
 app.use('/api/deliveries', require('./routes/deliveries'));
 app.use('/api/purchase-orders', require('./routes/purchase-orders'));
 app.use('/api/invoices', require('./routes/invoices'));
+app.use('/api/returns', require('./routes/returns'));
 app.use('/api/qrcode', require('./routes/qrcode'));
 app.use('/api/menu', require('./routes/menu'));
 app.use('/api/alerts', require('./routes/alerts'));

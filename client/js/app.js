@@ -102,6 +102,7 @@ const NAV_GROUPS = {
   gestion: {
     label: 'Gestion',
     items: [
+      { label: 'Retours & avoirs',   route: '/retours',  icon: 'package-x',        roles: ['gerant'] },
       { label: 'Exports comptables', route: '/exports', icon: 'file-spreadsheet', roles: ['gerant'] },
     ]
   },
@@ -129,6 +130,7 @@ const ROUTE_TO_GROUP = {
   '/fabrication-diagrams': 'documents',
   '/pms/export': 'documents',
   '/exports': 'gestion',
+  '/retours': 'gestion', '/returns': 'gestion',
   '/haccp': 'haccp',
   '/haccp/ma-journee': 'haccp',
   '/haccp/temperatures': 'haccp',
@@ -427,6 +429,10 @@ function registerRoutes() {
   Router.add(/^\/fabrication-diagrams$/, renderFabricationDiagrams);
   Router.add(/^\/pms\/export$/, renderPMSExport);
   Router.add(/^\/exports$/, renderExports);
+  Router.add(/^\/retours$/, renderReturns);
+  Router.add(/^\/retours\/(\d+)$/, (id) => renderReturnDetail(parseInt(id)));
+  Router.add(/^\/returns$/, () => { location.hash = '#/retours'; });
+  Router.add(/^\/returns\/(\d+)$/, (id) => { location.hash = '#/retours/' + id; });
   Router.add(/^\/docs$/, () => { location.hash = '#/fabrication-diagrams'; });
   Router.add(/^\/admin$/, renderAdmin);
 }

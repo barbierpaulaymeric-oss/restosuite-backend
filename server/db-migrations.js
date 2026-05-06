@@ -2061,9 +2061,89 @@ try {
     CREATE INDEX IF NOT EXISTS idx_supplier_integrations_supplier
       ON supplier_integrations(supplier_id);
   `);
+  // FoodFlow partnership: structured returns/claims need a separate provider
+  // mailbox (retours@foodflow.fr) distinct from orders. Stored on the
+  // integration row so each supplier connection can override its parent
+  // supplier's generic `email`.
+  const siCols = all("PRAGMA table_info(supplier_integrations)");
+  const siColNames = siCols.map(c => c.name);
+  if (!siColNames.includes('returns_email')) {
+    db.exec("ALTER TABLE supplier_integrations ADD COLUMN returns_email TEXT");
+  }
+  if (!siColNames.includes('orders_email')) {
+    db.exec("ALTER TABLE supplier_integrations ADD COLUMN orders_email TEXT");
+  }
   console.log('✅ Migration: supplier_integrations ready');
 } catch (e) {
   console.warn('⚠️ supplier_integrations migration error:', e.message);
+}
+
+// ─── Migration: returns_email on suppliers (per-supplier returns mailbox) ───
+try {
+  const supCols = all("PRAGMA table_info(suppliers)");
+  const supColNames = supCols.map(c => c.name);
+  if (!supColNames.includes('returns_email')) {
+    db.exec("ALTER TABLE suppliers ADD COLUMN returns_email TEXT");
+    console.log('✅ Migration: added returns_email to suppliers');
+  }
+} catch (e) {
+  console.warn('⚠️ suppliers.returns_email migration error:', e.message);
+}
+
+// ─── Migration: return_requests + return_request_items ───
+// Restaurateur-initiated claims for damaged / wrong / missing / short-DLC
+// products from a delivery. Email is dispatched to a returns-specific mailbox
+// when available (supplier_integrations.returns_email > suppliers.returns_email
+// > suppliers.email), otherwise the supplier's generic email.
+//
+// Status state machine: draft → sent → in_progress → (resolved | rejected).
+// `type` discriminates between physical return ('return') and credit-note
+// request ('credit'). `credit_amount` is optional and set when resolved.
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS return_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      restaurant_id INTEGER NOT NULL,
+      supplier_id INTEGER NOT NULL,
+      delivery_note_id INTEGER,
+      type TEXT NOT NULL DEFAULT 'return',
+      status TEXT NOT NULL DEFAULT 'draft',
+      reference TEXT,
+      notes TEXT,
+      credit_amount REAL,
+      email_sent_to TEXT,
+      email_sent_at DATETIME,
+      created_by INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      resolved_at DATETIME
+    );
+    CREATE INDEX IF NOT EXISTS idx_return_requests_restaurant
+      ON return_requests(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_return_requests_supplier
+      ON return_requests(supplier_id);
+    CREATE INDEX IF NOT EXISTS idx_return_requests_status
+      ON return_requests(status);
+
+    CREATE TABLE IF NOT EXISTS return_request_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      return_request_id INTEGER NOT NULL,
+      restaurant_id INTEGER NOT NULL,
+      product_name TEXT NOT NULL,
+      quantity REAL NOT NULL DEFAULT 1,
+      unit TEXT,
+      reason TEXT NOT NULL DEFAULT 'autre',
+      comment TEXT,
+      photo_path TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (return_request_id) REFERENCES return_requests(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_return_request_items_request
+      ON return_request_items(return_request_id);
+  `);
+  console.log('✅ Migration: return_requests ready');
+} catch (e) {
+  console.warn('⚠️ return_requests migration error:', e.message);
 }
 
 }

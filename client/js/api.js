@@ -875,6 +875,21 @@ const API = {
   reconcileInvoice(id) { return this.request(`/invoices/reconcile/${id}`); },
   getInvoiceStats() { return this.request('/invoices/stats'); },
 
+  // ─── Returns / claims ───
+  getReturns(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.status) params.set('status', filters.status);
+    if (filters.supplier_id) params.set('supplier_id', filters.supplier_id);
+    const qs = params.toString() ? `?${params}` : '';
+    return this.request(`/returns${qs}`, { noRedirectOn401: true });
+  },
+  getReturn(id) { return this.request(`/returns/${id}`); },
+  getReturnStats() { return this.request('/returns/stats'); },
+  createReturn(data) { return this.request('/returns', { method: 'POST', body: data }); },
+  setReturnStatus(id, data) { return this.request(`/returns/${id}/status`, { method: 'PUT', body: data }); },
+  sendReturn(id) { return this.request(`/returns/${id}/send`, { method: 'POST' }); },
+  deleteReturn(id) { return this.request(`/returns/${id}`, { method: 'DELETE' }); },
+
   // ─── Alerts ───
   getAlertsDailySummary() { return this.request('/alerts/daily-summary'); },
 
