@@ -1,7 +1,9 @@
-// Bumped 2026-05-06 (v44): P3-3 lien "Déjà un compte ? Se connecter" sur /register,
-// P1-4 banner PWA install masqué sur #register (réessaie au hashchange),
-// + BCC propriétaire sur emails de bons de commande sortants.
-const CACHE_NAME = 'restosuite-v44';
+// Bumped 2026-05-06 (v45): séparation des vues / et /recipes (renderDashboard
+// rendait les deux dans le même innerHTML — l'utilisateur voyait le greeting
+// + Premiers pas + Ma journée empilés au-dessus de Fiches Techniques quand il
+// cliquait sur Fiches Techniques dans la dropdown Cuisine), + clear défensif
+// du #app dans Router.navigate avant chaque handler.
+const CACHE_NAME = 'restosuite-v45';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

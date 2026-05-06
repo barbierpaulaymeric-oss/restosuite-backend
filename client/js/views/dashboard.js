@@ -94,57 +94,12 @@ function renderNavGuide() {
   });
 }
 
-async function renderDashboard() {
+// Recipes view (`#/recipes`) — Fiches Techniques list with search + type filters.
+async function renderRecipes() {
   const app = document.getElementById('app');
   const perms = getPermissions();
-  let account = getAccount();
-  // Stale localStorage may lack `name` (older login flows wrote partial shapes
-  // — see analytics.js:22-31 for the same pattern). Refresh /auth/me once
-  // before computing the greeting so we don't show "Bonjour Chef" to a
-  // logged-in user on return navigation.
-  if (account && !account.name && typeof API !== 'undefined' && typeof API.getMe === 'function') {
-    try {
-      const me = await API.getMe();
-      if (me && me.account) {
-        account = { ...account, ...me.account };
-        try { localStorage.setItem('restosuite_account', JSON.stringify(account)); } catch {}
-      }
-    } catch (_) { /* silent — fall back to 'Chef' */ }
-  }
-  const userName = (account && account.name) || 'Chef';
-  const greeting = getGreeting(userName);
-  const todayDate = formatFrenchDate(new Date());
 
   app.innerHTML = `
-    <header id="dashboard-greeting" role="banner" style="margin-bottom:var(--space-4)">
-      <div style="padding:var(--space-4);background:var(--color-accent-light);border-radius:var(--radius-lg);border-left:4px solid var(--color-accent)">
-        <h2 style="margin:0 0 2px 0;color:var(--text-primary);font-size:var(--text-xl)">${greeting}</h2>
-        <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)"><time datetime="${new Date().toISOString().slice(0, 10)}">${todayDate}</time></p>
-      </div>
-    </header>
-
-    <div id="dashboard-nav-guide"></div>
-    <div id="dashboard-onboarding"></div>
-
-    <a href="#/haccp/ma-journee" style="display:block;text-decoration:none;margin-bottom:var(--space-4)" aria-label="Ma journée HACCP">
-      <div style="background:var(--color-accent);border-radius:var(--radius-lg);padding:var(--space-4);display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);transition:opacity 0.15s" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-        <div style="display:flex;align-items:center;gap:var(--space-3)">
-          <i data-lucide="clipboard-check" style="width:28px;height:28px;color:white;flex-shrink:0"></i>
-          <div>
-            <div style="font-weight:700;color:white;font-size:var(--text-base)">Ma journée HACCP</div>
-            <div style="color:rgba(255,255,255,0.85);font-size:var(--text-sm)">Températures, nettoyage, réceptions du jour</div>
-          </div>
-        </div>
-        <i data-lucide="chevron-right" style="width:20px;height:20px;color:white;flex-shrink:0"></i>
-      </div>
-    </a>
-
-    <div id="dashboard-summary" role="region" aria-label="Résumé du jour" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
-
-    <div id="dashboard-alerts" role="region" aria-live="polite" aria-label="Alertes du jour"></div>
-    <div id="ai-suggestions-container" role="region" aria-label="Suggestions IA"></div>
-    <div id="daily-tip-container" role="region" aria-label="Astuce du jour"></div>
-
     <div class="page-header">
       <h1>Fiches Techniques</h1>
       ${perms.edit_recipes ? `<a href="#/new" class="btn btn-primary" aria-label="Créer une nouvelle fiche technique"><i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouvelle fiche</a>` : ''}
@@ -177,10 +132,10 @@ async function renderDashboard() {
     showToast('Erreur de chargement', 'error');
   }
 
-  // Render summary section
-  renderDailySummary(recipes, perms);
-
   const listEl = document.getElementById('recipe-list');
+  // Defensive: if the user navigated away mid-fetch, the list element no
+  // longer exists in the DOM. Bail rather than throwing.
+  if (!listEl) return;
   const searchInput = document.getElementById('recipe-search');
   let currentTypeFilter = '';
 
@@ -278,6 +233,76 @@ async function renderDashboard() {
       renderList(searchInput.value, currentTypeFilter);
     });
   });
+}
+
+// Home view (`#/`) — greeting, onboarding, Ma journée, KPI summary, alerts, AI tips.
+// Recipe list lives at `#/recipes` (renderRecipes), navigated via the Cuisine
+// dropdown — bug 2026-05-06: both routes used to map to renderDashboard, so
+// users on /recipes saw the home greeting + onboarding banner stacked above
+// their recipe list. Now each route renders its own concern.
+async function renderDashboard() {
+  const app = document.getElementById('app');
+  const perms = getPermissions();
+  let account = getAccount();
+  // Stale localStorage may lack `name` (older login flows wrote partial shapes
+  // — see analytics.js:22-31 for the same pattern). Refresh /auth/me once
+  // before computing the greeting so we don't show "Bonjour Chef" to a
+  // logged-in user on return navigation.
+  if (account && !account.name && typeof API !== 'undefined' && typeof API.getMe === 'function') {
+    try {
+      const me = await API.getMe();
+      if (me && me.account) {
+        account = { ...account, ...me.account };
+        try { localStorage.setItem('restosuite_account', JSON.stringify(account)); } catch {}
+      }
+    } catch (_) { /* silent — fall back to 'Chef' */ }
+  }
+  const userName = (account && account.name) || 'Chef';
+  const greeting = getGreeting(userName);
+  const todayDate = formatFrenchDate(new Date());
+
+  app.innerHTML = `
+    <header id="dashboard-greeting" role="banner" style="margin-bottom:var(--space-4)">
+      <div style="padding:var(--space-4);background:var(--color-accent-light);border-radius:var(--radius-lg);border-left:4px solid var(--color-accent)">
+        <h2 style="margin:0 0 2px 0;color:var(--text-primary);font-size:var(--text-xl)">${greeting}</h2>
+        <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)"><time datetime="${new Date().toISOString().slice(0, 10)}">${todayDate}</time></p>
+      </div>
+    </header>
+
+    <div id="dashboard-nav-guide"></div>
+    <div id="dashboard-onboarding"></div>
+
+    <a href="#/haccp/ma-journee" style="display:block;text-decoration:none;margin-bottom:var(--space-4)" aria-label="Ma journée HACCP">
+      <div style="background:var(--color-accent);border-radius:var(--radius-lg);padding:var(--space-4);display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);transition:opacity 0.15s" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+        <div style="display:flex;align-items:center;gap:var(--space-3)">
+          <i data-lucide="clipboard-check" style="width:28px;height:28px;color:white;flex-shrink:0"></i>
+          <div>
+            <div style="font-weight:700;color:white;font-size:var(--text-base)">Ma journée HACCP</div>
+            <div style="color:rgba(255,255,255,0.85);font-size:var(--text-sm)">Températures, nettoyage, réceptions du jour</div>
+          </div>
+        </div>
+        <i data-lucide="chevron-right" style="width:20px;height:20px;color:white;flex-shrink:0"></i>
+      </div>
+    </a>
+
+    <div id="dashboard-summary" role="region" aria-label="Résumé du jour" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
+
+    <div id="dashboard-alerts" role="region" aria-live="polite" aria-label="Alertes du jour"></div>
+    <div id="ai-suggestions-container" role="region" aria-label="Suggestions IA"></div>
+    <div id="daily-tip-container" role="region" aria-label="Astuce du jour"></div>
+  `;
+  lucide.createIcons();
+
+  let recipes = [];
+  try {
+    const response = await API.getRecipes();
+    recipes = response.recipes || [];
+  } catch (e) {
+    showToast('Erreur de chargement', 'error');
+  }
+
+  // Render summary section (uses recipe count + total cost for KPI tiles)
+  renderDailySummary(recipes, perms);
 
   // Nav orientation guide (dismissible, shown once per major version)
   renderNavGuide();
@@ -532,10 +557,10 @@ function renderDailySummary(recipes, perms) {
   if (perms.view_costs && recipes.length > 0) {
     const totalCost = recipes.reduce((sum, r) => sum + (r.total_cost || 0), 0);
     html += `
-      <button type="button" data-scroll-to="recipe-list" aria-label="Coût total matière — voir les fiches" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;display:block;width:100%;cursor:pointer;font:inherit;color:inherit;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-success)';this.style.boxShadow='0 0 0 2px rgba(var(--color-success-rgb,34,197,94),0.15)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
+      <a href="#/recipes" role="group" aria-label="Coût total matière — voir les fiches" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;color:inherit;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-success)';this.style.boxShadow='0 0 0 2px rgba(var(--color-success-rgb,34,197,94),0.15)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
         <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-success)">${formatCurrency(totalCost)}</div>
         <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Coût total matière</div>
-      </button>
+      </a>
     `;
   }
 
@@ -566,15 +591,6 @@ function renderDailySummary(recipes, perms) {
   }
 
   summaryEl.innerHTML = html;
-
-  // Wire up scroll-to-section on stat cards (#/recipes is the dashboard itself,
-  // so plain anchors looked like a no-op; smooth-scroll to the recipe list instead).
-  summaryEl.querySelectorAll('button[data-scroll-to]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = document.getElementById(btn.dataset.scrollTo);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  });
 
   // Populate covers KPI asynchronously so it doesn't block the rest
   if (typeof API !== 'undefined' && typeof API.getAnalyticsCovers === 'function') {
