@@ -397,7 +397,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   // are unset, so dev machines without OVH creds boot silently.
   // One-time diagnostic so Render logs let us verify env vars without exposing
   // the password (catches "!" mangled by bash history expansion, missing var,
-  // wrong host). Run scripts/test-imap.js for a full DNS+TLS+auth probe.
+  // wrong host). Run server/scripts/test-imap.js for a full DNS+TLS+auth probe.
   {
     const host = process.env.MERCURIALE_IMAP_HOST || 'ssl0.ovh.net';
     const port = Number(process.env.MERCURIALE_IMAP_PORT) || 993;

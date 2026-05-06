@@ -4,12 +4,26 @@
 // MIME body via mailparser into a normalized {from, attachments[]} shape, then
 // optionally marks the messages \Seen so we don't reprocess them next cycle.
 //
-// Error handling is deliberately defensive: ImapFlow extends EventEmitter and
-// emits 'error' events on socket timeout / TLS handshake failures. Without an
-// 'error' listener, Node crashes the whole process with "Unhandled error".
-// Render's outbound TLS to ssl0.ovh.net is sometimes slow enough to trip the
-// default timeouts, so we attach the listener BEFORE connect() and surface a
-// rejected promise from a single connect-or-fail wrapper instead.
+// Two non-obvious correctness rules baked into this file:
+//
+// 1. ImapFlow extends EventEmitter and emits async 'error' events on socket
+//    timeout / TLS handshake failures. Without an 'error' listener, Node
+//    crashes the whole process with "Unhandled error". Render's outbound TLS
+//    to ssl0.ovh.net is sometimes slow enough to trip the default timeouts,
+//    so we attach the listener BEFORE connect() and surface a rejected
+//    promise from the connect-or-fail wrapper instead.
+//
+// 2. ImapFlow does NOT allow concurrent commands during a fetch iteration —
+//    calling messageFlagsAdd inside the for-await loop corrupts the pipeline
+//    and the next command throws "Connection not available" (code:NoConnection
+//    from imap-flow.js:3506/3632 on a destroyed/!usable socket). The message
+//    then stays UNSEEN and every subsequent 5-min poll repeats the same
+//    crash forever. We drain the fetch generator into an array first, then
+//    parse + mark-seen in a separate pass.
+//
+// Step-by-step console logs exist on purpose — when this fails on Render the
+// only signal we have is the log line, so each operation announces itself
+// before running and reports its result after.
 
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
@@ -33,35 +47,56 @@ function buildClient() {
 
 async function fetchUnseen({ markSeen = true } = {}) {
   const client = buildClient();
+  const t0 = Date.now();
+  const elapsed = () => `${Date.now() - t0}ms`;
 
-  // Catch async ImapFlow 'error' events so a stray socket timeout after we've
-  // returned doesn't crash the process. We re-throw the most recent one only
-  // if our own try-block hasn't already failed.
   let asyncError = null;
   client.on('error', (err) => {
     asyncError = err;
-    console.warn('📧 IMAP async error:', err && err.message);
+    console.warn(`📧 IMAP async error event: code=${err && err.code} message=${err && err.message}`);
+  });
+  client.on('close', () => {
+    console.warn(`📧 IMAP socket close event (${elapsed()})`);
   });
 
+  console.log('📧 IMAP: connecting…');
   try {
     await client.connect();
   } catch (e) {
-    console.warn('📧 IMAP connect failed:', e && e.message);
+    console.warn(`📧 IMAP connect failed (${elapsed()}): code=${e && e.code} message=${e && e.message}`);
     try { await client.logout(); } catch {}
     throw e;
   }
+  console.log(
+    `📧 IMAP: connected (${elapsed()}) authenticated=${client.authenticated} usable=${client.usable}`
+  );
 
   const out = [];
   try {
+    console.log('📧 IMAP: acquiring INBOX lock…');
     const lock = await client.getMailboxLock('INBOX');
+    console.log(
+      `📧 IMAP: INBOX lock acquired (exists=${client.mailbox && client.mailbox.exists} unseen=${client.mailbox && client.mailbox.unseen})`
+    );
     try {
+      // Phase 1 — drain fetch generator BEFORE issuing any other command.
+      console.log('📧 IMAP: fetching UNSEEN…');
+      const collected = [];
       for await (const msg of client.fetch({ seen: false }, { source: true, uid: true })) {
+        collected.push({ uid: msg.uid, source: msg.source });
+      }
+      console.log(`📧 IMAP: fetched ${collected.length} unseen message(s)`);
+
+      // Phase 2 — fetch generator is closed; safe to issue messageFlagsAdd.
+      for (const msg of collected) {
         let parsed;
-        try { parsed = await simpleParser(msg.source); }
-        catch (e) {
-          // Skip messages we can't parse but mark them seen so we don't loop forever.
+        try {
+          parsed = await simpleParser(msg.source);
+        } catch (e) {
+          console.warn(`📧 IMAP: simpleParser failed uid=${msg.uid} — ${e.message}`);
           if (markSeen) {
-            try { await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true }); } catch {}
+            try { await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true }); }
+            catch (e2) { console.warn(`📧 IMAP: markSeen (post-parse-error) failed uid=${msg.uid} — ${e2.message}`); }
           }
           continue;
         }
@@ -81,14 +116,19 @@ async function fetchUnseen({ markSeen = true } = {}) {
           })),
         });
         if (markSeen) {
-          try { await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true }); } catch {}
+          try {
+            await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true });
+          } catch (e) {
+            console.warn(`📧 IMAP: markSeen failed uid=${msg.uid} — ${e.message}`);
+          }
         }
       }
     } finally {
-      lock.release();
+      try { lock.release(); } catch (e) { console.warn(`📧 IMAP: lock.release threw — ${e.message}`); }
     }
   } finally {
     try { await client.logout(); } catch {}
+    console.log(`📧 IMAP: cycle done (${elapsed()}) returned=${out.length}`);
   }
 
   if (asyncError && out.length === 0) throw asyncError;
