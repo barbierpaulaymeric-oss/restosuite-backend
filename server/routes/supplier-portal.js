@@ -1234,6 +1234,7 @@ router.post('/save-mercuriale', requireSupplierAuth, express.json({ limit: '5mb'
   const { db } = require('../db');
   let created = 0;
   let updated = 0;
+  let unchanged = 0;
 
   const tx = db.transaction(() => {
     for (const it of cleaned) {
@@ -1241,17 +1242,33 @@ router.post('/save-mercuriale', requireSupplierAuth, express.json({ limit: '5mb'
       let existing = null;
       if (it.sku) {
         existing = get(
-          'SELECT id, price FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(sku) = LOWER(?)',
+          'SELECT * FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(sku) = LOWER(?)',
           [supplierId, rid, it.sku]
         );
       }
       if (!existing) {
         existing = get(
-          'SELECT id, price FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(product_name) = LOWER(?)',
+          'SELECT * FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(product_name) = LOWER(?)',
           [supplierId, rid, it.name]
         );
       }
       if (existing) {
+        // Skip silently when nothing actually changed — avoids spurious
+        // updated_at bumps and price-change notifications on re-imports of
+        // the same mercuriale.
+        const sameAll =
+          (existing.product_name || '') === it.name &&
+          (existing.category || null) === (it.category || null) &&
+          (existing.unit || null) === it.unit &&
+          Number(existing.price) === Number(it.price) &&
+          (existing.sku || null) === (it.sku || null) &&
+          Number(existing.tva_rate) === Number(it.tva_rate) &&
+          (existing.packaging || null) === (it.packaging || null);
+        if (sameAll) {
+          unchanged++;
+          continue;
+        }
+        // Always overwrite with incoming data — newest mercuriale wins.
         run(
           `UPDATE supplier_catalog
               SET product_name = ?, category = ?, unit = ?, price = ?,
@@ -1259,7 +1276,7 @@ router.post('/save-mercuriale', requireSupplierAuth, express.json({ limit: '5mb'
             WHERE id = ? AND restaurant_id = ?`,
           [it.name, it.category, it.unit, it.price, it.sku, it.tva_rate, it.packaging, existing.id, rid]
         );
-        if (existing.price !== it.price) {
+        if (Number(existing.price) !== Number(it.price)) {
           run(
             'INSERT INTO price_change_notifications (restaurant_id, supplier_id, product_name, old_price, new_price, change_type) VALUES (?, ?, ?, ?, ?, ?)',
             [rid, supplierId, it.name, existing.price, it.price, 'update']
@@ -1289,7 +1306,7 @@ router.post('/save-mercuriale', requireSupplierAuth, express.json({ limit: '5mb'
     return res.status(500).json({ error: 'Erreur enregistrement' });
   }
 
-  res.status(201).json({ success: true, created, updated, total: created + updated });
+  res.status(201).json({ success: true, created, updated, unchanged, total: created + updated });
 });
 
 // ═════════════════════════════════════════

@@ -1,11 +1,14 @@
-// Bumped 2026-05-06 (v31): Service mode overhaul — new SALLE card-grid view
-// (zone filter + status pills + live timer + take-order modal w/ split-bill)
-// and new CUISINE KDS with 3 lanes (Nouveau / En préparation / Prêt) at the
-// item level. New endpoints /api/service/floor and /api/service/kds, new
-// item state 'en_préparation' in the order_items state machine. Service-hours
-// configuration moved to /settings/service-hours.
-// (v30 was floating bottom nav + remove duplicate mic on /ia.)
-const CACHE_NAME = 'restosuite-v31';
+// Bumped 2026-05-06 (v32): Mercuriale import accepts unmatched products
+// — new "Nouveau produit" (blue) vs "Correspondance trouvée" (green) badges,
+// import button works for ALL selected items (writes unmatched to
+// supplier_catalog with NULL ingredient_id), order form lists catalog-only
+// products via UNION on /suppliers/:id/prices. Migration adds
+// supplier_catalog.ingredient_id. Dedup: identical re-imports are skipped
+// silently; price changes are logged in price_change_notifications across
+// all 3 import paths (manual, supplier-portal, mail poller). Stats card UI
+// drops Taux de correspondance.
+// (v31 was Service mode overhaul — Salle card-grid + KDS lanes.)
+const CACHE_NAME = 'restosuite-v32';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

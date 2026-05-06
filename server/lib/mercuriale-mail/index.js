@@ -80,24 +80,37 @@ function buildUnmatchedAlert(email) {
   };
 }
 
+// Upsert mercuriale items into supplier_catalog for one (supplier, restaurant)
+// pair. Returns detailed counts: created/updated/unchanged. An item is
+// considered "unchanged" — and therefore silently skipped — when name, price,
+// unit, sku, packaging and tva_rate all match the existing row, so we don't
+// bump updated_at or fire downstream notifications for a no-op import.
+// Backward-compatible: still returns a number-coercible total via valueOf so
+// callers that did `+= upsertCatalog(...)` keep working.
 function upsertCatalog(rid, supplierId, items) {
-  let n = 0;
+  let created = 0, updated = 0, unchanged = 0;
   const tx = db.transaction(() => {
     for (const it of items) {
       let existing = null;
       if (it.sku) {
         existing = get(
-          'SELECT id, price FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(sku) = LOWER(?)',
+          'SELECT * FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(sku) = LOWER(?)',
           [supplierId, rid, it.sku]
         );
       }
       if (!existing) {
         existing = get(
-          'SELECT id, price FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(product_name) = LOWER(?)',
+          'SELECT * FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(product_name) = LOWER(?)',
           [supplierId, rid, it.name]
         );
       }
       if (existing) {
+        if (catalogRowMatches(existing, it)) {
+          unchanged++;
+          continue;
+        }
+        // Always overwrite with the incoming mercuriale data — suppliers re-send
+        // mercuriales weekly/monthly, the latest version is authoritative.
         run(
           `UPDATE supplier_catalog
               SET product_name = ?, category = ?, unit = ?, price = ?,
@@ -105,6 +118,16 @@ function upsertCatalog(rid, supplierId, items) {
             WHERE id = ? AND restaurant_id = ?`,
           [it.name, it.category, it.unit, it.price, it.sku, it.tva_rate, it.packaging, existing.id, rid]
         );
+        // Audit price evolution so the restaurateur can review history later.
+        if (Number(existing.price) !== Number(it.price)) {
+          run(
+            `INSERT INTO price_change_notifications
+               (restaurant_id, supplier_id, product_name, old_price, new_price, change_type)
+             VALUES (?, ?, ?, ?, ?, 'update')`,
+            [rid, supplierId, it.name, existing.price, it.price]
+          );
+        }
+        updated++;
       } else {
         run(
           `INSERT INTO supplier_catalog
@@ -112,12 +135,40 @@ function upsertCatalog(rid, supplierId, items) {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [rid, supplierId, it.name, it.category, it.unit, it.price, it.sku, it.tva_rate, it.packaging]
         );
+        run(
+          `INSERT INTO price_change_notifications
+             (restaurant_id, supplier_id, product_name, old_price, new_price, change_type)
+           VALUES (?, ?, ?, NULL, ?, 'new')`,
+          [rid, supplierId, it.name, it.price]
+        );
+        created++;
       }
-      n++;
     }
   });
   tx();
-  return n;
+  // Object that doubles as a number for legacy `n += upsertCatalog(...)` callers.
+  const total = created + updated;
+  return Object.assign(Object.create({ valueOf() { return total; } }), {
+    created, updated, unchanged, total,
+  });
+}
+
+// True if the new mercuriale item is byte-for-byte identical to the existing
+// catalog row on the fields the upsert would otherwise overwrite. Loose-equals
+// numeric compare so 1.5 === '1.5' (stringly DB return) doesn't churn rows.
+function catalogRowMatches(existing, item) {
+  const norm = (v) => v == null || v === '' ? null : v;
+  // eslint-disable-next-line eqeqeq
+  const numEq = (a, b) => Number(a) == Number(b);
+  return (
+    norm(existing.product_name) === norm(item.name) &&
+    norm(existing.category) === norm(item.category) &&
+    norm(existing.unit) === norm(item.unit) &&
+    numEq(existing.price, item.price) &&
+    norm(existing.sku) === norm(item.sku) &&
+    numEq(existing.tva_rate, item.tva_rate || 5.5) &&
+    norm(existing.packaging) === norm(item.packaging)
+  );
 }
 
 async function runInboundCycle({ fetchFn, sendAlertFn } = {}) {
@@ -164,7 +215,7 @@ async function runInboundCycle({ fetchFn, sendAlertFn } = {}) {
           console.log(
             `📧 Mercuriale matched uid=${email.uid} restaurant=${match.restaurantId}`
               + ` via ${match.matchedBy}=${match.matchedValue}`
-              + ` supplier=${out.supplierId} items=${n}`
+              + ` supplier=${out.supplierId} items=${Number(n)}`
           );
           continue;
         }
@@ -198,7 +249,7 @@ async function runInboundCycle({ fetchFn, sendAlertFn } = {}) {
           legacyHit = true;
           console.log(
             `📧 Mercuriale matched uid=${email.uid} restaurant=${r.id}`
-              + ` via sender=${email.from} supplier=${out.supplierId} items=${n}`
+              + ` via sender=${email.from} supplier=${out.supplierId} items=${Number(n)}`
           );
         } catch (e) {
           result.errors.push({ uid: email.uid, error: e.message });

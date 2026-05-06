@@ -99,24 +99,23 @@ async function renderMercurialeResults(data) {
     `<option value="${s.id}" ${data.supplier_id === s.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
   ).join('');
 
+  const matchedCount = Number(data.summary.matched_items) || 0;
+  const newCount = Math.max(0, (Number(data.summary.total_items) || 0) - matchedCount);
+
   el.innerHTML = `
     <!-- Summary -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)">
       <div class="card" style="padding:var(--space-3);text-align:center">
         <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-accent)">${data.summary.total_items}</div>
         <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Produits détectés</div>
       </div>
       <div class="card" style="padding:var(--space-3);text-align:center">
-        <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-success)">${data.summary.matched_items}</div>
-        <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Correspondances</div>
+        <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-success)">${matchedCount}</div>
+        <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Correspondances trouvées</div>
       </div>
       <div class="card" style="padding:var(--space-3);text-align:center">
-        <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-warning)">${data.summary.unmatched_items}</div>
-        <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Non reconnus</div>
-      </div>
-      <div class="card" style="padding:var(--space-3);text-align:center">
-        <div style="font-size:var(--text-xl);font-weight:700">${data.summary.match_rate}%</div>
-        <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Taux de correspondance</div>
+        <div style="font-size:var(--text-xl);font-weight:700;color:#3B82F6">${newCount}</div>
+        <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Nouveaux produits</div>
       </div>
     </div>
 
@@ -149,17 +148,24 @@ async function renderMercurialeResults(data) {
         <tbody id="merc-items-body">
           ${(data.items || []).map((item, i) => {
             const matched = item.ingredient_id ? true : false;
-            const confidence = item.match_confidence === 'exact' ? '✅' : item.match_confidence === 'fuzzy' ? '🔶' : '❌';
+            const matchedBadge = `
+              <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(34,197,94,0.12);color:#16A34A;font-size:11px;font-weight:600">
+                <span style="width:6px;height:6px;border-radius:50%;background:#16A34A;display:inline-block"></span>
+                Correspondance trouvée
+              </span>
+              <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">→ ${escapeHtml(item.matched_ingredient || '')}</div>`;
+            const newBadge = `
+              <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(59,130,246,0.12);color:#2563EB;font-size:11px;font-weight:600">
+                <span style="width:6px;height:6px;border-radius:50%;background:#2563EB;display:inline-block"></span>
+                Nouveau produit
+              </span>`;
             return `
-              <tr style="${!matched ? 'opacity:0.6' : ''}">
-                <td><input type="checkbox" class="merc-item-cb" data-idx="${i}" ${matched ? 'checked' : ''} data-ui="custom"></td>
+              <tr>
+                <td><input type="checkbox" class="merc-item-cb" data-idx="${i}" checked data-ui="custom"></td>
                 <td style="font-weight:500">${escapeHtml(item.product_name || '—')}
                   ${item.organic ? '<span style="color:var(--color-success);font-size:11px"> 🌿 Bio</span>' : ''}
                 </td>
-                <td>
-                  ${matched ? `<span style="color:var(--color-success)">${confidence} ${escapeHtml(item.matched_ingredient)}</span>` :
-                    `<span style="color:var(--text-tertiary)">Non reconnu</span>`}
-                </td>
+                <td>${matched ? matchedBadge : newBadge}</td>
                 <td class="numeric mono" style="font-weight:600">${item.price != null ? formatCurrency(item.price) : '—'}</td>
                 <td>${escapeHtml(item.unit || '—')}</td>
                 <td style="font-size:var(--text-xs);color:var(--text-secondary)">${escapeHtml(item.category || '—')}</td>
@@ -176,7 +182,7 @@ async function renderMercurialeResults(data) {
         <i data-lucide="refresh-cw" style="width:16px;height:16px"></i> Nouveau scan
       </button>
       <button class="btn btn-primary" id="merc-import-btn" style="min-width:200px">
-        <i data-lucide="download" style="width:16px;height:16px"></i> Importer les prix sélectionnés
+        <i data-lucide="download" style="width:16px;height:16px"></i> Importer les produits sélectionnés
       </button>
     </div>
   `;
@@ -206,37 +212,51 @@ async function importMercurialeItems() {
     return;
   }
 
+  // Send ALL selected items — matched (with ingredient_id) and unmatched
+  // (catalog-only). Server handles both paths: matched products land in
+  // supplier_prices + supplier_catalog, unmatched in supplier_catalog only.
   const items = checkedIdxs
     .map(i => _mercurialeData.items[i])
-    .filter(item => item.ingredient_id && item.price > 0)
+    .filter(item => item && item.product_name && Number(item.price) > 0)
     .map(item => ({
-      ingredient_id: item.ingredient_id,
-      price: item.price,
-      unit: item.unit || 'kg'
+      ingredient_id: item.ingredient_id || null,
+      product_name: item.product_name,
+      price: Number(item.price),
+      unit: item.unit || 'kg',
+      category: item.category || null,
+      sku: item.sku || null
     }));
 
   if (items.length === 0) {
-    showToast('Aucun produit reconnu dans la sélection', 'error');
+    showToast('Aucun produit valide dans la sélection (prix manquant ?)', 'error');
     return;
   }
 
   try {
     const result = await API.importMercuriale({ supplier_id: Number(supplierId), items });
-    showToast(`Import réussi : ${result.updated} mis à jour, ${result.created} nouveaux prix`, 'success');
+    const catalogNew = result.catalog_created || 0;
+    const catalogUpdated = result.catalog_updated || 0;
+    const matchedNew = result.matched_created || 0;
+    const matchedUpdated = result.matched_updated || 0;
+    const unchanged = result.unchanged || 0;
+    const totalImported = catalogNew + catalogUpdated;
+    showToast(`Import réussi : ${totalImported} produits enregistrés${unchanged ? ` (${unchanged} déjà à jour)` : ''}`, 'success');
 
-    // Show result summary
     const el = document.getElementById('merc-results');
     el.innerHTML = `
       <div style="text-align:center;padding:var(--space-8)">
         <div style="font-size:3rem;margin-bottom:var(--space-3)">✅</div>
         <h2>Import terminé</h2>
-        <p style="color:var(--text-secondary);margin-bottom:var(--space-4)">
-          <strong>${result.updated}</strong> prix mis à jour ·
-          <strong>${result.created}</strong> nouveaux prix ·
-          <strong>${result.skipped}</strong> ignorés
+        <p style="color:var(--text-secondary);margin-bottom:var(--space-4);line-height:1.7">
+          <strong>${catalogNew}</strong> nouveaux produits ajoutés au catalogue ·
+          <strong>${catalogUpdated}</strong> mis à jour
+          ${unchanged ? `<br><span style="color:var(--text-tertiary)">${unchanged} produits déjà à jour (ignorés)</span>` : ''}
+          ${(matchedNew + matchedUpdated) > 0 ? `<br><span style="color:var(--color-success)">${matchedNew + matchedUpdated} prix synchronisés avec vos ingrédients</span>` : ''}
+          ${result.skipped ? `<br><span style="color:var(--color-warning)">${result.skipped} produits ignorés (données invalides)</span>` : ''}
         </p>
-        <div style="display:flex;gap:var(--space-3);justify-content:center">
+        <div style="display:flex;gap:var(--space-3);justify-content:center;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="renderImportMercuriale()">Nouveau scan</button>
+          <a href="#/orders/new" class="btn btn-secondary">Créer une commande</a>
           <a href="#/mercuriale" class="btn btn-secondary">Voir la mercuriale</a>
         </div>
       </div>

@@ -15657,16 +15657,18 @@ async function renderNewOrder() {
     const btn = e.target.closest(".ingredient-item button");
     if (!btn) return;
     const ingredientItem = e.target.closest(".ingredient-item");
-    const ingredientId = parseInt(ingredientItem.dataset.id);
-    const product = _poSupplierProducts.find((p) => p.ingredient_id === ingredientId);
+    const key = ingredientItem.dataset.key;
+    const product = _poSupplierProducts.find((p) => productKey(p) === key);
     if (!product) return;
-    const existing = _poItems.find((i) => i.ingredient_id === ingredientId);
+    const existing = _poItems.find((i) => productKey(i) === key);
     if (existing) {
       existing.quantity++;
     } else {
       _poItems.push({
-        ingredient_id: ingredientId,
-        name: product.ingredient_name,
+        ingredient_id: product.ingredient_id || null,
+        catalog_id: product.catalog_id || null,
+        name: product.ingredient_name || product.product_name,
+        product_name: product.ingredient_name || product.product_name,
         quantity: 1,
         unit: product.unit || "unit\xE9",
         unit_price: Number(product.price) || 0
@@ -15713,14 +15715,23 @@ async function loadSupplierProducts() {
   ingredientsFiltered.innerHTML = _poSupplierProducts.map((p) => {
     const price = Number(p.price) || 0;
     const unit = p.unit || "unit\xE9";
+    const displayName = p.ingredient_name || p.product_name || "\u2014";
+    const isCatalogOnly = !p.ingredient_id && p.catalog_id;
+    const catalogBadge = isCatalogOnly ? `<span style="font-size:10px;padding:1px 6px;border-radius:999px;background:rgba(59,130,246,0.12);color:#2563EB;font-weight:600;margin-left:6px">Catalogue</span>` : "";
     return `
-      <div class="ingredient-item" data-id="${p.ingredient_id}" data-name="${escapeHtml(p.ingredient_name || "")}" role="listitem" style="padding:8px 12px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;gap:12px">
-        <span style="flex:1;min-width:0">${escapeHtml(p.ingredient_name || "\u2014")}</span>
+      <div class="ingredient-item" data-key="${productKey(p)}" data-name="${escapeHtml(displayName)}" role="listitem" style="padding:8px 12px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <span style="flex:1;min-width:0">${escapeHtml(displayName)}${catalogBadge}</span>
         <span class="text-secondary text-sm" style="font-family:var(--font-mono);white-space:nowrap">${formatCurrency(price)} / ${escapeHtml(unit)}</span>
-        <button type="button" class="btn btn-sm btn-primary" aria-label="Ajouter ${escapeHtml(p.ingredient_name || "")} \xE0 la commande">+</button>
+        <button type="button" class="btn btn-sm btn-primary" aria-label="Ajouter ${escapeHtml(displayName)} \xE0 la commande">+</button>
       </div>
     `;
   }).join("");
+}
+function productKey(p) {
+  if (p && p.ingredient_id) return `ing-${p.ingredient_id}`;
+  if (p && p.catalog_id) return `cat-${p.catalog_id}`;
+  if (p && p.product_name) return `name-${String(p.product_name).toLowerCase()}`;
+  return "";
 }
 function updatePOItemsDisplay() {
   const itemsTableEl = document.getElementById("po-items-table");
@@ -15807,7 +15818,8 @@ async function submitPurchaseOrder(sendImmediately) {
       supplier_id: _poSelectedSupplierId,
       status: sendImmediately ? "envoy\xE9e" : "brouillon",
       items: _poItems.map((i) => ({
-        ingredient_id: i.ingredient_id,
+        ingredient_id: i.ingredient_id || null,
+        product_name: i.product_name || i.name,
         quantity: i.quantity,
         unit: i.unit,
         unit_price: i.unit_price
@@ -26963,24 +26975,22 @@ async function renderMercurialeResults(data) {
   const supplierOptions = suppliers.map(
     (s) => `<option value="${s.id}" ${data.supplier_id === s.id ? "selected" : ""}>${escapeHtml(s.name)}</option>`
   ).join("");
+  const matchedCount = Number(data.summary.matched_items) || 0;
+  const newCount = Math.max(0, (Number(data.summary.total_items) || 0) - matchedCount);
   el.innerHTML = `
     <!-- Summary -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)">
       <div class="card" style="padding:var(--space-3);text-align:center">
         <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-accent)">${data.summary.total_items}</div>
         <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Produits d\xE9tect\xE9s</div>
       </div>
       <div class="card" style="padding:var(--space-3);text-align:center">
-        <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-success)">${data.summary.matched_items}</div>
-        <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Correspondances</div>
+        <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-success)">${matchedCount}</div>
+        <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Correspondances trouv\xE9es</div>
       </div>
       <div class="card" style="padding:var(--space-3);text-align:center">
-        <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-warning)">${data.summary.unmatched_items}</div>
-        <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Non reconnus</div>
-      </div>
-      <div class="card" style="padding:var(--space-3);text-align:center">
-        <div style="font-size:var(--text-xl);font-weight:700">${data.summary.match_rate}%</div>
-        <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Taux de correspondance</div>
+        <div style="font-size:var(--text-xl);font-weight:700;color:#3B82F6">${newCount}</div>
+        <div style="font-size:var(--text-xs);color:var(--text-tertiary)">Nouveaux produits</div>
       </div>
     </div>
 
@@ -27013,16 +27023,24 @@ async function renderMercurialeResults(data) {
         <tbody id="merc-items-body">
           ${(data.items || []).map((item, i) => {
     const matched = item.ingredient_id ? true : false;
-    const confidence = item.match_confidence === "exact" ? "\u2705" : item.match_confidence === "fuzzy" ? "\u{1F536}" : "\u274C";
+    const matchedBadge = `
+              <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(34,197,94,0.12);color:#16A34A;font-size:11px;font-weight:600">
+                <span style="width:6px;height:6px;border-radius:50%;background:#16A34A;display:inline-block"></span>
+                Correspondance trouv\xE9e
+              </span>
+              <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">\u2192 ${escapeHtml(item.matched_ingredient || "")}</div>`;
+    const newBadge = `
+              <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(59,130,246,0.12);color:#2563EB;font-size:11px;font-weight:600">
+                <span style="width:6px;height:6px;border-radius:50%;background:#2563EB;display:inline-block"></span>
+                Nouveau produit
+              </span>`;
     return `
-              <tr style="${!matched ? "opacity:0.6" : ""}">
-                <td><input type="checkbox" class="merc-item-cb" data-idx="${i}" ${matched ? "checked" : ""} data-ui="custom"></td>
+              <tr>
+                <td><input type="checkbox" class="merc-item-cb" data-idx="${i}" checked data-ui="custom"></td>
                 <td style="font-weight:500">${escapeHtml(item.product_name || "\u2014")}
                   ${item.organic ? '<span style="color:var(--color-success);font-size:11px"> \u{1F33F} Bio</span>' : ""}
                 </td>
-                <td>
-                  ${matched ? `<span style="color:var(--color-success)">${confidence} ${escapeHtml(item.matched_ingredient)}</span>` : `<span style="color:var(--text-tertiary)">Non reconnu</span>`}
-                </td>
+                <td>${matched ? matchedBadge : newBadge}</td>
                 <td class="numeric mono" style="font-weight:600">${item.price != null ? formatCurrency(item.price) : "\u2014"}</td>
                 <td>${escapeHtml(item.unit || "\u2014")}</td>
                 <td style="font-size:var(--text-xs);color:var(--text-secondary)">${escapeHtml(item.category || "\u2014")}</td>
@@ -27039,7 +27057,7 @@ async function renderMercurialeResults(data) {
         <i data-lucide="refresh-cw" style="width:16px;height:16px"></i> Nouveau scan
       </button>
       <button class="btn btn-primary" id="merc-import-btn" style="min-width:200px">
-        <i data-lucide="download" style="width:16px;height:16px"></i> Importer les prix s\xE9lectionn\xE9s
+        <i data-lucide="download" style="width:16px;height:16px"></i> Importer les produits s\xE9lectionn\xE9s
       </button>
     </div>
   `;
@@ -27061,30 +27079,42 @@ async function importMercurialeItems() {
     showToast("S\xE9lectionnez au moins un produit", "error");
     return;
   }
-  const items = checkedIdxs.map((i) => _mercurialeData.items[i]).filter((item) => item.ingredient_id && item.price > 0).map((item) => ({
-    ingredient_id: item.ingredient_id,
-    price: item.price,
-    unit: item.unit || "kg"
+  const items = checkedIdxs.map((i) => _mercurialeData.items[i]).filter((item) => item && item.product_name && Number(item.price) > 0).map((item) => ({
+    ingredient_id: item.ingredient_id || null,
+    product_name: item.product_name,
+    price: Number(item.price),
+    unit: item.unit || "kg",
+    category: item.category || null,
+    sku: item.sku || null
   }));
   if (items.length === 0) {
-    showToast("Aucun produit reconnu dans la s\xE9lection", "error");
+    showToast("Aucun produit valide dans la s\xE9lection (prix manquant ?)", "error");
     return;
   }
   try {
     const result = await API.importMercuriale({ supplier_id: Number(supplierId), items });
-    showToast(`Import r\xE9ussi : ${result.updated} mis \xE0 jour, ${result.created} nouveaux prix`, "success");
+    const catalogNew = result.catalog_created || 0;
+    const catalogUpdated = result.catalog_updated || 0;
+    const matchedNew = result.matched_created || 0;
+    const matchedUpdated = result.matched_updated || 0;
+    const unchanged = result.unchanged || 0;
+    const totalImported = catalogNew + catalogUpdated;
+    showToast(`Import r\xE9ussi : ${totalImported} produits enregistr\xE9s${unchanged ? ` (${unchanged} d\xE9j\xE0 \xE0 jour)` : ""}`, "success");
     const el = document.getElementById("merc-results");
     el.innerHTML = `
       <div style="text-align:center;padding:var(--space-8)">
         <div style="font-size:3rem;margin-bottom:var(--space-3)">\u2705</div>
         <h2>Import termin\xE9</h2>
-        <p style="color:var(--text-secondary);margin-bottom:var(--space-4)">
-          <strong>${result.updated}</strong> prix mis \xE0 jour \xB7
-          <strong>${result.created}</strong> nouveaux prix \xB7
-          <strong>${result.skipped}</strong> ignor\xE9s
+        <p style="color:var(--text-secondary);margin-bottom:var(--space-4);line-height:1.7">
+          <strong>${catalogNew}</strong> nouveaux produits ajout\xE9s au catalogue \xB7
+          <strong>${catalogUpdated}</strong> mis \xE0 jour
+          ${unchanged ? `<br><span style="color:var(--text-tertiary)">${unchanged} produits d\xE9j\xE0 \xE0 jour (ignor\xE9s)</span>` : ""}
+          ${matchedNew + matchedUpdated > 0 ? `<br><span style="color:var(--color-success)">${matchedNew + matchedUpdated} prix synchronis\xE9s avec vos ingr\xE9dients</span>` : ""}
+          ${result.skipped ? `<br><span style="color:var(--color-warning)">${result.skipped} produits ignor\xE9s (donn\xE9es invalides)</span>` : ""}
         </p>
-        <div style="display:flex;gap:var(--space-3);justify-content:center">
+        <div style="display:flex;gap:var(--space-3);justify-content:center;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="renderImportMercuriale()">Nouveau scan</button>
+          <a href="#/orders/new" class="btn btn-secondary">Cr\xE9er une commande</a>
           <a href="#/mercuriale" class="btn btn-secondary">Voir la mercuriale</a>
         </div>
       </div>

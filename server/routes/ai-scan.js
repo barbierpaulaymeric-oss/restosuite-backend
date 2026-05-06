@@ -393,53 +393,138 @@ router.post('/import-mercuriale', (req, res) => {
     const supplier = get('SELECT id, name FROM suppliers WHERE id = ? AND restaurant_id = ?', [Number(supplier_id), rid]);
     if (!supplier) return res.status(404).json({ error: 'Fournisseur introuvable' });
 
-    let updated = 0;
-    let created = 0;
-    let skipped = 0;
+    let priceUpdated = 0;     // existing supplier_prices row updated (matched products)
+    let priceCreated = 0;     // new supplier_prices row (matched products, first time)
+    let catalogCreated = 0;   // new supplier_catalog row
+    let catalogUpdated = 0;   // existing supplier_catalog row updated (real change)
+    let unchanged = 0;        // catalog row identical to incoming — silently skipped
+    let skipped = 0;          // dropped because input was invalid
 
     for (const item of items) {
-      if (!item.ingredient_id || !item.price || item.price <= 0) {
+      const price = Number(item.price);
+      if (!item.product_name || !Number.isFinite(price) || price <= 0) {
         skipped++;
         continue;
       }
-
-      // Verify ingredient belongs to caller tenant before any write
-      const ingOk = get('SELECT id FROM ingredients WHERE id = ? AND restaurant_id = ?', [item.ingredient_id, rid]);
-      if (!ingOk) { skipped++; continue; }
-
       const unit = item.unit || 'kg';
+      const productName = String(item.product_name).trim();
+      const sku = item.sku || null;
+      const category = item.category || null;
+      let ingredientId = item.ingredient_id ? Number(item.ingredient_id) : null;
 
-      // Upsert supplier_prices
-      const existing = get('SELECT id, price FROM supplier_prices WHERE ingredient_id = ? AND supplier_id = ? AND restaurant_id = ?',
-        [item.ingredient_id, supplier_id, rid]);
-
-      if (existing) {
-        if (existing.price !== item.price) {
-          run('UPDATE supplier_prices SET price = ?, unit = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?',
-            [item.price, unit, existing.id, rid]);
-          updated++;
-        } else {
-          skipped++; // Same price, no update needed
-          continue;
-        }
-      } else {
-        run('INSERT INTO supplier_prices (restaurant_id, ingredient_id, supplier_id, price, unit) VALUES (?, ?, ?, ?, ?)',
-          [rid, item.ingredient_id, supplier_id, item.price, unit]);
-        created++;
+      // Verify the ingredient (if provided) belongs to this tenant
+      if (ingredientId) {
+        const ingOk = get('SELECT id FROM ingredients WHERE id = ? AND restaurant_id = ?', [ingredientId, rid]);
+        if (!ingOk) ingredientId = null; // fall through to catalog-only insert
       }
 
-      // Record in price_history
-      run('INSERT INTO price_history (restaurant_id, ingredient_id, supplier_id, price, recorded_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
-        [rid, item.ingredient_id, supplier_id, item.price]);
+      // ─── ALWAYS upsert supplier_catalog so products (matched or not) appear
+      //     in the order form even when they have no local ingredient mapping.
+      //     Match priority: SKU first (stable across renames), then case-insensitive name.
+      let existingCat = null;
+      if (sku) {
+        existingCat = get(
+          'SELECT * FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(sku) = LOWER(?)',
+          [supplier_id, rid, sku]
+        );
+      }
+      if (!existingCat) {
+        existingCat = get(
+          'SELECT * FROM supplier_catalog WHERE supplier_id = ? AND restaurant_id = ? AND LOWER(product_name) = LOWER(?)',
+          [supplier_id, rid, productName]
+        );
+      }
+      if (existingCat) {
+        // Treat as identical only when nothing the user could see has changed
+        // — name, price, unit, sku, category, plus the new ingredient mapping.
+        const sameIngredient = (existingCat.ingredient_id || null) === ingredientId
+          || (ingredientId === null);
+        const isIdentical =
+          (existingCat.product_name || '') === productName &&
+          Number(existingCat.price) === price &&
+          (existingCat.unit || null) === unit &&
+          (existingCat.sku || null) === sku &&
+          (existingCat.category || null) === category &&
+          sameIngredient;
+        if (isIdentical) {
+          unchanged++;
+        } else {
+          // Always overwrite with incoming mercuriale data — the latest scan
+          // is authoritative. COALESCE keeps the prior ingredient mapping when
+          // this scan didn't include one.
+          run(
+            `UPDATE supplier_catalog
+                SET product_name = ?, category = ?, unit = ?, price = ?,
+                    sku = ?, ingredient_id = COALESCE(?, ingredient_id), updated_at = CURRENT_TIMESTAMP
+              WHERE id = ? AND restaurant_id = ?`,
+            [productName, category, unit, price, sku, ingredientId, existingCat.id, rid]
+          );
+          if (Number(existingCat.price) !== price) {
+            run(
+              `INSERT INTO price_change_notifications
+                 (restaurant_id, supplier_id, product_name, old_price, new_price, change_type)
+               VALUES (?, ?, ?, ?, ?, 'update')`,
+              [rid, Number(supplier_id), productName, existingCat.price, price]
+            );
+          }
+          catalogUpdated++;
+        }
+      } else {
+        run(
+          `INSERT INTO supplier_catalog
+             (restaurant_id, supplier_id, product_name, category, unit, price, sku, ingredient_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [rid, Number(supplier_id), productName, category, unit, price, sku, ingredientId]
+        );
+        run(
+          `INSERT INTO price_change_notifications
+             (restaurant_id, supplier_id, product_name, old_price, new_price, change_type)
+           VALUES (?, ?, ?, NULL, ?, 'new')`,
+          [rid, Number(supplier_id), productName, price]
+        );
+        catalogCreated++;
+      }
+
+      // ─── For matched items, also upsert supplier_prices + price_history.
+      //     This keeps the existing /suppliers/:id/prices flow working for
+      //     ingredient-keyed analytics (food cost, suggestions, etc.).
+      if (ingredientId) {
+        const existing = get(
+          'SELECT id, price FROM supplier_prices WHERE ingredient_id = ? AND supplier_id = ? AND restaurant_id = ?',
+          [ingredientId, supplier_id, rid]
+        );
+        if (existing) {
+          if (Number(existing.price) !== price) {
+            run('UPDATE supplier_prices SET price = ?, unit = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?',
+              [price, unit, existing.id, rid]);
+            priceUpdated++;
+            run('INSERT INTO price_history (restaurant_id, ingredient_id, supplier_id, price, recorded_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
+              [rid, ingredientId, Number(supplier_id), price]);
+          }
+        } else {
+          run('INSERT INTO supplier_prices (restaurant_id, ingredient_id, supplier_id, price, unit) VALUES (?, ?, ?, ?, ?)',
+            [rid, ingredientId, Number(supplier_id), price, unit]);
+          priceCreated++;
+          run('INSERT INTO price_history (restaurant_id, ingredient_id, supplier_id, price, recorded_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
+            [rid, ingredientId, Number(supplier_id), price]);
+        }
+      }
     }
 
     res.json({
       success: true,
       supplier_name: supplier.name,
-      updated,
-      created,
+      // backward-compatible counts (still used by existing UI summary):
+      updated: priceUpdated,
+      created: priceCreated + catalogCreated,
       skipped,
-      total: items.length
+      total: items.length,
+      // detailed breakdown:
+      matched_created: priceCreated,
+      matched_updated: priceUpdated,
+      catalog_created: catalogCreated,
+      catalog_updated: catalogUpdated,
+      unchanged
     });
   } catch (e) {
     console.error('Supplier import error:', e);

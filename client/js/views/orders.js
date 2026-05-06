@@ -310,23 +310,26 @@ async function renderNewOrder() {
     });
   });
 
-  // Add ingredient to order — uses cached mercuriale entry
+  // Add product to order — supports both ingredient-mapped (supplier_prices)
+  // and catalog-only items (supplier_catalog) via the row-level data-key.
   ingredientsFiltered.addEventListener('click', (e) => {
     const btn = e.target.closest('.ingredient-item button');
     if (!btn) return;
 
     const ingredientItem = e.target.closest('.ingredient-item');
-    const ingredientId = parseInt(ingredientItem.dataset.id);
-    const product = _poSupplierProducts.find(p => p.ingredient_id === ingredientId);
+    const key = ingredientItem.dataset.key;
+    const product = _poSupplierProducts.find(p => productKey(p) === key);
     if (!product) return;
 
-    const existing = _poItems.find(i => i.ingredient_id === ingredientId);
+    const existing = _poItems.find(i => productKey(i) === key);
     if (existing) {
       existing.quantity++;
     } else {
       _poItems.push({
-        ingredient_id: ingredientId,
-        name: product.ingredient_name,
+        ingredient_id: product.ingredient_id || null,
+        catalog_id: product.catalog_id || null,
+        name: product.ingredient_name || product.product_name,
+        product_name: product.ingredient_name || product.product_name,
         quantity: 1,
         unit: product.unit || 'unité',
         unit_price: Number(product.price) || 0
@@ -382,14 +385,29 @@ async function loadSupplierProducts() {
   ingredientsFiltered.innerHTML = _poSupplierProducts.map(p => {
     const price = Number(p.price) || 0;
     const unit = p.unit || 'unité';
+    const displayName = p.ingredient_name || p.product_name || '—';
+    // catalog-only items have no ingredient_id — flag them for the user.
+    const isCatalogOnly = !p.ingredient_id && p.catalog_id;
+    const catalogBadge = isCatalogOnly
+      ? `<span style="font-size:10px;padding:1px 6px;border-radius:999px;background:rgba(59,130,246,0.12);color:#2563EB;font-weight:600;margin-left:6px">Catalogue</span>`
+      : '';
     return `
-      <div class="ingredient-item" data-id="${p.ingredient_id}" data-name="${escapeHtml(p.ingredient_name || '')}" role="listitem" style="padding:8px 12px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;gap:12px">
-        <span style="flex:1;min-width:0">${escapeHtml(p.ingredient_name || '—')}</span>
+      <div class="ingredient-item" data-key="${productKey(p)}" data-name="${escapeHtml(displayName)}" role="listitem" style="padding:8px 12px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <span style="flex:1;min-width:0">${escapeHtml(displayName)}${catalogBadge}</span>
         <span class="text-secondary text-sm" style="font-family:var(--font-mono);white-space:nowrap">${formatCurrency(price)} / ${escapeHtml(unit)}</span>
-        <button type="button" class="btn btn-sm btn-primary" aria-label="Ajouter ${escapeHtml(p.ingredient_name || '')} à la commande">+</button>
+        <button type="button" class="btn btn-sm btn-primary" aria-label="Ajouter ${escapeHtml(displayName)} à la commande">+</button>
       </div>
     `;
   }).join('');
+}
+
+// Stable key for an order line so de-duplication works for both matched
+// (ingredient_id) and catalog-only (catalog_id) products.
+function productKey(p) {
+  if (p && p.ingredient_id) return `ing-${p.ingredient_id}`;
+  if (p && p.catalog_id) return `cat-${p.catalog_id}`;
+  if (p && p.product_name) return `name-${String(p.product_name).toLowerCase()}`;
+  return '';
 }
 
 function updatePOItemsDisplay() {
@@ -489,7 +507,8 @@ async function submitPurchaseOrder(sendImmediately) {
       supplier_id: _poSelectedSupplierId,
       status: sendImmediately ? 'envoyée' : 'brouillon',
       items: _poItems.map(i => ({
-        ingredient_id: i.ingredient_id,
+        ingredient_id: i.ingredient_id || null,
+        product_name: i.product_name || i.name,
         quantity: i.quantity,
         unit: i.unit,
         unit_price: i.unit_price

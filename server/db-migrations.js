@@ -1735,6 +1735,9 @@ try {
   if (!supplierCatalogCols.includes('packaging')) {
     db.exec("ALTER TABLE supplier_catalog ADD COLUMN packaging TEXT");
   }
+  if (!supplierCatalogCols.includes('ingredient_id')) {
+    db.exec("ALTER TABLE supplier_catalog ADD COLUMN ingredient_id INTEGER REFERENCES ingredients(id)");
+  }
   db.exec(`
     CREATE TABLE IF NOT EXISTS supplier_notifications (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
