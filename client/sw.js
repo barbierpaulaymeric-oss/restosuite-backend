@@ -1,8 +1,11 @@
-// Bumped 2026-05-06 (v30): Floating bottom nav (mobile margin/radius/shadow,
-// nav-panel-sheet repositioned to clear the gap) + remove duplicate mic
-// button on /ia page (keep persistent Alto bubble FAB only).
-// (v29 was returns/claims module; v28 exports branding; v27 FoodFlow modal copy.)
-const CACHE_NAME = 'restosuite-v30';
+// Bumped 2026-05-06 (v31): Service mode overhaul — new SALLE card-grid view
+// (zone filter + status pills + live timer + take-order modal w/ split-bill)
+// and new CUISINE KDS with 3 lanes (Nouveau / En préparation / Prêt) at the
+// item level. New endpoints /api/service/floor and /api/service/kds, new
+// item state 'en_préparation' in the order_items state machine. Service-hours
+// configuration moved to /settings/service-hours.
+// (v30 was floating bottom nav + remove duplicate mic on /ia.)
+const CACHE_NAME = 'restosuite-v31';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

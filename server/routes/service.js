@@ -302,4 +302,109 @@ router.get('/recap/:id', requireAuth, (req, res) => {
   }
 });
 
+// ─── GET /api/service/floor ───
+// Single round-trip endpoint for the salle view: returns active session,
+// configured tables (from onboarding), all live orders for the restaurant,
+// and a list of the recipes sellable on the carte.
+router.get('/floor', requireAuth, (req, res) => {
+  try {
+    const account = get('SELECT restaurant_id FROM accounts WHERE id = ?', [req.user.id]);
+    if (!account || !account.restaurant_id) {
+      return res.status(404).json({ error: 'Restaurant non trouvé' });
+    }
+    const rid = account.restaurant_id;
+
+    const restaurant = get(
+      'SELECT service_start, service_end, service_active FROM restaurants WHERE id = ?',
+      [rid]
+    );
+
+    const session = get(
+      'SELECT * FROM service_sessions WHERE restaurant_id = ? AND status = ?',
+      [rid, 'active']
+    );
+
+    const tables = all(
+      'SELECT id, table_number, zone, seats FROM tables WHERE restaurant_id = ? AND active = 1 ORDER BY zone, table_number',
+      [rid]
+    );
+
+    // Live orders: anything not terminé/annulé
+    const liveOrders = all(
+      `SELECT o.*
+       FROM orders o
+       WHERE o.restaurant_id = ? AND o.status NOT IN ('terminé','annulé')
+       ORDER BY o.created_at ASC`,
+      [rid]
+    );
+
+    // Enrich with items
+    const enriched = liveOrders.map(order => {
+      const items = all(`
+        SELECT oi.*, r.name as recipe_name, r.selling_price
+        FROM order_items oi
+        JOIN recipes r ON r.id = oi.recipe_id AND r.restaurant_id = ?
+        WHERE oi.order_id = ? AND oi.restaurant_id = ?
+      `, [rid, order.id, rid]);
+      return { ...order, items };
+    });
+
+    res.json({
+      service: {
+        active: !!session,
+        session: session ? {
+          id: session.id,
+          started_at: session.started_at,
+          status: session.status
+        } : null,
+        config: {
+          service_start: restaurant?.service_start || null,
+          service_end: restaurant?.service_end || null
+        }
+      },
+      tables,
+      orders: enriched
+    });
+  } catch (e) {
+    console.error('GET /api/service/floor error:', e);
+    res.status(500).json({ error: 'Erreur lors de la récupération du plan de salle' });
+  }
+});
+
+// ─── GET /api/service/kds ───
+// Kitchen display: orders sent to kitchen, grouped by lane
+router.get('/kds', requireAuth, (req, res) => {
+  try {
+    const account = get('SELECT restaurant_id FROM accounts WHERE id = ?', [req.user.id]);
+    if (!account || !account.restaurant_id) {
+      return res.status(404).json({ error: 'Restaurant non trouvé' });
+    }
+    const rid = account.restaurant_id;
+
+    // Orders that the kitchen cares about: envoyé (just received) + prêt (awaiting service pickup)
+    const orders = all(
+      `SELECT o.*
+       FROM orders o
+       WHERE o.restaurant_id = ? AND o.status IN ('envoyé','prêt')
+       ORDER BY o.created_at ASC`,
+      [rid]
+    );
+
+    const enriched = orders.map(order => {
+      const items = all(`
+        SELECT oi.*, r.name as recipe_name
+        FROM order_items oi
+        JOIN recipes r ON r.id = oi.recipe_id AND r.restaurant_id = ?
+        WHERE oi.order_id = ? AND oi.restaurant_id = ? AND oi.status != 'annulé'
+      `, [rid, order.id, rid]);
+      return { ...order, items };
+    });
+
+    res.json({ orders: enriched });
+  } catch (e) {
+    console.error('GET /api/service/kds error:', e);
+    res.status(500).json({ error: 'Erreur KDS' });
+  }
+});
+
 module.exports = router;

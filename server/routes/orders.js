@@ -147,12 +147,13 @@ const ORDER_STATUS_TRANSITIONS = {
   'reçu':                  ['en_cours', 'envoyé', 'annulé'],
 };
 const ITEM_STATUS_TRANSITIONS = {
-  en_attente: ['prêt', 'annulé'],
-  'prêt':     ['servi', 'annulé'],
-  servi:      [],
-  'annulé':   [],
+  en_attente:       ['en_préparation', 'prêt', 'annulé'],
+  'en_préparation': ['prêt', 'annulé'],
+  'prêt':           ['servi', 'annulé'],
+  servi:            [],
+  'annulé':         [],
   // Legacy
-  attente:    ['prêt', 'annulé'],
+  attente:          ['en_préparation', 'prêt', 'annulé'],
 };
 
 // ═══════════════════════════════════════════

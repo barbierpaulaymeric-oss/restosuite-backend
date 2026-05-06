@@ -10487,6 +10487,61 @@ async function renderSanitaryApproval() {
     app.innerHTML = `<div class="empty-state"><p>Erreur : ${escapeHtml(err.message)}</p></div>`;
   }
 }
+async function renderServiceHoursSettings() {
+  const app = document.getElementById("app");
+  app.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  let config = {};
+  try {
+    config = await API.getServiceConfig();
+  } catch (e) {
+  }
+  app.innerHTML = `
+    <div class="page-container" style="max-width:680px;margin:0 auto;padding:24px var(--space-4)">
+      <div class="page-header">
+        <h1>Horaires de service</h1>
+        <p class="text-secondary" style="margin-top:4px">D\xE9finissez les plages horaires de votre service. La salle s'ajuste automatiquement.</p>
+      </div>
+
+      <form id="svc-hours-form" style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:24px;margin-top:24px;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;gap:18px;flex-wrap:wrap">
+          <label style="flex:1;min-width:180px">
+            <span style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px">Heure de d\xE9but</span>
+            <input type="time" id="svc-hours-start" class="form-control" value="${config.service_start || "11:30"}" lang="fr" style="font-size:1.25rem;text-align:center">
+          </label>
+          <label style="flex:1;min-width:180px">
+            <span style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px">Heure de fin</span>
+            <input type="time" id="svc-hours-end" class="form-control" value="${config.service_end || "14:30"}" lang="fr" style="font-size:1.25rem;text-align:center">
+          </label>
+        </div>
+
+        <p style="font-size:13px;color:var(--text-tertiary);margin:0;line-height:1.5">
+          La salle se met automatiquement en veille \xE0 l'heure de fin lorsqu'il ne reste plus de commande active.
+          Pour un service du soir, vous pouvez utiliser une heure de fin apr\xE8s minuit (par ex. <code>02:00</code>).
+        </p>
+
+        <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:8px">
+          <a href="#/service" class="btn btn-secondary" style="text-decoration:none">Retour \xE0 la salle</a>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.getElementById("svc-hours-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const service_start = document.getElementById("svc-hours-start").value;
+    const service_end = document.getElementById("svc-hours-end").value;
+    if (!service_start || !service_end) {
+      showToast("Renseignez les deux horaires", "error");
+      return;
+    }
+    try {
+      await API.updateServiceConfig({ service_start, service_end });
+      showToast("Horaires enregistr\xE9s", "success");
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  });
+}
 const HACCP_PLAN_STEPS = ["R\xE9ception", "Stockage", "Pr\xE9paration", "Cuisson", "Refroidissement", "Remise en T\xB0", "Service", "Distribution"];
 function riskScore(severity, probability) {
   return severity * probability;
@@ -16169,446 +16224,133 @@ async function showPOAnalyticsModal() {
     if (el) el.innerHTML = `<p style="color:var(--color-danger)">Erreur : ${escapeHtml(e.message)}</p>`;
   }
 }
-const SERVICE_POLL_INTERVAL = 8e3;
-let _serviceInterval = null;
-let _serviceCheckInterval = null;
-let _serviceState = {
-  selectedTable: null,
-  tables: {},
-  menu: [],
-  menuSearch: "",
-  allOrders: [],
+const SALLE_POLL_INTERVAL = 6e3;
+let _salleInterval = null;
+let _salleTimerInterval = null;
+let _salleState = {
   account: null,
-  mobileTab: "tables",
-  serviceActive: false,
-  serviceSession: null,
-  serviceConfig: null,
-  tableList: []
+  service: { active: false, session: null, config: {} },
+  tables: [],
+  orders: [],
+  zoneFilter: "all",
+  selectedTableId: null,
+  draft: {},
+  draftCovers: null,
+  draftNotes: "",
+  recipes: [],
+  menuSearch: ""
 };
 async function renderServiceView() {
+  var _a;
   const app = document.getElementById("app");
   const nav = document.getElementById("nav");
-  _serviceState.account = getAccount();
+  _salleState.account = getAccount();
   app.style.maxWidth = "none";
   app.style.padding = "0";
   if (nav) nav.style.display = "none";
+  app.innerHTML = `
+    <div class="salle-shell" id="salle-shell">
+      <header class="salle-topbar">
+        <div class="salle-topbar__brand">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:22px">
+          <span class="salle-topbar__title">Salle</span>
+          <span class="salle-topbar__sep">\u2022</span>
+          <span class="salle-topbar__user">${escapeHtml(((_a = _salleState.account) == null ? void 0 : _a.name) || "")}</span>
+        </div>
+        <div class="salle-topbar__stats" id="salle-stats">
+          <div class="salle-stat"><span class="salle-stat__val" id="salle-s-occ">0/0</span><span class="salle-stat__lbl">Tables</span></div>
+          <div class="salle-stat"><span class="salle-stat__val" id="salle-s-cov">0</span><span class="salle-stat__lbl">Couverts</span></div>
+          <div class="salle-stat"><span class="salle-stat__val" id="salle-s-ca">0 \u20AC</span><span class="salle-stat__lbl">CA en cours</span></div>
+          <div class="salle-stat"><span class="salle-stat__val" id="salle-s-time">--:--</span><span class="salle-stat__lbl">Service</span></div>
+        </div>
+        <div class="salle-topbar__actions">
+          <button class="salle-btn salle-btn--ghost" id="salle-go-cuisine" title="\xC9cran cuisine">
+            <span aria-hidden="true">\u{1F468}\u200D\u{1F373}</span> Cuisine
+          </button>
+          <button class="salle-btn salle-btn--ghost" id="salle-quick-menu" title="Menu rapide">\u2630</button>
+          <button class="salle-btn salle-btn--primary hidden" id="salle-start-btn">\u25B6 Lancer le service</button>
+          <button class="salle-btn salle-btn--danger hidden" id="salle-stop-btn">\u23F9 Fin</button>
+          <button class="salle-btn salle-btn--ghost" id="salle-exit-btn" title="Quitter">\u2715</button>
+        </div>
+      </header>
+
+      <div class="salle-zonebar" id="salle-zonebar"></div>
+
+      <div class="salle-body" id="salle-body">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+  `;
+  document.getElementById("salle-exit-btn").addEventListener("click", _salleExit);
+  document.getElementById("salle-go-cuisine").addEventListener("click", () => {
+    location.hash = "#/kitchen";
+  });
+  document.getElementById("salle-quick-menu").addEventListener("click", _salleQuickMenu);
+  document.getElementById("salle-start-btn").addEventListener("click", _salleStart);
+  document.getElementById("salle-stop-btn").addEventListener("click", _salleStop);
+  await _salleLoad();
+  _salleStartPolling();
+  _salleStartTimer();
+}
+async function _salleLoad() {
   try {
-    const [config, active] = await Promise.all([
-      API.getServiceConfig(),
-      API.getActiveService()
+    const [floor, recipesResp] = await Promise.all([
+      API.request("/service/floor"),
+      API.getRecipes()
     ]);
-    _serviceState.serviceConfig = config;
-    _serviceState.serviceActive = !!active.session;
-    _serviceState.serviceSession = active.session;
+    _salleState.service = floor.service;
+    _salleState.tables = floor.tables || [];
+    _salleState.orders = floor.orders || [];
+    const list = Array.isArray(recipesResp) ? recipesResp : recipesResp.recipes || [];
+    _salleState.recipes = list.filter((r) => {
+      const rt = r.recipe_type || "plat";
+      if (rt === "sous_recette" || rt === "base") return false;
+      if (r.category === "sauce" || r.category === "base") return false;
+      return true;
+    });
   } catch (e) {
-    _serviceState.serviceConfig = {};
+    showToast("Erreur de chargement de la salle", "error");
   }
+  _salleRenderAll();
+}
+async function _salleRefresh() {
   try {
-    const tables = await API.request("/onboarding/status");
-    _serviceState.tableList = tables.tables || [];
+    const floor = await API.request("/service/floor");
+    const prevReady = new Set(
+      _salleState.orders.filter((o) => o.status === "pr\xEAt").map((o) => o.id)
+    );
+    _salleState.service = floor.service;
+    _salleState.tables = floor.tables || [];
+    _salleState.orders = floor.orders || [];
+    const nowReady = _salleState.orders.filter((o) => o.status === "pr\xEAt" && !prevReady.has(o.id));
+    if (nowReady.length > 0) _salleNotifyReady(nowReady);
+    _salleRenderAll();
   } catch (e) {
   }
-  const tableCount = _serviceState.tableList.length || 20;
-  if (!_serviceState.serviceActive) {
-    _svcRenderConfigScreen(app);
-  } else {
-    _svcRenderServiceUI(app, tableCount);
-    await _svcLoadData(tableCount);
-    _svcRenderTables(tableCount);
-    _svcRenderMenu();
-    _svcRenderTracking();
-    _svcUpdateServiceMetrics();
+}
+function _salleStartPolling() {
+  if (_salleInterval) clearInterval(_salleInterval);
+  _salleInterval = setInterval(() => {
+    if (!location.hash.startsWith("#/service")) return _salleCleanup();
+    _salleRefresh();
+  }, SALLE_POLL_INTERVAL);
+}
+function _salleStartTimer() {
+  if (_salleTimerInterval) clearInterval(_salleTimerInterval);
+  _salleTimerInterval = setInterval(() => {
+    if (!location.hash.startsWith("#/service")) return _salleCleanup();
+    _salleRenderTimers();
+    _salleUpdateStats();
+  }, 1e3);
+}
+function _salleCleanup() {
+  if (_salleInterval) {
+    clearInterval(_salleInterval);
+    _salleInterval = null;
   }
-  _svcStartPolling(tableCount);
-}
-function _svcRenderConfigScreen(app) {
-  const config = _serviceState.serviceConfig || {};
-  app.innerHTML = `
-    <div class="svc-config-screen">
-      <header class="svc-header">
-        <div class="svc-header__left">
-          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:28px;width:auto">
-          <span class="svc-header__title">Mode Service</span>
-        </div>
-        <div class="svc-header__right">
-          <button class="btn btn-secondary btn-sm" onclick="_svcExit()">\u2190 Retour</button>
-        </div>
-      </header>
-
-      <div style="max-width:480px;margin:60px auto;padding:0 var(--space-4)">
-        <div style="text-align:center;margin-bottom:var(--space-8)">
-          <div style="font-size:3.5rem;margin-bottom:var(--space-3)">\u{1F37D}\uFE0F</div>
-          <h1 style="font-size:var(--text-2xl);margin-bottom:var(--space-2)">Mode Service</h1>
-          <p style="color:var(--text-secondary)">Configurez les horaires et lancez le service. L'interface s'adapte automatiquement pour g\xE9rer les commandes en temps r\xE9el.</p>
-        </div>
-
-        <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-5);margin-bottom:var(--space-4)">
-          <h3 style="font-size:var(--text-base);margin-bottom:var(--space-4)">Horaires du service</h3>
-          <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-3)">
-            <div style="flex:1">
-              <label for="svc-start-time" style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">D\xE9but (HH:MM)</label>
-              <input type="text" inputmode="numeric" pattern="[0-2][0-9]:[0-5][0-9]" maxlength="5" placeholder="11:30" class="form-control" id="svc-start-time" value="${config.service_start || "11:30"}" style="font-size:var(--text-lg);text-align:center;font-variant-numeric:tabular-nums">
-            </div>
-            <div style="flex:1">
-              <label for="svc-end-time" style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:4px;display:block">Fin (HH:MM)</label>
-              <input type="text" inputmode="numeric" pattern="[0-2][0-9]:[0-5][0-9]" maxlength="5" placeholder="23:00" class="form-control" id="svc-end-time" value="${config.service_end || "14:30"}" style="font-size:var(--text-lg);text-align:center;font-variant-numeric:tabular-nums">
-            </div>
-          </div>
-          <button class="btn btn-ghost btn-sm" id="svc-save-config" style="width:100%">Enregistrer les horaires</button>
-        </div>
-
-        <button class="btn btn-primary" id="svc-start-btn" style="width:100%;padding:16px;font-size:var(--text-lg);border-radius:var(--radius-lg)">
-          \u{1F680} Lancer le service
-        </button>
-
-        <div style="margin-top:var(--space-4);padding:var(--space-3);background:var(--bg-elevated);border-radius:var(--radius-md)">
-          <p style="font-size:var(--text-sm);color:var(--text-secondary);margin:0;line-height:1.6">
-            <strong>Pendant le service :</strong> l'interface passe en mode plein \xE9cran avec les bons en temps r\xE9el, le suivi des tables et les m\xE9triques cl\xE9s. Le reste du logiciel reste accessible via le menu rapide.
-          </p>
-        </div>
-      </div>
-    </div>
-  `;
-  const TIME_RE = /^[0-2][0-9]:[0-5][0-9]$/;
-  document.getElementById("svc-save-config").addEventListener("click", async () => {
-    const start = document.getElementById("svc-start-time").value;
-    const end = document.getElementById("svc-end-time").value;
-    if (!TIME_RE.test(start) || !TIME_RE.test(end)) {
-      showToast("Horaires invalides \u2014 utilisez le format HH:MM (ex. 11:30)", "error");
-      return;
-    }
-    try {
-      await API.updateServiceConfig({ service_start: start, service_end: end });
-      showToast("Horaires enregistr\xE9s", "success");
-    } catch (e) {
-      showToast((e == null ? void 0 : e.message) || "Erreur lors de l\u2019enregistrement des horaires", "error");
-    }
-  });
-  document.getElementById("svc-start-btn").addEventListener("click", async () => {
-    const btn = document.getElementById("svc-start-btn");
-    const start = document.getElementById("svc-start-time").value;
-    const end = document.getElementById("svc-end-time").value;
-    if (!TIME_RE.test(start) || !TIME_RE.test(end)) {
-      showToast("Horaires invalides \u2014 utilisez le format HH:MM (ex. 11:30)", "error");
-      return;
-    }
-    btn.disabled = true;
-    const originalLabel = btn.innerHTML;
-    btn.innerHTML = "\u23F3 D\xE9marrage\u2026";
-    try {
-      await API.updateServiceConfig({ service_start: start, service_end: end });
-      await API.startService();
-      _serviceState.serviceActive = true;
-      renderServiceView();
-    } catch (e) {
-      btn.disabled = false;
-      btn.innerHTML = originalLabel;
-      const msg = (e == null ? void 0 : e.message) || "Impossible de lancer le service";
-      showToast(msg, "error");
-      console.error("[service] startService failed:", e);
-    }
-  });
-}
-function _svcRenderServiceUI(app, tableCount) {
-  var _a;
-  app.innerHTML = `
-    <div class="svc-shell">
-      <header class="svc-header">
-        <div class="svc-header__left">
-          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:28px;width:auto">
-          <span class="svc-header__title">Service</span>
-          <span class="svc-header__user">\u2014 ${escapeHtml(((_a = _serviceState.account) == null ? void 0 : _a.name) || "")}</span>
-        </div>
-        <div class="svc-header__center" id="svc-metrics-bar">
-          <div class="svc-metric"><span class="svc-metric__val" id="svc-m-time">--:--</span><span class="svc-metric__label">Dur\xE9e</span></div>
-          <div class="svc-metric"><span class="svc-metric__val" id="svc-m-orders">0</span><span class="svc-metric__label">Commandes</span></div>
-          <div class="svc-metric"><span class="svc-metric__val" id="svc-m-covers">0</span><span class="svc-metric__label">Couverts</span></div>
-          <div class="svc-metric"><span class="svc-metric__val" id="svc-m-pending">0</span><span class="svc-metric__label">En cours</span></div>
-          <div class="svc-metric"><span class="svc-metric__val" id="svc-m-avg">0min</span><span class="svc-metric__label">Moy. ticket</span></div>
-        </div>
-        <div class="svc-header__right">
-          <button class="svc-header__btn" id="svc-notif-btn" title="Notifications">\u{1F514} <span class="svc-notif-badge hidden" id="svc-notif-count">0</span></button>
-          <button class="svc-header__btn" id="svc-quick-menu" title="Menu rapide">\u2630</button>
-          <button class="svc-header__btn svc-header__btn--stop" id="svc-stop-btn" title="Fin du service">\u23F9 Fin</button>
-        </div>
-      </header>
-
-      <div class="svc-mobile-tabs" id="svc-mobile-tabs">
-        <button class="svc-tab active" data-tab="tables">Tables</button>
-        <button class="svc-tab" data-tab="order">Commande</button>
-        <button class="svc-tab" data-tab="tracking">Suivi</button>
-      </div>
-
-      <div class="svc-body">
-        <div class="svc-col-left" id="svc-tables-panel">
-          <h2 class="svc-section-title">Plan de salle</h2>
-          <div class="svc-tables-grid" id="svc-tables-grid"></div>
-          <div class="svc-tracking-section" id="svc-tracking-inline"></div>
-        </div>
-        <div class="svc-col-right" id="svc-order-panel">
-          <div class="svc-no-table" id="svc-no-table">
-            <div class="svc-no-table__icon">\u{1F37D}\uFE0F</div>
-            <p>S\xE9lectionnez une table pour commencer</p>
-          </div>
-          <div class="svc-order-content hidden" id="svc-order-content">
-            <div class="svc-order-header">
-              <h2 id="svc-order-title">Table \u2014</h2>
-              <button class="btn btn-danger btn-sm" id="svc-close-table-btn" title="Terminer la table">Terminer</button>
-            </div>
-            <div class="svc-order-cols">
-              <div class="svc-menu-panel" id="svc-menu-panel">
-                <div class="svc-menu-header" style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)">
-                  <h3 class="svc-section-subtitle" style="margin:0;flex:1">Carte</h3>
-                  <a href="#/recipes" class="btn btn-ghost btn-sm" title="G\xE9rer les fiches techniques" style="text-decoration:none">\u{1F4CB} Fiches</a>
-                </div>
-                <input type="search" id="svc-menu-search" class="form-control" placeholder="Rechercher un plat\u2026" style="width:100%;margin-bottom:var(--space-2)" data-ui="custom">
-                <div id="svc-menu-list"></div>
-              </div>
-              <div class="svc-cart-panel" id="svc-cart-panel">
-                <h3 class="svc-section-subtitle">Commande en cours</h3>
-                <div id="svc-cart-items"></div>
-                <div class="svc-cart-covers" style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) 0">
-                  <label for="svc-order-covers" style="font-size:var(--text-sm);color:var(--text-secondary);flex:1">\u{1F465} Couverts</label>
-                  <input type="number" class="form-control" id="svc-order-covers" min="0" max="999" step="1" placeholder="\u2014" style="max-width:100px;text-align:center" data-ui="custom">
-                </div>
-                <div class="svc-cart-notes">
-                  <textarea class="form-control svc-notes-input" id="svc-order-notes" rows="2" placeholder="Notes (allergies, demandes sp\xE9ciales...)" data-ui="custom"></textarea>
-                </div>
-                <div class="svc-cart-total" id="svc-cart-total">Total : 0,00 \u20AC</div>
-                <div class="svc-cart-actions">
-                  <button class="btn btn-secondary svc-action-btn" id="svc-save-btn">\u{1F4BE} Sauvegarder</button>
-                  <button class="btn btn-primary svc-action-btn" id="svc-send-btn">\u{1F514} Envoyer en cuisine</button>
-                </div>
-                <div class="svc-table-orders" id="svc-table-orders"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="svc-col-tracking hidden" id="svc-tracking-panel">
-          <h2 class="svc-section-title">Suivi des commandes</h2>
-          <div id="svc-tracking-list"></div>
-        </div>
-      </div>
-    </div>
-  `;
-  document.querySelectorAll(".svc-tab").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      _serviceState.mobileTab = tab.dataset.tab;
-      document.querySelectorAll(".svc-tab").forEach((t) => t.classList.remove("active"));
-      tab.classList.add("active");
-      _svcUpdateMobileVisibility();
-    });
-  });
-  document.getElementById("svc-stop-btn").addEventListener("click", _svcStopService);
-  document.getElementById("svc-quick-menu").addEventListener("click", () => {
-    const overlay = document.createElement("div");
-    overlay.className = "modal-overlay";
-    overlay.style.zIndex = "9999";
-    overlay.innerHTML = `
-      <div class="modal" style="max-width:300px;padding:var(--space-4)">
-        <h3 style="margin-bottom:var(--space-3)">Menu rapide</h3>
-        <div style="display:flex;flex-direction:column;gap:var(--space-2)">
-          <a href="#/" class="btn btn-secondary btn-sm" style="text-align:left" onclick="this.closest('.modal-overlay').remove()">\u{1F4CB} Fiches techniques</a>
-          <a href="#/stock" class="btn btn-secondary btn-sm" style="text-align:left" onclick="this.closest('.modal-overlay').remove()">\u{1F4E6} Stock</a>
-          <a href="#/haccp" class="btn btn-secondary btn-sm" style="text-align:left" onclick="this.closest('.modal-overlay').remove()">\u2705 HACCP</a>
-          <a href="#/kitchen" class="btn btn-secondary btn-sm" style="text-align:left" onclick="this.closest('.modal-overlay').remove()">\u{1F468}\u200D\u{1F373} \xC9cran cuisine</a>
-          <a href="#/analytics" class="btn btn-secondary btn-sm" style="text-align:left" onclick="this.closest('.modal-overlay').remove()">\u{1F4CA} Analytics</a>
-        </div>
-        <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:var(--space-3)" onclick="this.closest('.modal-overlay').remove()">Fermer</button>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
-  });
-  document.getElementById("svc-close-table-btn").addEventListener("click", _svcCloseTable);
-  document.getElementById("svc-save-btn").addEventListener("click", () => _svcSaveOrder(false));
-  document.getElementById("svc-send-btn").addEventListener("click", () => _svcSaveOrder(true));
-  const searchEl = document.getElementById("svc-menu-search");
-  if (searchEl) {
-    let st;
-    searchEl.addEventListener("input", () => {
-      clearTimeout(st);
-      st = setTimeout(() => {
-        _serviceState.menuSearch = searchEl.value.trim().toLowerCase();
-        _svcRenderMenu();
-      }, 150);
-    });
-  }
-}
-async function _svcStopService() {
-  const activeOrders = _serviceState.allOrders.filter((o) => ["envoy\xE9", "en_cours"].includes(o.status));
-  const title = activeOrders.length > 0 ? `Il reste ${activeOrders.length} commande(s) en cours` : "Terminer le service ?";
-  const message = activeOrders.length > 0 ? "Voulez-vous vraiment arr\xEAter le service avec des commandes en cours ?" : "Le r\xE9capitulatif du service sera affich\xE9.";
-  showConfirmModal(title, message, async () => {
-    try {
-      const result = await API.stopService();
-      _serviceState.serviceActive = false;
-      _svcShowRecap(result.recap);
-    } catch (e) {
-      showToast(e.message, "error");
-    }
-  }, { confirmText: "Terminer le service", confirmClass: "btn btn-danger" });
-}
-function _svcShowRecap(recap) {
-  const app = document.getElementById("app");
-  const duration = recap.started_at && recap.ended_at ? _svcFormatDuration(new Date(recap.ended_at) - new Date(recap.started_at)) : "\u2014";
-  app.innerHTML = `
-    <div class="svc-config-screen">
-      <header class="svc-header">
-        <div class="svc-header__left">
-          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:28px;width:auto">
-          <span class="svc-header__title">R\xE9capitulatif du service</span>
-        </div>
-        <div class="svc-header__right">
-          <button class="btn btn-secondary btn-sm" onclick="_svcExit()">\u2190 Retour</button>
-        </div>
-      </header>
-
-      <div style="max-width:500px;margin:40px auto;padding:0 var(--space-4)">
-        <div style="text-align:center;margin-bottom:var(--space-6)">
-          <div style="font-size:3rem;margin-bottom:var(--space-2)">\u{1F3C1}</div>
-          <h1 style="font-size:var(--text-2xl);margin-bottom:var(--space-1)">Service termin\xE9</h1>
-          <p style="color:var(--text-secondary)">${recap.started_at ? new Date(recap.started_at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }) : ""}</p>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-5)">
-          <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);text-align:center">
-            <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recap.total_orders || 0}</div>
-            <div style="font-size:var(--text-sm);color:var(--text-secondary)">Commandes</div>
-          </div>
-          <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);text-align:center">
-            <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recap.total_covers || 0}</div>
-            <div style="font-size:var(--text-sm);color:var(--text-secondary)">Couverts</div>
-          </div>
-          <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);text-align:center">
-            <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${recap.total_items || 0}</div>
-            <div style="font-size:var(--text-sm);color:var(--text-secondary)">Plats servis</div>
-          </div>
-          <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);text-align:center">
-            <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-accent)">${formatCurrency(recap.total_revenue || 0)}</div>
-            <div style="font-size:var(--text-sm);color:var(--text-secondary)">Chiffre d'affaires</div>
-          </div>
-        </div>
-
-        <div style="background:var(--bg-elevated);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-5)">
-          <h3 style="font-size:var(--text-base);margin-bottom:var(--space-3)">Performance</h3>
-          <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--border-light)">
-            <span style="color:var(--text-secondary);font-size:var(--text-sm)">Dur\xE9e du service</span>
-            <span style="font-weight:600">${duration}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--border-light)">
-            <span style="color:var(--text-secondary);font-size:var(--text-sm)">Ticket moyen</span>
-            <span style="font-weight:600">${recap.total_covers > 0 ? formatCurrency((recap.total_revenue || 0) / recap.total_covers) + " / couvert" : "\u2014"}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--border-light)">
-            <span style="color:var(--text-secondary);font-size:var(--text-sm)">Temps moyen par commande</span>
-            <span style="font-weight:600">${recap.avg_ticket_time_min || 0} min</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:var(--space-2) 0">
-            <span style="color:var(--text-secondary);font-size:var(--text-sm)">Heure de pointe</span>
-            <span style="font-weight:600">${recap.peak_hour ? recap.peak_hour + "h" : "\u2014"}</span>
-          </div>
-        </div>
-
-        <button class="btn btn-primary" style="width:100%;padding:14px;border-radius:var(--radius-lg)" onclick="_svcExit()">
-          Retour \xE0 l'accueil
-        </button>
-      </div>
-    </div>
-  `;
-}
-function _svcFormatDuration(ms) {
-  const totalMin = Math.floor(ms / 6e4);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  return h > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${m}min`;
-}
-function _svcUpdateServiceMetrics() {
-  if (!_serviceState.serviceSession) return;
-  const started = new Date(_serviceState.serviceSession.started_at);
-  const now = /* @__PURE__ */ new Date();
-  const elapsed = now - started;
-  const el = document.getElementById("svc-m-time");
-  if (el) el.textContent = _svcFormatDuration(elapsed);
-  const sessionOrders = _serviceState.allOrders.filter((o) => o.status !== "annul\xE9");
-  const totalOrders = sessionOrders.length;
-  const totalCovers = sessionOrders.reduce((s, o) => s + (o.covers || 0), 0);
-  const pending = _serviceState.allOrders.filter((o) => ["envoy\xE9", "en_cours"].includes(o.status)).length;
-  const completed = _serviceState.allOrders.filter((o) => o.status === "termin\xE9");
-  const ordersEl = document.getElementById("svc-m-orders");
-  const coversEl = document.getElementById("svc-m-covers");
-  const pendingEl = document.getElementById("svc-m-pending");
-  const avgEl = document.getElementById("svc-m-avg");
-  if (ordersEl) ordersEl.textContent = totalOrders;
-  if (coversEl) coversEl.textContent = totalCovers;
-  if (pendingEl) {
-    pendingEl.textContent = pending;
-    pendingEl.style.color = pending > 5 ? "var(--color-danger)" : pending > 2 ? "var(--color-warning)" : "";
-  }
-  if (avgEl && completed.length > 0) {
-    const totalMin = completed.reduce((sum, o) => {
-      return sum + (new Date(o.updated_at) - new Date(o.created_at)) / 6e4;
-    }, 0);
-    avgEl.textContent = Math.round(totalMin / completed.length) + "min";
-  }
-}
-function _svcStartPolling(tableCount) {
-  if (_serviceInterval) clearInterval(_serviceInterval);
-  _serviceInterval = setInterval(async () => {
-    if (!location.hash.startsWith("#/service")) {
-      _svcCleanup();
-      return;
-    }
-    if (_serviceState.serviceActive) {
-      await _svcRefreshOrders(tableCount);
-      _svcUpdateServiceMetrics();
-      _svcCheckAutoStop(tableCount);
-    }
-  }, SERVICE_POLL_INTERVAL);
-}
-async function _svcCheckAutoStop(tableCount) {
-  const config = _serviceState.serviceConfig;
-  if (!config || !config.service_end) return;
-  const session = _serviceState.serviceSession;
-  if (session && session.started_at) {
-    const startedAt = new Date(session.started_at);
-    const minRuntime = 15 * 60 * 1e3;
-    if (Date.now() - startedAt.getTime() < minRuntime) return;
-  }
-  const now = /* @__PURE__ */ new Date();
-  const [endH, endM] = config.service_end.split(":").map(Number);
-  const endTime = /* @__PURE__ */ new Date();
-  endTime.setHours(endH, endM, 0, 0);
-  if (config.service_start) {
-    const [startH, startM] = config.service_start.split(":").map(Number);
-    if (endH < startH || endH === startH && endM < startM) {
-      endTime.setDate(endTime.getDate() + 1);
-    }
-  }
-  if (now > endTime) {
-    const activeOrders = _serviceState.allOrders.filter(
-      (o) => ["envoy\xE9", "en_cours", "pr\xEAt", "re\xE7u"].includes(o.status)
-    );
-    if (activeOrders.length === 0) {
-      try {
-        const result = await API.stopService();
-        _serviceState.serviceActive = false;
-        _svcShowRecap(result.recap);
-      } catch (e) {
-      }
-    }
-  }
-}
-function _svcCleanup() {
-  if (_serviceInterval) {
-    clearInterval(_serviceInterval);
-    _serviceInterval = null;
-  }
-  if (_serviceCheckInterval) {
-    clearInterval(_serviceCheckInterval);
-    _serviceCheckInterval = null;
+  if (_salleTimerInterval) {
+    clearInterval(_salleTimerInterval);
+    _salleTimerInterval = null;
   }
   const app = document.getElementById("app");
   if (app) {
@@ -16618,477 +16360,655 @@ function _svcCleanup() {
   const nav = document.getElementById("nav");
   if (nav) nav.style.display = "";
 }
-function _svcExit() {
-  _svcCleanup();
+function _salleExit() {
+  _salleCleanup();
   location.hash = "#/";
 }
-async function _svcLoadData(tableCount) {
-  try {
-    const [recipesResp, orders] = await Promise.all([
-      API.getRecipes(),
-      API.getOrders()
-    ]);
-    const recipeList = Array.isArray(recipesResp) ? recipesResp : recipesResp.recipes || [];
-    const plats = recipeList.filter((r) => {
-      const rt = r.recipe_type || "plat";
-      if (rt === "sous_recette" || rt === "base") return false;
-      if (r.category === "sauce" || r.category === "base") return false;
-      return true;
+function _salleRenderAll() {
+  _salleRenderTopbar();
+  _salleRenderZoneBar();
+  _salleRenderGrid();
+  _salleUpdateStats();
+}
+function _salleRenderTopbar() {
+  const startBtn = document.getElementById("salle-start-btn");
+  const stopBtn = document.getElementById("salle-stop-btn");
+  if (!startBtn || !stopBtn) return;
+  if (_salleState.service.active) {
+    startBtn.classList.add("hidden");
+    stopBtn.classList.remove("hidden");
+  } else {
+    startBtn.classList.remove("hidden");
+    stopBtn.classList.add("hidden");
+  }
+}
+function _salleRenderZoneBar() {
+  const bar = document.getElementById("salle-zonebar");
+  if (!bar) return;
+  const zones = Array.from(new Set(_salleState.tables.map((t) => t.zone || "Salle")));
+  zones.sort();
+  const all = ["all", ...zones];
+  bar.innerHTML = all.map((z) => {
+    const label = z === "all" ? "Toutes" : z;
+    const active = _salleState.zoneFilter === z ? " salle-zone--active" : "";
+    const count = z === "all" ? _salleState.tables.length : _salleState.tables.filter((t) => (t.zone || "Salle") === z).length;
+    return `<button class="salle-zone${active}" data-zone="${escapeHtml(z)}">
+      <span class="salle-zone__name">${escapeHtml(label)}</span>
+      <span class="salle-zone__count">${count}</span>
+    </button>`;
+  }).join("");
+  bar.querySelectorAll(".salle-zone").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _salleState.zoneFilter = btn.dataset.zone;
+      _salleRenderAll();
     });
-    const grouped = {};
-    const categoryOrder = ["entr\xE9e", "entr\xE9e froide", "entr\xE9e chaude", "plat", "plat principal", "dessert", "boisson", "accompagnement"];
-    for (const r of plats) {
-      const cat = r.category || "Autres";
-      if (!grouped[cat]) grouped[cat] = [];
-      grouped[cat].push(r);
-    }
-    _serviceState.menu = Object.entries(grouped).sort((a, b) => {
-      const ia = categoryOrder.indexOf(a[0]);
-      const ib = categoryOrder.indexOf(b[0]);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-    });
-    _serviceState.allOrders = orders;
-    _svcBuildTableState(tableCount);
-  } catch (e) {
-    showToast("Erreur chargement donn\xE9es service", "error");
-  }
-}
-async function _svcRefreshOrders(tableCount) {
-  try {
-    const prevStates = {};
-    for (let t = 1; t <= tableCount; t++) {
-      const td = _serviceState.tables[t];
-      if (td) prevStates[t] = td.orders.filter((o) => o.status === "pr\xEAt").length;
-    }
-    _serviceState.allOrders = await API.getOrders();
-    _svcBuildTableState(tableCount);
-    for (let t = 1; t <= tableCount; t++) {
-      const td = _serviceState.tables[t];
-      if (td) {
-        const readyNow = td.orders.filter((o) => o.status === "pr\xEAt").length;
-        if (readyNow > (prevStates[t] || 0)) _svcNotifyReady(t);
-      }
-    }
-    _svcRenderTables(tableCount);
-    _svcRenderTracking();
-    if (_serviceState.selectedTable) _svcRenderTableOrders();
-  } catch (e) {
-  }
-}
-function _svcBuildTableState(tableCount) {
-  const tables = {};
-  for (let t = 1; t <= tableCount; t++) {
-    tables[t] = { orders: [], currentDraft: null };
-  }
-  for (const order of _serviceState.allOrders) {
-    const tn = order.table_number;
-    if (tn >= 1 && tn <= tableCount) {
-      if (!tables[tn]) tables[tn] = { orders: [], currentDraft: null };
-      tables[tn].orders.push(order);
-      if (order.status === "en_cours") tables[tn].currentDraft = order;
-    }
-  }
-  const prev = _serviceState.tables;
-  for (let t = 1; t <= tableCount; t++) {
-    if (prev[t] && prev[t]._localDraft) tables[t]._localDraft = prev[t]._localDraft;
-  }
-  _serviceState.tables = tables;
-}
-function _svcNotifyReady(tableNum) {
-  showToast(`\u2705 Table ${tableNum} \u2014 Plat(s) pr\xEAt(s) !`, "success");
-  if (typeof playKitchenNotificationSound === "function") playKitchenNotificationSound();
-  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-  const badge = document.getElementById("svc-notif-count");
-  if (badge) {
-    const current = parseInt(badge.textContent) || 0;
-    badge.textContent = current + 1;
-    badge.classList.remove("hidden");
-  }
-}
-function _svcGetTableStatus(tableNum) {
-  const td = _serviceState.tables[tableNum];
-  if (!td) return "libre";
-  const activeOrders = td.orders.filter((o) => !["termin\xE9", "annul\xE9"].includes(o.status));
-  if (activeOrders.length === 0 && !td._localDraft) return "libre";
-  if (td._localDraft && td._localDraft.length > 0) return "draft";
-  if (activeOrders.some((o) => o.status === "en_cours")) return "draft";
-  if (activeOrders.some((o) => o.status === "pr\xEAt")) return "ready";
-  if (activeOrders.some((o) => {
-    const elapsed = (Date.now() - new Date(o.created_at).getTime()) / 6e4;
-    return o.status === "envoy\xE9" && elapsed > 20;
-  })) return "late";
-  if (activeOrders.some((o) => o.status === "envoy\xE9")) return "sent";
-  return "libre";
-}
-function _svcRenderTables(tableCount) {
-  var _a;
-  const grid = document.getElementById("svc-tables-grid");
-  if (!grid) return;
-  let html = "";
-  for (let t = 1; t <= tableCount; t++) {
-    const status = _svcGetTableStatus(t);
-    const selected = _serviceState.selectedTable === t ? " svc-table--selected" : "";
-    const activeOrders = (((_a = _serviceState.tables[t]) == null ? void 0 : _a.orders) || []).filter((o) => !["termin\xE9", "annul\xE9"].includes(o.status));
-    const itemCount = activeOrders.reduce((sum, o) => {
-      var _a2;
-      return sum + (((_a2 = o.items) == null ? void 0 : _a2.length) || 0);
-    }, 0);
-    let timerHtml = "";
-    if (activeOrders.length > 0) {
-      const oldest = activeOrders.reduce((a, b) => new Date(a.created_at) < new Date(b.created_at) ? a : b);
-      const elapsed = Math.floor((Date.now() - new Date(oldest.created_at).getTime()) / 6e4);
-      if (elapsed > 0) {
-        const timerColor = elapsed > 20 ? "var(--color-danger)" : elapsed > 10 ? "var(--color-warning)" : "var(--text-tertiary)";
-        timerHtml = `<span class="svc-table-timer" style="color:${timerColor}">${elapsed}\u2032</span>`;
-      }
-    }
-    html += `
-      <button class="svc-table-btn svc-table--${status}${selected}" data-table="${t}">
-        <span class="svc-table-num">${t}</span>
-        ${itemCount > 0 ? `<span class="svc-table-count">${itemCount}</span>` : ""}
-        ${timerHtml}
-        <span class="svc-table-status">${_svcStatusIcon(status)}</span>
-      </button>
-    `;
-  }
-  grid.innerHTML = html;
-  grid.querySelectorAll(".svc-table-btn").forEach((btn) => {
-    btn.addEventListener("click", () => _svcSelectTable(parseInt(btn.dataset.table), tableCount));
   });
 }
-function _svcStatusIcon(status) {
-  switch (status) {
-    case "libre":
-      return "";
-    case "draft":
-      return "\u{1F4DD}";
-    case "sent":
-      return "\u{1F535}";
-    case "ready":
-      return "\u2705";
-    case "late":
-      return "\u{1F534}";
-    default:
-      return "";
+function _salleRenderGrid() {
+  const body = document.getElementById("salle-body");
+  if (!body) return;
+  if (_salleState.tables.length === 0) {
+    body.innerHTML = `
+      <div class="salle-empty">
+        <div class="salle-empty__icon">\u{1F37D}\uFE0F</div>
+        <h2>Aucune table configur\xE9e</h2>
+        <p>Configurez votre plan de salle pour commencer.</p>
+        <a href="#/multi-site" class="salle-btn salle-btn--primary" style="text-decoration:none;display:inline-flex;margin-top:12px">Configurer les tables</a>
+      </div>
+    `;
+    return;
+  }
+  const filtered2 = _salleState.zoneFilter === "all" ? _salleState.tables : _salleState.tables.filter((t) => (t.zone || "Salle") === _salleState.zoneFilter);
+  body.innerHTML = `<div class="salle-grid">${filtered2.map((t) => _salleCardHTML(t)).join("")}</div>`;
+  body.querySelectorAll(".salle-card").forEach((card) => {
+    const id = parseInt(card.dataset.tableId);
+    card.addEventListener("click", () => _salleOpenTable(id));
+  });
+}
+function _salleTableState(table) {
+  const orders = _salleState.orders.filter((o) => o.table_number === table.table_number);
+  const draft = orders.find((o) => o.status === "en_cours");
+  const sent = orders.filter((o) => ["envoy\xE9", "pr\xEAt", "servi"].includes(o.status));
+  const ready = sent.some((o) => o.status === "pr\xEAt");
+  const allActive = [...draft ? [draft] : [], ...sent];
+  if (allActive.length === 0) return { status: "libre", orders: [], oldest: null, total: 0, covers: 0 };
+  const oldest = allActive.reduce((a, b) => new Date(a.created_at) < new Date(b.created_at) ? a : b);
+  const total = allActive.reduce((s, o) => s + (o.total_cost || 0), 0);
+  const covers = allActive.reduce((mx, o) => Math.max(mx, o.covers || 0), 0);
+  let status;
+  if (ready) status = "ready";
+  else if (sent.some((o) => o.status === "servi") && !draft) status = "served";
+  else if (draft) status = "draft";
+  else status = "occupied";
+  return { status, orders: allActive, oldest, total, covers };
+}
+function _salleStatusPill(status) {
+  const map = {
+    libre: { txt: "Libre", cls: "salle-pill--libre" },
+    draft: { txt: "Prise de cmd.", cls: "salle-pill--draft" },
+    occupied: { txt: "Occup\xE9e", cls: "salle-pill--occupied" },
+    ready: { txt: "Pr\xEAt \xE0 servir", cls: "salle-pill--ready" },
+    served: { txt: "\xC0 d\xE9barrasser", cls: "salle-pill--served" }
+  };
+  const m = map[status] || map.libre;
+  return `<span class="salle-pill ${m.cls}">${m.txt}</span>`;
+}
+function _salleCardHTML(table) {
+  const st = _salleTableState(table);
+  const elapsed = st.oldest ? Math.floor((Date.now() - new Date(st.oldest.created_at).getTime()) / 6e4) : 0;
+  const elapsedTxt = elapsed >= 60 ? `${Math.floor(elapsed / 60)}h${String(elapsed % 60).padStart(2, "0")}` : `${elapsed}\u2032`;
+  const elapsedCls = elapsed > 30 ? "salle-card__timer--late" : elapsed > 15 ? "salle-card__timer--warn" : "";
+  const ringCls = `salle-card--${st.status}`;
+  const itemCount = st.orders.reduce((s, o) => {
+    var _a;
+    return s + (((_a = o.items) == null ? void 0 : _a.length) || 0);
+  }, 0);
+  return `
+    <button class="salle-card ${ringCls}" data-table-id="${table.id}" data-status="${st.status}">
+      <div class="salle-card__head">
+        <div class="salle-card__num">${table.table_number}</div>
+        <div class="salle-card__zone">${escapeHtml(table.zone || "Salle")}</div>
+      </div>
+      <div class="salle-card__body">
+        ${_salleStatusPill(st.status)}
+        <div class="salle-card__meta">
+          <span class="salle-card__seats">${st.covers > 0 ? `\u{1F465} ${st.covers}` : `\u25A2 ${table.seats || 4}`}</span>
+          ${itemCount > 0 ? `<span class="salle-card__items">\u{1F37D}\uFE0F ${itemCount}</span>` : ""}
+        </div>
+      </div>
+      <div class="salle-card__foot">
+        ${st.status !== "libre" ? `<span class="salle-card__total">${formatCurrency(st.total)}</span>` : '<span class="salle-card__total" style="opacity:.4">\u2014</span>'}
+        ${st.oldest ? `<span class="salle-card__timer ${elapsedCls}" data-created-at="${st.oldest.created_at}">${elapsedTxt}</span>` : ""}
+      </div>
+    </button>
+  `;
+}
+function _salleRenderTimers() {
+  document.querySelectorAll(".salle-card__timer[data-created-at]").forEach((el) => {
+    const created = new Date(el.dataset.createdAt);
+    const elapsed = Math.floor((Date.now() - created.getTime()) / 6e4);
+    const txt = elapsed >= 60 ? `${Math.floor(elapsed / 60)}h${String(elapsed % 60).padStart(2, "0")}` : `${elapsed}\u2032`;
+    el.textContent = txt;
+    el.classList.toggle("salle-card__timer--late", elapsed > 30);
+    el.classList.toggle("salle-card__timer--warn", elapsed > 15 && elapsed <= 30);
+  });
+  if (_salleState.service.session) {
+    const el = document.getElementById("salle-s-time");
+    if (el) {
+      const ms = Date.now() - new Date(_salleState.service.session.started_at).getTime();
+      const min = Math.floor(ms / 6e4);
+      const h = Math.floor(min / 60);
+      el.textContent = h > 0 ? `${h}h${String(min % 60).padStart(2, "0")}` : `${min}min`;
+    }
+  } else {
+    const el = document.getElementById("salle-s-time");
+    if (el) el.textContent = "\u2014";
   }
 }
-function _svcSelectTable(tableNum) {
-  var _a, _b;
-  _serviceState.selectedTable = tableNum;
-  const tableCount = Object.keys(_serviceState.tables).length;
-  _svcRenderTables(tableCount);
-  const noTable = document.getElementById("svc-no-table");
-  const content = document.getElementById("svc-order-content");
-  if (noTable) noTable.classList.add("hidden");
-  if (content) content.classList.remove("hidden");
-  document.getElementById("svc-order-title").textContent = `Table ${tableNum}`;
-  const td = _serviceState.tables[tableNum];
-  if (!td._localDraft) {
-    if (td.currentDraft && td.currentDraft.items) {
-      td._localDraft = td.currentDraft.items.map((it) => ({
+function _salleUpdateStats() {
+  const totalTables = _salleState.tables.length;
+  let occupied = 0, totalCovers = 0, totalCA = 0;
+  for (const t of _salleState.tables) {
+    const st = _salleTableState(t);
+    if (st.status !== "libre") {
+      occupied++;
+      totalCovers += st.covers;
+      totalCA += st.total;
+    }
+  }
+  const occEl = document.getElementById("salle-s-occ");
+  const covEl = document.getElementById("salle-s-cov");
+  const caEl = document.getElementById("salle-s-ca");
+  if (occEl) occEl.textContent = `${occupied}/${totalTables}`;
+  if (covEl) covEl.textContent = totalCovers;
+  if (caEl) caEl.textContent = formatCurrency(totalCA);
+}
+function _salleOpenTable(tableId) {
+  var _a;
+  const table = _salleState.tables.find((t) => t.id === tableId);
+  if (!table) return;
+  _salleState.selectedTableId = tableId;
+  const existingDraft = _salleState.orders.find(
+    (o) => o.table_number === table.table_number && o.status === "en_cours"
+  );
+  _salleState.draft = {};
+  if (existingDraft && existingDraft.items) {
+    for (const it of existingDraft.items) {
+      _salleState.draft[it.recipe_id] = {
         recipe_id: it.recipe_id,
         name: it.recipe_name,
         price: it.selling_price || 0,
         quantity: it.quantity,
         notes: it.notes || ""
-      }));
-    } else {
-      td._localDraft = [];
+      };
     }
   }
-  const notesEl = document.getElementById("svc-order-notes");
-  if (notesEl) notesEl.value = ((_a = td.currentDraft) == null ? void 0 : _a.notes) || "";
-  const coversEl = document.getElementById("svc-order-covers");
-  if (coversEl) coversEl.value = ((_b = td.currentDraft) == null ? void 0 : _b.covers) != null ? td.currentDraft.covers : "";
-  _svcRenderCart();
-  _svcRenderTableOrders();
-  if (window.innerWidth < 768) {
-    _serviceState.mobileTab = "order";
-    document.querySelectorAll(".svc-tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === "order"));
-    _svcUpdateMobileVisibility();
-  }
+  _salleState.draftCovers = (_a = existingDraft == null ? void 0 : existingDraft.covers) != null ? _a : null;
+  _salleState.draftNotes = (existingDraft == null ? void 0 : existingDraft.notes) || "";
+  _salleState.menuSearch = "";
+  _salleRenderModal(table);
 }
-function _svcRenderMenu() {
-  const el = document.getElementById("svc-menu-list");
-  if (!el) return;
-  if (_serviceState.menu.length === 0) {
-    el.innerHTML = `<div class="svc-menu-empty" style="padding:var(--space-4);text-align:center;color:var(--text-secondary)">
-      <p style="margin-bottom:var(--space-2)">Aucun plat au menu.</p>
-      <a href="#/recipes/new" class="btn btn-primary btn-sm" style="text-decoration:none">+ Cr\xE9er une fiche technique</a>
-    </div>`;
-    return;
-  }
-  const emojis = {
-    "entr\xE9e": "\u{1F957}",
-    "entr\xE9e froide": "\u{1F957}",
-    "entr\xE9e chaude": "\u{1F958}",
-    "plat": "\u{1F37D}\uFE0F",
-    "plat principal": "\u{1F37D}\uFE0F",
-    "dessert": "\u{1F370}",
-    "boisson": "\u{1F942}",
-    "accompagnement": "\u{1F96C}",
-    "Autres": "\u{1F4CB}"
-  };
-  const q = (_serviceState.menuSearch || "").toLowerCase();
-  let html = "";
-  let totalShown = 0;
-  for (const [cat, items] of _serviceState.menu) {
-    const filtered2 = q ? items.filter((it) => (it.name || "").toLowerCase().includes(q)) : items;
-    if (filtered2.length === 0) continue;
-    const emoji = emojis[cat] || "\u{1F4CB}";
-    html += `<div class="svc-menu-category"><h4 class="svc-menu-cat-title">${emoji} ${escapeHtml(cat.charAt(0).toUpperCase() + cat.slice(1))} <span style="color:var(--text-tertiary);font-weight:400;font-size:var(--text-xs)">(${filtered2.length})</span></h4><div class="svc-menu-items">`;
-    for (const item of filtered2) {
-      const price = item.selling_price || 0;
-      const cpp = item.cost_per_portion || 0;
-      const fcPct = item.food_cost_percent;
-      const fcCls = fcPct == null ? "" : fcPct > 35 ? "svc-menu-item__fc--bad" : fcPct > 28 ? "svc-menu-item__fc--warn" : "svc-menu-item__fc--good";
-      const fcText = price > 0 && cpp > 0 ? `Co\xFBt ${formatCurrency(cpp)}${fcPct != null ? ` \xB7 ${fcPct.toFixed(0)}%` : ""}` : price > 0 ? "Co\xFBt n/c" : "";
-      html += `
-        <button class="svc-menu-item" data-id="${item.id}" data-name="${escapeHtml(item.name)}" data-price="${price}">
-          <span class="svc-menu-item__main">
-            <span class="svc-menu-item__name">${escapeHtml(item.name)}</span>
-            ${fcText ? `<span class="svc-menu-item__fc ${fcCls}">${escapeHtml(fcText)}</span>` : ""}
-          </span>
-          <span class="svc-menu-item__price">${price ? formatCurrency(price) : "\u2014"}</span>
-          <span class="svc-menu-item__add">+</span>
-        </button>
-      `;
-      totalShown++;
-    }
-    html += "</div></div>";
-  }
-  if (totalShown === 0) {
-    html = `<p class="text-muted" style="padding:16px;text-align:center">Aucun plat ne correspond \xE0 \xAB ${escapeHtml(q)} \xBB.</p>`;
-  }
-  el.innerHTML = html;
-  el.querySelectorAll(".svc-menu-item").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      if (!_serviceState.selectedTable) {
-        showToast("S\xE9lectionnez une table", "error");
-        return;
-      }
-      _svcAddItem(parseInt(btn.dataset.id), btn.dataset.name, parseFloat(btn.dataset.price));
-    });
-  });
+function _salleCloseModal() {
+  var _a;
+  (_a = document.getElementById("salle-modal-overlay")) == null ? void 0 : _a.remove();
+  _salleState.selectedTableId = null;
 }
-function _svcAddItem(recipeId, name, price) {
-  const tn = _serviceState.selectedTable;
-  if (!tn) return;
-  const draft = _serviceState.tables[tn]._localDraft;
-  const existing = draft.find((i) => i.recipe_id === recipeId);
-  if (existing) {
-    existing.quantity++;
-  } else {
-    draft.push({ recipe_id: recipeId, name, price, quantity: 1, notes: "" });
-  }
-  _svcRenderCart();
-  _svcRenderTables(Object.keys(_serviceState.tables).length);
-}
-function _svcChangeQty(recipeId, delta) {
-  const tn = _serviceState.selectedTable;
-  if (!tn) return;
-  const draft = _serviceState.tables[tn]._localDraft;
-  const item = draft.find((i) => i.recipe_id === recipeId);
-  if (!item) return;
-  item.quantity += delta;
-  if (item.quantity <= 0) _serviceState.tables[tn]._localDraft = draft.filter((i) => i.recipe_id !== recipeId);
-  _svcRenderCart();
-  _svcRenderTables(Object.keys(_serviceState.tables).length);
-}
-function _svcRemoveItem(recipeId) {
-  const tn = _serviceState.selectedTable;
-  if (!tn) return;
-  _serviceState.tables[tn]._localDraft = _serviceState.tables[tn]._localDraft.filter((i) => i.recipe_id !== recipeId);
-  _svcRenderCart();
-  _svcRenderTables(Object.keys(_serviceState.tables).length);
-}
-function _svcRenderCart() {
-  const el = document.getElementById("svc-cart-items");
-  const totalEl = document.getElementById("svc-cart-total");
-  const tn = _serviceState.selectedTable;
-  if (!el || !tn) return;
-  const draft = _serviceState.tables[tn]._localDraft || [];
-  if (draft.length === 0) {
-    el.innerHTML = '<p class="text-muted svc-empty-cart">Aucun plat ajout\xE9</p>';
-    totalEl.textContent = "Total : 0,00 \u20AC";
-    return;
-  }
-  let total = 0;
-  el.innerHTML = draft.map((item) => {
-    const subtotal = item.price * item.quantity;
-    total += subtotal;
-    return `
-      <div class="svc-cart-item">
-        <span class="svc-cart-item__qty">${item.quantity}\xD7</span>
-        <span class="svc-cart-item__name">${escapeHtml(item.name)}</span>
-        <span class="svc-cart-item__price">${formatCurrency(subtotal)}</span>
-        <div class="svc-cart-item__actions">
-          <button class="svc-qty-btn" onclick="_svcChangeQty(${item.recipe_id}, -1)">\u2212</button>
-          <button class="svc-qty-btn" onclick="_svcChangeQty(${item.recipe_id}, 1)">+</button>
-          <button class="svc-qty-btn svc-qty-btn--delete" onclick="_svcRemoveItem(${item.recipe_id})">\u{1F5D1}\uFE0F</button>
+function _salleRenderModal(table) {
+  var _a, _b;
+  (_a = document.getElementById("salle-modal-overlay")) == null ? void 0 : _a.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "salle-modal-overlay";
+  overlay.id = "salle-modal-overlay";
+  const sentOrders = _salleState.orders.filter(
+    (o) => o.table_number === table.table_number && o.status !== "en_cours"
+  );
+  overlay.innerHTML = `
+    <div class="salle-modal" role="dialog" aria-modal="true">
+      <header class="salle-modal__head">
+        <div class="salle-modal__title">
+          <span class="salle-modal__num">Table ${table.table_number}</span>
+          <span class="salle-modal__zone">${escapeHtml(table.zone || "Salle")} \xB7 ${table.seats || 4} places</span>
+        </div>
+        <button class="salle-modal__close" id="salle-modal-close" aria-label="Fermer">\u2715</button>
+      </header>
+
+      <div class="salle-modal__body">
+        <div class="salle-modal__menu">
+          <div class="salle-modal__search">
+            <input type="search" id="salle-modal-search" placeholder="Rechercher un plat\u2026" class="form-control" data-ui="custom">
+          </div>
+          <div class="salle-modal__menu-list" id="salle-menu-list"></div>
+        </div>
+
+        <div class="salle-modal__cart">
+          <h3 class="salle-modal__section">Commande</h3>
+          <div id="salle-cart-items" class="salle-cart"></div>
+
+          <div class="salle-cart-meta">
+            <label class="salle-cart-meta__field">
+              <span>\u{1F465} Couverts</span>
+              <input type="number" id="salle-cart-covers" min="0" max="999" step="1" placeholder="\u2014" class="form-control" data-ui="custom" value="${(_b = _salleState.draftCovers) != null ? _b : ""}">
+            </label>
+            <label class="salle-cart-meta__field salle-cart-meta__field--full">
+              <span>\u{1F4DD} Notes (allergies, demandes)</span>
+              <textarea id="salle-cart-notes" rows="2" class="form-control" data-ui="custom">${escapeHtml(_salleState.draftNotes)}</textarea>
+            </label>
+          </div>
+
+          <div class="salle-cart__total" id="salle-cart-total">Total : 0,00 \u20AC</div>
+
+          <div class="salle-cart__actions">
+            <button class="salle-btn salle-btn--ghost" id="salle-action-save">\u{1F4BE} Sauvegarder</button>
+            <button class="salle-btn salle-btn--primary" id="salle-action-send">\u{1F514} Envoyer en cuisine</button>
+          </div>
+
+          <div class="salle-modal__sent" id="salle-modal-sent"></div>
+
+          <div class="salle-modal__danger">
+            <button class="salle-btn salle-btn--ghost" id="salle-action-split" title="Diviser l'addition">\u2797 Diviser l'addition</button>
+            <button class="salle-btn salle-btn--danger" id="salle-action-close">Terminer la table</button>
+          </div>
         </div>
       </div>
-    `;
-  }).join("");
-  totalEl.textContent = `Total : ${formatCurrency(total)}`;
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) _salleCloseModal();
+  });
+  document.getElementById("salle-modal-close").addEventListener("click", _salleCloseModal);
+  document.getElementById("salle-action-save").addEventListener("click", () => _salleSaveOrder(table, false));
+  document.getElementById("salle-action-send").addEventListener("click", () => _salleSaveOrder(table, true));
+  document.getElementById("salle-action-close").addEventListener("click", () => _salleCloseTable(table));
+  document.getElementById("salle-action-split").addEventListener("click", () => _salleSplitBill(table));
+  const search = document.getElementById("salle-modal-search");
+  let st;
+  search.addEventListener("input", () => {
+    clearTimeout(st);
+    st = setTimeout(() => {
+      _salleState.menuSearch = (search.value || "").trim().toLowerCase();
+      _salleRenderMenu();
+    }, 120);
+  });
+  document.getElementById("salle-cart-covers").addEventListener("input", (e) => {
+    const v = e.target.value;
+    _salleState.draftCovers = v === "" ? null : parseInt(v, 10);
+  });
+  document.getElementById("salle-cart-notes").addEventListener("input", (e) => {
+    _salleState.draftNotes = e.target.value;
+  });
+  _salleRenderMenu();
+  _salleRenderCart();
+  _salleRenderSent(table, sentOrders);
 }
-async function _svcSaveOrder(sendImmediately) {
-  var _a, _b, _c, _d;
-  const tn = _serviceState.selectedTable;
-  if (!tn) return;
-  const draft = _serviceState.tables[tn]._localDraft || [];
-  if (draft.length === 0) {
-    showToast("Ajoutez au moins un plat", "error");
+function _salleRenderMenu() {
+  const el = document.getElementById("salle-menu-list");
+  if (!el) return;
+  const q = _salleState.menuSearch;
+  const grouped = {};
+  for (const r of _salleState.recipes) {
+    if (q && !(r.name || "").toLowerCase().includes(q)) continue;
+    const cat = r.category || "Autres";
+    (grouped[cat] = grouped[cat] || []).push(r);
+  }
+  const order = ["entr\xE9e", "entr\xE9e froide", "entr\xE9e chaude", "plat", "plat principal", "dessert", "boisson", "accompagnement"];
+  const cats = Object.keys(grouped).sort((a, b) => {
+    const ia = order.indexOf(a);
+    const ib = order.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+  if (cats.length === 0) {
+    el.innerHTML = `<div class="salle-empty-menu">Aucun plat${q ? ` pour \xAB ${escapeHtml(q)} \xBB` : ""}.<br><a href="#/recipes/new">+ Cr\xE9er une fiche</a></div>`;
     return;
   }
-  const notes = ((_b = (_a = document.getElementById("svc-order-notes")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim()) || null;
-  const coversRaw = (_c = document.getElementById("svc-order-covers")) == null ? void 0 : _c.value;
-  const coversNum = coversRaw !== void 0 && coversRaw !== null && coversRaw !== "" ? parseInt(coversRaw, 10) : null;
-  const covers = Number.isInteger(coversNum) && coversNum >= 0 && coversNum <= 999 ? coversNum : null;
-  const td = _serviceState.tables[tn];
-  try {
-    if (td.currentDraft) await API.cancelOrder(td.currentDraft.id);
-    const order = await API.createOrder({
-      table_number: tn,
-      notes,
-      covers,
-      items: draft.map((i) => ({ recipe_id: i.recipe_id, quantity: i.quantity, notes: i.notes || null }))
-    });
-    if (sendImmediately) {
-      const result = await API.sendOrder(order.id);
-      if (((_d = result.warnings) == null ? void 0 : _d.length) > 0) showToast(`\u26A0\uFE0F Stock insuffisant pour ${result.warnings.length} ingr\xE9dient(s)`, "info");
-      showToast(`Table ${tn} \u2014 Commande envoy\xE9e en cuisine !`, "success");
-      _serviceState.tables[tn]._localDraft = [];
-    } else {
-      showToast(`Table ${tn} \u2014 Commande sauvegard\xE9e`, "success");
-      _serviceState.tables[tn]._localDraft = null;
-    }
-    const tableCount = Object.keys(_serviceState.tables).length;
-    await _svcRefreshOrders(tableCount);
-    if (_serviceState.selectedTable === tn) _svcSelectTable(tn);
-  } catch (e) {
-    showToast("Erreur : " + e.message, "error");
-  }
-}
-async function _svcCloseTable() {
-  const tn = _serviceState.selectedTable;
-  if (!tn) return;
-  const td = _serviceState.tables[tn];
-  const activeOrders = td.orders.filter((o) => !["termin\xE9", "annul\xE9"].includes(o.status));
-  if (activeOrders.length === 0 && (!td._localDraft || td._localDraft.length === 0)) {
-    showToast("Cette table est d\xE9j\xE0 libre", "info");
-    return;
-  }
-  showConfirmModal(`Terminer la table ${tn} ?`, `${activeOrders.length} commande(s) seront marqu\xE9es comme termin\xE9es.`, async () => {
-    var _a, _b;
-    try {
-      for (const order of activeOrders) await API.closeOrder(order.id);
-      _serviceState.tables[tn]._localDraft = [];
-      showToast(`Table ${tn} termin\xE9e`, "success");
-      _serviceState.selectedTable = null;
-      (_a = document.getElementById("svc-no-table")) == null ? void 0 : _a.classList.remove("hidden");
-      (_b = document.getElementById("svc-order-content")) == null ? void 0 : _b.classList.add("hidden");
-      await _svcRefreshOrders(Object.keys(_serviceState.tables).length);
-    } catch (e) {
-      showToast("Erreur : " + e.message, "error");
-    }
-  }, { confirmText: "Terminer", confirmClass: "btn btn-primary" });
-}
-function _svcRenderTableOrders() {
-  const el = document.getElementById("svc-table-orders");
-  const tn = _serviceState.selectedTable;
-  if (!el || !tn) return;
-  const td = _serviceState.tables[tn];
-  const sentOrders = td.orders.filter((o) => ["envoy\xE9", "pr\xEAt"].includes(o.status));
-  if (sentOrders.length === 0) {
-    el.innerHTML = "";
-    return;
-  }
-  let html = '<h4 class="svc-section-subtitle" style="margin-top:16px">Commandes envoy\xE9es</h4>';
-  for (const order of sentOrders) {
-    const readyCls = order.status === "pr\xEAt" ? "svc-sent-order--ready" : "";
-    const badgeCls = order.status === "pr\xEAt" ? "badge-success" : "badge-info";
-    const badgeLabel = order.status === "pr\xEAt" ? "\u2705 Pr\xEAt" : "\u23F3 En cuisine";
-    html += `<div class="svc-sent-order ${readyCls}">
-      <div class="svc-sent-order__header">
-        <span class="badge ${badgeCls}">${badgeLabel}</span>
-        <span class="svc-sent-order__time">${getElapsedTime(order.created_at)}</span>
-      </div>`;
-    for (const item of order.items) {
-      html += `<div class="svc-sent-item"><span>${item.quantity}\xD7 ${escapeHtml(item.recipe_name)}</span><span class="svc-sent-item__status">${getItemStatusIcon(item.status)}</span></div>`;
-    }
-    if (order.status === "pr\xEAt") {
-      html += `<button class="btn btn-primary btn-sm svc-served-btn" onclick="_svcMarkServed(${order.id})">\u{1F37D}\uFE0F Marquer servi</button>`;
+  let html = "";
+  for (const cat of cats) {
+    const items = grouped[cat];
+    html += `<div class="salle-menu-cat"><h4>${escapeHtml(cat.charAt(0).toUpperCase() + cat.slice(1))} <span class="salle-menu-cat__count">${items.length}</span></h4>`;
+    for (const r of items) {
+      const price = r.selling_price || 0;
+      html += `
+        <button class="salle-menu-item" data-id="${r.id}" data-name="${escapeHtml(r.name)}" data-price="${price}">
+          <span class="salle-menu-item__name">${escapeHtml(r.name)}</span>
+          <span class="salle-menu-item__price">${price ? formatCurrency(price) : "\u2014"}</span>
+          <span class="salle-menu-item__add">+</span>
+        </button>
+      `;
     }
     html += "</div>";
   }
   el.innerHTML = html;
+  el.querySelectorAll(".salle-menu-item").forEach((btn) => {
+    btn.addEventListener("click", () => _salleAdd(parseInt(btn.dataset.id), btn.dataset.name, parseFloat(btn.dataset.price)));
+  });
 }
-async function _svcMarkServed(orderId) {
+function _salleAdd(rid, name, price) {
+  const item = _salleState.draft[rid];
+  if (item) item.quantity++;
+  else _salleState.draft[rid] = { recipe_id: rid, name, price, quantity: 1, notes: "" };
+  _salleRenderCart();
+}
+function _salleQty(rid, delta) {
+  const it = _salleState.draft[rid];
+  if (!it) return;
+  it.quantity += delta;
+  if (it.quantity <= 0) delete _salleState.draft[rid];
+  _salleRenderCart();
+}
+function _salleRemove(rid) {
+  delete _salleState.draft[rid];
+  _salleRenderCart();
+}
+function _salleRenderCart() {
+  const el = document.getElementById("salle-cart-items");
+  const totalEl = document.getElementById("salle-cart-total");
+  if (!el || !totalEl) return;
+  const items = Object.values(_salleState.draft);
+  if (items.length === 0) {
+    el.innerHTML = '<div class="salle-cart__empty">Aucun plat ajout\xE9</div>';
+    totalEl.textContent = "Total : 0,00 \u20AC";
+    return;
+  }
+  let total = 0;
+  el.innerHTML = items.map((it) => {
+    const subtotal = it.price * it.quantity;
+    total += subtotal;
+    return `
+      <div class="salle-cart__item">
+        <span class="salle-cart__qty">${it.quantity}\xD7</span>
+        <span class="salle-cart__name">${escapeHtml(it.name)}</span>
+        <span class="salle-cart__price">${formatCurrency(subtotal)}</span>
+        <span class="salle-cart__ctrls">
+          <button class="salle-cart__btn" data-act="dec" data-id="${it.recipe_id}">\u2212</button>
+          <button class="salle-cart__btn" data-act="inc" data-id="${it.recipe_id}">+</button>
+          <button class="salle-cart__btn salle-cart__btn--del" data-act="del" data-id="${it.recipe_id}">\xD7</button>
+        </span>
+      </div>
+    `;
+  }).join("");
+  totalEl.textContent = `Total : ${formatCurrency(total)}`;
+  el.querySelectorAll(".salle-cart__btn").forEach((b) => {
+    b.addEventListener("click", () => {
+      const id = parseInt(b.dataset.id);
+      if (b.dataset.act === "inc") _salleQty(id, 1);
+      else if (b.dataset.act === "dec") _salleQty(id, -1);
+      else _salleRemove(id);
+    });
+  });
+}
+function _salleRenderSent(table, sentOrders) {
+  const el = document.getElementById("salle-modal-sent");
+  if (!el) return;
+  if (!sentOrders.length) {
+    el.innerHTML = "";
+    return;
+  }
+  let html = '<h3 class="salle-modal__section">Envoy\xE9 en cuisine</h3>';
+  for (const o of sentOrders) {
+    const elapsedMin = Math.floor((Date.now() - new Date(o.created_at).getTime()) / 6e4);
+    const isReady = o.status === "pr\xEAt";
+    const isServed = o.status === "servi";
+    const cls = isReady ? "salle-sent--ready" : isServed ? "salle-sent--served" : "";
+    const badge = isReady ? "\u2705 Pr\xEAt" : isServed ? "\u{1F37D}\uFE0F Servi" : "\u23F3 En cuisine";
+    html += `<div class="salle-sent ${cls}">
+      <div class="salle-sent__head">
+        <span class="salle-sent__badge">${badge}</span>
+        <span class="salle-sent__time">${elapsedMin}\u2032</span>
+        <span class="salle-sent__total">${formatCurrency(o.total_cost || 0)}</span>
+      </div>
+      <ul class="salle-sent__items">
+        ${(o.items || []).filter((it) => it.status !== "annul\xE9").map((it) => `
+          <li>
+            <span>${it.quantity}\xD7 ${escapeHtml(it.recipe_name)}</span>
+            <span class="salle-sent__item-status">${_salleItemStatusIcon(it.status)}</span>
+          </li>
+        `).join("")}
+      </ul>
+      ${isReady ? `<button class="salle-btn salle-btn--primary salle-btn--sm" data-mark-served="${o.id}">\u{1F37D}\uFE0F Marquer servi</button>` : ""}
+    </div>`;
+  }
+  el.innerHTML = html;
+  el.querySelectorAll("[data-mark-served]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      try {
+        await API.closeOrder(parseInt(b.dataset.markServed));
+        showToast("Commande servie", "success");
+        await _salleRefresh();
+        _salleOpenTable(table.id);
+      } catch (e) {
+        showToast(e.message, "error");
+      }
+    });
+  });
+}
+function _salleItemStatusIcon(s) {
+  switch (s) {
+    case "pr\xEAt":
+      return "\u2705";
+    case "en_pr\xE9paration":
+      return "\u{1F525}";
+    case "servi":
+      return "\u{1F37D}\uFE0F";
+    default:
+      return "\u23F3";
+  }
+}
+async function _salleSaveOrder(table, sendImmediately) {
+  var _a;
+  const items = Object.values(_salleState.draft);
+  if (items.length === 0) {
+    showToast("Ajoutez au moins un plat", "error");
+    return;
+  }
+  let coversValue = null;
+  if (_salleState.draftCovers != null && _salleState.draftCovers !== "") {
+    const n = parseInt(_salleState.draftCovers, 10);
+    if (Number.isInteger(n) && n >= 0 && n <= 999) coversValue = n;
+  }
   try {
-    await API.closeOrder(orderId);
-    showToast("Commande marqu\xE9e comme servie", "success");
-    await _svcRefreshOrders(Object.keys(_serviceState.tables).length);
-    if (_serviceState.selectedTable) _svcRenderTableOrders();
+    const existingDraft = _salleState.orders.find(
+      (o) => o.table_number === table.table_number && o.status === "en_cours"
+    );
+    if (existingDraft) await API.cancelOrder(existingDraft.id);
+    const order = await API.createOrder({
+      table_number: table.table_number,
+      notes: _salleState.draftNotes || null,
+      covers: coversValue,
+      items: items.map((i) => ({ recipe_id: i.recipe_id, quantity: i.quantity, notes: i.notes || null }))
+    });
+    if (sendImmediately) {
+      const result = await API.sendOrder(order.id);
+      if (((_a = result.warnings) == null ? void 0 : _a.length) > 0) {
+        showToast(`\u26A0\uFE0F Stock bas pour ${result.warnings.length} ingr\xE9dient(s)`, "info");
+      }
+      showToast(`Table ${table.table_number} \u2014 Commande envoy\xE9e \u{1F514}`, "success");
+      _salleCloseModal();
+    } else {
+      showToast(`Table ${table.table_number} \u2014 Commande sauvegard\xE9e`, "success");
+    }
+    await _salleRefresh();
+    if (!sendImmediately && _salleState.selectedTableId === table.id) {
+      _salleOpenTable(table.id);
+    }
   } catch (e) {
     showToast("Erreur : " + e.message, "error");
   }
 }
-function _svcRenderTracking() {
-  const el = document.getElementById("svc-tracking-list");
-  const inlineEl = document.getElementById("svc-tracking-inline");
-  if (!el) return;
-  const activeOrders = _serviceState.allOrders.filter((o) => ["envoy\xE9", "pr\xEAt"].includes(o.status));
-  activeOrders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  let html = "";
-  if (activeOrders.length === 0) {
-    html = '<div class="svc-empty-tracking"><p class="text-muted">Aucune commande en cours</p></div>';
-  } else {
-    for (const order of activeOrders) {
-      const elapsed = getElapsedTime(order.created_at);
-      const isReady = order.status === "pr\xEAt";
-      const isLate = !isReady && Date.now() - new Date(order.created_at).getTime() > 20 * 6e4;
-      const cardCls = isReady ? "svc-track-card--ready" : isLate ? "svc-track-card--late" : "";
-      const badgeCls = isReady ? "badge-success" : isLate ? "badge--danger" : "badge-info";
-      const badgeTxt = isReady ? "\u2705 Pr\xEAt" : isLate ? "\u26A0\uFE0F En retard" : "\u23F3 En cuisine";
-      html += `<div class="svc-track-card ${cardCls}">
-        <div class="svc-track-card__header">
-          <span class="svc-track-card__table" onclick="_svcSelectTable(${order.table_number})">Table ${order.table_number}</span>
-          <span class="svc-track-card__time">${elapsed}</span>
-          <span class="badge ${badgeCls}">${badgeTxt}</span>
-        </div>
-        <div class="svc-track-card__items">`;
-      for (const it of order.items) {
-        html += `<span class="svc-track-item">${it.quantity}\xD7 ${escapeHtml(it.recipe_name)} ${getItemStatusIcon(it.status)}</span>`;
-      }
-      html += "</div>";
-      if (isReady) html += `<button class="btn btn-primary btn-sm" onclick="_svcMarkServed(${order.id})" style="margin-top:8px">\u{1F37D}\uFE0F Servi</button>`;
-      html += "</div>";
-    }
-  }
-  el.innerHTML = html;
-  if (inlineEl) {
-    inlineEl.innerHTML = activeOrders.length > 0 ? `<h3 class="svc-section-subtitle" style="margin-top:20px">Suivi rapide</h3>${html}` : "";
-  }
-}
-function _svcUpdateMobileVisibility() {
-  const tables = document.getElementById("svc-tables-panel");
-  const order = document.getElementById("svc-order-panel");
-  const tracking = document.getElementById("svc-tracking-panel");
-  if (!tables || !order || !tracking) return;
-  if (window.innerWidth >= 768) {
-    tables.classList.remove("hidden");
-    order.classList.remove("hidden");
-    tracking.classList.add("hidden");
+async function _salleCloseTable(table) {
+  const tableOrders = _salleState.orders.filter(
+    (o) => o.table_number === table.table_number && !["termin\xE9", "annul\xE9"].includes(o.status)
+  );
+  if (tableOrders.length === 0) {
+    showToast("Cette table est d\xE9j\xE0 libre", "info");
     return;
   }
-  tables.classList.toggle("hidden", _serviceState.mobileTab !== "tables");
-  order.classList.toggle("hidden", _serviceState.mobileTab !== "order");
-  tracking.classList.toggle("hidden", _serviceState.mobileTab !== "tracking");
+  showConfirmModal(
+    `Terminer la table ${table.table_number} ?`,
+    `${tableOrders.length} commande(s) seront marqu\xE9es termin\xE9es.`,
+    async () => {
+      try {
+        for (const o of tableOrders) {
+          if (o.status === "en_cours") await API.cancelOrder(o.id);
+          else await API.closeOrder(o.id);
+        }
+        showToast(`Table ${table.table_number} termin\xE9e`, "success");
+        _salleCloseModal();
+        await _salleRefresh();
+      } catch (e) {
+        showToast(e.message, "error");
+      }
+    },
+    { confirmText: "Terminer", confirmClass: "salle-btn salle-btn--primary" }
+  );
 }
-window.addEventListener("resize", _svcUpdateMobileVisibility);
-let kitchenRefreshInterval = null;
-let _kitchenPrevOrderIds = null;
+function _salleSplitBill(table) {
+  const sent = _salleState.orders.filter(
+    (o) => o.table_number === table.table_number && ["envoy\xE9", "pr\xEAt", "servi"].includes(o.status)
+  );
+  const total = sent.reduce((s, o) => s + (o.total_cost || 0), 0);
+  if (total <= 0) {
+    showToast("Aucune commande \xE0 diviser", "info");
+    return;
+  }
+  const overlay = document.createElement("div");
+  overlay.className = "salle-modal-overlay";
+  overlay.style.zIndex = "10010";
+  overlay.innerHTML = `
+    <div class="salle-modal" style="max-width:380px">
+      <header class="salle-modal__head">
+        <div class="salle-modal__title"><span class="salle-modal__num" style="font-size:1.2rem">Diviser l'addition</span></div>
+        <button class="salle-modal__close" aria-label="Fermer">\u2715</button>
+      </header>
+      <div style="padding:20px">
+        <p style="margin:0 0 8px;color:var(--text-secondary);font-size:14px">Table ${table.table_number} \u2014 Total ${formatCurrency(total)}</p>
+        <label style="display:block;margin:12px 0">
+          <span style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:4px">Nombre de personnes</span>
+          <input type="number" id="salle-split-n" min="2" max="20" value="2" class="form-control" style="font-size:1.5rem;text-align:center">
+        </label>
+        <div id="salle-split-result" style="font-size:1.4rem;font-weight:700;color:var(--color-accent);text-align:center;padding:16px;background:var(--bg-elevated);border-radius:10px;margin-top:8px"></div>
+        <p style="font-size:12px;color:var(--text-tertiary);margin-top:8px;text-align:center">Information indicative \u2014 saisissez les paiements dans votre TPE</p>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector(".salle-modal__close").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  const inp = overlay.querySelector("#salle-split-n");
+  const result = overlay.querySelector("#salle-split-result");
+  const recompute = () => {
+    const n = Math.max(2, Math.min(20, parseInt(inp.value, 10) || 2));
+    result.textContent = `${formatCurrency(total / n)} / personne`;
+  };
+  inp.addEventListener("input", recompute);
+  recompute();
+}
+function _salleNotifyReady(orders) {
+  const tables = orders.map((o) => o.table_number).join(", ");
+  showToast(`\u2705 Table ${tables} \u2014 Pr\xEAt \xE0 servir !`, "success");
+  if (typeof playKitchenNotificationSound === "function") playKitchenNotificationSound();
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+}
+async function _salleStart() {
+  try {
+    await API.startService();
+    showToast("\u{1F680} Service lanc\xE9", "success");
+    await _salleRefresh();
+  } catch (e) {
+    showToast(e.message, "error");
+  }
+}
+async function _salleStop() {
+  const active = _salleState.orders.filter((o) => ["envoy\xE9", "en_cours", "pr\xEAt"].includes(o.status));
+  const msg = active.length > 0 ? `Il reste ${active.length} commande(s) en cours. Continuer ?` : "Le r\xE9capitulatif du service sera affich\xE9.";
+  showConfirmModal("Terminer le service ?", msg, async () => {
+    try {
+      const result = await API.stopService();
+      _salleShowRecap(result.recap);
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+  }, { confirmText: "Terminer le service", confirmClass: "salle-btn salle-btn--danger" });
+}
+function _salleShowRecap(recap) {
+  const overlay = document.createElement("div");
+  overlay.className = "salle-modal-overlay";
+  overlay.id = "salle-modal-overlay";
+  const dur = recap.started_at && recap.ended_at ? (() => {
+    const ms = new Date(recap.ended_at) - new Date(recap.started_at);
+    const m = Math.floor(ms / 6e4);
+    return m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}` : `${m}min`;
+  })() : "\u2014";
+  overlay.innerHTML = `
+    <div class="salle-modal" style="max-width:520px">
+      <header class="salle-modal__head">
+        <div class="salle-modal__title">
+          <span class="salle-modal__num" style="font-size:1.4rem">\u{1F3C1} Service termin\xE9</span>
+        </div>
+        <button class="salle-modal__close" aria-label="Fermer">\u2715</button>
+      </header>
+      <div style="padding:24px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+          <div class="salle-recap__cell"><strong>${recap.total_orders || 0}</strong><span>Commandes</span></div>
+          <div class="salle-recap__cell"><strong>${recap.total_covers || 0}</strong><span>Couverts</span></div>
+          <div class="salle-recap__cell"><strong>${recap.total_items || 0}</strong><span>Plats servis</span></div>
+          <div class="salle-recap__cell"><strong>${formatCurrency(recap.total_revenue || 0)}</strong><span>CA</span></div>
+        </div>
+        <div style="background:var(--bg-elevated);border-radius:10px;padding:12px;margin-bottom:16px;font-size:14px">
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-light)"><span>Dur\xE9e</span><strong>${dur}</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-light)"><span>Ticket moyen</span><strong>${recap.total_covers > 0 ? formatCurrency((recap.total_revenue || 0) / recap.total_covers) + "/cv" : "\u2014"}</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-light)"><span>Temps moyen / commande</span><strong>${recap.avg_ticket_time_min || 0} min</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Heure de pointe</span><strong>${recap.peak_hour ? recap.peak_hour + "h" : "\u2014"}</strong></div>
+        </div>
+        <button class="salle-btn salle-btn--primary" style="width:100%" id="salle-recap-close">Retour \xE0 la salle</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector(".salle-modal__close").addEventListener("click", () => {
+    overlay.remove();
+    _salleRefresh();
+  });
+  document.getElementById("salle-recap-close").addEventListener("click", () => {
+    overlay.remove();
+    _salleRefresh();
+  });
+}
+function _salleQuickMenu() {
+  const overlay = document.createElement("div");
+  overlay.className = "salle-modal-overlay";
+  overlay.innerHTML = `
+    <div class="salle-modal" style="max-width:320px">
+      <header class="salle-modal__head">
+        <div class="salle-modal__title"><span class="salle-modal__num" style="font-size:1.1rem">Menu rapide</span></div>
+        <button class="salle-modal__close" aria-label="Fermer">\u2715</button>
+      </header>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:8px">
+        <a href="#/kitchen" class="salle-btn salle-btn--ghost" style="text-decoration:none;justify-content:flex-start">\u{1F468}\u200D\u{1F373} \xC9cran cuisine</a>
+        <a href="#/recipes" class="salle-btn salle-btn--ghost" style="text-decoration:none;justify-content:flex-start">\u{1F4CB} Fiches techniques</a>
+        <a href="#/stock" class="salle-btn salle-btn--ghost" style="text-decoration:none;justify-content:flex-start">\u{1F4E6} Stock</a>
+        <a href="#/analytics" class="salle-btn salle-btn--ghost" style="text-decoration:none;justify-content:flex-start">\u{1F4CA} Pilotage</a>
+        <a href="#/settings/service-hours" class="salle-btn salle-btn--ghost" style="text-decoration:none;justify-content:flex-start">\u2699\uFE0F Horaires de service</a>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector(".salle-modal__close").addEventListener("click", () => overlay.remove());
+  overlay.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => overlay.remove()));
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+const KDS_POLL_INTERVAL = 7e3;
+let _kdsInterval = null;
+let _kdsTimerInterval = null;
+let _kdsState = {
+  orders: [],
+  prevIds: null,
+  soundOn: true,
+  fullscreen: false
+};
 async function renderKitchenView() {
   const app = document.getElementById("app");
   const nav = document.getElementById("nav");
@@ -17096,54 +17016,88 @@ async function renderKitchenView() {
   app.style.padding = "0";
   if (nav) nav.style.display = "none";
   app.innerHTML = `
-    <div class="kitchen-shell">
-      <header class="kitchen-header">
-        <div class="kitchen-header__left">
-          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height: 28px; width: auto;">
-          <span class="kitchen-header__title">Cuisine</span>
+    <div class="kds-shell">
+      <header class="kds-topbar">
+        <div class="kds-topbar__brand">
+          <img src="assets/logo-icon.svg" alt="RestoSuite" style="height:22px">
+          <span class="kds-topbar__title">Cuisine</span>
+          <span class="kds-topbar__sep">\u2022</span>
+          <span class="kds-topbar__clock" id="kds-clock">--:--</span>
         </div>
-        <div class="kitchen-header__right">
-          <span class="kitchen-header__clock" id="kitchen-clock"></span>
-          <button class="btn btn-secondary btn-sm" aria-label="Rafra\xEEchir" onclick="renderKitchenView()"><i data-lucide="refresh-cw" style="width:16px;height:16px"></i></button>
-          <button class="btn btn-secondary btn-sm" onclick="_kitchenExit()">Quitter</button>
+        <div class="kds-topbar__stats">
+          <div class="kds-stat"><span class="kds-stat__val" id="kds-s-new">0</span><span class="kds-stat__lbl">Nouveau</span></div>
+          <div class="kds-stat"><span class="kds-stat__val" id="kds-s-cook">0</span><span class="kds-stat__lbl">En pr\xE9paration</span></div>
+          <div class="kds-stat"><span class="kds-stat__val" id="kds-s-ready">0</span><span class="kds-stat__lbl">Pr\xEAt</span></div>
+        </div>
+        <div class="kds-topbar__actions">
+          <button class="kds-btn" id="kds-sound-btn" title="Son notification">\u{1F514}</button>
+          <button class="kds-btn" id="kds-fullscreen-btn" title="Plein \xE9cran">\u26F6</button>
+          <button class="kds-btn" id="kds-refresh-btn" title="Rafra\xEEchir">\u21BB</button>
+          <button class="kds-btn kds-btn--ghost" id="kds-go-salle">Salle</button>
+          <button class="kds-btn kds-btn--ghost" id="kds-exit-btn" title="Quitter">\u2715</button>
         </div>
       </header>
-      <div class="kitchen-body" id="kitchen-tickets">
+
+      <div class="kds-body" id="kds-body">
         <div class="loading"><div class="spinner"></div></div>
       </div>
     </div>
   `;
-  if (window.lucide) lucide.createIcons();
-  if (kitchenRefreshInterval) {
-    clearInterval(kitchenRefreshInterval);
-    kitchenRefreshInterval = null;
-  }
-  _kitchenPrevOrderIds = null;
-  await loadKitchenTickets();
-  _kitchenUpdateClock();
-  kitchenRefreshInterval = setInterval(async () => {
-    if (location.hash === "#/kitchen") {
-      await loadKitchenTickets();
-      _kitchenUpdateClock();
-    } else {
-      clearInterval(kitchenRefreshInterval);
-      kitchenRefreshInterval = null;
-      app.style.maxWidth = "";
-      app.style.padding = "";
-      if (nav) nav.style.display = "";
+  document.getElementById("kds-exit-btn").addEventListener("click", _kdsExit);
+  document.getElementById("kds-go-salle").addEventListener("click", () => {
+    location.hash = "#/service";
+  });
+  document.getElementById("kds-refresh-btn").addEventListener("click", _kdsLoad);
+  document.getElementById("kds-fullscreen-btn").addEventListener("click", _kdsToggleFullscreen);
+  document.getElementById("kds-sound-btn").addEventListener("click", () => {
+    _kdsState.soundOn = !_kdsState.soundOn;
+    document.getElementById("kds-sound-btn").textContent = _kdsState.soundOn ? "\u{1F514}" : "\u{1F515}";
+    showToast(_kdsState.soundOn ? "Son activ\xE9" : "Son d\xE9sactiv\xE9", "info");
+  });
+  _kdsState.prevIds = null;
+  await _kdsLoad();
+  _kdsUpdateClock();
+  _kdsStartPolling();
+  _kdsStartTimers();
+}
+async function _kdsLoad() {
+  try {
+    const data = await API.request("/service/kds");
+    const orders = data.orders || [];
+    const currentIds = new Set(orders.map((o) => o.id));
+    if (_kdsState.prevIds !== null) {
+      const hasNew = orders.some((o) => !_kdsState.prevIds.has(o.id) && o.status === "envoy\xE9");
+      if (hasNew && _kdsState.soundOn) _kdsPlaySound();
     }
-  }, 1e4);
+    _kdsState.prevIds = currentIds;
+    _kdsState.orders = orders;
+    _kdsRender();
+  } catch (e) {
+  }
 }
-function _kitchenUpdateClock() {
-  const el = document.getElementById("kitchen-clock");
-  if (!el) return;
-  const now = /* @__PURE__ */ new Date();
-  el.textContent = now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+function _kdsStartPolling() {
+  if (_kdsInterval) clearInterval(_kdsInterval);
+  _kdsInterval = setInterval(() => {
+    if (location.hash !== "#/kitchen") return _kdsCleanup();
+    _kdsLoad();
+  }, KDS_POLL_INTERVAL);
 }
-function _kitchenExit() {
-  if (kitchenRefreshInterval) {
-    clearInterval(kitchenRefreshInterval);
-    kitchenRefreshInterval = null;
+function _kdsStartTimers() {
+  if (_kdsTimerInterval) clearInterval(_kdsTimerInterval);
+  _kdsTimerInterval = setInterval(() => {
+    if (location.hash !== "#/kitchen") return _kdsCleanup();
+    _kdsUpdateClock();
+    _kdsUpdateTimers();
+  }, 1e3);
+}
+function _kdsCleanup() {
+  if (_kdsInterval) {
+    clearInterval(_kdsInterval);
+    _kdsInterval = null;
+  }
+  if (_kdsTimerInterval) {
+    clearInterval(_kdsTimerInterval);
+    _kdsTimerInterval = null;
   }
   const app = document.getElementById("app");
   const nav = document.getElementById("nav");
@@ -17152,80 +17106,170 @@ function _kitchenExit() {
     app.style.padding = "";
   }
   if (nav) nav.style.display = "";
+}
+function _kdsExit() {
+  _kdsCleanup();
   location.hash = "#/";
 }
-async function loadKitchenTickets() {
-  let orders = [];
-  try {
-    orders = await API.getOrders();
-    orders = orders.filter((o) => o.status === "envoy\xE9" || o.status === "pr\xEAt");
-    orders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  } catch (e) {
-    return;
-  }
-  const currentIds = new Set(orders.map((o) => o.id));
-  if (_kitchenPrevOrderIds !== null) {
-    const hasNewOrders = orders.some((o) => !_kitchenPrevOrderIds.has(o.id));
-    if (hasNewOrders) {
-      _kitchenPlaySound();
+function _kdsUpdateClock() {
+  const el = document.getElementById("kds-clock");
+  if (!el) return;
+  el.textContent = (/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+function _kdsLanes() {
+  const lanes = { nouveau: [], cook: [], ready: [] };
+  for (const o of _kdsState.orders) {
+    for (const it of o.items || []) {
+      if (it.status === "servi" || it.status === "annul\xE9") continue;
+      const ticket = {
+        order: o,
+        item: it
+      };
+      if (it.status === "en_attente" || it.status === "attente") lanes.nouveau.push(ticket);
+      else if (it.status === "en_pr\xE9paration") lanes.cook.push(ticket);
+      else if (it.status === "pr\xEAt") lanes.ready.push(ticket);
     }
   }
-  _kitchenPrevOrderIds = currentIds;
-  const el = document.getElementById("kitchen-tickets");
-  if (!el) return;
-  if (orders.length === 0) {
-    el.innerHTML = `
-      <div class="empty-state" style="padding-top:120px">
-        <div class="empty-icon" style="font-size:4rem"><i data-lucide="check-circle"></i></div>
-        <h3>Pas de commande en attente</h3>
-        <p>Les nouvelles commandes appara\xEEtront ici automatiquement.</p>
+  for (const k of Object.keys(lanes)) {
+    lanes[k].sort((a, b) => new Date(a.order.created_at) - new Date(b.order.created_at));
+  }
+  return lanes;
+}
+function _kdsRender() {
+  const body = document.getElementById("kds-body");
+  if (!body) return;
+  const lanes = _kdsLanes();
+  const counts = {
+    nouveau: lanes.nouveau.length,
+    cook: lanes.cook.length,
+    ready: lanes.ready.length
+  };
+  const newEl = document.getElementById("kds-s-new");
+  const cookEl = document.getElementById("kds-s-cook");
+  const readyEl = document.getElementById("kds-s-ready");
+  if (newEl) newEl.textContent = counts.nouveau;
+  if (cookEl) cookEl.textContent = counts.cook;
+  if (readyEl) readyEl.textContent = counts.ready;
+  if (counts.nouveau + counts.cook + counts.ready === 0) {
+    body.innerHTML = `
+      <div class="kds-empty">
+        <div class="kds-empty__icon">\u2713</div>
+        <h2>Cuisine au calme</h2>
+        <p>Aucune commande en attente. Les nouveaux bons appara\xEEtront ici d\xE8s qu'ils sont envoy\xE9s.</p>
       </div>
     `;
     return;
   }
-  el.innerHTML = `<div class="kitchen-grid">${orders.map((order) => {
-    const elapsed = _kitchenElapsed(order.created_at);
-    const isReady = order.status === "pr\xEAt";
-    const isLate = !isReady && Date.now() - new Date(order.created_at).getTime() > 20 * 6e4;
-    return `
-      <div class="kitchen-ticket ${isReady ? "kitchen-ticket--ready" : ""} ${isLate ? "kitchen-ticket--late" : ""}">
-        <div class="kitchen-ticket__header">
-          <span class="kitchen-ticket__table">Table ${order.table_number}</span>
-          <span class="kitchen-ticket__id">#${order.id}</span>
-          <span class="kitchen-ticket__timer ${isLate ? "kitchen-ticket__timer--late" : ""}">${elapsed}</span>
+  body.innerHTML = `
+    <div class="kds-lanes">
+      <section class="kds-lane kds-lane--new">
+        <header class="kds-lane__head">
+          <span class="kds-lane__icon">\u{1F4E5}</span>
+          <h2>Nouveau</h2>
+          <span class="kds-lane__count">${counts.nouveau}</span>
+        </header>
+        <div class="kds-lane__body">
+          ${lanes.nouveau.map((t) => _kdsTicketHTML(t, "nouveau")).join("") || '<div class="kds-lane__empty">\u2014</div>'}
         </div>
-        ${order.notes ? `<div class="kitchen-ticket__notes">\u{1F4CC} ${escapeHtml(order.notes)}</div>` : ""}
-        <div class="kitchen-ticket__items">
-          ${order.items.map((item) => {
-      const itemStatusClass = item.status === "pr\xEAt" ? "kitchen-item--ready" : item.status === "en_pr\xE9paration" ? "kitchen-item--cooking" : "";
-      return `
-              <div class="kitchen-item ${itemStatusClass}">
-                <span class="kitchen-item__qty">${item.quantity}\xD7</span>
-                <span class="kitchen-item__name">${escapeHtml(item.recipe_name)}</span>
-                ${item.notes ? `<span class="kitchen-item__notes">(${escapeHtml(item.notes)})</span>` : ""}
-                <div class="kitchen-item__actions">
-                  ${item.status === "en_attente" ? `<button class="btn btn-sm btn-secondary" onclick="updateKitchenItem(${order.id}, ${item.id}, 'en_pr\xE9paration')">\u{1F525} Pr\xE9p.</button>` : ""}
-                  ${item.status === "en_pr\xE9paration" ? `<button class="btn btn-sm btn-primary" onclick="updateKitchenItem(${order.id}, ${item.id}, 'pr\xEAt')">\u2705 Pr\xEAt</button>` : ""}
-                  ${item.status === "pr\xEAt" ? `<span class="badge badge-success">\u2705 Pr\xEAt</span>` : ""}
-                </div>
-              </div>
-            `;
-    }).join("")}
+      </section>
+      <section class="kds-lane kds-lane--cook">
+        <header class="kds-lane__head">
+          <span class="kds-lane__icon">\u{1F525}</span>
+          <h2>En pr\xE9paration</h2>
+          <span class="kds-lane__count">${counts.cook}</span>
+        </header>
+        <div class="kds-lane__body">
+          ${lanes.cook.map((t) => _kdsTicketHTML(t, "cook")).join("") || '<div class="kds-lane__empty">\u2014</div>'}
         </div>
-        ${isReady ? `<div class="kitchen-ticket__footer"><span class="badge badge-success" style="font-size:1rem;padding:6px 12px">\u2705 Tout est pr\xEAt \u2014 En attente service</span></div>` : ""}
-      </div>
-    `;
-  }).join("")}</div>`;
+      </section>
+      <section class="kds-lane kds-lane--ready">
+        <header class="kds-lane__head">
+          <span class="kds-lane__icon">\u2705</span>
+          <h2>Pr\xEAt</h2>
+          <span class="kds-lane__count">${counts.ready}</span>
+        </header>
+        <div class="kds-lane__body">
+          ${lanes.ready.map((t) => _kdsTicketHTML(t, "ready")).join("") || '<div class="kds-lane__empty">\u2014</div>'}
+        </div>
+      </section>
+    </div>
+  `;
+  body.querySelectorAll("[data-action]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const orderId = parseInt(btn.dataset.orderId);
+      const itemId = parseInt(btn.dataset.itemId);
+      const action = btn.dataset.action;
+      let nextStatus;
+      if (action === "start") nextStatus = "en_pr\xE9paration";
+      else if (action === "ready") nextStatus = "pr\xEAt";
+      else if (action === "undo") nextStatus = "en_pr\xE9paration";
+      if (!nextStatus) return;
+      try {
+        await API.updateOrderItem(orderId, itemId, { status: nextStatus });
+        await _kdsLoad();
+      } catch (err) {
+        showToast("Erreur : " + err.message, "error");
+      }
+    });
+  });
 }
-async function updateKitchenItem(orderId, itemId, status) {
-  try {
-    await API.updateOrderItem(orderId, itemId, { status });
-    await loadKitchenTickets();
-  } catch (e) {
-    showToast("Erreur : " + e.message, "error");
+function _kdsTicketHTML(ticket, lane) {
+  const o = ticket.order;
+  const it = ticket.item;
+  const elapsed = Math.floor((Date.now() - new Date(o.created_at).getTime()) / 6e4);
+  const urgent = elapsed > 15 ? "kds-ticket--urgent" : elapsed > 8 ? "kds-ticket--warn" : "";
+  const fresh = elapsed < 2 ? "kds-ticket--fresh" : "";
+  const noteText = [o.notes, it.notes].filter(Boolean).join(" \u2022 ");
+  const hasAllergy = noteText && /allergi|sans|gluten|lactose|noix|arachide|fruit\s*de\s*mer/i.test(noteText);
+  let actions = "";
+  if (lane === "nouveau") {
+    actions = `<button class="kds-ticket__btn kds-ticket__btn--primary" data-action="start" data-order-id="${o.id}" data-item-id="${it.id}">\u{1F525} D\xE9marrer</button>
+               <button class="kds-ticket__btn kds-ticket__btn--ready" data-action="ready" data-order-id="${o.id}" data-item-id="${it.id}">\u2705 Pr\xEAt</button>`;
+  } else if (lane === "cook") {
+    actions = `<button class="kds-ticket__btn kds-ticket__btn--ready" data-action="ready" data-order-id="${o.id}" data-item-id="${it.id}">\u2705 Pr\xEAt</button>`;
+  } else if (lane === "ready") {
+    actions = `<button class="kds-ticket__btn kds-ticket__btn--ghost" data-action="undo" data-order-id="${o.id}" data-item-id="${it.id}">\u21B6 Re-prep</button>`;
+  }
+  return `
+    <article class="kds-ticket ${urgent} ${fresh}" data-created-at="${o.created_at}">
+      <header class="kds-ticket__head">
+        <span class="kds-ticket__table">T${o.table_number}</span>
+        <span class="kds-ticket__id">#${o.id}</span>
+        <span class="kds-ticket__timer" data-created-at="${o.created_at}">${elapsed}\u2032</span>
+      </header>
+      <div class="kds-ticket__body">
+        <div class="kds-ticket__qty">${it.quantity}\xD7</div>
+        <div class="kds-ticket__name">${escapeHtml(it.recipe_name || "?")}</div>
+      </div>
+      ${noteText ? `<div class="kds-ticket__notes ${hasAllergy ? "kds-ticket__notes--allergy" : ""}">
+        ${hasAllergy ? "\u26A0\uFE0F " : "\u{1F4DD} "}${escapeHtml(noteText)}
+      </div>` : ""}
+      <footer class="kds-ticket__foot">${actions}</footer>
+    </article>
+  `;
+}
+function _kdsUpdateTimers() {
+  document.querySelectorAll(".kds-ticket").forEach((card) => {
+    const created = card.dataset.createdAt;
+    if (!created) return;
+    const elapsed = Math.floor((Date.now() - new Date(created).getTime()) / 6e4);
+    const timer = card.querySelector(".kds-ticket__timer");
+    if (timer) timer.textContent = `${elapsed}\u2032`;
+    card.classList.toggle("kds-ticket--urgent", elapsed > 15);
+    card.classList.toggle("kds-ticket--warn", elapsed > 8 && elapsed <= 15);
+    card.classList.toggle("kds-ticket--fresh", elapsed < 2);
+  });
+}
+function _kdsToggleFullscreen() {
+  const el = document.documentElement;
+  if (!document.fullscreenElement) {
+    if (el.requestFullscreen) el.requestFullscreen();
+  } else {
+    if (document.exitFullscreen) document.exitFullscreen();
   }
 }
-function _kitchenPlaySound() {
+function _kdsPlaySound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator();
@@ -17251,18 +17295,15 @@ function _kitchenPlaySound() {
   }
 }
 function playKitchenNotificationSound() {
-  _kitchenPlaySound();
+  _kdsPlaySound();
 }
-function _kitchenElapsed(createdAt) {
-  const now = /* @__PURE__ */ new Date();
-  const created = new Date(createdAt);
-  const diffMs = now - created;
-  const diffMin = Math.floor(diffMs / 6e4);
-  if (diffMin < 1) return "\xC0 l'instant";
-  if (diffMin < 60) return `${diffMin} min`;
-  const hours = Math.floor(diffMin / 60);
-  const mins = diffMin % 60;
-  return `${hours}h${mins > 0 ? String(mins).padStart(2, "0") : ""}`;
+async function updateKitchenItem(orderId, itemId, status) {
+  try {
+    await API.updateOrderItem(orderId, itemId, { status });
+    await _kdsLoad();
+  } catch (e) {
+    showToast("Erreur : " + e.message, "error");
+  }
 }
 async function renderAnalytics() {
   const app = document.getElementById("app");
@@ -30683,8 +30724,8 @@ const NAV_GROUPS = {
       { label: "Factures", route: "/invoices", icon: "receipt", roles: ["gerant"] },
       { label: "Planning", route: "/planning", icon: "calendar-clock", roles: ["gerant"] },
       { label: "Messages", route: "/messages", icon: "message-square", roles: ["gerant", "cuisinier"], badgeKey: "messages" },
-      { label: "Service (Salle)", route: "/service", icon: "concierge-bell", roles: ["gerant", "salle"] },
-      { label: "Cuisine (\xE9cran)", route: "/kitchen", icon: "chef-hat", roles: ["gerant", "cuisinier"] }
+      { label: "Salle", route: "/service", icon: "concierge-bell", roles: ["gerant", "salle"] },
+      { label: "Cuisine", route: "/kitchen", icon: "chef-hat", roles: ["gerant", "cuisinier"] }
     ]
   },
   haccp: {
@@ -30711,6 +30752,7 @@ const NAV_GROUPS = {
       { label: "Portail Fournisseur", route: "/supplier-portal", icon: "truck", roles: ["gerant"] },
       { label: "Journal erreurs", route: "/errors-log", icon: "bug", roles: ["gerant"] },
       { label: "Agr\xE9ment sanitaire", route: "/settings/sanitary-approval", icon: "badge-check", roles: ["gerant"] },
+      { label: "Horaires de service", route: "/settings/service-hours", icon: "clock", roles: ["gerant"] },
       { label: "Se d\xE9connecter", route: null, icon: "log-out", roles: ["gerant", "cuisinier", "equipier"], action: "logout" }
     ]
   },
@@ -31033,6 +31075,13 @@ function registerRoutes() {
   Router.add(/^\/subscribe$/, renderSubscribe);
   Router.add(/^\/supplier-portal$/, renderSupplierPortalManage);
   Router.add(/^\/service$/, renderServiceView);
+  Router.add(/^\/service-salle$/, () => {
+    location.hash = "#/service";
+  });
+  Router.add(/^\/service-cuisine$/, () => {
+    location.hash = "#/kitchen";
+  });
+  Router.add(/^\/settings\/service-hours$/, renderServiceHoursSettings);
   Router.add(/^\/scan-invoice$/, renderScanInvoice);
   Router.add(/^\/mercuriale$/, renderMercuriale);
   Router.add(/^\/import-mercuriale$/, renderImportMercuriale);

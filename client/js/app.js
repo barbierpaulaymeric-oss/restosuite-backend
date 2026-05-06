@@ -45,8 +45,8 @@ const NAV_GROUPS = {
       { label: 'Factures',               route: '/invoices',  icon: 'receipt',        roles: ['gerant'] },
       { label: 'Planning',               route: '/planning',  icon: 'calendar-clock', roles: ['gerant'] },
       { label: 'Messages',               route: '/messages',  icon: 'message-square', roles: ['gerant','cuisinier'], badgeKey: 'messages' },
-      { label: 'Service (Salle)',        route: '/service',   icon: 'concierge-bell', roles: ['gerant','salle'] },
-      { label: 'Cuisine (écran)',        route: '/kitchen',   icon: 'chef-hat',       roles: ['gerant','cuisinier'] },
+      { label: 'Salle',                  route: '/service',   icon: 'concierge-bell', roles: ['gerant','salle'] },
+      { label: 'Cuisine',                route: '/kitchen',   icon: 'chef-hat',       roles: ['gerant','cuisinier'] },
     ]
   },
   haccp: {
@@ -73,6 +73,7 @@ const NAV_GROUPS = {
       { label: 'Portail Fournisseur', route: '/supplier-portal', icon: 'truck',        roles: ['gerant'] },
       { label: 'Journal erreurs',     route: '/errors-log',         icon: 'bug',          roles: ['gerant'] },
       { label: 'Agrément sanitaire',  route: '/settings/sanitary-approval', icon: 'badge-check', roles: ['gerant'] },
+      { label: 'Horaires de service', route: '/settings/service-hours',     icon: 'clock',       roles: ['gerant'] },
       { label: 'Se déconnecter',      route: null,               icon: 'log-out',      roles: ['gerant','cuisinier','equipier'], action: 'logout' },
     ]
   },
@@ -409,6 +410,9 @@ function registerRoutes() {
   Router.add(/^\/subscribe$/, renderSubscribe);
   Router.add(/^\/supplier-portal$/, renderSupplierPortalManage);
   Router.add(/^\/service$/, renderServiceView);
+  Router.add(/^\/service-salle$/, () => { location.hash = '#/service'; });
+  Router.add(/^\/service-cuisine$/, () => { location.hash = '#/kitchen'; });
+  Router.add(/^\/settings\/service-hours$/, renderServiceHoursSettings);
   Router.add(/^\/scan-invoice$/, renderScanInvoice);
   Router.add(/^\/mercuriale$/, renderMercuriale);
   Router.add(/^\/import-mercuriale$/, renderImportMercuriale);

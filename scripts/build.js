@@ -47,6 +47,7 @@ const JS_FILES = [
   'js/views/haccp-witness-meals.js',
   'js/views/haccp-staff-health.js',
   'js/views/settings-sanitary.js',
+  'js/views/settings-service-hours.js',
   'js/views/haccp-plan.js',
   'js/views/haccp-recall.js',
   'js/views/haccp-training.js',
