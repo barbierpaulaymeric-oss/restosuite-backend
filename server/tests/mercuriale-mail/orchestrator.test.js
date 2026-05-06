@@ -421,4 +421,32 @@ describe('dispatchOrderEmail', () => {
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/email/i);
   });
+
+  test('BCCs the restaurant owner so they keep a copy of every PO', async () => {
+    // Restaurant 4243 has owner account 9100 with email owner@testrestoflow.com
+    // and supplier 9101 (FoodFlow) with email julie@foodflow.com.
+    run(`INSERT INTO purchase_orders (id, restaurant_id, supplier_id, reference, status, total_amount)
+         VALUES (50004, 4243, 9101, 'PO-T-4', 'envoyée', 25)`);
+    run(`INSERT INTO purchase_order_items (purchase_order_id, restaurant_id, product_name, quantity, unit, unit_price, total_price)
+         VALUES (50004, 4243, 'Tomates', 1, 'kg', 25, 25)`);
+    let captured = null;
+    const r = await dispatchOrderEmail({ rid: 4243, supplier_id: 9101, po_id: 50004, sendFn: async (a) => { captured = a; } });
+    expect(r.ok).toBe(true);
+    expect(r.to).toBe('julie@foodflow.com');
+    expect(r.bcc).toBe('owner@testrestoflow.com');
+    expect(captured.bcc).toBe('owner@testrestoflow.com');
+  });
+
+  test('omits BCC when the restaurant has no owner email on file', async () => {
+    // Restaurant 4242 has supplier 9001 but no accounts row.
+    run(`INSERT INTO purchase_orders (id, restaurant_id, supplier_id, reference, status, total_amount)
+         VALUES (50005, 4242, 9001, 'PO-T-5', 'envoyée', 10)`);
+    run(`INSERT INTO purchase_order_items (purchase_order_id, restaurant_id, product_name, quantity, unit, unit_price, total_price)
+         VALUES (50005, 4242, 'X', 1, 'kg', 10, 10)`);
+    let captured = null;
+    const r = await dispatchOrderEmail({ rid: 4242, supplier_id: 9001, po_id: 50005, sendFn: async (a) => { captured = a; } });
+    expect(r.ok).toBe(true);
+    expect(r.bcc).toBeNull();
+    expect(captured.bcc).toBeUndefined();
+  });
 });

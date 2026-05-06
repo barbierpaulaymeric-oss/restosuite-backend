@@ -23,15 +23,17 @@ function getTransport() {
   return _transport;
 }
 
-async function sendOrderEmail({ to, subject, text, xlsxBuffer, filename }) {
+async function sendOrderEmail({ to, bcc, subject, text, xlsxBuffer, filename }) {
   const transport = getTransport();
-  return transport.sendMail({
+  const msg = {
     from: process.env.MERCURIALE_EMAIL,
     to,
     subject,
     text,
     attachments: [{ filename, content: xlsxBuffer }],
-  });
+  };
+  if (bcc) msg.bcc = bcc;
+  return transport.sendMail(msg);
 }
 
 async function sendPlainEmail({ to, subject, text, html }) {

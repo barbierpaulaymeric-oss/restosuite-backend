@@ -463,6 +463,22 @@ async function dispatchOrderEmail({ rid, supplier_id, po_id, sendFn }) {
     [supplier_id, rid]
   );
 
+  // BCC the restaurant owner so they keep a copy of every PO sent to a
+  // supplier. Owner = is_owner=1; fall back to the most recent patron-role
+  // account so legacy rows that predate the is_owner column still get a copy.
+  // Skip if it accidentally equals the supplier address (don't double-send).
+  const ownerRow = get(
+    `SELECT email FROM accounts
+       WHERE restaurant_id = ? AND email IS NOT NULL AND email != ''
+       ORDER BY is_owner DESC, (role = 'patron') DESC, id ASC
+       LIMIT 1`,
+    [rid]
+  );
+  const supplierEmailLc = String(supplier.email).trim().toLowerCase();
+  const ownerEmail = ownerRow && ownerRow.email && String(ownerRow.email).trim().toLowerCase() !== supplierEmailLc
+    ? ownerRow.email
+    : null;
+
   const xlsxBuffer = buildOrderXlsx({ restaurant, supplier, integration, po, items });
   const sender = sendFn || (async (args) => {
     const { sendOrderEmail } = require('./smtp-client');
@@ -471,12 +487,13 @@ async function dispatchOrderEmail({ rid, supplier_id, po_id, sendFn }) {
   try {
     await sender({
       to: supplier.email,
+      bcc: ownerEmail || undefined,
       subject: `Bon de commande ${po.reference} — ${restaurant && restaurant.name}`,
       text: `Bonjour,\n\nVeuillez trouver ci-joint le bon de commande ${po.reference}.\n\nCordialement,\n${restaurant && restaurant.name}\n\n— Envoyé automatiquement par RestoSuite.`,
       xlsxBuffer,
       filename: `commande-${po.reference}.xlsx`,
     });
-    return { ok: true, to: supplier.email };
+    return { ok: true, to: supplier.email, bcc: ownerEmail || null };
   } catch (e) {
     return { ok: false, to: supplier.email, error: e.message };
   }

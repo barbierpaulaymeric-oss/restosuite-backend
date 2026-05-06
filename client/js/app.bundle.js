@@ -20099,6 +20099,11 @@ class LoginView {
           <button class="btn btn-primary" id="reg-submit" disabled aria-disabled="true" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             ${isSupplier ? "Cr\xE9er mon compte fournisseur" : "Cr\xE9er mon compte"}
           </button>
+
+          <p style="text-align:center;margin-top:var(--space-4);font-size:var(--text-sm);color:var(--text-secondary)">
+            D\xE9j\xE0 un compte ?
+            <a href="#" id="reg-go-login" style="color:var(--color-accent);text-decoration:none;font-weight:600">Se connecter</a>
+          </p>
         </div>
       </div>
     `;
@@ -20117,6 +20122,15 @@ class LoginView {
       this.registerType = "supplier";
       this.render();
     });
+    const goLoginLink = document.getElementById("reg-go-login");
+    if (goLoginLink) {
+      goLoginLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (location.hash === "#register") history.replaceState(null, "", location.pathname + location.search);
+        this.mode = "restaurant";
+        this.render();
+      });
+    }
     if (hasResumeStash) {
       const resumeLink = document.getElementById("resume-stash-link");
       if (resumeLink) {
@@ -31373,13 +31387,24 @@ document.addEventListener("keydown", (e) => {
   }
 });
 let deferredPrompt;
+function isRegisterView() {
+  return location.hash === "#register" || location.hash.startsWith("#register?");
+}
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
+  if (isRegisterView()) return;
   showInstallBanner();
+});
+window.addEventListener("hashchange", () => {
+  if (deferredPrompt && !isRegisterView() && !document.querySelector(".install-banner")) {
+    showInstallBanner();
+  }
 });
 function showInstallBanner() {
   if (localStorage.getItem("restosuite_install_dismissed")) return;
+  if (isRegisterView()) return;
+  if (document.querySelector(".install-banner")) return;
   const banner = document.createElement("div");
   banner.className = "install-banner";
   banner.innerHTML = `

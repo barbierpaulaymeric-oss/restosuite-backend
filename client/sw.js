@@ -1,8 +1,7 @@
-// Bumped 2026-05-06 (v43): P1-2 reg-staff-password type=password,
-// P2-2 #fonctionnalites → #fonctionnalites-piliers anchors,
-// P2-1 clear #app DOM avant overlay wizard, sur la base v42 RGPD consent
-// + v41 P0-1 stale-JWT, + v40 /confidentialite + blog strip.
-const CACHE_NAME = 'restosuite-v43';
+// Bumped 2026-05-06 (v44): P3-3 lien "Déjà un compte ? Se connecter" sur /register,
+// P1-4 banner PWA install masqué sur #register (réessaie au hashchange),
+// + BCC propriétaire sur emails de bons de commande sortants.
+const CACHE_NAME = 'restosuite-v44';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
