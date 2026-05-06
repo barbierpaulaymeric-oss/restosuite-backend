@@ -358,7 +358,7 @@ function registerRoutes() {
   if (Router.routes.length > 0) return;
 
   Router.add(/^\/$/, renderDashboard);
-  Router.add(/^\/recipes$/, renderDashboard);
+  Router.add(/^\/recipes$/, renderRecipes);
   Router.add(/^\/new$/, () => renderRecipeForm(null));
   Router.add(/^\/recipe\/(\d+)$/, (id) => renderRecipeDetail(parseInt(id)));
   Router.add(/^\/edit\/(\d+)$/, (id) => renderRecipeForm(parseInt(id)));
