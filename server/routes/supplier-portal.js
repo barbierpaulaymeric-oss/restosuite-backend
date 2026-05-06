@@ -1218,7 +1218,7 @@ router.post('/import-mercuriale', requireSupplierAuth, mercurialeUpload.single('
   }
 });
 
-router.post('/save-mercuriale', requireSupplierAuth, express.json({ limit: '5mb' }), (req, res) => {
+router.post('/save-mercuriale', requireSupplierAuth, (req, res) => {
   const supplierId = req.supplierAccount.supplier_id;
   const rid = req.supplierAccount.restaurant_id;
   const { items } = req.body || {};
@@ -2036,7 +2036,7 @@ router.get('/messages/conversations/:restaurantId', requireSupplierAuth, (req, r
   res.json({ restaurant, messages });
 });
 
-router.post('/messages/conversations/:restaurantId', requireSupplierAuth, express.json({ limit: '256kb' }), (req, res) => {
+router.post('/messages/conversations/:restaurantId', requireSupplierAuth, (req, res) => {
   const requestedRid = Number(req.params.restaurantId);
   const identities = getSupplierIdentities(req.supplierAccount);
   const match = identities.find(i => i.restaurant_id === requestedRid);

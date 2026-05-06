@@ -81,12 +81,7 @@
     "name": "RestoSuite",
     "url": "https://www.restosuite.fr",
     "description": "Logiciel de gestion restaurant tout-en-un avec saisie vocale IA",
-    "inLanguage": "fr",
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": "https://www.restosuite.fr/blog/?q={search_term_string}",
-      "query-input": "required name=search_term_string"
-    }
+    "inLanguage": "fr"
   }
   </script>
   <script type="application/ld+json">
@@ -141,26 +136,6 @@
           "@type": "Answer",
           "text": "Oui. Vous pouvez saisir vos recettes par la voix, les taper manuellement, ou scanner vos factures fournisseurs. L'IA s'adapte à votre façon de travailler et structure tout automatiquement."
         }
-      }
-    ]
-  }
-  </script>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      {
-        "@type": "ListItem",
-        "position": 1,
-        "name": "Accueil",
-        "item": "https://www.restosuite.fr/"
-      },
-      {
-        "@type": "ListItem",
-        "position": 2,
-        "name": "Blog",
-        "item": "https://www.restosuite.fr/blog/"
       }
     ]
   }
@@ -231,7 +206,6 @@
         <a href="#fonctionnalites">Fonctionnalités</a>
         <a href="#tarifs">Tarifs</a>
         <a href="#faq">FAQ</a>
-        <a href="/blog/">Blog</a>
       </nav>
       <div class="header__cta">
         <a href="/app" class="btn btn--ghost" style="margin-right:var(--space-2,8px)">Se connecter</a>
@@ -248,7 +222,6 @@
     <a href="#fonctionnalites" onclick="closeMobile()">Fonctionnalités</a>
     <a href="#tarifs" onclick="closeMobile()">Tarifs</a>
     <a href="#faq" onclick="closeMobile()">FAQ</a>
-    <a href="/blog/" onclick="closeMobile()">Blog</a>
     <a href="/app" onclick="closeMobile()">Se connecter</a>
     <a href="/app#register" class="btn btn--primary" onclick="closeMobile()">Essayer gratuitement</a>
   </nav>
@@ -758,51 +731,6 @@
     </div>
   </section>
 
-  <!-- ========== NOS GUIDES ========== -->
-  <section class="section section--elevated" id="blog">
-    <div class="container">
-      <div class="section-header reveal">
-        <h2>Nos guides pour restaurateurs</h2>
-        <p>Ressources pratiques pour optimiser votre cuisine et vos marges.</p>
-      </div>
-      <div class="blog-grid reveal">
-        <a href="/blog/fiche-technique-cuisine.html" class="blog-card">
-          <span class="blog-card__emoji">📋</span>
-          <span class="blog-card__title">Créer une fiche technique cuisine</span>
-          <span class="blog-card__cta">Guide complet 2026 →</span>
-        </a>
-        <a href="/blog/calcul-food-cost.html" class="blog-card">
-          <span class="blog-card__emoji">🧮</span>
-          <span class="blog-card__title">Calculer son food cost</span>
-          <span class="blog-card__cta">Formules & outils →</span>
-        </a>
-        <a href="/blog/saisie-vocale-cuisine.html" class="blog-card">
-          <span class="blog-card__emoji"><i data-lucide="mic" style="width:20px;height:20px;color:var(--color-accent)"></i></span>
-          <span class="blog-card__title">Saisie vocale en cuisine</span>
-          <span class="blog-card__cta">Révolution IA →</span>
-        </a>
-        <a href="/blog/gestion-restaurant-ia.html" class="blog-card">
-          <span class="blog-card__emoji">🤖</span>
-          <span class="blog-card__title">Gestion restaurant par IA</span>
-          <span class="blog-card__cta">Guide 2026 →</span>
-        </a>
-        <a href="/blog/logiciel-restaurant-gratuit.html" class="blog-card">
-          <span class="blog-card__emoji">💻</span>
-          <span class="blog-card__title">Logiciels restaurant gratuits</span>
-          <span class="blog-card__cta">Comparatif honnête →</span>
-        </a>
-        <a href="/blog/alternative-restosuite.html" class="blog-card">
-          <span class="blog-card__emoji"><i data-lucide="scale" style="width:20px;height:20px;color:var(--color-accent)"></i></span>
-          <span class="blog-card__title">RestoSuite vs alternatives</span>
-          <span class="blog-card__cta">Comparatif 2026 →</span>
-        </a>
-      </div>
-      <div class="blog-more">
-        <a href="/blog/">Voir tous les guides →</a>
-      </div>
-    </div>
-  </section>
-
   <!-- ========== FOOTER ========== -->
   <footer class="footer">
     <div class="container">
@@ -817,10 +745,9 @@
           <span class="footer__tagline">Votre cuisine tourne. Vos chiffres suivent.</span>
         </div>
         <div class="footer__links">
-          <a href="/blog/">Blog</a>
           <a href="/legal/cgv.html">CGV</a>
           <a href="/legal/mentions.html">Mentions légales</a>
-          <a href="/legal/privacy.html">Confidentialité</a>
+          <a href="/confidentialite">Confidentialité</a>
           <a href="mailto:contact@restosuite.fr">Contact</a>
         </div>
         <div class="footer__copy">© 2026 RestoSuite</div>
@@ -839,7 +766,7 @@
 
   <!-- ========== BANDEAU COOKIES RGPD ========== -->
   <div id="cookie-banner" class="cookie-banner" role="region" aria-label="Consentement cookies" style="display:none">
-    <p class="cookie-banner__text">Ce site utilise des cookies pour améliorer votre expérience et mesurer l'audience. <a href="/legal/privacy.html" class="cookie-banner__link">En savoir plus</a></p>
+    <p class="cookie-banner__text">Ce site utilise des cookies pour améliorer votre expérience et mesurer l'audience. <a href="/confidentialite" class="cookie-banner__link">En savoir plus</a></p>
     <div class="cookie-banner__actions">
       <button class="btn btn--outline btn--sm" id="cookie-refuse" onclick="cookieChoice(false)">Refuser</button>
       <button class="btn btn--primary btn--sm" id="cookie-accept" onclick="cookieChoice(true)">Accepter</button>

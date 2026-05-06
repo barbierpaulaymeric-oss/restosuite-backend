@@ -342,6 +342,9 @@ app.get('/cgv', (req, res) => {
 app.get('/privacy', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'client', 'legal', 'privacy.html'));
 });
+app.get('/confidentialite', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'legal', 'privacy.html'));
+});
 
 // SPA app on /app (and sub-routes)
 app.get('/app', (req, res) => {

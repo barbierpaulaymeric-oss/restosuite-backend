@@ -1,9 +1,8 @@
-// Bumped 2026-05-06 (v39): catalog cleanup tools + auto-save FoodFlow id
-// from inbound mercuriales + return-request emails now surface the
-// supplier-side external_id in subject + body (so retours@foodflow.fr
-// can route shared-mailbox claims back to the right tenant).
-// (v38 was renderSuppliers global-collision hotfix.)
-const CACHE_NAME = 'restosuite-v39';
+// Bumped 2026-05-06 (v40): /confidentialite route alias + canonical footer
+// link, blog nav/footer/cards stripped from landing pending real content,
+// supplier-portal inline express.json() removed (CI flakiness root cause).
+// (v39 was catalog cleanup + autoSaveExternalId.)
+const CACHE_NAME = 'restosuite-v40';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
