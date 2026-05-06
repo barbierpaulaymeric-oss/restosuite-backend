@@ -1,8 +1,8 @@
-// Bumped 2026-05-06 (v40): /confidentialite route alias + canonical footer
-// link, blog nav/footer/cards stripped from landing pending real content,
-// supplier-portal inline express.json() removed (CI flakiness root cause).
-// (v39 was catalog cleanup + autoSaveExternalId.)
-const CACHE_NAME = 'restosuite-v40';
+// Bumped 2026-05-06 (v41): reg-staff-password type=password (P1-2),
+// landing #fonctionnalites → #fonctionnalites-piliers anchors (P2-2),
+// clear #app DOM before onboarding wizard (P2-1).
+// (v40 was /confidentialite + blog strip + supplier-portal CI flake fix.)
+const CACHE_NAME = 'restosuite-v41';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

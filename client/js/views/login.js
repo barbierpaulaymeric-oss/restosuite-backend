@@ -315,7 +315,7 @@ class LoginView {
         </div>
         <div class="form-group">
           <label for="reg-staff-password">Mot de passe équipe (partagé avec le staff)</label>
-          <input type="text" class="form-control" id="reg-staff-password" placeholder="ex: Resto2026" autocomplete="off"
+          <input type="password" class="form-control" id="reg-staff-password" placeholder="ex: Resto2026" autocomplete="new-password"
                  style="font-family:var(--font-mono);letter-spacing:0.05em" data-ui="custom">
         </div>
         <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-1)">Optionnel — vous pourrez le configurer plus tard dans Équipe.</p>
@@ -507,6 +507,8 @@ class LoginView {
 
       const nav = document.getElementById('nav');
       if (nav) nav.style.display = 'none';
+      const appEl = document.getElementById('app');
+      if (appEl) appEl.innerHTML = '';
       const wizard = new OnboardingWizard(() => {
         if (nav) nav.style.display = '';
         bootApp(result.account.role, result.account);
