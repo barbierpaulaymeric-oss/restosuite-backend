@@ -362,6 +362,21 @@ router.put('/:id', (req, res) => {
         return res.status(400).json({ error: `Transition ${po.status} → ${status} non autorisée` });
       }
 
+      // Block the send if the supplier has an integration row but external_id
+      // is empty — the provider would never receive the order. The user must
+      // finish wiring the connection in /supplier-integrations first.
+      if (status === 'envoyée') {
+        const { checkOrderDispatchReady } = require('./supplier-integrations');
+        const check = checkOrderDispatchReady({ rid, supplier_id: po.supplier_id });
+        if (!check.ok) {
+          return res.status(400).json({
+            error: check.error,
+            code: check.code,
+            provider: check.provider,
+          });
+        }
+      }
+
       let extra = '';
       if (status === 'envoyée') extra = ", sent_at = CURRENT_TIMESTAMP";
       if (status === 'réceptionnée') extra = ", received_at = CURRENT_TIMESTAMP";

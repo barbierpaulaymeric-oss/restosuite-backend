@@ -1,11 +1,12 @@
-// Bumped 2026-05-06 (v35): Salle modal polish — bigger visible covers
-// stepper (text input + −/+ buttons, no spin chrome) and per-seat allergies
-// strip (P1…Pn rows + clickable preset chips) replacing the single global
-// notes-as-allergy field. New orders.seat_allergies JSON column, surfaced
-// as red-bordered chips on KDS tickets so the cuisinier sees position +
-// restriction at a glance.
-// (v34 was supplier-organized catalog browser; v33 PO form unit chips.)
-const CACHE_NAME = 'restosuite-v35';
+// Bumped 2026-05-06 (v36): block PO send when supplier has a
+// supplier_integrations row but external_id is empty — server returns 400
+// INTEGRATION_NOT_CONFIGURED, client shows a modal pointing the user at
+// /supplier-integrations + a warning banner on the new-order form +
+// disables the "Envoyer" button with a tooltip until the connection is
+// completed. New showAlertModal helper in utils.js, error.code now
+// propagated through API.request().
+// (v35 was Salle covers stepper + per-seat allergies.)
+const CACHE_NAME = 'restosuite-v36';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

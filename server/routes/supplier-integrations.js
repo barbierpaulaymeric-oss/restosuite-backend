@@ -291,6 +291,37 @@ function safeJSON(s) {
   try { return JSON.parse(s); } catch { return null; }
 }
 
+// ─── Pre-flight gate used by purchase-orders.js before transitioning to 'envoyée' ───
+// If the supplier has an integration row but external_id is missing/empty,
+// the provider can't actually receive the order — block the transition with
+// 400 + INTEGRATION_NOT_CONFIGURED. Returns { ok:true } when no integration
+// exists (free-form email path) or when the integration is fully wired.
+function checkOrderDispatchReady({ rid, supplier_id }) {
+  try {
+    const integ = get(
+      `SELECT * FROM supplier_integrations
+         WHERE supplier_id = ? AND restaurant_id = ?
+         ORDER BY id DESC LIMIT 1`,
+      [supplier_id, rid]
+    );
+    if (!integ) return { ok: true };
+    const ext = String(integ.external_id || '').trim();
+    if (!ext) {
+      return {
+        ok: false,
+        code: 'INTEGRATION_NOT_CONFIGURED',
+        provider: integ.provider,
+        integration_id: integ.id,
+        error: "Veuillez d'abord connecter votre compte FoodFlow dans Intégrations → Connecter FoodFlow avec votre numéro client à 5 chiffres. Sans cet identifiant, le fournisseur ne pourra pas traiter votre commande.",
+      };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.warn('checkOrderDispatchReady failed:', e.message);
+    return { ok: true };
+  }
+}
+
 // ─── Hook used by purchase-orders.js when a PO transitions to 'envoyée' ───
 // Looks up an active integration for the supplier and dispatches via the
 // provider adapter. Failures are swallowed (logged) so they never roll back
@@ -321,3 +352,4 @@ function dispatchOrder({ rid, supplier_id, order }) {
 
 module.exports = router;
 module.exports.dispatchOrder = dispatchOrder;
+module.exports.checkOrderDispatchReady = checkOrderDispatchReady;

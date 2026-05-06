@@ -394,3 +394,122 @@ describe('purchase-orders → FoodFlow dispatch hook', () => {
     expect(dispatch).toBeDefined();
   });
 });
+
+// ─── Pre-flight gate: block PO send when integration is half-configured ──────
+// Spec: if a supplier has a row in supplier_integrations whose external_id is
+// empty/missing, sending a PO must 400 with code='INTEGRATION_NOT_CONFIGURED'
+// and a French message that points the user at /supplier-integrations.
+
+describe('purchase-orders → integration external_id gate', () => {
+  it('blocks status→envoyée with 400 when external_id is empty', async () => {
+    const t = tag();
+    const sid = run(
+      `INSERT INTO suppliers (name, restaurant_id) VALUES (?, ?)`,
+      [`Sup gate empty ${t}`, RID_A]
+    ).lastInsertRowid;
+    // Insert a half-configured integration directly (POST endpoint blocks this,
+    // but legacy rows or future columns might still surface in the table).
+    run(
+      `INSERT INTO supplier_integrations
+         (restaurant_id, supplier_id, provider, external_id, status)
+       VALUES (?, ?, 'foodflow', '', 'connected')`,
+      [RID_A, sid]
+    );
+
+    const poId = run(
+      `INSERT INTO purchase_orders (supplier_id, reference, total_amount, status, restaurant_id)
+       VALUES (?, ?, 25.0, 'brouillon', ?)`,
+      [sid, `PO-GATE-${t}`, RID_A]
+    ).lastInsertRowid;
+
+    const res = await request(app)
+      .put(`/api/purchase-orders/${poId}`)
+      .set(authA())
+      .send({ status: 'envoyée' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INTEGRATION_NOT_CONFIGURED');
+    expect(res.body.provider).toBe('foodflow');
+    expect(res.body.error).toMatch(/FoodFlow/);
+    expect(res.body.error).toMatch(/Intégrations/);
+
+    // PO must remain in brouillon (transition was blocked).
+    const after = get('SELECT status FROM purchase_orders WHERE id = ?', [poId]);
+    expect(after.status).toBe('brouillon');
+  });
+
+  it('blocks status→envoyée with 400 when external_id is whitespace-only', async () => {
+    const t = tag();
+    const sid = run(
+      `INSERT INTO suppliers (name, restaurant_id) VALUES (?, ?)`,
+      [`Sup gate ws ${t}`, RID_A]
+    ).lastInsertRowid;
+    run(
+      `INSERT INTO supplier_integrations
+         (restaurant_id, supplier_id, provider, external_id, status)
+       VALUES (?, ?, 'foodflow', '   ', 'connected')`,
+      [RID_A, sid]
+    );
+
+    const poId = run(
+      `INSERT INTO purchase_orders (supplier_id, reference, total_amount, status, restaurant_id)
+       VALUES (?, ?, 30.0, 'brouillon', ?)`,
+      [sid, `PO-WS-${t}`, RID_A]
+    ).lastInsertRowid;
+
+    const res = await request(app)
+      .put(`/api/purchase-orders/${poId}`)
+      .set(authA())
+      .send({ status: 'envoyée' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INTEGRATION_NOT_CONFIGURED');
+  });
+
+  it('allows status→envoyée when external_id is set', async () => {
+    const t = tag();
+    const sid = run(
+      `INSERT INTO suppliers (name, restaurant_id) VALUES (?, ?)`,
+      [`Sup gate ok ${t}`, RID_A]
+    ).lastInsertRowid;
+    await request(app).post('/api/supplier-integrations').set(authA())
+      .send({ supplier_id: sid, provider: 'foodflow', external_id: `FF-OK-${t}` });
+
+    const poId = run(
+      `INSERT INTO purchase_orders (supplier_id, reference, total_amount, status, restaurant_id)
+       VALUES (?, ?, 40.0, 'brouillon', ?)`,
+      [sid, `PO-OK-${t}`, RID_A]
+    ).lastInsertRowid;
+
+    const res = await request(app)
+      .put(`/api/purchase-orders/${poId}`)
+      .set(authA())
+      .send({ status: 'envoyée' });
+
+    expect(res.status).toBe(200);
+    const after = get('SELECT status FROM purchase_orders WHERE id = ?', [poId]);
+    expect(after.status).toBe('envoyée');
+  });
+
+  it('allows status→envoyée when supplier has no integration row', async () => {
+    const t = tag();
+    const sid = run(
+      `INSERT INTO suppliers (name, restaurant_id) VALUES (?, ?)`,
+      [`Sup gate noint ${t}`, RID_A]
+    ).lastInsertRowid;
+    // No supplier_integrations row — free-form email path.
+
+    const poId = run(
+      `INSERT INTO purchase_orders (supplier_id, reference, total_amount, status, restaurant_id)
+       VALUES (?, ?, 12.0, 'brouillon', ?)`,
+      [sid, `PO-NOINT-${t}`, RID_A]
+    ).lastInsertRowid;
+
+    const res = await request(app)
+      .put(`/api/purchase-orders/${poId}`)
+      .set(authA())
+      .send({ status: 'envoyée' });
+
+    expect(res.status).toBe(200);
+  });
+});

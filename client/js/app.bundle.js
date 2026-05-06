@@ -105,7 +105,11 @@ const API = {
       } else if (res.status >= 500) {
         errorMessage = "Erreur serveur. R\xE9essayez ou contactez le support.";
       }
-      throw new Error(errorMessage);
+      const apiErr = new Error(errorMessage);
+      if (err.code) apiErr.code = err.code;
+      if (err.provider) apiErr.provider = err.provider;
+      apiErr.status = res.status;
+      throw apiErr;
     }
     const contentType = res.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
@@ -1310,6 +1314,64 @@ function showConfirmModal(title, message, onConfirm, options = {}) {
     onConfirm();
   };
   overlay.querySelector("#confirm-no").onclick = closeModal;
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeModal();
+  });
+  const escHandler = (e) => {
+    if (e.key === "Escape") {
+      closeModal();
+      document.removeEventListener("keydown", escHandler);
+    }
+  };
+  document.addEventListener("keydown", escHandler);
+}
+function showAlertModal({ title, message, primary, dismissText, icon, iconColor } = {}) {
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const safeTitle = esc(title || "Information");
+  const safeMessage = esc(message || "").replace(/\n/g, "<br>");
+  const safeDismiss = esc(dismissText || "Fermer");
+  const iconName = icon || "alert-triangle";
+  const iconColorVar = iconColor || "--color-warning";
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay alert-modal-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "alert-modal-title");
+  const primaryBtn = primary ? `<button class="btn btn-primary" id="alert-primary">${esc(primary.label || "OK")}</button>` : "";
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:480px;text-align:center">
+      <div style="font-size:2rem;margin-bottom:12px">
+        <i data-lucide="${esc(iconName)}" style="width:40px;height:40px;color:var(${esc(iconColorVar)})"></i>
+      </div>
+      <h3 id="alert-modal-title" style="margin-bottom:8px">${safeTitle}</h3>
+      <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:20px;line-height:1.55">${safeMessage}</p>
+      <div class="actions-row" style="justify-content:center;flex-wrap:wrap;gap:8px">
+        ${primaryBtn}
+        <button class="btn btn-secondary" id="alert-dismiss">${safeDismiss}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  const releaseFocus = trapFocus(overlay);
+  const closeModal = () => {
+    try {
+      releaseFocus();
+    } catch (e) {
+    }
+    overlay.remove();
+  };
+  if (primary && typeof primary.onClick === "function") {
+    overlay.querySelector("#alert-primary").onclick = () => {
+      closeModal();
+      try {
+        primary.onClick();
+      } catch (e) {
+        console.warn("alert primary failed:", e);
+      }
+    };
+  }
+  overlay.querySelector("#alert-dismiss").onclick = closeModal;
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) closeModal();
   });
@@ -15577,16 +15639,38 @@ async function showSuggestionsModal() {
 let _poItems = [];
 let _poSelectedSupplierId = null;
 let _poSupplierProducts = [];
+let _poIntegrationsBySupplier = {};
+function _poSupplierIntegrationStatus(supplierId) {
+  if (!supplierId) return null;
+  return _poIntegrationsBySupplier[supplierId] || null;
+}
+function _poRequiresIntegrationSetup(supplierId) {
+  const s = _poSupplierIntegrationStatus(supplierId);
+  return !!(s && !s.configured);
+}
 async function renderNewOrder() {
   const app = document.getElementById("app");
   _poItems = [];
   _poSelectedSupplierId = null;
   _poSupplierProducts = [];
+  _poIntegrationsBySupplier = {};
   let suppliers = [];
   try {
     suppliers = await API.getSuppliers();
   } catch (e) {
     showToast("Erreur chargement fournisseurs", "error");
+  }
+  try {
+    const integrations = await API.getSupplierIntegrations();
+    (integrations || []).forEach((i) => {
+      const ext = String(i && i.external_id || "").trim();
+      _poIntegrationsBySupplier[i.supplier_id] = {
+        id: i.id,
+        provider: i.provider,
+        configured: !!ext
+      };
+    });
+  } catch (e) {
   }
   app.innerHTML = `
     <div class="page-header">
@@ -15597,6 +15681,11 @@ async function renderNewOrder() {
     </div>
 
     <div style="max-width:800px">
+      <div id="po-integration-warning" hidden style="display:none;margin-bottom:16px;padding:14px 16px;background:#FFF7E6;border:1px solid #F5C36C;border-left:4px solid #E8722A;border-radius:var(--radius-md);color:#7A4300;font-size:var(--text-sm);line-height:1.5">
+        <strong style="display:block;margin-bottom:4px">\u26A0\uFE0F Compte FoodFlow non connect\xE9</strong>
+        <span>Connectez votre identifiant client dans <a href="#/supplier-integrations" style="color:#7A4300;text-decoration:underline;font-weight:600">Int\xE9grations</a> avant d'envoyer.</span>
+      </div>
+
       <div class="form-group">
         <label for="po-supplier">Fournisseur *</label>
         <select class="form-control" id="po-supplier" data-ui="custom" required aria-required="true">
@@ -15643,9 +15732,11 @@ async function renderNewOrder() {
     _poSelectedSupplierId = e.target.value ? parseInt(e.target.value) : null;
     _poItems = [];
     ingredientSearch.value = "";
+    refreshIntegrationGate();
     await loadSupplierProducts();
     updatePOItemsDisplay();
   });
+  refreshIntegrationGate();
   ingredientSearch.addEventListener("input", (e) => {
     const query = e.target.value.toLowerCase();
     document.querySelectorAll(".ingredient-item").forEach((item) => {
@@ -15733,6 +15824,26 @@ function productKey(p) {
   if (p && p.product_name) return `name-${String(p.product_name).toLowerCase()}`;
   return "";
 }
+function refreshIntegrationGate() {
+  const banner = document.getElementById("po-integration-warning");
+  const sendBtn = document.getElementById("btn-send-po");
+  const requiresSetup = _poRequiresIntegrationSetup(_poSelectedSupplierId);
+  if (banner) {
+    banner.hidden = !requiresSetup;
+    banner.style.display = requiresSetup ? "" : "none";
+  }
+  if (sendBtn) {
+    if (requiresSetup) {
+      sendBtn.dataset.gatedByIntegration = "1";
+      sendBtn.title = "Compte FoodFlow non connect\xE9 \u2014 configurez votre identifiant client dans Int\xE9grations avant d'envoyer.";
+      sendBtn.setAttribute("aria-disabled", "true");
+    } else {
+      delete sendBtn.dataset.gatedByIntegration;
+      sendBtn.title = "";
+      sendBtn.removeAttribute("aria-disabled");
+    }
+  }
+}
 function updatePOItemsDisplay() {
   const itemsTableEl = document.getElementById("po-items-table");
   const sendBtn = document.getElementById("btn-send-po");
@@ -15741,10 +15852,13 @@ function updatePOItemsDisplay() {
     itemsTableEl.innerHTML = '<p class="text-muted">Aucun article pour le moment. Ajoutez des ingr\xE9dients ci-dessus.</p>';
     if (sendBtn) sendBtn.disabled = true;
     if (saveBtn) saveBtn.disabled = true;
+    refreshIntegrationGate();
     return;
   }
-  if (sendBtn) sendBtn.disabled = !_poSelectedSupplierId || _poItems.length === 0;
+  const integrationBlocked = _poRequiresIntegrationSetup(_poSelectedSupplierId);
+  if (sendBtn) sendBtn.disabled = !_poSelectedSupplierId || _poItems.length === 0 || integrationBlocked;
   if (saveBtn) saveBtn.disabled = !_poSelectedSupplierId || _poItems.length === 0;
+  refreshIntegrationGate();
   let total = 0;
   itemsTableEl.innerHTML = `
     <table style="width:100%;border-collapse:collapse;font-size:var(--text-sm)">
@@ -15805,6 +15919,10 @@ async function submitPurchaseOrder(sendImmediately) {
     showToast("Ajoutez au moins un article", "error");
     return;
   }
+  if (sendImmediately && _poRequiresIntegrationSetup(_poSelectedSupplierId)) {
+    showIntegrationNotConfiguredModal();
+    return;
+  }
   try {
     const po = await API.createPurchaseOrder({
       supplier_id: _poSelectedSupplierId,
@@ -15820,8 +15938,28 @@ async function submitPurchaseOrder(sendImmediately) {
     showToast(sendImmediately ? "Commande envoy\xE9e" : "Commande sauvegard\xE9e", "success");
     location.hash = "#/orders";
   } catch (e) {
-    showToast("Erreur : " + e.message, "error");
+    if (e && e.code === "INTEGRATION_NOT_CONFIGURED") {
+      showIntegrationNotConfiguredModal(e.message);
+    } else {
+      showToast("Erreur : " + e.message, "error");
+    }
   }
+}
+function showIntegrationNotConfiguredModal(serverMessage) {
+  const message = serverMessage || "Veuillez d'abord connecter votre compte FoodFlow dans Int\xE9grations \u2192 Connecter FoodFlow avec votre num\xE9ro client \xE0 5 chiffres. Sans cet identifiant, le fournisseur ne pourra pas traiter votre commande.";
+  showAlertModal({
+    title: "Compte FoodFlow non connect\xE9",
+    message,
+    icon: "plug",
+    iconColor: "--color-warning",
+    primary: {
+      label: "Ouvrir Int\xE9grations",
+      onClick: () => {
+        location.hash = "#/supplier-integrations";
+      }
+    },
+    dismissText: "Annuler"
+  });
 }
 async function createPurchaseOrderFromSuggestions(supplierId) {
   try {
@@ -15981,7 +16119,11 @@ async function sendPurchaseOrder(id) {
       showToast("Commande envoy\xE9e", "success");
       location.hash = "#/orders";
     } catch (e) {
-      showToast("Erreur : " + e.message, "error");
+      if (e && e.code === "INTEGRATION_NOT_CONFIGURED") {
+        showIntegrationNotConfiguredModal(e.message);
+      } else {
+        showToast("Erreur : " + e.message, "error");
+      }
     }
   }, { confirmText: "Envoyer", confirmClass: "btn btn-primary" });
   return;

@@ -121,7 +121,14 @@ const API = {
       } else if (res.status >= 500) {
         errorMessage = 'Erreur serveur. Réessayez ou contactez le support.';
       }
-      throw new Error(errorMessage);
+      // Preserve server-supplied code/extras so callers can branch on
+      // semantic identifiers (e.g. INTEGRATION_NOT_CONFIGURED) without
+      // pattern-matching the user-facing French message.
+      const apiErr = new Error(errorMessage);
+      if (err.code) apiErr.code = err.code;
+      if (err.provider) apiErr.provider = err.provider;
+      apiErr.status = res.status;
+      throw apiErr;
     }
     const contentType = res.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {

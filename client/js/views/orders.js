@@ -225,18 +225,51 @@ async function showSuggestionsModal() {
 let _poItems = [];
 let _poSelectedSupplierId = null;
 let _poSupplierProducts = [];
+// Map of supplier_id → { provider, configured } for supplier_integrations rows.
+// Used to gate the Send button when a supplier requires a provider connection.
+let _poIntegrationsBySupplier = {};
+
+function _poSupplierIntegrationStatus(supplierId) {
+  if (!supplierId) return null;
+  return _poIntegrationsBySupplier[supplierId] || null;
+}
+
+// Returns true when the supplier has an integration row but external_id is
+// empty/missing — sending would be blocked server-side.
+function _poRequiresIntegrationSetup(supplierId) {
+  const s = _poSupplierIntegrationStatus(supplierId);
+  return !!(s && !s.configured);
+}
 
 async function renderNewOrder() {
   const app = document.getElementById('app');
   _poItems = [];
   _poSelectedSupplierId = null;
   _poSupplierProducts = [];
+  _poIntegrationsBySupplier = {};
 
   let suppliers = [];
   try {
     suppliers = await API.getSuppliers();
   } catch (e) {
     showToast('Erreur chargement fournisseurs', 'error');
+  }
+
+  // Best-effort: load supplier_integrations so we can warn before the user
+  // clicks Envoyer when a supplier is half-configured. A failure here just
+  // means we fall back to server-side validation.
+  try {
+    const integrations = await API.getSupplierIntegrations();
+    (integrations || []).forEach((i) => {
+      const ext = String(i && i.external_id || '').trim();
+      _poIntegrationsBySupplier[i.supplier_id] = {
+        id: i.id,
+        provider: i.provider,
+        configured: !!ext,
+      };
+    });
+  } catch (e) {
+    // Silently degrade — server still blocks the send.
   }
 
   app.innerHTML = `
@@ -248,6 +281,11 @@ async function renderNewOrder() {
     </div>
 
     <div style="max-width:800px">
+      <div id="po-integration-warning" hidden style="display:none;margin-bottom:16px;padding:14px 16px;background:#FFF7E6;border:1px solid #F5C36C;border-left:4px solid #E8722A;border-radius:var(--radius-md);color:#7A4300;font-size:var(--text-sm);line-height:1.5">
+        <strong style="display:block;margin-bottom:4px">⚠️ Compte FoodFlow non connecté</strong>
+        <span>Connectez votre identifiant client dans <a href="#/supplier-integrations" style="color:#7A4300;text-decoration:underline;font-weight:600">Intégrations</a> avant d'envoyer.</span>
+      </div>
+
       <div class="form-group">
         <label for="po-supplier">Fournisseur *</label>
         <select class="form-control" id="po-supplier" data-ui="custom" required aria-required="true">
@@ -297,9 +335,13 @@ async function renderNewOrder() {
     _poSelectedSupplierId = e.target.value ? parseInt(e.target.value) : null;
     _poItems = [];
     ingredientSearch.value = '';
+    refreshIntegrationGate();
     await loadSupplierProducts();
     updatePOItemsDisplay();
   });
+
+  // Initial gate state (no supplier yet → banner hidden, send disabled by item-count anyway).
+  refreshIntegrationGate();
 
   // Ingredient search
   ingredientSearch.addEventListener('input', (e) => {
@@ -410,6 +452,30 @@ function productKey(p) {
   return '';
 }
 
+// Toggles the warning banner + Send-button disabled state based on the
+// selected supplier's integration config. Called both on supplier change
+// and after item changes so the disabled state stays in sync.
+function refreshIntegrationGate() {
+  const banner = document.getElementById('po-integration-warning');
+  const sendBtn = document.getElementById('btn-send-po');
+  const requiresSetup = _poRequiresIntegrationSetup(_poSelectedSupplierId);
+  if (banner) {
+    banner.hidden = !requiresSetup;
+    banner.style.display = requiresSetup ? '' : 'none';
+  }
+  if (sendBtn) {
+    if (requiresSetup) {
+      sendBtn.dataset.gatedByIntegration = '1';
+      sendBtn.title = "Compte FoodFlow non connecté — configurez votre identifiant client dans Intégrations avant d'envoyer.";
+      sendBtn.setAttribute('aria-disabled', 'true');
+    } else {
+      delete sendBtn.dataset.gatedByIntegration;
+      sendBtn.title = '';
+      sendBtn.removeAttribute('aria-disabled');
+    }
+  }
+}
+
 function updatePOItemsDisplay() {
   const itemsTableEl = document.getElementById('po-items-table');
   const sendBtn = document.getElementById('btn-send-po');
@@ -419,11 +485,14 @@ function updatePOItemsDisplay() {
     itemsTableEl.innerHTML = '<p class="text-muted">Aucun article pour le moment. Ajoutez des ingrédients ci-dessus.</p>';
     if (sendBtn) sendBtn.disabled = true;
     if (saveBtn) saveBtn.disabled = true;
+    refreshIntegrationGate();
     return;
   }
 
-  if (sendBtn) sendBtn.disabled = !_poSelectedSupplierId || _poItems.length === 0;
+  const integrationBlocked = _poRequiresIntegrationSetup(_poSelectedSupplierId);
+  if (sendBtn) sendBtn.disabled = !_poSelectedSupplierId || _poItems.length === 0 || integrationBlocked;
   if (saveBtn) saveBtn.disabled = !_poSelectedSupplierId || _poItems.length === 0;
+  refreshIntegrationGate();
 
   let total = 0;
   itemsTableEl.innerHTML = `
@@ -492,6 +561,14 @@ async function submitPurchaseOrder(sendImmediately) {
     return;
   }
 
+  // Client-side gate: refuse to submit a "send immediately" request when
+  // the supplier integration is half-configured. Server still enforces this,
+  // but a local pre-check avoids a wasted round-trip.
+  if (sendImmediately && _poRequiresIntegrationSetup(_poSelectedSupplierId)) {
+    showIntegrationNotConfiguredModal();
+    return;
+  }
+
   try {
     const po = await API.createPurchaseOrder({
       supplier_id: _poSelectedSupplierId,
@@ -508,8 +585,30 @@ async function submitPurchaseOrder(sendImmediately) {
     showToast(sendImmediately ? 'Commande envoyée' : 'Commande sauvegardée', 'success');
     location.hash = '#/orders';
   } catch (e) {
-    showToast('Erreur : ' + e.message, 'error');
+    if (e && e.code === 'INTEGRATION_NOT_CONFIGURED') {
+      showIntegrationNotConfiguredModal(e.message);
+    } else {
+      showToast('Erreur : ' + e.message, 'error');
+    }
   }
+}
+
+// Opens a modal pointing the user at /supplier-integrations. Used for both
+// pre-check and post-400 paths so the copy stays consistent.
+function showIntegrationNotConfiguredModal(serverMessage) {
+  const message = serverMessage ||
+    "Veuillez d'abord connecter votre compte FoodFlow dans Intégrations → Connecter FoodFlow avec votre numéro client à 5 chiffres. Sans cet identifiant, le fournisseur ne pourra pas traiter votre commande.";
+  showAlertModal({
+    title: 'Compte FoodFlow non connecté',
+    message,
+    icon: 'plug',
+    iconColor: '--color-warning',
+    primary: {
+      label: 'Ouvrir Intégrations',
+      onClick: () => { location.hash = '#/supplier-integrations'; },
+    },
+    dismissText: 'Annuler',
+  });
 }
 
 async function createPurchaseOrderFromSuggestions(supplierId) {
@@ -692,7 +791,11 @@ async function sendPurchaseOrder(id) {
       showToast('Commande envoyée', 'success');
       location.hash = '#/orders';
     } catch (e) {
-      showToast('Erreur : ' + e.message, 'error');
+      if (e && e.code === 'INTEGRATION_NOT_CONFIGURED') {
+        showIntegrationNotConfiguredModal(e.message);
+      } else {
+        showToast('Erreur : ' + e.message, 'error');
+      }
     }
   }, { confirmText: 'Envoyer', confirmClass: 'btn btn-primary' });
   return;

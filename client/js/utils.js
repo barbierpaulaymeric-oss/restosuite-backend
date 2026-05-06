@@ -84,6 +84,69 @@ function showConfirmModal(title, message, onConfirm, options = {}) {
   document.addEventListener('keydown', escHandler);
 }
 
+// ─── Custom alert modal — for long actionable error messages ───
+// showConfirmModal asks yes/no; this one is a single-CTA dialog that survives
+// long copy (toast auto-dismisses in 3s, too short for setup instructions).
+// Optional `primary` adds a second action button (e.g. "Ouvrir Intégrations").
+function showAlertModal({ title, message, primary, dismissText, icon, iconColor } = {}) {
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const safeTitle = esc(title || 'Information');
+  const safeMessage = esc(message || '').replace(/\n/g, '<br>');
+  const safeDismiss = esc(dismissText || 'Fermer');
+  const iconName = icon || 'alert-triangle';
+  const iconColorVar = iconColor || '--color-warning';
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay alert-modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'alert-modal-title');
+
+  const primaryBtn = primary
+    ? `<button class="btn btn-primary" id="alert-primary">${esc(primary.label || 'OK')}</button>`
+    : '';
+
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:480px;text-align:center">
+      <div style="font-size:2rem;margin-bottom:12px">
+        <i data-lucide="${esc(iconName)}" style="width:40px;height:40px;color:var(${esc(iconColorVar)})"></i>
+      </div>
+      <h3 id="alert-modal-title" style="margin-bottom:8px">${safeTitle}</h3>
+      <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:20px;line-height:1.55">${safeMessage}</p>
+      <div class="actions-row" style="justify-content:center;flex-wrap:wrap;gap:8px">
+        ${primaryBtn}
+        <button class="btn btn-secondary" id="alert-dismiss">${safeDismiss}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+
+  const releaseFocus = trapFocus(overlay);
+  const closeModal = () => {
+    try { releaseFocus(); } catch {}
+    overlay.remove();
+  };
+
+  if (primary && typeof primary.onClick === 'function') {
+    overlay.querySelector('#alert-primary').onclick = () => {
+      closeModal();
+      try { primary.onClick(); } catch (e) { console.warn('alert primary failed:', e); }
+    };
+  }
+  overlay.querySelector('#alert-dismiss').onclick = closeModal;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      closeModal();
+      document.removeEventListener('keydown', escHandler);
+    }
+  };
+  document.addEventListener('keydown', escHandler);
+}
+
 // ─── Format date in French locale ───
 function formatDateFR(dateStr) {
   if (!dateStr) return '—';
