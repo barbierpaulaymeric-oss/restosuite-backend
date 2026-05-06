@@ -8,7 +8,7 @@ describe('POST /api/auth/register', () => {
   it('registers a new account and returns token', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'owner@test.fr', password: 'Secure1pass' });
+      .send({ email: 'owner@test.fr', password: 'Secure1pass', accepted_terms: true });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('token');
     expect(res.body).toHaveProperty('account');
@@ -17,40 +17,67 @@ describe('POST /api/auth/register', () => {
   it('rejects duplicate email', async () => {
     await request(app)
       .post('/api/auth/register')
-      .send({ email: 'dup@test.fr', password: 'Secure1pass' });
+      .send({ email: 'dup@test.fr', password: 'Secure1pass', accepted_terms: true });
 
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'dup@test.fr', password: 'Secure1pass' });
+      .send({ email: 'dup@test.fr', password: 'Secure1pass', accepted_terms: true });
     expect(res.status).toBe(409);
   });
 
   it('rejects short password', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'weak@test.fr', password: 'abc' });
+      .send({ email: 'weak@test.fr', password: 'abc', accepted_terms: true });
     expect(res.status).toBe(400);
   });
 
   it('rejects password without uppercase', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'noup@test.fr', password: 'lowercase1' });
+      .send({ email: 'noup@test.fr', password: 'lowercase1', accepted_terms: true });
     expect(res.status).toBe(400);
   });
 
   it('rejects password without digit', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'nodig@test.fr', password: 'NoDigitPass' });
+      .send({ email: 'nodig@test.fr', password: 'NoDigitPass', accepted_terms: true });
     expect(res.status).toBe(400);
   });
 
   it('rejects missing email', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ password: 'Secure1pass' });
+      .send({ password: 'Secure1pass', accepted_terms: true });
     expect(res.status).toBe(400);
+  });
+
+  it('rejects registration without accepted_terms (RGPD consent)', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'noterms@test.fr', password: 'Secure1pass' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('TERMS_NOT_ACCEPTED');
+  });
+
+  it('rejects registration with accepted_terms !== true', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'falseterms@test.fr', password: 'Secure1pass', accepted_terms: false });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('TERMS_NOT_ACCEPTED');
+  });
+
+  it('persists terms_accepted_at on accounts row', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'terms-ok@test.fr', password: 'Secure1pass', accepted_terms: true });
+    expect(res.status).toBe(200);
+    const { get } = require('../db');
+    const row = get('SELECT terms_accepted_at FROM accounts WHERE email = ?', ['terms-ok@test.fr']);
+    expect(row).toBeTruthy();
+    expect(row.terms_accepted_at).toBeTruthy();
   });
 });
 
@@ -61,6 +88,7 @@ describe('POST /api/auth/register-supplier', () => {
     email: `sup-${Date.now()}-${Math.random().toString(36).slice(2)}@test.fr`,
     password: 'Secure1pass',
     phone: '0612345678',
+    accepted_terms: true,
   });
 
   it('creates a supplier and returns success', async () => {
@@ -125,6 +153,23 @@ describe('POST /api/auth/register-supplier', () => {
     const res = await request(app).post('/api/auth/register-supplier').send(body);
     expect(res.status).toBe(201);
   });
+
+  it('rejects supplier registration without accepted_terms (RGPD consent)', async () => {
+    const body = validBody();
+    delete body.accepted_terms;
+    const res = await request(app).post('/api/auth/register-supplier').send(body);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('TERMS_NOT_ACCEPTED');
+  });
+
+  it('persists terms_accepted_at on suppliers row', async () => {
+    const body = validBody();
+    await request(app).post('/api/auth/register-supplier').send(body);
+    const { get } = require('../db');
+    const row = get('SELECT terms_accepted_at FROM suppliers WHERE email = ?', [body.email.toLowerCase()]);
+    expect(row).toBeTruthy();
+    expect(row.terms_accepted_at).toBeTruthy();
+  });
 });
 
 describe('POST /api/auth/login', () => {
@@ -134,13 +179,13 @@ describe('POST /api/auth/login', () => {
   beforeAll(async () => {
     await request(app)
       .post('/api/auth/register')
-      .send({ email, password });
+      .send({ email, password, accepted_terms: true });
   });
 
   it('returns token on valid credentials', async () => {
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ email, password });
+      .send({ email, password, accepted_terms: true });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('token');
     expect(res.body.token).toBeTruthy();
@@ -201,7 +246,7 @@ describe('JWT cookie + CSRF', () => {
   it('POST /register sets HttpOnly jwt cookie and returns csrf_token', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'cookie-reg@test.fr', password: 'Secure1pass' });
+      .send({ email: 'cookie-reg@test.fr', password: 'Secure1pass', accepted_terms: true });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('csrf_token');
     expect(typeof res.body.csrf_token).toBe('string');
@@ -216,10 +261,10 @@ describe('JWT cookie + CSRF', () => {
   it('POST /login sets HttpOnly jwt cookie and returns csrf_token', async () => {
     await request(app)
       .post('/api/auth/register')
-      .send({ email: 'cookie-login@test.fr', password: 'Secure1pass' });
+      .send({ email: 'cookie-login@test.fr', password: 'Secure1pass', accepted_terms: true });
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'cookie-login@test.fr', password: 'Secure1pass' });
+      .send({ email: 'cookie-login@test.fr', password: 'Secure1pass', accepted_terms: true });
     expect(res.status).toBe(200);
     expect(res.body.csrf_token).toBeTruthy();
     const setCookie = res.headers['set-cookie'] || [];
@@ -229,7 +274,7 @@ describe('JWT cookie + CSRF', () => {
   it('cookie auth alone is accepted on GET (no CSRF needed for safe methods)', async () => {
     const reg = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'cookie-get@test.fr', password: 'Secure1pass' });
+      .send({ email: 'cookie-get@test.fr', password: 'Secure1pass', accepted_terms: true });
     const jwtCookie = reg.headers['set-cookie'].find(c => /^jwt=/.test(c)).split(';')[0];
     const res = await request(app)
       .get('/api/ingredients')
@@ -240,7 +285,7 @@ describe('JWT cookie + CSRF', () => {
   it('cookie auth without X-CSRF-Token is rejected with 403 on POST', async () => {
     const reg = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'cookie-nocsrf@test.fr', password: 'Secure1pass' });
+      .send({ email: 'cookie-nocsrf@test.fr', password: 'Secure1pass', accepted_terms: true });
     const jwtCookie = reg.headers['set-cookie'].find(c => /^jwt=/.test(c)).split(';')[0];
     const res = await request(app)
       .post('/api/ingredients')
@@ -253,7 +298,7 @@ describe('JWT cookie + CSRF', () => {
   it('cookie auth with matching X-CSRF-Token is accepted on POST', async () => {
     const reg = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'cookie-withcsrf@test.fr', password: 'Secure1pass' });
+      .send({ email: 'cookie-withcsrf@test.fr', password: 'Secure1pass', accepted_terms: true });
     const jwtCookie = reg.headers['set-cookie'].find(c => /^jwt=/.test(c)).split(';')[0];
     const csrf = reg.body.csrf_token;
     const res = await request(app)
@@ -268,7 +313,7 @@ describe('JWT cookie + CSRF', () => {
   it('cookie auth with wrong X-CSRF-Token is rejected with 403', async () => {
     const reg = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'cookie-badcsrf@test.fr', password: 'Secure1pass' });
+      .send({ email: 'cookie-badcsrf@test.fr', password: 'Secure1pass', accepted_terms: true });
     const jwtCookie = reg.headers['set-cookie'].find(c => /^jwt=/.test(c)).split(';')[0];
     const res = await request(app)
       .post('/api/ingredients')
@@ -289,7 +334,7 @@ describe('JWT cookie + CSRF', () => {
   it('POST /logout clears jwt cookie (Max-Age=0)', async () => {
     const reg = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'cookie-logout@test.fr', password: 'Secure1pass' });
+      .send({ email: 'cookie-logout@test.fr', password: 'Secure1pass', accepted_terms: true });
     const jwtCookie = reg.headers['set-cookie'].find(c => /^jwt=/.test(c)).split(';')[0];
     const csrf = reg.body.csrf_token;
     const res = await request(app)

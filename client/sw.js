@@ -1,8 +1,8 @@
-// Bumped 2026-05-06 (v40): /confidentialite route alias + canonical footer
-// link, blog nav/footer/cards stripped from landing pending real content,
-// supplier-portal inline express.json() removed (CI flakiness root cause).
-// (v39 was catalog cleanup + autoSaveExternalId.)
-const CACHE_NAME = 'restosuite-v40';
+// Bumped 2026-05-06 (v41): RGPD consent checkbox on registration form (links
+// to CGV + /confidentialite, mandatory, server-enforced via accepted_terms +
+// terms_accepted_at on accounts/suppliers).
+// (v40 was /confidentialite route alias + landing blog strip.)
+const CACHE_NAME = 'restosuite-v41';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

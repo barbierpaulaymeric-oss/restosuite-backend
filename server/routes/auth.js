@@ -223,7 +223,7 @@ function requireAuth(req, res, next) {
 
 // ─── POST /api/auth/register ───
 router.post('/register', async (req, res) => {
-  const { email, password, first_name, last_name } = req.body;
+  const { email, password, first_name, last_name, accepted_terms } = req.body;
 
   // Validation
   if (!email || !email.trim()) {
@@ -241,6 +241,15 @@ router.post('/register', async (req, res) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email.trim())) {
     return res.status(400).json({ error: 'Email invalide' });
+  }
+  // RGPD: explicit consent to CGV + Politique de confidentialité is required.
+  // Strict `=== true` so a truthy string ("yes") or 1 doesn't accidentally
+  // count as acceptance — only the checked checkbox value sent as JSON `true`.
+  if (accepted_terms !== true) {
+    return res.status(400).json({
+      error: 'Vous devez accepter les CGV et la politique de confidentialité',
+      code: 'TERMS_NOT_ACCEPTED',
+    });
   }
 
   // Check if email already exists
@@ -283,8 +292,8 @@ router.post('/register', async (req, res) => {
     // freshly-registered account (PENTEST_REPORT C2.1). The owner sets their
     // PIN from an authenticated session later.
     const accountResult = run(
-      `INSERT INTO accounts (name, pin, role, permissions, email, password_hash, first_name, last_name, restaurant_id, onboarding_step, is_owner, trial_start)
-       VALUES (?, NULL, 'gerant', ?, ?, ?, ?, ?, ?, 0, 1, datetime('now'))`,
+      `INSERT INTO accounts (name, pin, role, permissions, email, password_hash, first_name, last_name, restaurant_id, onboarding_step, is_owner, trial_start, terms_accepted_at)
+       VALUES (?, NULL, 'gerant', ?, ?, ?, ?, ?, ?, 0, 1, datetime('now'), datetime('now'))`,
       [
         (first_name || '').trim() + (last_name ? ' ' + last_name.trim() : '') || email.split('@')[0],
         permissions,
@@ -330,7 +339,7 @@ router.post('/register', async (req, res) => {
 // restaurant once that restaurant invites them by email via the supplier-portal
 // /invite flow, which adopts the row by setting its restaurant_id.
 router.post('/register-supplier', async (req, res) => {
-  const { company_name, contact_name, email, password, phone } = req.body;
+  const { company_name, contact_name, email, password, phone, accepted_terms } = req.body;
 
   if (!company_name || !company_name.trim()) {
     return res.status(400).json({ error: 'Le nom de la société est requis' });
@@ -354,6 +363,13 @@ router.post('/register-supplier', async (req, res) => {
   if (!/[0-9]/.test(password)) {
     return res.status(400).json({ error: 'Le mot de passe doit contenir au moins un chiffre' });
   }
+  // RGPD: same explicit consent gate as /register.
+  if (accepted_terms !== true) {
+    return res.status(400).json({
+      error: 'Vous devez accepter les CGV et la politique de confidentialité',
+      code: 'TERMS_NOT_ACCEPTED',
+    });
+  }
 
   const emailLower = email.trim().toLowerCase();
 
@@ -371,8 +387,8 @@ router.post('/register-supplier', async (req, res) => {
     // platform but isn't yet attached to any restaurant. The first restaurant
     // that invites them by email adopts the row (sets restaurant_id).
     run(
-      `INSERT INTO suppliers (name, contact_name, email, password_hash, phone, restaurant_id)
-       VALUES (?, ?, ?, ?, ?, NULL)`,
+      `INSERT INTO suppliers (name, contact_name, email, password_hash, phone, restaurant_id, terms_accepted_at)
+       VALUES (?, ?, ?, ?, ?, NULL, datetime('now'))`,
       [company_name.trim(), contact_name.trim(), emailLower, passwordHash, (phone || '').trim() || null]
     );
     res.status(201).json({
