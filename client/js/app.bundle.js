@@ -27017,7 +27017,7 @@ async function renderMercuriale() {
   }
   renderSummary(catalog.totals);
   renderAlerts(priceData.recent_changes || []);
-  renderSuppliers(catalog.suppliers || []);
+  renderMercurialeSuppliers(catalog.suppliers || []);
   const search = document.getElementById("merc-search");
   search.addEventListener("input", () => {
     const q = search.value.trim().toLowerCase();
@@ -27120,7 +27120,7 @@ function renderAlertCard(c) {
     </div>
   `;
 }
-function renderSuppliers(suppliers) {
+function renderMercurialeSuppliers(suppliers) {
   const el = document.getElementById("merc-suppliers");
   if (!suppliers || suppliers.length === 0) {
     el.innerHTML = `

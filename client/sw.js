@@ -1,10 +1,12 @@
-// Bumped 2026-05-06 (v37): clean up Opérations sidebar — remove
-// "Intégrations" entry (now reachable from /suppliers via a new
-// "Intégrations" button), remove redundant "Fournisseurs" button on
-// /supplier-integrations page header. Sidebar order: Commandes,
-// Fournisseurs (→ supplier list), Livraisons, Factures, Planning…
-// (v36 was PO send INTEGRATION_NOT_CONFIGURED gate.)
-const CACHE_NAME = 'restosuite-v37';
+// Bumped 2026-05-06 (v38): hotfix — Fournisseurs sidebar entry was
+// dead-clicking because client/js/views/mercuriale.js declared a
+// top-level `function renderSuppliers(suppliers)` that clobbered the
+// canonical `renderSuppliers()` from views/suppliers.js (concat bundle
+// = single global scope, last decl wins). Renamed mercuriale's helper
+// to `renderMercurialeSuppliers`. Router /suppliers now resolves to
+// the real list view again.
+// (v37 was Opérations sidebar cleanup.)
+const CACHE_NAME = 'restosuite-v38';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
