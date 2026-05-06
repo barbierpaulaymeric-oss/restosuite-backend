@@ -1,7 +1,8 @@
-// Bumped 2026-05-06 (v42): RGPD consent checkbox obligatoire à l'inscription
-// (P0-3, accepted_terms + terms_accepted_at) sur la base v41 P0-1 stale-JWT
-// + reprendre-session, sur la base v40 /confidentialite + blog strip.
-const CACHE_NAME = 'restosuite-v42';
+// Bumped 2026-05-06 (v43): P1-2 reg-staff-password type=password,
+// P2-2 #fonctionnalites → #fonctionnalites-piliers anchors,
+// P2-1 clear #app DOM avant overlay wizard, sur la base v42 RGPD consent
+// + v41 P0-1 stale-JWT, + v40 /confidentialite + blog strip.
+const CACHE_NAME = 'restosuite-v43';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
