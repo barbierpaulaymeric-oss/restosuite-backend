@@ -20086,9 +20086,17 @@ class LoginView {
             ${isSupplier ? supplierFields : restaurantFields}
           </div>
 
+          <label for="reg-terms" style="display:flex;align-items:flex-start;gap:var(--space-2);margin-top:var(--space-4);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md);font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5;cursor:pointer;text-align:left;width:100%">
+            <input type="checkbox" id="reg-terms" required style="margin-top:3px;width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:var(--color-accent)" data-ui="custom">
+            <span>
+              J'accepte les <a href="/cgv" target="_blank" rel="noopener" style="color:var(--color-accent);text-decoration:underline">CGV</a>
+              et la <a href="/confidentialite" target="_blank" rel="noopener" style="color:var(--color-accent);text-decoration:underline">politique de confidentialit\xE9</a>.
+            </span>
+          </label>
+
           <div id="reg-error" role="alert" aria-live="assertive" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
 
-          <button class="btn btn-primary" id="reg-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
+          <button class="btn btn-primary" id="reg-submit" disabled aria-disabled="true" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             ${isSupplier ? "Cr\xE9er mon compte fournisseur" : "Cr\xE9er mon compte"}
           </button>
         </div>
@@ -20123,15 +20131,24 @@ class LoginView {
         });
       }
     }
+    const termsBox = document.getElementById("reg-terms");
+    const submitBtn = document.getElementById("reg-submit");
+    const syncSubmitState = () => {
+      const ok = !!termsBox.checked;
+      submitBtn.disabled = !ok;
+      submitBtn.setAttribute("aria-disabled", ok ? "false" : "true");
+    };
+    termsBox.addEventListener("change", syncSubmitState);
+    syncSubmitState();
     if (isSupplier) {
-      document.getElementById("reg-submit").addEventListener("click", () => this.handleRegisterSupplier());
+      submitBtn.addEventListener("click", () => this.handleRegisterSupplier());
       document.getElementById("sup-password2").addEventListener("keydown", (e) => {
-        if (e.key === "Enter") this.handleRegisterSupplier();
+        if (e.key === "Enter" && !submitBtn.disabled) this.handleRegisterSupplier();
       });
     } else {
-      document.getElementById("reg-submit").addEventListener("click", () => this.handleRegister());
+      submitBtn.addEventListener("click", () => this.handleRegister());
       document.getElementById("reg-password2").addEventListener("keydown", (e) => {
-        if (e.key === "Enter") this.handleRegister();
+        if (e.key === "Enter" && !submitBtn.disabled) this.handleRegister();
       });
     }
   }
@@ -20173,6 +20190,11 @@ class LoginView {
       errorEl.textContent = "Les mots de passe ne correspondent pas";
       return;
     }
+    const termsBox = document.getElementById("reg-terms");
+    if (!termsBox || !termsBox.checked) {
+      errorEl.textContent = "Vous devez accepter les CGV et la politique de confidentialit\xE9";
+      return;
+    }
     submitBtn.disabled = true;
     submitBtn.textContent = "Cr\xE9ation...";
     try {
@@ -20181,7 +20203,8 @@ class LoginView {
         contact_name: contact,
         email,
         password,
-        phone: phone || void 0
+        phone: phone || void 0,
+        accepted_terms: true
       });
       const app = document.getElementById("app");
       app.innerHTML = `
@@ -20242,10 +20265,15 @@ class LoginView {
       errorEl.textContent = "Les mots de passe ne correspondent pas";
       return;
     }
+    const termsBox = document.getElementById("reg-terms");
+    if (!termsBox || !termsBox.checked) {
+      errorEl.textContent = "Vous devez accepter les CGV et la politique de confidentialit\xE9";
+      return;
+    }
     submitBtn.disabled = true;
     submitBtn.textContent = "Cr\xE9ation...";
     try {
-      const result = await API.register({ email, password, first_name: firstName, last_name: lastName, staff_password: staffPassword || void 0 });
+      const result = await API.register({ email, password, first_name: firstName, last_name: lastName, staff_password: staffPassword || void 0, accepted_terms: true });
       _persistRestaurantLogin(result.token, result.account);
       const nav = document.getElementById("nav");
       if (nav) nav.style.display = "none";
