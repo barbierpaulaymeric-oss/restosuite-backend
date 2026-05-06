@@ -15769,10 +15769,10 @@ function updatePOItemsDisplay() {
                 <input type="number" class="form-control" style="max-width:80px" value="${item.quantity}" min="1" onchange="updatePOItemQuantity(${idx}, this.value)" data-ui="custom">
               </td>
               <td style="padding:8px;text-align:right">
-                <input type="text" class="form-control" style="max-width:80px" value="${escapeHtml(item.unit)}" onchange="updatePOItemUnit(${idx}, this.value)" data-ui="custom">
+                <span class="po-readonly-cell" style="display:inline-flex;align-items:center;justify-content:center;min-height:48px;min-width:80px;padding:0 var(--space-4);background:var(--border-default);border-radius:var(--radius-md);color:var(--text-secondary);font:600 var(--text-base)/var(--leading-normal) var(--font-sans)" title="Unit\xE9 d\xE9finie par le catalogue fournisseur">${escapeHtml(item.unit || "unit\xE9")}</span>
               </td>
               <td style="padding:8px;text-align:right">
-                <input type="number" class="form-control" style="max-width:100px" step="0.01" value="${item.unit_price || ""}" placeholder="0.00" onchange="updatePOItemPrice(${idx}, this.value)" data-ui="custom">
+                <span class="po-readonly-cell" style="display:inline-flex;align-items:center;justify-content:flex-end;min-height:48px;min-width:100px;padding:0 var(--space-4);background:var(--border-default);border-radius:var(--radius-md);color:var(--text-secondary);font:600 var(--text-base)/var(--leading-normal) var(--font-sans);font-variant-numeric:tabular-nums" title="Prix issu de la mercuriale">${item.unit_price ? formatCurrency(item.unit_price) : "\u2014"}</span>
               </td>
               <td style="padding:8px;text-align:right;font-weight:600">${formatCurrency(lineTotal)}</td>
               <td style="padding:8px;text-align:center">
@@ -15790,14 +15790,6 @@ function updatePOItemsDisplay() {
 }
 function updatePOItemQuantity(idx, value) {
   _poItems[idx].quantity = parseInt(value) || 1;
-  updatePOItemsDisplay();
-}
-function updatePOItemUnit(idx, value) {
-  _poItems[idx].unit = value.trim() || "unit\xE9";
-  updatePOItemsDisplay();
-}
-function updatePOItemPrice(idx, value) {
-  _poItems[idx].unit_price = parseFloat(value) || 0;
   updatePOItemsDisplay();
 }
 function removePOItem(idx) {
