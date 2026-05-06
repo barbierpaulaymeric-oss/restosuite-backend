@@ -2149,6 +2149,20 @@ try {
   console.warn('⚠️ return_requests migration error:', e.message);
 }
 
+// ─── Migration: per-seat allergies on orders ───
+// Stored as JSON: {"1": "gluten", "3": "végétarien"} — sparse map keyed by
+// 1-based seat position. Surfaced on the salle modal + KDS tickets so the
+// cuisinier knows which dish goes to which seat with which restriction.
+try {
+  const orderCols = all("PRAGMA table_info(orders)");
+  if (!orderCols.some(c => c.name === 'seat_allergies')) {
+    db.exec("ALTER TABLE orders ADD COLUMN seat_allergies TEXT");
+    console.log('✅ Migration: added seat_allergies to orders');
+  }
+} catch (e) {
+  console.warn('⚠️ seat_allergies migration error:', e.message);
+}
+
 }
 
 module.exports = { runMigrations };

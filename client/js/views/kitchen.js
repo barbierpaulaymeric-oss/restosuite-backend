@@ -229,6 +229,16 @@ function _kdsRender() {
   });
 }
 
+function _kdsParseSeatAllergies(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'object') return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+  } catch (e) { /* swallow */ }
+  return {};
+}
+
 function _kdsTicketHTML(ticket, lane) {
   const o = ticket.order;
   const it = ticket.item;
@@ -236,9 +246,20 @@ function _kdsTicketHTML(ticket, lane) {
   const urgent = elapsed > 15 ? 'kds-ticket--urgent' : elapsed > 8 ? 'kds-ticket--warn' : '';
   const fresh = elapsed < 2 ? 'kds-ticket--fresh' : '';
 
-  // Allergy/notes detection
+  // Free-text allergy/notes detection (legacy global notes field)
   const noteText = [o.notes, it.notes].filter(Boolean).join(' • ');
   const hasAllergy = noteText && /allergi|sans|gluten|lactose|noix|arachide|fruit\s*de\s*mer/i.test(noteText);
+
+  // Per-seat allergies — render as red chips so the cuisinier sees them at a glance
+  const seatAllergies = _kdsParseSeatAllergies(o.seat_allergies);
+  const seatEntries = Object.entries(seatAllergies).sort((a,b) => Number(a[0]) - Number(b[0]));
+  const seatBadges = seatEntries.length > 0
+    ? `<div class="kds-ticket__seat-allergies">
+        ${seatEntries.map(([pos, txt]) =>
+          `<span class="kds-ticket__seat-chip"><span class="kds-ticket__seat-chip-pos">P${escapeHtml(String(pos))}</span><span class="kds-ticket__seat-chip-txt">${escapeHtml(txt)}</span></span>`
+        ).join('')}
+      </div>`
+    : '';
 
   let actions = '';
   if (lane === 'nouveau') {
@@ -250,8 +271,10 @@ function _kdsTicketHTML(ticket, lane) {
     actions = `<button class="kds-ticket__btn kds-ticket__btn--ghost" data-action="undo" data-order-id="${o.id}" data-item-id="${it.id}">↶ Re-prep</button>`;
   }
 
+  const allergyClass = (hasAllergy || seatEntries.length > 0) ? 'kds-ticket--has-allergy' : '';
+
   return `
-    <article class="kds-ticket ${urgent} ${fresh}" data-created-at="${o.created_at}">
+    <article class="kds-ticket ${urgent} ${fresh} ${allergyClass}" data-created-at="${o.created_at}">
       <header class="kds-ticket__head">
         <span class="kds-ticket__table">T${o.table_number}</span>
         <span class="kds-ticket__id">#${o.id}</span>
@@ -261,6 +284,7 @@ function _kdsTicketHTML(ticket, lane) {
         <div class="kds-ticket__qty">${it.quantity}×</div>
         <div class="kds-ticket__name">${escapeHtml(it.recipe_name || '?')}</div>
       </div>
+      ${seatBadges}
       ${noteText ? `<div class="kds-ticket__notes ${hasAllergy ? 'kds-ticket__notes--allergy' : ''}">
         ${hasAllergy ? '⚠️ ' : '📝 '}${escapeHtml(noteText)}
       </div>` : ''}

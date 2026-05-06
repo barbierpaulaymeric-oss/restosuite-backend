@@ -16549,8 +16549,19 @@ function _salleOpenTable(tableId) {
   }
   _salleState.draftCovers = (_a = existingDraft == null ? void 0 : existingDraft.covers) != null ? _a : null;
   _salleState.draftNotes = (existingDraft == null ? void 0 : existingDraft.notes) || "";
+  _salleState.draftSeatAllergies = _salleParseSeatAllergies(existingDraft == null ? void 0 : existingDraft.seat_allergies);
   _salleState.menuSearch = "";
   _salleRenderModal(table);
+}
+function _salleParseSeatAllergies(raw) {
+  if (!raw) return {};
+  if (typeof raw === "object") return __spreadValues({}, raw);
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+  } catch (e) {
+  }
+  return {};
 }
 function _salleCloseModal() {
   var _a;
@@ -16588,16 +16599,21 @@ function _salleRenderModal(table) {
           <h3 class="salle-modal__section">Commande</h3>
           <div id="salle-cart-items" class="salle-cart"></div>
 
-          <div class="salle-cart-meta">
-            <label class="salle-cart-meta__field">
-              <span>\u{1F465} Couverts</span>
-              <input type="number" id="salle-cart-covers" min="0" max="999" step="1" placeholder="\u2014" class="form-control" data-ui="custom" value="${(_b = _salleState.draftCovers) != null ? _b : ""}">
-            </label>
-            <label class="salle-cart-meta__field salle-cart-meta__field--full">
-              <span>\u{1F4DD} Notes (allergies, demandes)</span>
-              <textarea id="salle-cart-notes" rows="2" class="form-control" data-ui="custom">${escapeHtml(_salleState.draftNotes)}</textarea>
-            </label>
+          <div class="salle-covers">
+            <span class="salle-covers__label">\u{1F465} Couverts</span>
+            <div class="salle-covers__stepper">
+              <button type="button" class="salle-covers__btn" id="salle-covers-dec" aria-label="Moins">\u2212</button>
+              <input type="text" inputmode="numeric" id="salle-cart-covers" maxlength="3" placeholder="0" value="${(_b = _salleState.draftCovers) != null ? _b : ""}">
+              <button type="button" class="salle-covers__btn" id="salle-covers-inc" aria-label="Plus">+</button>
+            </div>
           </div>
+
+          <div class="salle-seat-allergies" id="salle-seat-allergies"></div>
+
+          <label class="salle-cart-meta__field salle-cart-meta__field--full">
+            <span>\u{1F4DD} Notes g\xE9n\xE9rales (demandes table)</span>
+            <textarea id="salle-cart-notes" rows="2" class="form-control" data-ui="custom">${escapeHtml(_salleState.draftNotes)}</textarea>
+          </label>
 
           <div class="salle-cart__total" id="salle-cart-total">Total : 0,00 \u20AC</div>
 
@@ -16634,16 +16650,131 @@ function _salleRenderModal(table) {
       _salleRenderMenu();
     }, 120);
   });
-  document.getElementById("salle-cart-covers").addEventListener("input", (e) => {
-    const v = e.target.value;
-    _salleState.draftCovers = v === "" ? null : parseInt(v, 10);
+  const coversInp = document.getElementById("salle-cart-covers");
+  const setCovers = (n, opts = {}) => {
+    n = Math.max(0, Math.min(999, n | 0));
+    _salleState.draftCovers = n === 0 && opts.allowZero !== true ? null : n;
+    coversInp.value = n === 0 ? "" : String(n);
+    _salleRenderSeatAllergies();
+  };
+  coversInp.addEventListener("input", (e) => {
+    const digits = (e.target.value || "").replace(/\D+/g, "").slice(0, 3);
+    e.target.value = digits;
+    _salleState.draftCovers = digits === "" ? null : parseInt(digits, 10);
+    _salleRenderSeatAllergies();
+  });
+  document.getElementById("salle-covers-dec").addEventListener("click", () => {
+    setCovers((_salleState.draftCovers || 0) - 1, { allowZero: true });
+  });
+  document.getElementById("salle-covers-inc").addEventListener("click", () => {
+    setCovers((_salleState.draftCovers || 0) + 1);
   });
   document.getElementById("salle-cart-notes").addEventListener("input", (e) => {
     _salleState.draftNotes = e.target.value;
   });
   _salleRenderMenu();
   _salleRenderCart();
+  _salleRenderSeatAllergies();
   _salleRenderSent(table, sentOrders);
+}
+const _SALLE_ALLERGY_PRESETS = [
+  "gluten",
+  "lactose",
+  "arachides",
+  "fruits \xE0 coque",
+  "\u0153ufs",
+  "poisson",
+  "crustac\xE9s",
+  "soja",
+  "c\xE9leri",
+  "moutarde",
+  "s\xE9same",
+  "sulfites",
+  "lupin",
+  "mollusques",
+  "v\xE9g\xE9tarien",
+  "vegan",
+  "sans porc",
+  "sans alcool"
+];
+function _salleRenderSeatAllergies() {
+  var _a;
+  const el = document.getElementById("salle-seat-allergies");
+  if (!el) return;
+  const n = _salleState.draftCovers || 0;
+  if (n <= 0) {
+    el.innerHTML = `
+      <div class="salle-seat-allergies__hint">
+        \u{1F4A1} Ajoutez le nombre de couverts pour saisir les allergies par position.
+      </div>
+    `;
+    return;
+  }
+  let html = `
+    <div class="salle-seat-allergies__head">
+      <span class="salle-seat-allergies__title">\u26A0\uFE0F Allergies / r\xE9gimes par position</span>
+      <span class="salle-seat-allergies__sub">Cliquez sur une \xE9tiquette ou tapez librement</span>
+    </div>
+    <div class="salle-seat-allergies__rows">
+  `;
+  for (let i = 1; i <= n; i++) {
+    const value = ((_a = _salleState.draftSeatAllergies) == null ? void 0 : _a[i]) || "";
+    const filled = value ? "salle-seat-row--filled" : "";
+    html += `
+      <div class="salle-seat-row ${filled}">
+        <span class="salle-seat-row__pos">P${i}</span>
+        <input type="text" class="salle-seat-row__input" data-pos="${i}" maxlength="200" placeholder="Aucune allergie" value="${escapeHtml(value)}">
+        <button type="button" class="salle-seat-row__clear" data-clear-pos="${i}" title="Effacer" aria-label="Effacer position ${i}">\u2715</button>
+      </div>
+    `;
+  }
+  html += `</div>
+    <div class="salle-seat-allergies__presets" id="salle-seat-presets" hidden>
+      <span class="salle-seat-allergies__presets-label">Suggestions :</span>
+      ${_SALLE_ALLERGY_PRESETS.map((p) => `<button type="button" class="salle-seat-chip" data-preset="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join("")}
+    </div>
+  `;
+  el.innerHTML = html;
+  let activePos = null;
+  el.querySelectorAll(".salle-seat-row__input").forEach((inp) => {
+    inp.addEventListener("input", (e) => {
+      const pos = parseInt(inp.dataset.pos, 10);
+      const v = e.target.value;
+      if (v) _salleState.draftSeatAllergies[pos] = v;
+      else delete _salleState.draftSeatAllergies[pos];
+      inp.parentElement.classList.toggle("salle-seat-row--filled", !!v);
+    });
+    inp.addEventListener("focus", () => {
+      activePos = parseInt(inp.dataset.pos, 10);
+      const presets = document.getElementById("salle-seat-presets");
+      if (presets) presets.hidden = false;
+    });
+  });
+  el.querySelectorAll(".salle-seat-row__clear").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const pos = parseInt(btn.dataset.clearPos, 10);
+      delete _salleState.draftSeatAllergies[pos];
+      const inp = el.querySelector(`.salle-seat-row__input[data-pos="${pos}"]`);
+      if (inp) {
+        inp.value = "";
+        inp.parentElement.classList.remove("salle-seat-row--filled");
+      }
+    });
+  });
+  el.querySelectorAll(".salle-seat-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      if (activePos == null) return;
+      const inp = el.querySelector(`.salle-seat-row__input[data-pos="${activePos}"]`);
+      if (!inp) return;
+      const current = inp.value.trim();
+      const preset = chip.dataset.preset;
+      const next = current ? `${current}, ${preset}` : preset;
+      inp.value = next;
+      _salleState.draftSeatAllergies[activePos] = next;
+      inp.parentElement.classList.add("salle-seat-row--filled");
+      inp.focus();
+    });
+  });
 }
 function _salleRenderMenu() {
   const el = document.getElementById("salle-menu-list");
@@ -16754,12 +16885,18 @@ function _salleRenderSent(table, sentOrders) {
     const isServed = o.status === "servi";
     const cls = isReady ? "salle-sent--ready" : isServed ? "salle-sent--served" : "";
     const badge = isReady ? "\u2705 Pr\xEAt" : isServed ? "\u{1F37D}\uFE0F Servi" : "\u23F3 En cuisine";
+    const sa = _salleParseSeatAllergies(o.seat_allergies);
+    const saEntries = Object.entries(sa).sort((a, b) => Number(a[0]) - Number(b[0]));
+    const saChips = saEntries.length > 0 ? `<div class="salle-sent__allergies">${saEntries.map(
+      ([pos, txt]) => `<span class="salle-sent__allergy-chip">P${pos} \xB7 ${escapeHtml(txt)}</span>`
+    ).join("")}</div>` : "";
     html += `<div class="salle-sent ${cls}">
       <div class="salle-sent__head">
         <span class="salle-sent__badge">${badge}</span>
         <span class="salle-sent__time">${elapsedMin}\u2032</span>
         <span class="salle-sent__total">${formatCurrency(o.total_cost || 0)}</span>
       </div>
+      ${saChips}
       <ul class="salle-sent__items">
         ${(o.items || []).filter((it) => it.status !== "annul\xE9").map((it) => `
           <li>
@@ -16814,10 +16951,19 @@ async function _salleSaveOrder(table, sendImmediately) {
       (o) => o.table_number === table.table_number && o.status === "en_cours"
     );
     if (existingDraft) await API.cancelOrder(existingDraft.id);
+    const seatPayload = {};
+    const ceiling = coversValue || 0;
+    for (const [k, v] of Object.entries(_salleState.draftSeatAllergies || {})) {
+      const pos = parseInt(k, 10);
+      if (!Number.isInteger(pos) || pos < 1) continue;
+      if (ceiling > 0 && pos > ceiling) continue;
+      if (typeof v === "string" && v.trim()) seatPayload[pos] = v.trim();
+    }
     const order = await API.createOrder({
       table_number: table.table_number,
       notes: _salleState.draftNotes || null,
       covers: coversValue,
+      seat_allergies: Object.keys(seatPayload).length > 0 ? seatPayload : null,
       items: items.map((i) => ({ recipe_id: i.recipe_id, quantity: i.quantity, notes: i.notes || null }))
     });
     if (sendImmediately) {
@@ -17218,6 +17364,16 @@ function _kdsRender() {
     });
   });
 }
+function _kdsParseSeatAllergies(raw) {
+  if (!raw) return {};
+  if (typeof raw === "object") return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+  } catch (e) {
+  }
+  return {};
+}
 function _kdsTicketHTML(ticket, lane) {
   const o = ticket.order;
   const it = ticket.item;
@@ -17226,6 +17382,13 @@ function _kdsTicketHTML(ticket, lane) {
   const fresh = elapsed < 2 ? "kds-ticket--fresh" : "";
   const noteText = [o.notes, it.notes].filter(Boolean).join(" \u2022 ");
   const hasAllergy = noteText && /allergi|sans|gluten|lactose|noix|arachide|fruit\s*de\s*mer/i.test(noteText);
+  const seatAllergies = _kdsParseSeatAllergies(o.seat_allergies);
+  const seatEntries = Object.entries(seatAllergies).sort((a, b) => Number(a[0]) - Number(b[0]));
+  const seatBadges = seatEntries.length > 0 ? `<div class="kds-ticket__seat-allergies">
+        ${seatEntries.map(
+    ([pos, txt]) => `<span class="kds-ticket__seat-chip"><span class="kds-ticket__seat-chip-pos">P${escapeHtml(String(pos))}</span><span class="kds-ticket__seat-chip-txt">${escapeHtml(txt)}</span></span>`
+  ).join("")}
+      </div>` : "";
   let actions = "";
   if (lane === "nouveau") {
     actions = `<button class="kds-ticket__btn kds-ticket__btn--primary" data-action="start" data-order-id="${o.id}" data-item-id="${it.id}">\u{1F525} D\xE9marrer</button>
@@ -17235,8 +17398,9 @@ function _kdsTicketHTML(ticket, lane) {
   } else if (lane === "ready") {
     actions = `<button class="kds-ticket__btn kds-ticket__btn--ghost" data-action="undo" data-order-id="${o.id}" data-item-id="${it.id}">\u21B6 Re-prep</button>`;
   }
+  const allergyClass = hasAllergy || seatEntries.length > 0 ? "kds-ticket--has-allergy" : "";
   return `
-    <article class="kds-ticket ${urgent} ${fresh}" data-created-at="${o.created_at}">
+    <article class="kds-ticket ${urgent} ${fresh} ${allergyClass}" data-created-at="${o.created_at}">
       <header class="kds-ticket__head">
         <span class="kds-ticket__table">T${o.table_number}</span>
         <span class="kds-ticket__id">#${o.id}</span>
@@ -17246,6 +17410,7 @@ function _kdsTicketHTML(ticket, lane) {
         <div class="kds-ticket__qty">${it.quantity}\xD7</div>
         <div class="kds-ticket__name">${escapeHtml(it.recipe_name || "?")}</div>
       </div>
+      ${seatBadges}
       ${noteText ? `<div class="kds-ticket__notes ${hasAllergy ? "kds-ticket__notes--allergy" : ""}">
         ${hasAllergy ? "\u26A0\uFE0F " : "\u{1F4DD} "}${escapeHtml(noteText)}
       </div>` : ""}

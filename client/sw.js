@@ -1,12 +1,11 @@
-// Bumped 2026-05-06 (v34): Mercuriale page redesign — replaces useless
-// "ingredients from fiches techniques" list with a supplier-organized
-// catalog browser (Fournisseurs → Catégories → Produits) backed by the
-// supplier_catalog table. Adds GET /api/analytics/mercuriale-catalog,
-// search filter, expandable supplier sections, trend arrows from
-// price_change_notifications, and a top summary line.
-// (v33 was PO form — read-only Unit & Prix unitaire chips. v32 was
-// Mercuriale import accepts unmatched products.)
-const CACHE_NAME = 'restosuite-v34';
+// Bumped 2026-05-06 (v35): Salle modal polish — bigger visible covers
+// stepper (text input + −/+ buttons, no spin chrome) and per-seat allergies
+// strip (P1…Pn rows + clickable preset chips) replacing the single global
+// notes-as-allergy field. New orders.seat_allergies JSON column, surfaced
+// as red-bordered chips on KDS tickets so the cuisinier sees position +
+// restriction at a glance.
+// (v34 was supplier-organized catalog browser; v33 PO form unit chips.)
+const CACHE_NAME = 'restosuite-v35';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

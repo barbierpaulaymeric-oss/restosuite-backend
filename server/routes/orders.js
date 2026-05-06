@@ -61,7 +61,7 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   try {
     const rid = req.user.restaurant_id;
-    const { table_number, items, notes, covers } = req.body;
+    const { table_number, items, notes, covers, seat_allergies } = req.body;
 
     if (!table_number) return res.status(400).json({ error: 'table_number requis' });
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -75,6 +75,24 @@ router.post('/', (req, res) => {
         return res.status(400).json({ error: 'covers doit être un entier entre 0 et 999' });
       }
       coversValue = n;
+    }
+
+    // seat_allergies: optional sparse map keyed by 1-based seat position →
+    // free text restriction (e.g. {"1": "gluten", "3": "végétarien"}). Stored
+    // as JSON; null/empty when unused. Reject anything that's not a plain
+    // object so we don't end up with arrays or stringly-typed garbage in DB.
+    let seatAllergiesJson = null;
+    if (seat_allergies !== undefined && seat_allergies !== null) {
+      if (typeof seat_allergies !== 'object' || Array.isArray(seat_allergies)) {
+        return res.status(400).json({ error: 'seat_allergies doit être un objet { "1": "...", ... }' });
+      }
+      const cleaned = {};
+      for (const [k, v] of Object.entries(seat_allergies)) {
+        const pos = parseInt(k, 10);
+        if (!Number.isInteger(pos) || pos < 1 || pos > 999) continue;
+        if (typeof v === 'string' && v.trim()) cleaned[pos] = v.trim().slice(0, 200);
+      }
+      if (Object.keys(cleaned).length > 0) seatAllergiesJson = JSON.stringify(cleaned);
     }
 
     // Validate items have required fields
@@ -100,8 +118,8 @@ router.post('/', (req, res) => {
       }
 
       const orderInfo = run(
-        'INSERT INTO orders (table_number, notes, total_cost, covers, restaurant_id) VALUES (?, ?, ?, ?, ?)',
-        [table_number, notes || null, Math.round(totalCost * 100) / 100, coversValue, rid]
+        'INSERT INTO orders (table_number, notes, total_cost, covers, seat_allergies, restaurant_id) VALUES (?, ?, ?, ?, ?, ?)',
+        [table_number, notes || null, Math.round(totalCost * 100) / 100, coversValue, seatAllergiesJson, rid]
       );
       const orderId = orderInfo.lastInsertRowid;
 
@@ -162,7 +180,7 @@ const ITEM_STATUS_TRANSITIONS = {
 router.put('/:id', (req, res) => {
   const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
-  const { status, notes, covers } = req.body;
+  const { status, notes, covers, seat_allergies } = req.body;
   const order = get('SELECT * FROM orders WHERE id = ? AND restaurant_id = ?', [id, rid]);
   if (!order) return res.status(404).json({ error: 'Commande introuvable' });
 
@@ -192,6 +210,22 @@ router.put('/:id', (req, res) => {
       coversValue = n;
     }
     run('UPDATE orders SET covers = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?', [coversValue, id, rid]);
+  }
+  if (seat_allergies !== undefined) {
+    let seatJson = null;
+    if (seat_allergies !== null) {
+      if (typeof seat_allergies !== 'object' || Array.isArray(seat_allergies)) {
+        return res.status(400).json({ error: 'seat_allergies doit être un objet { "1": "...", ... }' });
+      }
+      const cleaned = {};
+      for (const [k, v] of Object.entries(seat_allergies)) {
+        const pos = parseInt(k, 10);
+        if (!Number.isInteger(pos) || pos < 1 || pos > 999) continue;
+        if (typeof v === 'string' && v.trim()) cleaned[pos] = v.trim().slice(0, 200);
+      }
+      if (Object.keys(cleaned).length > 0) seatJson = JSON.stringify(cleaned);
+    }
+    run('UPDATE orders SET seat_allergies = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?', [seatJson, id, rid]);
   }
 
   const updated = get('SELECT * FROM orders WHERE id = ? AND restaurant_id = ?', [id, rid]);

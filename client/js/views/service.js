@@ -338,9 +338,20 @@ function _salleOpenTable(tableId) {
   }
   _salleState.draftCovers = existingDraft?.covers ?? null;
   _salleState.draftNotes = existingDraft?.notes || '';
+  _salleState.draftSeatAllergies = _salleParseSeatAllergies(existingDraft?.seat_allergies);
   _salleState.menuSearch = '';
 
   _salleRenderModal(table);
+}
+
+function _salleParseSeatAllergies(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'object') return { ...raw };
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+  } catch (e) { /* swallow */ }
+  return {};
 }
 
 function _salleCloseModal() {
@@ -380,16 +391,21 @@ function _salleRenderModal(table) {
           <h3 class="salle-modal__section">Commande</h3>
           <div id="salle-cart-items" class="salle-cart"></div>
 
-          <div class="salle-cart-meta">
-            <label class="salle-cart-meta__field">
-              <span>👥 Couverts</span>
-              <input type="number" id="salle-cart-covers" min="0" max="999" step="1" placeholder="—" class="form-control" data-ui="custom" value="${_salleState.draftCovers ?? ''}">
-            </label>
-            <label class="salle-cart-meta__field salle-cart-meta__field--full">
-              <span>📝 Notes (allergies, demandes)</span>
-              <textarea id="salle-cart-notes" rows="2" class="form-control" data-ui="custom">${escapeHtml(_salleState.draftNotes)}</textarea>
-            </label>
+          <div class="salle-covers">
+            <span class="salle-covers__label">👥 Couverts</span>
+            <div class="salle-covers__stepper">
+              <button type="button" class="salle-covers__btn" id="salle-covers-dec" aria-label="Moins">−</button>
+              <input type="text" inputmode="numeric" id="salle-cart-covers" maxlength="3" placeholder="0" value="${_salleState.draftCovers ?? ''}">
+              <button type="button" class="salle-covers__btn" id="salle-covers-inc" aria-label="Plus">+</button>
+            </div>
           </div>
+
+          <div class="salle-seat-allergies" id="salle-seat-allergies"></div>
+
+          <label class="salle-cart-meta__field salle-cart-meta__field--full">
+            <span>📝 Notes générales (demandes table)</span>
+            <textarea id="salle-cart-notes" rows="2" class="form-control" data-ui="custom">${escapeHtml(_salleState.draftNotes)}</textarea>
+          </label>
 
           <div class="salle-cart__total" id="salle-cart-total">Total : 0,00 €</div>
 
@@ -427,17 +443,120 @@ function _salleRenderModal(table) {
     }, 120);
   });
 
-  document.getElementById('salle-cart-covers').addEventListener('input', (e) => {
-    const v = e.target.value;
-    _salleState.draftCovers = v === '' ? null : parseInt(v, 10);
+  const coversInp = document.getElementById('salle-cart-covers');
+  const setCovers = (n, opts = {}) => {
+    n = Math.max(0, Math.min(999, n | 0));
+    _salleState.draftCovers = n === 0 && opts.allowZero !== true ? null : n;
+    coversInp.value = n === 0 ? '' : String(n);
+    _salleRenderSeatAllergies();
+  };
+  coversInp.addEventListener('input', (e) => {
+    const digits = (e.target.value || '').replace(/\D+/g, '').slice(0, 3);
+    e.target.value = digits;
+    _salleState.draftCovers = digits === '' ? null : parseInt(digits, 10);
+    _salleRenderSeatAllergies();
   });
+  document.getElementById('salle-covers-dec').addEventListener('click', () => {
+    setCovers((_salleState.draftCovers || 0) - 1, { allowZero: true });
+  });
+  document.getElementById('salle-covers-inc').addEventListener('click', () => {
+    setCovers((_salleState.draftCovers || 0) + 1);
+  });
+
   document.getElementById('salle-cart-notes').addEventListener('input', (e) => {
     _salleState.draftNotes = e.target.value;
   });
 
   _salleRenderMenu();
   _salleRenderCart();
+  _salleRenderSeatAllergies();
   _salleRenderSent(table, sentOrders);
+}
+
+// Common allergens — clickable chip preset to speed up the waiter's input.
+const _SALLE_ALLERGY_PRESETS = [
+  'gluten', 'lactose', 'arachides', 'fruits à coque', 'œufs',
+  'poisson', 'crustacés', 'soja', 'céleri', 'moutarde',
+  'sésame', 'sulfites', 'lupin', 'mollusques',
+  'végétarien', 'vegan', 'sans porc', 'sans alcool'
+];
+
+function _salleRenderSeatAllergies() {
+  const el = document.getElementById('salle-seat-allergies');
+  if (!el) return;
+  const n = _salleState.draftCovers || 0;
+  if (n <= 0) {
+    el.innerHTML = `
+      <div class="salle-seat-allergies__hint">
+        💡 Ajoutez le nombre de couverts pour saisir les allergies par position.
+      </div>
+    `;
+    return;
+  }
+
+  let html = `
+    <div class="salle-seat-allergies__head">
+      <span class="salle-seat-allergies__title">⚠️ Allergies / régimes par position</span>
+      <span class="salle-seat-allergies__sub">Cliquez sur une étiquette ou tapez librement</span>
+    </div>
+    <div class="salle-seat-allergies__rows">
+  `;
+  for (let i = 1; i <= n; i++) {
+    const value = _salleState.draftSeatAllergies?.[i] || '';
+    const filled = value ? 'salle-seat-row--filled' : '';
+    html += `
+      <div class="salle-seat-row ${filled}">
+        <span class="salle-seat-row__pos">P${i}</span>
+        <input type="text" class="salle-seat-row__input" data-pos="${i}" maxlength="200" placeholder="Aucune allergie" value="${escapeHtml(value)}">
+        <button type="button" class="salle-seat-row__clear" data-clear-pos="${i}" title="Effacer" aria-label="Effacer position ${i}">✕</button>
+      </div>
+    `;
+  }
+  html += `</div>
+    <div class="salle-seat-allergies__presets" id="salle-seat-presets" hidden>
+      <span class="salle-seat-allergies__presets-label">Suggestions :</span>
+      ${_SALLE_ALLERGY_PRESETS.map(p => `<button type="button" class="salle-seat-chip" data-preset="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join('')}
+    </div>
+  `;
+  el.innerHTML = html;
+
+  let activePos = null;
+  el.querySelectorAll('.salle-seat-row__input').forEach(inp => {
+    inp.addEventListener('input', (e) => {
+      const pos = parseInt(inp.dataset.pos, 10);
+      const v = e.target.value;
+      if (v) _salleState.draftSeatAllergies[pos] = v;
+      else delete _salleState.draftSeatAllergies[pos];
+      inp.parentElement.classList.toggle('salle-seat-row--filled', !!v);
+    });
+    inp.addEventListener('focus', () => {
+      activePos = parseInt(inp.dataset.pos, 10);
+      const presets = document.getElementById('salle-seat-presets');
+      if (presets) presets.hidden = false;
+    });
+  });
+  el.querySelectorAll('.salle-seat-row__clear').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pos = parseInt(btn.dataset.clearPos, 10);
+      delete _salleState.draftSeatAllergies[pos];
+      const inp = el.querySelector(`.salle-seat-row__input[data-pos="${pos}"]`);
+      if (inp) { inp.value = ''; inp.parentElement.classList.remove('salle-seat-row--filled'); }
+    });
+  });
+  el.querySelectorAll('.salle-seat-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      if (activePos == null) return;
+      const inp = el.querySelector(`.salle-seat-row__input[data-pos="${activePos}"]`);
+      if (!inp) return;
+      const current = inp.value.trim();
+      const preset = chip.dataset.preset;
+      const next = current ? `${current}, ${preset}` : preset;
+      inp.value = next;
+      _salleState.draftSeatAllergies[activePos] = next;
+      inp.parentElement.classList.add('salle-seat-row--filled');
+      inp.focus();
+    });
+  });
 }
 
 function _salleRenderMenu() {
@@ -546,12 +665,20 @@ function _salleRenderSent(table, sentOrders) {
     const isServed = o.status === 'servi';
     const cls = isReady ? 'salle-sent--ready' : isServed ? 'salle-sent--served' : '';
     const badge = isReady ? '✅ Prêt' : isServed ? '🍽️ Servi' : '⏳ En cuisine';
+    const sa = _salleParseSeatAllergies(o.seat_allergies);
+    const saEntries = Object.entries(sa).sort((a,b) => Number(a[0]) - Number(b[0]));
+    const saChips = saEntries.length > 0
+      ? `<div class="salle-sent__allergies">${saEntries.map(([pos, txt]) =>
+          `<span class="salle-sent__allergy-chip">P${pos} · ${escapeHtml(txt)}</span>`
+        ).join('')}</div>`
+      : '';
     html += `<div class="salle-sent ${cls}">
       <div class="salle-sent__head">
         <span class="salle-sent__badge">${badge}</span>
         <span class="salle-sent__time">${elapsedMin}′</span>
         <span class="salle-sent__total">${formatCurrency(o.total_cost || 0)}</span>
       </div>
+      ${saChips}
       <ul class="salle-sent__items">
         ${(o.items || []).filter(it => it.status !== 'annulé').map(it => `
           <li>
@@ -601,10 +728,23 @@ async function _salleSaveOrder(table, sendImmediately) {
     );
     if (existingDraft) await API.cancelOrder(existingDraft.id);
 
+    // Build the seat-allergies payload — keep only non-empty entries that are
+    // within the configured covers count. Server normalises again, but trim
+    // up-front so the wire payload matches what the cuisinier will see.
+    const seatPayload = {};
+    const ceiling = coversValue || 0;
+    for (const [k, v] of Object.entries(_salleState.draftSeatAllergies || {})) {
+      const pos = parseInt(k, 10);
+      if (!Number.isInteger(pos) || pos < 1) continue;
+      if (ceiling > 0 && pos > ceiling) continue;
+      if (typeof v === 'string' && v.trim()) seatPayload[pos] = v.trim();
+    }
+
     const order = await API.createOrder({
       table_number: table.table_number,
       notes: _salleState.draftNotes || null,
       covers: coversValue,
+      seat_allergies: Object.keys(seatPayload).length > 0 ? seatPayload : null,
       items: items.map(i => ({ recipe_id: i.recipe_id, quantity: i.quantity, notes: i.notes || null }))
     });
 

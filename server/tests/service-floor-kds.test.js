@@ -68,6 +68,51 @@ describe('Service mode — floor & KDS endpoints', () => {
     expect(found.items[0].recipe_name).toBe('Plat KDS test');
   });
 
+  it('POST /api/orders accepts seat_allergies and persists them as JSON', async () => {
+    const res = await request(app)
+      .post('/api/orders')
+      .set(AUTH)
+      .send({
+        table_number: 1,
+        covers: 4,
+        seat_allergies: { '1': 'gluten', '3': 'végétarien', '5': 'ignored beyond covers' },
+        items: [{ recipe_id: recipeId, quantity: 1 }]
+      });
+    expect(res.status).toBe(201);
+    // Server stores trimmed JSON; positions out of cover range still pass validation
+    // but client-side trims; here server keeps everything within 1..999
+    const stored = JSON.parse(res.body.seat_allergies);
+    expect(stored['1']).toBe('gluten');
+    expect(stored['3']).toBe('végétarien');
+    expect(stored['5']).toBe('ignored beyond covers');
+  });
+
+  it('POST /api/orders rejects array seat_allergies', async () => {
+    const res = await request(app)
+      .post('/api/orders')
+      .set(AUTH)
+      .send({
+        table_number: 2,
+        seat_allergies: ['gluten'],
+        items: [{ recipe_id: recipeId, quantity: 1 }]
+      });
+    expect(res.status).toBe(400);
+  });
+
+  it('PUT /api/orders/:id accepts seat_allergies update', async () => {
+    const create = await request(app)
+      .post('/api/orders')
+      .set(AUTH)
+      .send({ table_number: 1, items: [{ recipe_id: recipeId, quantity: 1 }] });
+    const id = create.body.id;
+    const upd = await request(app)
+      .put(`/api/orders/${id}`)
+      .set(AUTH)
+      .send({ seat_allergies: { '2': 'lactose' } });
+    expect(upd.status).toBe(200);
+    expect(JSON.parse(upd.body.seat_allergies)).toEqual({ '2': 'lactose' });
+  });
+
   it('PUT /api/orders/:id/items/:itemId accepts en_préparation transition', async () => {
     const orderRes = await request(app)
       .post('/api/orders')
