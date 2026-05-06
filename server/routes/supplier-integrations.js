@@ -343,7 +343,12 @@ function dispatchOrder({ rid, supplier_id, order }) {
       credentials: integ.credentials ? safeJSON(integ.credentials) : null,
       order,
     });
-    return { provider: integ.provider, integration_id: integ.id, ...r };
+    return {
+      provider: integ.provider,
+      integration_id: integ.id,
+      external_id: integ.external_id,
+      ...r,
+    };
   } catch (e) {
     console.warn('supplier-integrations dispatchOrder failed:', e.message);
     return null;

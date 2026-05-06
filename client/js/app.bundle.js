@@ -15939,7 +15939,6 @@ async function submitPurchaseOrder(sendImmediately) {
   try {
     const po = await API.createPurchaseOrder({
       supplier_id: _poSelectedSupplierId,
-      status: sendImmediately ? "envoy\xE9e" : "brouillon",
       items: _poItems.map((i) => ({
         ingredient_id: i.ingredient_id || null,
         product_name: i.product_name || i.name,
@@ -15948,7 +15947,13 @@ async function submitPurchaseOrder(sendImmediately) {
         unit_price: i.unit_price
       }))
     });
-    showToast(sendImmediately ? "Commande envoy\xE9e" : "Commande sauvegard\xE9e", "success");
+    if (!sendImmediately) {
+      showToast("Brouillon enregistr\xE9", "success");
+      location.hash = "#/orders";
+      return;
+    }
+    const sent = await API.updatePurchaseOrder(po.id, { status: "envoy\xE9e" });
+    showToast(buildOrderSentMessage(sent && sent.dispatch), "success");
     location.hash = "#/orders";
   } catch (e) {
     if (e && e.code === "INTEGRATION_NOT_CONFIGURED") {
@@ -15957,6 +15962,13 @@ async function submitPurchaseOrder(sendImmediately) {
       showToast("Erreur : " + e.message, "error");
     }
   }
+}
+function buildOrderSentMessage(dispatch) {
+  if (dispatch && dispatch.ok && dispatch.external_id) {
+    const provider = dispatch.provider === "foodflow" ? "FoodFlow" : dispatch.provider || "";
+    return provider ? `Commande envoy\xE9e \u2014 identifiant ${provider} ${dispatch.external_id} transmis` : `Commande envoy\xE9e \u2014 identifiant ${dispatch.external_id} transmis`;
+  }
+  return "Commande envoy\xE9e";
 }
 function showIntegrationNotConfiguredModal(serverMessage) {
   const message = serverMessage || "Veuillez d'abord connecter votre compte FoodFlow dans Int\xE9grations \u2192 Connecter FoodFlow avec votre num\xE9ro client \xE0 5 chiffres. Sans cet identifiant, le fournisseur ne pourra pas traiter votre commande.";
@@ -16128,8 +16140,8 @@ function renderPODetail(po) {
 async function sendPurchaseOrder(id) {
   showConfirmModal("Envoyer la commande", "\xCAtes-vous s\xFBr de vouloir envoyer cette commande au fournisseur ?", async () => {
     try {
-      await API.updatePurchaseOrder(id, { status: "envoy\xE9e" });
-      showToast("Commande envoy\xE9e", "success");
+      const sent = await API.updatePurchaseOrder(id, { status: "envoy\xE9e" });
+      showToast(buildOrderSentMessage(sent && sent.dispatch), "success");
       location.hash = "#/orders";
     } catch (e) {
       if (e && e.code === "INTEGRATION_NOT_CONFIGURED") {
@@ -30286,22 +30298,43 @@ async function renderQRCodes() {
         body > *:not(#app) { display:none !important; }
         #app { padding:0 !important; }
         .qr-header, .qr-print-hide { display:none !important; }
-        .qr-grid { 
-          display:grid !important; 
-          grid-template-columns:repeat(3, 1fr) !important; 
-          gap:12px !important; 
-          page-break-inside:auto; 
+        .qr-grid {
+          display:grid !important;
+          grid-template-columns:repeat(3, 1fr) !important;
+          gap:12px !important;
+          page-break-inside:auto;
         }
-        .qr-card { 
-          break-inside:avoid; 
-          border:2px solid #000 !important; 
-          padding:16px !important; 
-          text-align:center !important; 
+        .qr-card {
+          break-inside:avoid;
+          border:2px solid #000 !important;
+          padding:16px !important;
+          text-align:center !important;
           background:white !important;
           color:black !important;
         }
         .qr-card img { width:180px !important; height:180px !important; }
         .qr-card .qr-table-number { font-size:28px !important; font-weight:700 !important; color:black !important; }
+
+        /* Single-card print mode \u2014 only the targeted card prints, full page. */
+        body.qr-printing-single .qr-grid {
+          display:block !important;
+          grid-template-columns:none !important;
+        }
+        body.qr-printing-single .qr-card:not(.qr-printing-target) { display:none !important; }
+        body.qr-printing-single .qr-card.qr-printing-target {
+          page-break-inside:avoid;
+          margin:0 auto !important;
+          width:80% !important;
+          max-width:480px !important;
+          padding:32px !important;
+        }
+        body.qr-printing-single .qr-card.qr-printing-target img {
+          width:360px !important;
+          height:360px !important;
+        }
+        body.qr-printing-single .qr-card.qr-printing-target .qr-table-number {
+          font-size:48px !important;
+        }
       }
     </style>
     <div class="qr-header page-header">
@@ -30333,6 +30366,13 @@ async function renderQRCodes() {
     } else {
       renderQRGrid(gridEl, tables);
     }
+    gridEl.addEventListener("click", (e) => {
+      const btn = e.target.closest("button.qr-print-one");
+      if (!btn) return;
+      const card = btn.closest(".qr-card");
+      if (!card) return;
+      printSingleQRCard(card);
+    });
   } catch (e) {
     document.getElementById("qr-grid").innerHTML = `
       <div class="empty-state">
@@ -30342,6 +30382,18 @@ async function renderQRCodes() {
     `;
   }
 }
+function printSingleQRCard(card) {
+  document.body.classList.add("qr-printing-single");
+  card.classList.add("qr-printing-target");
+  const cleanup = () => {
+    document.body.classList.remove("qr-printing-single");
+    card.classList.remove("qr-printing-target");
+    window.removeEventListener("afterprint", cleanup);
+  };
+  window.addEventListener("afterprint", cleanup);
+  setTimeout(cleanup, 5e3);
+  window.print();
+}
 function renderQRGrid(gridEl, tables) {
   gridEl.innerHTML = tables.map((t) => `
     <div class="qr-card" style="background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);text-align:center;border:1px solid var(--color-border)">
@@ -30349,8 +30401,12 @@ function renderQRGrid(gridEl, tables) {
       ${t.zone ? `<div class="text-secondary text-sm" style="margin-bottom:8px">${escapeHtml(t.zone)}</div>` : ""}
       ${t.qr_data_url ? `<img src="${t.qr_data_url}" alt="QR Table ${t.table_number}" style="width:200px;height:200px;border-radius:8px">` : `<img src="/api/qrcode/table/${t.table_number}" alt="QR Table ${t.table_number}" style="width:200px;height:200px;border-radius:8px">`}
       <div class="text-secondary text-sm" style="margin-top:8px">Scannez pour commander</div>
+      <button type="button" class="btn btn-secondary btn-sm qr-print-hide qr-print-one" style="margin-top:12px" aria-label="Imprimer le QR de la table ${t.table_number}">
+        <i data-lucide="printer" style="width:14px;height:14px"></i> Imprimer cette table
+      </button>
     </div>
   `).join("");
+  if (window.lucide) lucide.createIcons();
 }
 let _commandPaletteOpen = false;
 const _commands = [
