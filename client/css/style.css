@@ -152,8 +152,8 @@
 
 [data-theme="light"] .nav-bottom {
   background: #FFFFFF;
-  border-top-color: #E2E8F0;
-  border-bottom-color: #E2E8F0;
+  border-color: #E2E8F0;
+  box-shadow: 0 8px 24px rgba(15, 23, 35, 0.10), 0 2px 6px rgba(15, 23, 35, 0.05);
 }
 
 [data-theme="light"] .mockup__bar {
@@ -228,7 +228,7 @@ body {
   color: var(--text-primary);
   min-height: 100vh;
   min-height: 100dvh;
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 20px);
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 32px);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -293,16 +293,17 @@ h3 {
    ═══════════════════════════════════════════ */
 .nav-bottom {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + 12px);
+  left: 12px;
+  right: 12px;
   height: var(--nav-height);
   background: var(--color-primary);
-  border-top: 1px solid var(--border-light);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.12);
   z-index: var(--z-nav);
 }
 
@@ -385,9 +386,13 @@ h3 {
   .nav-bottom {
     top: 0;
     bottom: auto;
+    left: 0;
+    right: 0;
     height: 56px;
-    border-top: none;
+    border: none;
     border-bottom: 1px solid var(--border-light);
+    border-radius: 0;
+    box-shadow: none;
     padding: 0 var(--space-6);
     justify-content: center;
     gap: 0;
@@ -5532,20 +5537,21 @@ button.nav-link {
 
 .nav-panel-sheet {
   position: absolute;
-  bottom: var(--nav-height);
-  left: 0;
-  right: 0;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 24px);
+  left: 12px;
+  right: 12px;
   background: var(--bg-elevated);
-  border-top: 1px solid var(--border-light);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
   padding: var(--space-4) var(--space-3) var(--space-3);
-  transform: translateY(100%);
+  transform: translateY(110%);
   transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-2);
-  max-height: calc(100vh - var(--nav-height) - 16px);
+  max-height: calc(100vh - var(--nav-height) - 40px);
   overflow-y: auto;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
 }
 .nav-panel.open .nav-panel-sheet { transform: translateY(0); }
 

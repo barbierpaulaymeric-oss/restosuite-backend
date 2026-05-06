@@ -27227,10 +27227,6 @@ async function renderAIAssistant() {
       <div style="flex-shrink:0;padding:var(--space-3);border:1px solid var(--border-light);border-radius:var(--radius-lg);background:var(--bg-sunken)">
         <form id="ai-form" role="search" aria-label="Envoyer un message \xE0 Alto" style="display:flex;gap:var(--space-2)">
           <label for="ai-input" class="visually-hidden">Message \xE0 Alto</label>
-          <button type="button" class="btn" id="ai-voice-btn" aria-label="Dicter au micro" aria-pressed="false"
-                  style="padding:8px 12px;background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-secondary)" title="Enregistrer au micro">
-            <i data-lucide="mic" style="width:18px;height:18px" aria-hidden="true"></i>
-          </button>
           <input type="text" id="ai-input" class="input" placeholder="Parlez \xE0 Alto ou \xE9crivez votre demande\u2026"
             aria-label="Message \xE0 Alto"
             style="flex:1;font-size:var(--text-base)" autocomplete="off" data-ui="custom">
@@ -27314,7 +27310,8 @@ async function renderAIAssistant() {
       sendAIMessage(msg);
     }
   });
-  document.getElementById("ai-voice-btn").addEventListener("click", toggleAIVoice);
+  const voiceBtn = document.getElementById("ai-voice-btn");
+  if (voiceBtn) voiceBtn.addEventListener("click", toggleAIVoice);
 }
 function sendAISuggestion(text) {
   if (!_aiLoading) sendAIMessage(text);

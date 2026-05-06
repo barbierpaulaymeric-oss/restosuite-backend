@@ -1,11 +1,8 @@
-// Bumped 2026-05-06 (v29): Product returns/claims module — new #/retours
-// view (list + detail + new-request modal), POST/GET /api/returns, FoodFlow
-// returns_email priority over generic supplier email, French structured
-// email dispatch via OVH SMTP. Adds js/views/returns.js to the bundle and
-// `Retours & avoirs` entry under the Gestion nav group.
-// (v28 was exports branding + RestoSuite footer + XLSX endpoints + mercuriale
-// .xlsx/.csv accept; v27 was FoodFlow connect modal 5-digit client-ID copy.)
-const CACHE_NAME = 'restosuite-v29';
+// Bumped 2026-05-06 (v30): Floating bottom nav (mobile margin/radius/shadow,
+// nav-panel-sheet repositioned to clear the gap) + remove duplicate mic
+// button on /ia page (keep persistent Alto bubble FAB only).
+// (v29 was returns/claims module; v28 exports branding; v27 FoodFlow modal copy.)
+const CACHE_NAME = 'restosuite-v30';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
