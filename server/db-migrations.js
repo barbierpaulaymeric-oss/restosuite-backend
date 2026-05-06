@@ -2163,6 +2163,25 @@ try {
   console.warn('⚠️ seat_allergies migration error:', e.message);
 }
 
+// ─── Migration: RGPD consent timestamp on accounts + suppliers ───
+// /api/auth/register and /register-supplier require `accepted_terms: true`
+// and persist this timestamp as proof of consent (CGV + Politique de
+// confidentialité). NULL on legacy rows created before this migration.
+try {
+  const accCols = all("PRAGMA table_info(accounts)");
+  if (!accCols.some(c => c.name === 'terms_accepted_at')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN terms_accepted_at DATETIME");
+    console.log('✅ Migration: added terms_accepted_at to accounts');
+  }
+  const supCols = all("PRAGMA table_info(suppliers)");
+  if (!supCols.some(c => c.name === 'terms_accepted_at')) {
+    db.exec("ALTER TABLE suppliers ADD COLUMN terms_accepted_at DATETIME");
+    console.log('✅ Migration: added terms_accepted_at to suppliers');
+  }
+} catch (e) {
+  console.warn('⚠️ terms_accepted_at migration error:', e.message);
+}
+
 }
 
 module.exports = { runMigrations };

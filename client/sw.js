@@ -1,7 +1,7 @@
-// Bumped 2026-05-06 (v41): /app#register force-clears stale JWT in localStorage
-// + bannière "Reprendre ma session" si stash existante (P0-1) on top of the
-// v40 confidentialité/blog-nav strip + supplier-portal inline-json fix.
-const CACHE_NAME = 'restosuite-v41';
+// Bumped 2026-05-06 (v42): RGPD consent checkbox obligatoire à l'inscription
+// (P0-3, accepted_terms + terms_accepted_at) sur la base v41 P0-1 stale-JWT
+// + reprendre-session, sur la base v40 /confidentialite + blog strip.
+const CACHE_NAME = 'restosuite-v42';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

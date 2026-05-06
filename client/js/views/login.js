@@ -390,9 +390,17 @@ class LoginView {
             ${isSupplier ? supplierFields : restaurantFields}
           </div>
 
+          <label for="reg-terms" style="display:flex;align-items:flex-start;gap:var(--space-2);margin-top:var(--space-4);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md);font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5;cursor:pointer;text-align:left;width:100%">
+            <input type="checkbox" id="reg-terms" required style="margin-top:3px;width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:var(--color-accent)" data-ui="custom">
+            <span>
+              J'accepte les <a href="/cgv" target="_blank" rel="noopener" style="color:var(--color-accent);text-decoration:underline">CGV</a>
+              et la <a href="/confidentialite" target="_blank" rel="noopener" style="color:var(--color-accent);text-decoration:underline">politique de confidentialité</a>.
+            </span>
+          </label>
+
           <div id="reg-error" role="alert" aria-live="assertive" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
 
-          <button class="btn btn-primary" id="reg-submit" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
+          <button class="btn btn-primary" id="reg-submit" disabled aria-disabled="true" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             ${isSupplier ? 'Créer mon compte fournisseur' : 'Créer mon compte'}
           </button>
         </div>
@@ -429,15 +437,28 @@ class LoginView {
       }
     }
 
+    // Submit is disabled until the user ticks the consent box. The hard gate is
+    // server-side (`accepted_terms: true`); this is just UX so users don't fight
+    // an enabled button that 400s.
+    const termsBox = document.getElementById('reg-terms');
+    const submitBtn = document.getElementById('reg-submit');
+    const syncSubmitState = () => {
+      const ok = !!termsBox.checked;
+      submitBtn.disabled = !ok;
+      submitBtn.setAttribute('aria-disabled', ok ? 'false' : 'true');
+    };
+    termsBox.addEventListener('change', syncSubmitState);
+    syncSubmitState();
+
     if (isSupplier) {
-      document.getElementById('reg-submit').addEventListener('click', () => this.handleRegisterSupplier());
+      submitBtn.addEventListener('click', () => this.handleRegisterSupplier());
       document.getElementById('sup-password2').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') this.handleRegisterSupplier();
+        if (e.key === 'Enter' && !submitBtn.disabled) this.handleRegisterSupplier();
       });
     } else {
-      document.getElementById('reg-submit').addEventListener('click', () => this.handleRegister());
+      submitBtn.addEventListener('click', () => this.handleRegister());
       document.getElementById('reg-password2').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') this.handleRegister();
+        if (e.key === 'Enter' && !submitBtn.disabled) this.handleRegister();
       });
     }
   }
@@ -460,6 +481,8 @@ class LoginView {
     if (!/[A-Z]/.test(password)) { errorEl.textContent = 'Le mot de passe doit contenir au moins une majuscule'; return; }
     if (!/[0-9]/.test(password)) { errorEl.textContent = 'Le mot de passe doit contenir au moins un chiffre'; return; }
     if (password !== password2) { errorEl.textContent = 'Les mots de passe ne correspondent pas'; return; }
+    const termsBox = document.getElementById('reg-terms');
+    if (!termsBox || !termsBox.checked) { errorEl.textContent = 'Vous devez accepter les CGV et la politique de confidentialité'; return; }
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Création...';
@@ -471,6 +494,7 @@ class LoginView {
         email,
         password,
         phone: phone || undefined,
+        accepted_terms: true,
       });
 
       // No session is issued — the supplier needs a restaurant to invite them
@@ -522,12 +546,14 @@ class LoginView {
     if (!/[A-Z]/.test(password)) { errorEl.textContent = 'Le mot de passe doit contenir au moins une majuscule'; return; }
     if (!/[0-9]/.test(password)) { errorEl.textContent = 'Le mot de passe doit contenir au moins un chiffre'; return; }
     if (password !== password2) { errorEl.textContent = 'Les mots de passe ne correspondent pas'; return; }
+    const termsBox = document.getElementById('reg-terms');
+    if (!termsBox || !termsBox.checked) { errorEl.textContent = 'Vous devez accepter les CGV et la politique de confidentialité'; return; }
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Création...';
 
     try {
-      const result = await API.register({ email, password, first_name: firstName, last_name: lastName, staff_password: staffPassword || undefined });
+      const result = await API.register({ email, password, first_name: firstName, last_name: lastName, staff_password: staffPassword || undefined, accepted_terms: true });
       _persistRestaurantLogin(result.token, result.account); /* clears supplier sessionStorage too */
       /* — handled by _persistRestaurantLogin */
 
