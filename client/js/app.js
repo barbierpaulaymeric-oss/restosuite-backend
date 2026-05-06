@@ -755,6 +755,29 @@ function initMobileNav(role) {
     return;
   }
 
+  // Landing CTA "Essayer gratuitement" → /app#register : on PC partagé un
+  // ancien JWT en localStorage faisait booter le compte précédent. On force
+  // le formulaire d'inscription en effaçant la session, et on stash l'ancien
+  // état pour offrir un lien "Reprendre ma session".
+  if (location.hash === '#register') {
+    const stashedToken = localStorage.getItem('restosuite_token');
+    const stashedAccount = localStorage.getItem('restosuite_account');
+    const stashedRole = localStorage.getItem('restosuite_role');
+    if (stashedToken || stashedAccount || stashedRole) {
+      localStorage.removeItem('restosuite_token');
+      localStorage.removeItem('restosuite_account');
+      localStorage.removeItem('restosuite_role');
+    }
+    history.replaceState(null, '', location.pathname);
+    const login = new LoginView();
+    login.mode = 'register';
+    if (stashedToken) {
+      login.resumeStash = { token: stashedToken, account: stashedAccount, role: stashedRole };
+    }
+    login.render();
+    return;
+  }
+
   // Check for JWT token
   const token = localStorage.getItem('restosuite_token');
 

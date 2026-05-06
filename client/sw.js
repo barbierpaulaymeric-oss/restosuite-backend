@@ -1,8 +1,7 @@
-// Bumped 2026-05-06 (v40): /confidentialite route alias + canonical footer
-// link, blog nav/footer/cards stripped from landing pending real content,
-// supplier-portal inline express.json() removed (CI flakiness root cause).
-// (v39 was catalog cleanup + autoSaveExternalId.)
-const CACHE_NAME = 'restosuite-v40';
+// Bumped 2026-05-06 (v41): /app#register force-clears stale JWT in localStorage
+// + bannière "Reprendre ma session" si stash existante (P0-1) on top of the
+// v40 confidentialité/blog-nav strip + supplier-portal inline-json fix.
+const CACHE_NAME = 'restosuite-v41';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

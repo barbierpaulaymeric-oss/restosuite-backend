@@ -19970,6 +19970,16 @@ class LoginView {
   // ─── Register ───
   renderRegister(app) {
     const isSupplier = this.registerType === "supplier";
+    const hasResumeStash = !!(this.resumeStash && this.resumeStash.token);
+    const resumeBanner = hasResumeStash ? `
+      <div id="resume-stash-banner" role="status" style="margin-top:var(--space-4);padding:var(--space-3);background:var(--bg-secondary);border:1px solid var(--border-default);border-radius:var(--radius-md);display:flex;align-items:center;gap:var(--space-3);font-size:var(--text-sm);color:var(--text-secondary);text-align:left">
+        <span style="font-size:1.2rem;line-height:1">\u21A9\uFE0F</span>
+        <div style="flex:1">
+          Vous aviez une session en cours.
+          <a href="#" id="resume-stash-link" style="color:var(--color-accent);font-weight:600;text-decoration:none">Reprendre&nbsp;?</a>
+        </div>
+      </div>
+    ` : "";
     const tabBtnStyle = (active) => `
       flex:1;padding:10px 12px;border:none;cursor:pointer;
       background:${active ? "var(--bg-primary)" : "transparent"};
@@ -20061,6 +20071,8 @@ class LoginView {
           <h2 class="login-subtitle">Cr\xE9er un compte</h2>
           <p class="login-tagline">${isSupplier ? "Espace fournisseur \u2014 inscription gratuite" : "Essai gratuit 60 jours \u2014 aucun engagement"}</p>
 
+          ${resumeBanner}
+
           <div role="tablist" aria-label="Type de compte" style="display:flex;gap:4px;padding:4px;background:var(--bg-secondary);border-radius:var(--radius-md);margin-top:var(--space-4);width:100%">
             <button type="button" role="tab" id="reg-tab-restaurant" aria-selected="${!isSupplier}" style="${tabBtnStyle(!isSupplier)}">
               \u{1F37D}\uFE0F Restaurant
@@ -20097,6 +20109,20 @@ class LoginView {
       this.registerType = "supplier";
       this.render();
     });
+    if (hasResumeStash) {
+      const resumeLink = document.getElementById("resume-stash-link");
+      if (resumeLink) {
+        resumeLink.addEventListener("click", (e) => {
+          e.preventDefault();
+          const stash = this.resumeStash;
+          if (stash.token) localStorage.setItem("restosuite_token", stash.token);
+          if (stash.account) localStorage.setItem("restosuite_account", stash.account);
+          if (stash.role) localStorage.setItem("restosuite_role", stash.role);
+          this.resumeStash = null;
+          location.reload();
+        });
+      }
+    }
     if (isSupplier) {
       document.getElementById("reg-submit").addEventListener("click", () => this.handleRegisterSupplier());
       document.getElementById("sup-password2").addEventListener("keydown", (e) => {
@@ -31827,6 +31853,24 @@ function initMobileNav(role) {
   if (supplierSession && getSupplierToken()) {
     document.body.classList.add("supplier-mode");
     bootSupplierApp(supplierSession);
+    return;
+  }
+  if (location.hash === "#register") {
+    const stashedToken = localStorage.getItem("restosuite_token");
+    const stashedAccount = localStorage.getItem("restosuite_account");
+    const stashedRole = localStorage.getItem("restosuite_role");
+    if (stashedToken || stashedAccount || stashedRole) {
+      localStorage.removeItem("restosuite_token");
+      localStorage.removeItem("restosuite_account");
+      localStorage.removeItem("restosuite_role");
+    }
+    history.replaceState(null, "", location.pathname);
+    const login2 = new LoginView();
+    login2.mode = "register";
+    if (stashedToken) {
+      login2.resumeStash = { token: stashedToken, account: stashedAccount, role: stashedRole };
+    }
+    login2.render();
     return;
   }
   const token = localStorage.getItem("restosuite_token");
