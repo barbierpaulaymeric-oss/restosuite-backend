@@ -135,7 +135,9 @@ describe('Exports — monthly-purchases CSV', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/text\/csv/);
     expect(res.headers['content-disposition']).toMatch(/achats-2026-04\.csv/);
-    expect(res.text).toMatch(/date;fournisseur;numero_commande/);
+    // Branded CSV header (UTF-8, French Excel friendly)
+    expect(res.text).toMatch(/Date;Fournisseur;N° commande/);
+    expect(res.text).toContain('RestoSuite — www.restosuite.fr');
     // April-15 sent purchase included
     expect(res.text).toContain('PO-9720');
     expect(res.text).toContain('Supplier 9710');
@@ -160,7 +162,7 @@ describe('Exports — monthly-food-cost CSV', () => {
       .set(AUTH);
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/text\/csv/);
-    expect(res.text).toMatch(/fiche_technique;categorie;portions_vendues/);
+    expect(res.text).toMatch(/Fiche technique;Catégorie;Portions vendues/);
     // The recipe was sold 3× in April (in-month) + 99× in March (out-of-month).
     // Only the 3 portions count.
     const lines = res.text.split(/\r?\n/);
@@ -270,5 +272,59 @@ describe('Exports — monthly-report PDF (all-in-one)', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/application\/pdf/);
     expect(res.body.length).toBeGreaterThan(800);
+  });
+});
+
+describe('Exports — branded XLSX endpoints', () => {
+  async function fetchXlsx(path, auth) {
+    return request(app)
+      .get(path)
+      .set(auth)
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks = [];
+        r.on('data', c => chunks.push(c));
+        r.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
+  }
+
+  it('monthly-purchases-xlsx → spreadsheet content-type + ZIP magic', async () => {
+    const res = await fetchXlsx(`/api/exports/monthly-purchases-xlsx?month=${MONTH}`, AUTH);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/spreadsheetml\.sheet/);
+    expect(res.headers['content-disposition']).toMatch(/achats-2026-04\.xlsx/);
+    // ZIP magic bytes 'PK'
+    const head = Buffer.from(res.body).slice(0, 2).toString();
+    expect(head).toBe('PK');
+    expect(res.body.length).toBeGreaterThan(1000);
+  });
+
+  it('monthly-food-cost-xlsx → spreadsheet content-type', async () => {
+    const res = await fetchXlsx(`/api/exports/monthly-food-cost-xlsx?month=${MONTH}`, AUTH);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/spreadsheetml\.sheet/);
+    expect(res.headers['content-disposition']).toMatch(/food-cost-2026-04\.xlsx/);
+    expect(Buffer.from(res.body).slice(0, 2).toString()).toBe('PK');
+  });
+
+  it('stock-variance-xlsx → spreadsheet content-type', async () => {
+    const res = await fetchXlsx(`/api/exports/stock-variance-xlsx?month=${MONTH}`, AUTH);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/spreadsheetml\.sheet/);
+    expect(res.headers['content-disposition']).toMatch(/variance-stock-2026-04\.xlsx/);
+    expect(Buffer.from(res.body).slice(0, 2).toString()).toBe('PK');
+  });
+
+  it('monthly-purchases-xlsx → 400 on invalid month', async () => {
+    const res = await request(app)
+      .get('/api/exports/monthly-purchases-xlsx')
+      .set(AUTH);
+    expect(res.status).toBe(400);
+  });
+
+  it('monthly-purchases-xlsx → 401 without auth', async () => {
+    const res = await request(app)
+      .get(`/api/exports/monthly-purchases-xlsx?month=${MONTH}`);
+    expect(res.status).toBe(401);
   });
 });

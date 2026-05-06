@@ -1,10 +1,14 @@
 const PDFDocument = require('pdfkit');
+const path = require('path');
+const fs = require('fs');
+const { BRAND, LOGO_PATH } = require('../lib/pdf-branding');
 
 // Page layout constants (A4 in points: 595.28 x 841.89)
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
 const MARGIN = 42; // ~15mm
 const CONTENT_W = PAGE_W - 2 * MARGIN;
+const FOOTER_Y = PAGE_H - 28;
 
 // Column split
 const LEFT_RATIO = 0.48;
@@ -40,7 +44,8 @@ const GRAY_LINE = '#C0C0C0';
 function generatePDF(recipe, res) {
   const doc = new PDFDocument({
     size: 'A4',
-    margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }
+    margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
+    bufferPages: true,
   });
 
   // Pipe to response
@@ -50,19 +55,26 @@ function generatePDF(recipe, res) {
 
   let y = MARGIN;
 
-  // === HEADER ===
-  // Title block
-  doc.font('Helvetica-Bold').fontSize(HEADER_SIZE);
-  doc.text('RESTOSUITE', COL_LEFT_X, y, { width: LEFT_W });
-  doc.font('Helvetica').fontSize(8);
-  doc.text('Fiche Technique Professionnelle', COL_LEFT_X, y + 14);
+  // === HEADER === RestoSuite branded
+  // Logo (left)
+  if (LOGO_PATH) {
+    try { doc.image(LOGO_PATH, COL_LEFT_X, y, { width: 26, height: 26 }); } catch {}
+  }
+  // Wordmark + tagline next to logo
+  doc.font('Helvetica-Bold').fontSize(HEADER_SIZE).fillColor(BRAND.NAVY);
+  doc.text('RestoSuite', COL_LEFT_X + 32, y + 1, { width: LEFT_W - 32, lineBreak: false });
+  doc.font('Helvetica').fontSize(7.5).fillColor(BRAND.MUTED);
+  doc.text('Fiche Technique Professionnelle', COL_LEFT_X + 32, y + 15, { lineBreak: false });
 
-  doc.font('Helvetica-Bold').fontSize(HEADER_SIZE);
-  doc.text('FICHE TECHNIQUE DE FABRICATION', COL_RIGHT_X, y, { width: RIGHT_W, align: 'right' });
-  
-  y += 32;
-  doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_W, y).lineWidth(1).stroke('#000');
-  y += 8;
+  // Right side title
+  doc.font('Helvetica-Bold').fontSize(HEADER_SIZE).fillColor(BRAND.NAVY);
+  doc.text('FICHE TECHNIQUE DE FABRICATION', COL_RIGHT_X, y + 4, { width: RIGHT_W, align: 'right', lineBreak: false });
+
+  y += 30;
+  // Orange brand accent line under header
+  doc.rect(MARGIN, y, CONTENT_W, 2).fill(BRAND.ORANGE);
+  y += 10;
+  doc.fillColor('#000');
 
   // Chef line
   doc.font('Helvetica-Bold').fontSize(FONT_SIZE);
@@ -244,6 +256,23 @@ function generatePDF(recipe, res) {
   doc.moveTo(COL_RIGHT_X, bodyStartY).lineTo(COL_RIGHT_X, bodyEndY).lineWidth(0.75).stroke('#000');
   // Left column outer border
   doc.moveTo(COL_LEFT_X, bodyStartY).lineTo(COL_LEFT_X, bodyEndY).lineWidth(1).stroke('#000');
+
+  // === FOOTER === RestoSuite brand
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    doc.moveTo(MARGIN, FOOTER_Y - 6).lineTo(MARGIN + CONTENT_W, FOOTER_Y - 6)
+       .lineWidth(0.75).strokeColor(BRAND.ORANGE).stroke();
+    doc.font('Helvetica').fontSize(7).fillColor(BRAND.MUTED);
+    doc.text(
+      `Généré par RestoSuite — www.restosuite.fr  ·  ${new Date().toLocaleDateString('fr-FR')}`,
+      MARGIN, FOOTER_Y, { width: CONTENT_W * 0.6, align: 'left', lineBreak: false }
+    );
+    doc.text(
+      `Fiche technique  ·  Page ${i - range.start + 1} / ${range.count}`,
+      MARGIN + CONTENT_W * 0.4, FOOTER_Y, { width: CONTENT_W * 0.6, align: 'right', lineBreak: false }
+    );
+  }
 
   doc.end();
 }

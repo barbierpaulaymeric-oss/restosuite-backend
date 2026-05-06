@@ -3,20 +3,29 @@ const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
 const { INCO_ALLERGENS } = require('./allergens');
 const { validate, ingredientValidation } = require('../middleware/validate');
+const { writeBrandedCsv } = require('../lib/csv-branding');
 const router = Router();
 router.use(requireAuth);
 
 router.get('/export-csv', (req, res) => {
   const rid = req.user.restaurant_id;
+  const restaurant = get('SELECT name FROM restaurants WHERE id = ?', [rid]) || {};
   const rows = all('SELECT * FROM ingredients WHERE restaurant_id = ? ORDER BY name', [rid]);
-  const header = 'nom;catégorie;unité;prix_unitaire;pourcentage_perte';
-  const lines = rows.map(r =>
-    `${r.name};${r.category || ''};${r.default_unit || 'g'};${r.price_per_unit || 0};${r.waste_percent || 0}`
-  );
-  const csv = [header, ...lines].join('\n');
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="ingredients.csv"');
-  res.send(csv);
+  const today = new Date().toISOString().slice(0, 10);
+  writeBrandedCsv(res, {
+    filename: `ingredients-${today}.csv`,
+    title: 'Liste des ingrédients',
+    restaurantName: restaurant.name || '',
+    period: `Édition du ${today}`,
+    columns: ['Nom', 'Catégorie', 'Unité', 'Prix unitaire (€)', 'Pourcentage de perte (%)'],
+    rows: rows.map(r => [
+      r.name,
+      r.category || '',
+      r.default_unit || 'g',
+      Number(r.price_per_unit || 0).toFixed(4),
+      Number(r.waste_percent || 0).toFixed(1),
+    ]),
+  });
 });
 
 router.get('/', (req, res) => {

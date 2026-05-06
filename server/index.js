@@ -232,6 +232,7 @@ app.use(require('./lib/soft-auth').softAuth);
 
 // API routes
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/audit-log', require('./routes/audit'));
 app.use('/api/onboarding', require('./routes/onboarding'));
 app.use('/api/ingredients', require('./routes/ingredients'));
 app.use('/api/suppliers', require('./routes/suppliers'));
@@ -240,8 +241,15 @@ app.use('/api/recipes', require('./routes/recipes'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/ai-preferences', require('./routes/ai-preferences'));
 app.use('/api/accounts', require('./routes/accounts'));
+// HACCP sub-routers MUST mount before /api/haccp catch-all (prefix-match order).
+app.use('/api/haccp/witness-meals', require('./routes/witness-meals'));
+app.use('/api/haccp', require('./routes/haccp-calibrations'));
 app.use('/api/haccp', require('./routes/haccp'));
 app.use('/api/haccp-plan', require('./routes/haccp-plan'));
+app.use('/api/planning', require('./routes/planning'));
+// /api/exports — accountant-friendly CSV/XLSX/PDF. MUST be mounted before the
+// SPA catch-all at line ~347 or downloads return landing.html instead of files.
+app.use('/api/exports', require('./routes/exports'));
 app.use('/api/recall', require('./routes/recall'));
 app.use('/api/stock', require('./routes/stock'));
 app.use('/api/stripe', require('./routes/stripe'));

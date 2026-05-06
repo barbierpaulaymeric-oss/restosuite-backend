@@ -22,13 +22,13 @@ async function renderImportMercuriale() {
         <div style="font-size:3rem;margin-bottom:var(--space-3)">📄</div>
         <h3 style="margin-bottom:var(--space-2)">Glissez votre mercuriale ici</h3>
         <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-3)">
-          Photo, PDF ou scan de la liste de prix fournisseur
+          Photo, PDF, Excel (.xlsx/.xls) ou CSV de la liste de prix fournisseur
         </p>
         <label class="btn btn-primary" style="cursor:pointer">
           <i data-lucide="camera" style="width:16px;height:16px"></i> Choisir un fichier
-          <input type="file" id="merc-file-input" accept="image/*,application/pdf" capture="environment" style="display:none">
+          <input type="file" id="merc-file-input" accept="image/*,.xlsx,.xls,.csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" capture="environment" style="display:none">
         </label>
-        <p style="color:var(--text-tertiary);font-size:var(--text-xs);margin-top:var(--space-2)">JPG, PNG ou PDF — max 10 Mo</p>
+        <p style="color:var(--text-tertiary);font-size:var(--text-xs);margin-top:var(--space-2)">JPG, PNG, PDF, Excel (.xlsx/.xls) ou CSV — max 10 Mo</p>
       </div>
     </div>
 

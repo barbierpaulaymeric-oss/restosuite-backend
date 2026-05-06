@@ -8,6 +8,7 @@ const { Router } = require('express');
 const { all, get } = require('../db');
 const { requireAuth } = require('./auth');
 const PDFDocument = require('pdfkit');
+const { pdfBrandedHeader, pdfBrandedFooter } = require('../lib/pdf-branding');
 const router = Router();
 
 router.use(requireAuth);
@@ -329,16 +330,13 @@ router.get('/export/pdf', (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     doc.pipe(res);
 
-    // ── PAGE 1 : Garde ──────────────────────────────────────────────────────
-    let y = PDF_MARGIN;
-    doc.font('Helvetica-Bold').fontSize(18).fillColor('#1B2A4A');
-    doc.text('PLAN DE MAÎTRISE SANITAIRE', PDF_MARGIN, y, { align: 'center', width: CONTENT_W });
-    y += 26;
-    doc.font('Helvetica').fontSize(11).fillColor('#444');
-    doc.text('Document officiel — Contrôle DDPP / DGAL', PDF_MARGIN, y, { align: 'center', width: CONTENT_W });
-    y += 20;
-    doc.moveTo(PDF_MARGIN, y).lineTo(PDF_MARGIN + CONTENT_W, y).lineWidth(1).stroke('#1B2A4A');
-    y += 16;
+    // ── PAGE 1 : Garde — RestoSuite branded ───────────────────────────────
+    let y = pdfBrandedHeader(doc, {
+      title: 'Plan de Maîtrise Sanitaire',
+      subtitle: 'Document officiel — Contrôle DDPP / DGAL',
+      restaurantName: restaurant.name || 'Établissement',
+      period: `Période : ${periodLabel} (depuis le ${new Date(periodSince).toLocaleDateString('fr-FR')})`,
+    });
 
     // Infos établissement
     y = pmsSection(doc, '1. Identification de l\'établissement', y);
@@ -522,17 +520,11 @@ router.get('/export/pdf', (req, res) => {
     }
     y += 4;
 
-    // ── Pied de page sur toutes les pages ──────────────────────────────────
-    const pageCount = doc.bufferedPageRange().count;
-    for (let i = 0; i < pageCount; i++) {
-      doc.switchToPage(i);
-      doc.font('Helvetica').fontSize(7).fillColor('#888');
-      doc.text(
-        `${restaurant.name || 'Établissement'} — PMS DDPP — Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')} — Page ${i + 1}/${pageCount}`,
-        PDF_MARGIN, 820, { width: CONTENT_W, align: 'center' }
-      );
-    }
-
+    // ── Pied de page branded RestoSuite sur toutes les pages ──────────────
+    pdfBrandedFooter(doc, {
+      restaurantName: restaurant.name || 'Établissement',
+      label: `PMS DDPP — ${periodLabel}`,
+    });
     doc.end();
   } catch (e) {
     console.error('PMS PDF export error:', e.message);

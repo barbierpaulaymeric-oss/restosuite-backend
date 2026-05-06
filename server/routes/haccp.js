@@ -4,6 +4,11 @@ const PDFDocument = require('pdfkit');
 const { requireAuth } = require('./auth');
 const { writeAudit } = require('../lib/audit-log');
 const { validateReceptionTemp, validateCookingTarget, minCookingTempFor } = require('../lib/haccp-thresholds');
+const {
+  BRAND, MARGIN: PDF_MARGIN_BR, CONTENT_W: CONTENT_W_BR,
+  pdfBrandedHeader, pdfBrandedFooter, pdfBrandedTableHeader, pdfBrandedTableRow,
+  checkPageBreak: pdfCheckPageBreak,
+} = require('../lib/pdf-branding');
 const router = Router();
 
 router.use(requireAuth);
@@ -431,46 +436,25 @@ router.get('/traceability/dlc-alerts', requireAuth, (req, res) => {
 // PDF EXPORTS
 // ═══════════════════════════════════════════
 
-const PAGE_W = 595.28;
-const MARGIN = 42;
-const CONTENT_W = PAGE_W - 2 * MARGIN;
+const MARGIN = PDF_MARGIN_BR;
+const CONTENT_W = CONTENT_W_BR;
 
+// Branded HACCP header — orange accent, logo, footer set up by pdfBrandedFooter at doc.end().
 function pdfHeader(doc, title, from, to) {
-  let y = MARGIN;
-  doc.font('Helvetica-Bold').fontSize(14).fillColor('#1B2A4A');
-  doc.text('RESTOSUITE — HACCP', MARGIN, y);
-  y += 20;
-  doc.font('Helvetica-Bold').fontSize(11).fillColor('#000');
-  doc.text(title, MARGIN, y);
-  y += 16;
-  doc.font('Helvetica').fontSize(9).fillColor('#666');
-  const periodText = from && to ? `Période : ${from} au ${to}` : `Généré le ${new Date().toLocaleDateString('fr-FR')}`;
-  doc.text(periodText, MARGIN, y);
-  y += 6;
-  doc.text(`Date d'export : ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, MARGIN, y);
-  y += 14;
-  doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_W, y).lineWidth(1).stroke('#1B2A4A');
-  y += 12;
-  return y;
+  const period = from && to ? `Période : ${from} au ${to}` : null;
+  return pdfBrandedHeader(doc, {
+    title,
+    subtitle: 'Registre HACCP',
+    period,
+  });
 }
 
 function pdfTableHeader(doc, y, columns) {
-  doc.rect(MARGIN, y, CONTENT_W, 18).fill('#E8E8E8').stroke('#CCC');
-  doc.fillColor('#000').font('Helvetica-Bold').fontSize(7.5);
-  let x = MARGIN;
-  for (const col of columns) {
-    doc.text(col.label, x + 4, y + 5, { width: col.width - 8, align: col.align || 'left' });
-    x += col.width;
-  }
-  return y + 18;
+  return pdfBrandedTableHeader(doc, y, columns);
 }
 
 function checkPageBreak(doc, y, needed) {
-  if (y + needed > 800) {
-    doc.addPage();
-    return MARGIN;
-  }
-  return y;
+  return pdfCheckPageBreak(doc, y, needed);
 }
 
 // Export temperatures PDF
@@ -491,7 +475,7 @@ router.get('/export/temperatures', (req, res) => {
   sql += ' ORDER BY tl.recorded_at DESC';
   const logs = all(sql, params);
 
-  const doc = new PDFDocument({ size: 'A4', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } });
+  const doc = new PDFDocument({ size: 'A4', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, bufferPages: true });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="haccp-temperatures-${from || 'all'}.pdf"`);
   doc.pipe(res);
@@ -528,7 +512,8 @@ router.get('/export/temperatures', (req, res) => {
     x += columns[2].width;
     doc.text(`${log.min_temp}° / ${log.max_temp}°`, x + 4, y + 4, { width: columns[3].width - 8, align: 'center' });
     x += columns[3].width;
-    doc.text(isAlert ? '⚠ ALERTE' : '✓ OK', x + 4, y + 4, { width: columns[4].width - 8, align: 'center' });
+    // Helvetica has no emoji glyphs — use plain labels
+    doc.text(isAlert ? 'ALERTE' : 'OK', x + 4, y + 4, { width: columns[4].width - 8, align: 'center' });
     x += columns[4].width;
     doc.text(log.recorded_by_name || '—', x + 4, y + 4, { width: columns[5].width - 8 });
     x += columns[5].width;
@@ -549,9 +534,10 @@ router.get('/export/temperatures', (req, res) => {
   doc.fillColor('#000').font('Helvetica-Bold').fontSize(9);
   doc.text(`Total relevés : ${logs.length}`, MARGIN, y);
   const alerts = logs.filter(l => l.is_alert);
-  doc.fillColor(alerts.length > 0 ? '#D93025' : '#2D8B55');
+  doc.fillColor(alerts.length > 0 ? BRAND.ALERT : BRAND.OK);
   doc.text(`Alertes : ${alerts.length}`, MARGIN, y + 14);
 
+  pdfBrandedFooter(doc, { label: 'Relevés de température' });
   doc.end();
 });
 
@@ -574,7 +560,7 @@ router.get('/export/cleaning', (req, res) => {
   logSql += ' ORDER BY cl.completed_at DESC';
   const logs = all(logSql, params);
 
-  const doc = new PDFDocument({ size: 'A4', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } });
+  const doc = new PDFDocument({ size: 'A4', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, bufferPages: true });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="haccp-nettoyage-${from || 'all'}.pdf"`);
   doc.pipe(res);
@@ -636,6 +622,7 @@ router.get('/export/cleaning', (req, res) => {
     doc.fillColor('#999').fontSize(9).text('Aucune exécution sur cette période.', MARGIN, y + 10);
   }
 
+  pdfBrandedFooter(doc, { label: 'Plan de nettoyage' });
   doc.end();
 });
 
@@ -655,7 +642,7 @@ router.get('/export/traceability', (req, res) => {
   sql += ' ORDER BY tl.received_at DESC';
   const logs = all(sql, params);
 
-  const doc = new PDFDocument({ size: 'A4', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } });
+  const doc = new PDFDocument({ size: 'A4', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, bufferPages: true });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="haccp-tracabilite-${from || 'all'}.pdf"`);
   doc.pipe(res);
@@ -704,6 +691,7 @@ router.get('/export/traceability', (req, res) => {
     doc.fillColor('#999').fontSize(9).text('Aucune réception sur cette période.', MARGIN, y + 10);
   }
 
+  pdfBrandedFooter(doc, { label: 'Traçabilité réceptions' });
   doc.end();
 });
 

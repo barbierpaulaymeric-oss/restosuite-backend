@@ -377,7 +377,7 @@ router.get('/card-pdf', requireAuth, (req, res) => {
     const FOOTER_Y = PAGE_H - 32;
     const BODY_TOP = HEADER_BOTTOM_Y + 18;
     const BODY_BOTTOM = PAGE_H - 64;
-    const ACCENT = '#C45A18';
+    const ACCENT = '#E8722A'; // RestoSuite brand orange
     const HEADING = '#1a1a1a';
 
     const doc = new PDFDocument({
@@ -687,20 +687,21 @@ router.get('/card-pdf', requireAuth, (req, res) => {
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
-      // Thin top rule above footer
+      // Orange accent rule above the footer (RestoSuite brand)
       doc.moveTo(MARGIN, FOOTER_Y - 8).lineTo(MARGIN + CONTENT_W, FOOTER_Y - 8)
-         .lineWidth(0.3).strokeColor('#DDD').stroke();
+         .lineWidth(0.75).strokeColor(ACCENT).stroke();
       doc.font('Helvetica').fontSize(7).fillColor('#888');
       doc.text(
-        `${restaurantName}  ·  Conforme INCO Règlement (UE) n°1169/2011  ·  Édition ${dateFr}`,
-        MARGIN, FOOTER_Y, {
-          width: CONTENT_W * 0.7, align: 'left', lineBreak: false
+        `${restaurantName}  ·  Conforme INCO (UE) n°1169/2011  ·  Édition ${dateFr}`,
+        MARGIN, FOOTER_Y - 1, {
+          width: CONTENT_W * 0.55, align: 'left', lineBreak: false
         }
       );
+      // Right side: brand line + page count
       doc.text(
-        `Page ${i - range.start + 1} / ${range.count}`,
-        MARGIN + CONTENT_W * 0.7, FOOTER_Y, {
-          width: CONTENT_W * 0.3, align: 'right', lineBreak: false
+        `Généré par RestoSuite — www.restosuite.fr  ·  Page ${i - range.start + 1} / ${range.count}`,
+        MARGIN + CONTENT_W * 0.40, FOOTER_Y - 1, {
+          width: CONTENT_W * 0.60, align: 'right', lineBreak: false
         }
       );
     }

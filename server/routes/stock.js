@@ -3,6 +3,11 @@ const { all, get, run, db } = require('../db');
 const PDFDocument = require('pdfkit');
 const { requireAuth } = require('./auth');
 const { validate, stockReceptionValidation } = require('../middleware/validate');
+const {
+  BRAND, MARGIN: PDF_MARGIN, CONTENT_W: PDF_CONTENT_W,
+  pdfBrandedHeader, pdfBrandedFooter, pdfBrandedTableHeader, pdfBrandedTableRow,
+  checkPageBreak, STATUS_LABELS,
+} = require('../lib/pdf-branding');
 const router = Router();
 
 router.use(requireAuth);
@@ -355,101 +360,72 @@ router.get('/export/pdf', (req, res) => {
   sql += ' ORDER BY sm.recorded_at DESC';
   const movements = all(sql, params);
 
-  const PAGE_W = 595.28;
-  const MARGIN = 42;
-  const CONTENT_W = PAGE_W - 2 * MARGIN;
+  const MARGIN = PDF_MARGIN;
+  const CONTENT_W = PDF_CONTENT_W;
 
-  const doc = new PDFDocument({ size: 'A4', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } });
+  const doc = new PDFDocument({ size: 'A4', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, bufferPages: true });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="stock-mouvements-${from || 'all'}.pdf"`);
   doc.pipe(res);
 
-  // Header
-  let y = MARGIN;
-  doc.font('Helvetica-Bold').fontSize(14).fillColor('#1B2A4A');
-  doc.text('RESTOSUITE — STOCK', MARGIN, y);
-  y += 20;
-  doc.font('Helvetica-Bold').fontSize(11).fillColor('#000');
-  doc.text('HISTORIQUE DES MOUVEMENTS DE STOCK', MARGIN, y);
-  y += 16;
-  doc.font('Helvetica').fontSize(9).fillColor('#666');
-  const periodText = from && to ? `Période : ${from} au ${to}` : `Généré le ${new Date().toLocaleDateString('fr-FR')}`;
-  doc.text(periodText, MARGIN, y);
-  y += 6;
-  doc.text(`Date d'export : ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, MARGIN, y);
-  y += 14;
-  doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_W, y).lineWidth(1).stroke('#1B2A4A');
-  y += 12;
+  let y = pdfBrandedHeader(doc, {
+    title: 'Mouvements de stock',
+    subtitle: 'Historique des entrées, sorties et pertes',
+    period: from && to ? `Période : ${from} au ${to}` : null,
+  });
 
-  // Table header
   const columns = [
-    { label: 'Date', width: 75 },
+    { label: 'Date', width: 70 },
     { label: 'Type', width: 70 },
     { label: 'Ingrédient', width: 110 },
-    { label: 'Qté', width: 50, align: 'center' },
+    { label: 'Qté', width: 60, align: 'right' },
     { label: 'Fournisseur', width: 80 },
     { label: 'N° Lot', width: 55 },
-    { label: 'Prix unit.', width: 50, align: 'right' },
-    { label: 'Par', width: CONTENT_W - 490 },
+    { label: 'Prix unit.', width: 55, align: 'right' },
+    { label: 'Par', width: CONTENT_W - 500 },
   ];
+  y = pdfBrandedTableHeader(doc, y, columns);
 
-  doc.rect(MARGIN, y, CONTENT_W, 18).fill('#E8E8E8').stroke('#CCC');
-  doc.fillColor('#000').font('Helvetica-Bold').fontSize(7.5);
-  let x = MARGIN;
-  for (const col of columns) {
-    doc.text(col.label, x + 4, y + 5, { width: col.width - 8, align: col.align || 'left' });
-    x += col.width;
-  }
-  y += 18;
-
+  // Helvetica has no emoji glyphs (see feedback memory) — use plain labels
   const typeLabels = {
-    reception: '📥 Réception',
-    consumption: '📤 Consommation',
-    loss: '❌ Perte',
-    adjustment: '🔄 Ajustement',
-    inventory: '📋 Inventaire'
+    reception: 'Réception',
+    consumption: 'Consommation',
+    loss: 'Perte',
+    adjustment: 'Ajustement',
+    inventory: 'Inventaire',
   };
 
-  doc.font('Helvetica').fontSize(7.5);
+  let i = 0;
   for (const mv of movements) {
-    if (y + 15 > 800) { doc.addPage(); y = MARGIN; }
-    doc.fillColor('#000');
-    x = MARGIN;
-    const date = new Date(mv.recorded_at);
-    doc.text(date.toLocaleDateString('fr-FR'), x + 4, y + 4, { width: columns[0].width - 8 });
-    x += columns[0].width;
-    doc.text(typeLabels[mv.movement_type] || mv.movement_type, x + 4, y + 4, { width: columns[1].width - 8 });
-    x += columns[1].width;
-    doc.text(mv.ingredient_name, x + 4, y + 4, { width: columns[2].width - 8 });
-    x += columns[2].width;
+    y = checkPageBreak(doc, y, 18);
     const sign = mv.movement_type === 'reception' || (mv.movement_type === 'adjustment' && mv.quantity > 0) ? '+' : '';
-    doc.text(`${sign}${mv.quantity} ${mv.unit}`, x + 4, y + 4, { width: columns[3].width - 8, align: 'center' });
-    x += columns[3].width;
-    doc.text(mv.supplier_name || '—', x + 4, y + 4, { width: columns[4].width - 8 });
-    x += columns[4].width;
-    doc.text(mv.batch_number || '—', x + 4, y + 4, { width: columns[5].width - 8 });
-    x += columns[5].width;
-    doc.text(mv.unit_price != null ? mv.unit_price.toFixed(2) + '€' : '—', x + 4, y + 4, { width: columns[6].width - 8, align: 'right' });
-    x += columns[6].width;
-    doc.text(mv.recorded_by_name || '—', x + 4, y + 4, { width: columns[7].width - 8 });
-
-    doc.moveTo(MARGIN, y + 15).lineTo(MARGIN + CONTENT_W, y + 15).lineWidth(0.25).stroke('#DDD');
-    y += 15;
+    const date = new Date(mv.recorded_at);
+    y = pdfBrandedTableRow(doc, y, columns, [
+      date.toLocaleDateString('fr-FR'),
+      typeLabels[mv.movement_type] || mv.movement_type,
+      mv.ingredient_name,
+      `${sign}${mv.quantity} ${mv.unit || ''}`,
+      mv.supplier_name || '—',
+      mv.batch_number || '—',
+      mv.unit_price != null ? Number(mv.unit_price).toFixed(2) + '€' : '—',
+      mv.recorded_by_name || '—',
+    ], i++, { alert: mv.movement_type === 'loss' });
   }
 
   if (movements.length === 0) {
-    doc.fillColor('#999').fontSize(9).text('Aucun mouvement sur cette période.', MARGIN, y + 10);
+    doc.fillColor(BRAND.MUTED).fontSize(9).text('Aucun mouvement sur cette période.', MARGIN, y + 10);
   }
 
   // Summary
   y += 20;
-  if (y + 40 > 800) { doc.addPage(); y = MARGIN; }
-  doc.fillColor('#000').font('Helvetica-Bold').fontSize(9);
+  y = checkPageBreak(doc, y, 40);
+  doc.fillColor(BRAND.TEXT).font('Helvetica-Bold').fontSize(9);
   doc.text(`Total mouvements : ${movements.length}`, MARGIN, y);
   const receptions = movements.filter(m => m.movement_type === 'reception');
   const losses = movements.filter(m => m.movement_type === 'loss');
   doc.text(`Réceptions : ${receptions.length}  |  Pertes : ${losses.length}`, MARGIN, y + 14);
 
+  pdfBrandedFooter(doc, { label: 'Mouvements de stock' });
   doc.end();
 });
 

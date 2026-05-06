@@ -1,9 +1,16 @@
-// Bumped 2026-05-06 (v27): FoodFlow connect modal copy fix — placeholder is
-// the 5-digit FoodFlow CLIENT/restaurant ID (e.g. 89764), not the product
-// SKU format "FF-METRO-42" that wrongly appeared in the UI. Title, label,
-// description, error toast, and intro paragraph all updated; numeric input
-// constraints (inputmode/pattern/maxlength=5) added to the field.
-const CACHE_NAME = 'restosuite-v27';
+// Bumped 2026-05-06 (v28): exports overhaul + RestoSuite branding + mercuriale.
+// 1) Routing bug fix: /api/exports was unmounted in production index.js,
+//    making the achats CSV (and 4 other routes) silently return landing.html.
+//    Restored mounts BEFORE the SPA catch-all.
+// 2) New server/lib/{pdf,csv,xlsx}-branding.js — all exports carry
+//    the orange #E8722A accent, RestoSuite logo, and "Généré par
+//    RestoSuite — www.restosuite.fr" footer.
+// 3) New XLSX endpoints: /api/exports/{monthly-purchases,monthly-food-cost,
+//    stock-variance}-xlsx — branded headers + auto-width columns.
+// 4) Mercuriale import: file input now accepts .xlsx/.xls/.csv in
+//    addition to images/PDF (server already parsed all of them).
+// (v27 was FoodFlow connect modal 5-digit client-ID placeholder copy fix.)
+const CACHE_NAME = 'restosuite-v28';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

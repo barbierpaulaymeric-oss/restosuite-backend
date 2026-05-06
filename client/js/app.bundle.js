@@ -15166,33 +15166,38 @@ const PMS_PRINT_CSS = `
         <div class="exports-grid" style="display:grid;grid-template-columns:1fr;gap:14px">
           ${exportCard({
       id: "btn-export-purchases",
+      altId: "btn-export-purchases-xlsx",
       icon: "shopping-cart",
-      title: "Achats fournisseurs (CSV)",
+      title: "Achats fournisseurs",
       desc: "Toutes les commandes envoy\xE9es : date, fournisseur, n\xB0 commande, articles, HT, TVA, TTC."
     })}
           ${exportCard({
       id: "btn-export-foodcost",
+      altId: "btn-export-foodcost-xlsx",
       icon: "chef-hat",
-      title: "Food cost par fiche (CSV)",
+      title: "Food cost par fiche",
       desc: "Portions vendues, co\xFBt ingr\xE9dients, prix de vente, marge et food cost % par recette."
     })}
           ${exportCard({
       id: "btn-export-variance",
+      altId: "btn-export-variance-xlsx",
       icon: "package",
-      title: "Variance de stock (CSV)",
+      title: "Variance de stock",
       desc: "Stock initial, r\xE9ceptions, consommation, pertes, stock final et variance par ingr\xE9dient."
     })}
           ${exportCard({
       id: "btn-export-haccp",
       icon: "shield-check",
-      title: "Synth\xE8se HACCP (PDF)",
-      desc: "Relev\xE9s de temp\xE9rature, plan de nettoyage et non-conformit\xE9s du mois."
+      title: "Synth\xE8se HACCP",
+      desc: "Relev\xE9s de temp\xE9rature, plan de nettoyage et non-conformit\xE9s du mois.",
+      pdfOnly: true
     })}
           ${exportCard({
       id: "btn-export-monthly",
       icon: "file-text",
-      title: "Rapport mensuel comptable (PDF)",
-      desc: "Document tout-en-un : couverture, achats, food cost, variance stock, factures, pertes, HACCP. \xC0 transmettre \xE0 votre comptable."
+      title: "Rapport mensuel comptable",
+      desc: "Document tout-en-un : couverture, achats, food cost, variance stock, factures, pertes, HACCP. \xC0 transmettre \xE0 votre comptable.",
+      pdfOnly: true
     })}
         </div>
 
@@ -15217,13 +15222,25 @@ const PMS_PRINT_CSS = `
       path: `/api/exports/monthly-purchases?month=${currentMonth()}`,
       file: `achats-${currentMonth()}.csv`
     }));
+    bindDownload("btn-export-purchases-xlsx", () => ({
+      path: `/api/exports/monthly-purchases-xlsx?month=${currentMonth()}`,
+      file: `achats-${currentMonth()}.xlsx`
+    }));
     bindDownload("btn-export-foodcost", () => ({
       path: `/api/exports/monthly-food-cost?month=${currentMonth()}`,
       file: `food-cost-${currentMonth()}.csv`
     }));
+    bindDownload("btn-export-foodcost-xlsx", () => ({
+      path: `/api/exports/monthly-food-cost-xlsx?month=${currentMonth()}`,
+      file: `food-cost-${currentMonth()}.xlsx`
+    }));
     bindDownload("btn-export-variance", () => ({
       path: `/api/exports/stock-variance?month=${currentMonth()}`,
       file: `variance-stock-${currentMonth()}.csv`
+    }));
+    bindDownload("btn-export-variance-xlsx", () => ({
+      path: `/api/exports/stock-variance-xlsx?month=${currentMonth()}`,
+      file: `variance-stock-${currentMonth()}.xlsx`
     }));
     bindDownload("btn-export-haccp", () => ({
       path: `/api/exports/haccp-summary?month=${currentMonth()}`,
@@ -15234,7 +15251,20 @@ const PMS_PRINT_CSS = `
       file: `rapport-mensuel-${currentMonth()}.pdf`
     }));
   }
-  function exportCard({ id, icon, title, desc }) {
+  function exportCard({ id, altId, icon, title, desc, pdfOnly }) {
+    const buttons = pdfOnly ? `<button id="${id}" class="btn btn-primary" style="flex:0 0 auto;align-self:center;white-space:nowrap">
+          <i data-lucide="file-text" style="width:16px;height:16px"></i>
+          T\xE9l\xE9charger PDF
+        </button>` : `<div style="flex:0 0 auto;align-self:center;display:flex;gap:6px;flex-wrap:wrap">
+          <button id="${id}" class="btn btn-secondary" style="white-space:nowrap" title="Format CSV \u2014 texte ouvert dans tout tableur">
+            <i data-lucide="file-text" style="width:14px;height:14px"></i>
+            CSV
+          </button>
+          <button id="${altId}" class="btn btn-primary" style="white-space:nowrap" title="Format Excel \u2014 colonnes auto, en-t\xEAtes RestoSuite, en-t\xEAtes fig\xE9s">
+            <i data-lucide="file-spreadsheet" style="width:14px;height:14px"></i>
+            Excel
+          </button>
+        </div>`;
     return `
       <div class="card" style="display:flex;gap:16px;align-items:flex-start;padding:16px">
         <div style="flex:0 0 44px;height:44px;border-radius:10px;background:var(--bg-subtle, #f3f1ec);display:flex;align-items:center;justify-content:center">
@@ -15244,10 +15274,7 @@ const PMS_PRINT_CSS = `
           <div style="font-weight:600;font-size:15px;margin-bottom:4px">${escapeHtml(title)}</div>
           <div style="color:var(--text-secondary);font-size:13px;line-height:1.4">${escapeHtml(desc)}</div>
         </div>
-        <button id="${id}" class="btn btn-primary" style="flex:0 0 auto;align-self:center">
-          <i data-lucide="download" style="width:16px;height:16px"></i>
-          T\xE9l\xE9charger
-        </button>
+        ${buttons}
       </div>
     `;
   }
@@ -26252,13 +26279,13 @@ async function renderImportMercuriale() {
         <div style="font-size:3rem;margin-bottom:var(--space-3)">\u{1F4C4}</div>
         <h3 style="margin-bottom:var(--space-2)">Glissez votre mercuriale ici</h3>
         <p style="color:var(--text-secondary);font-size:var(--text-sm);margin-bottom:var(--space-3)">
-          Photo, PDF ou scan de la liste de prix fournisseur
+          Photo, PDF, Excel (.xlsx/.xls) ou CSV de la liste de prix fournisseur
         </p>
         <label class="btn btn-primary" style="cursor:pointer">
           <i data-lucide="camera" style="width:16px;height:16px"></i> Choisir un fichier
-          <input type="file" id="merc-file-input" accept="image/*,application/pdf" capture="environment" style="display:none">
+          <input type="file" id="merc-file-input" accept="image/*,.xlsx,.xls,.csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" capture="environment" style="display:none">
         </label>
-        <p style="color:var(--text-tertiary);font-size:var(--text-xs);margin-top:var(--space-2)">JPG, PNG ou PDF \u2014 max 10 Mo</p>
+        <p style="color:var(--text-tertiary);font-size:var(--text-xs);margin-top:var(--space-2)">JPG, PNG, PDF, Excel (.xlsx/.xls) ou CSV \u2014 max 10 Mo</p>
       </div>
     </div>
 
