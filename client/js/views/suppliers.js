@@ -14,6 +14,9 @@ async function renderSuppliers() {
         <a href="#/orders" class="btn btn-secondary" aria-label="Voir les commandes fournisseur">
           <i data-lucide="clipboard-pen" style="width:18px;height:18px" aria-hidden="true"></i> <span class="btn-label-desktop">Commandes</span>
         </a>
+        ${isGerant ? `<a href="#/supplier-integrations" class="btn btn-secondary" aria-label="Configurer les intégrations fournisseur">
+          <i data-lucide="plug" style="width:18px;height:18px" aria-hidden="true"></i> <span class="btn-label-desktop">Intégrations</span>
+        </a>` : ''}
         ${isGerant ? `<button class="btn btn-secondary" onclick="location.hash='#/supplier-portal'" id="btn-portal" aria-label="Ouvrir le portail fournisseur">
           <i data-lucide="link" style="width:18px;height:18px" aria-hidden="true"></i> <span class="btn-label-desktop">Portail</span>
           <span class="portal-badge" id="portal-badge" style="display:none" aria-label="Notifications non lues"></span>

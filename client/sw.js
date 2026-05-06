@@ -1,12 +1,10 @@
-// Bumped 2026-05-06 (v36): block PO send when supplier has a
-// supplier_integrations row but external_id is empty — server returns 400
-// INTEGRATION_NOT_CONFIGURED, client shows a modal pointing the user at
-// /supplier-integrations + a warning banner on the new-order form +
-// disables the "Envoyer" button with a tooltip until the connection is
-// completed. New showAlertModal helper in utils.js, error.code now
-// propagated through API.request().
-// (v35 was Salle covers stepper + per-seat allergies.)
-const CACHE_NAME = 'restosuite-v36';
+// Bumped 2026-05-06 (v37): clean up Opérations sidebar — remove
+// "Intégrations" entry (now reachable from /suppliers via a new
+// "Intégrations" button), remove redundant "Fournisseurs" button on
+// /supplier-integrations page header. Sidebar order: Commandes,
+// Fournisseurs (→ supplier list), Livraisons, Factures, Planning…
+// (v36 was PO send INTEGRATION_NOT_CONFIGURED gate.)
+const CACHE_NAME = 'restosuite-v37';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

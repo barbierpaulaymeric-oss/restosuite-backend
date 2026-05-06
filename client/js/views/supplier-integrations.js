@@ -24,10 +24,6 @@ async function renderSupplierIntegrations() {
     <section role="region" aria-label="Intégrations fournisseurs">
       <div class="page-header">
         <h1>Intégrations fournisseurs</h1>
-        <a href="#/suppliers" class="btn btn-secondary">
-          <i data-lucide="truck" style="width:18px;height:18px"></i>
-          <span class="btn-label-desktop">Fournisseurs</span>
-        </a>
       </div>
 
       <p style="color:var(--text-secondary);margin-bottom:var(--space-4)">

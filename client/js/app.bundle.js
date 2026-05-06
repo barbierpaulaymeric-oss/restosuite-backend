@@ -4821,6 +4821,9 @@ async function renderSuppliers() {
         <a href="#/orders" class="btn btn-secondary" aria-label="Voir les commandes fournisseur">
           <i data-lucide="clipboard-pen" style="width:18px;height:18px" aria-hidden="true"></i> <span class="btn-label-desktop">Commandes</span>
         </a>
+        ${isGerant ? `<a href="#/supplier-integrations" class="btn btn-secondary" aria-label="Configurer les int\xE9grations fournisseur">
+          <i data-lucide="plug" style="width:18px;height:18px" aria-hidden="true"></i> <span class="btn-label-desktop">Int\xE9grations</span>
+        </a>` : ""}
         ${isGerant ? `<button class="btn btn-secondary" onclick="location.hash='#/supplier-portal'" id="btn-portal" aria-label="Ouvrir le portail fournisseur">
           <i data-lucide="link" style="width:18px;height:18px" aria-hidden="true"></i> <span class="btn-label-desktop">Portail</span>
           <span class="portal-badge" id="portal-badge" style="display:none" aria-label="Notifications non lues"></span>
@@ -5008,10 +5011,6 @@ async function renderSupplierIntegrations() {
     <section role="region" aria-label="Int\xE9grations fournisseurs">
       <div class="page-header">
         <h1>Int\xE9grations fournisseurs</h1>
-        <a href="#/suppliers" class="btn btn-secondary">
-          <i data-lucide="truck" style="width:18px;height:18px"></i>
-          <span class="btn-label-desktop">Fournisseurs</span>
-        </a>
       </div>
 
       <p style="color:var(--text-secondary);margin-bottom:var(--space-4)">
@@ -31102,7 +31101,6 @@ const NAV_GROUPS = {
       // already shows orders + has a "Fournisseurs" button to drill back.
       { label: "Commandes", route: "/orders", icon: "clipboard-pen", roles: ["gerant"] },
       { label: "Fournisseurs", route: "/suppliers", icon: "truck", roles: ["gerant"] },
-      { label: "Int\xE9grations", route: "/supplier-integrations", icon: "plug", roles: ["gerant"] },
       { label: "Livraisons", route: "/deliveries", icon: "package-check", roles: ["gerant", "cuisinier"] },
       { label: "Factures", route: "/invoices", icon: "receipt", roles: ["gerant"] },
       { label: "Planning", route: "/planning", icon: "calendar-clock", roles: ["gerant"] },
