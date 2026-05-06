@@ -346,6 +346,7 @@ router.put('/:id', (req, res) => {
     if (!po) return res.status(404).json({ error: 'Commande introuvable' });
 
     const { status, notes, expected_delivery, items } = req.body;
+    let dispatchSummary = null;
 
     // Status transitions
     if (status) {
@@ -403,6 +404,16 @@ router.put('/:id', (req, res) => {
             order: { reference: po.reference, total_amount: po.total_amount, items },
           });
           if (dispatch) {
+            // Capture for the HTTP response so the client can confirm the
+            // FoodFlow client_id (external_id) was transmitted to the supplier.
+            dispatchSummary = {
+              provider: dispatch.provider,
+              ok: dispatch.ok === true,
+              external_id: dispatch.external_id || null,
+              external_ref: dispatch.external_ref || null,
+              status: dispatch.status || null,
+              error: dispatch.error || null,
+            };
             const { writeAudit } = require('../lib/audit-log');
             writeAudit({
               restaurant_id: rid,
@@ -410,15 +421,7 @@ router.put('/:id', (req, res) => {
               table_name: 'purchase_orders',
               record_id: id,
               action: 'update',
-              new_values: {
-                dispatch: {
-                  provider: dispatch.provider,
-                  ok: dispatch.ok === true,
-                  external_ref: dispatch.external_ref || null,
-                  status: dispatch.status || null,
-                  error: dispatch.error || null,
-                },
-              },
+              new_values: { dispatch: dispatchSummary },
             });
           }
         } catch (e) {
@@ -507,7 +510,7 @@ router.put('/:id', (req, res) => {
        WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,
       [rid, id, rid]
     );
-    res.json({ ...updated, items: updatedItems });
+    res.json({ ...updated, items: updatedItems, dispatch: dispatchSummary });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }

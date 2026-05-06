@@ -1,9 +1,10 @@
-// Bumped 2026-05-06 (v45): séparation des vues / et /recipes (renderDashboard
-// rendait les deux dans le même innerHTML — l'utilisateur voyait le greeting
-// + Premiers pas + Ma journée empilés au-dessus de Fiches Techniques quand il
-// cliquait sur Fiches Techniques dans la dropdown Cuisine), + clear défensif
-// du #app dans Router.navigate avant chaque handler.
-const CACHE_NAME = 'restosuite-v45';
+// Bumped 2026-05-06 (v46): bouton "Imprimer cette table" par carte QR (mode
+// d'impression single-card via classe body), bouton "Envoyer" du formulaire
+// de commande déclenche maintenant réellement l'envoi (POST brouillon + PUT
+// envoyée → dispatch FoodFlow + email), et l'identifiant client FoodFlow
+// (external_id) est inclus dans la confirmation après envoi pour rassurer
+// le restaurateur que son numéro a bien été transmis au fournisseur.
+const CACHE_NAME = 'restosuite-v46';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

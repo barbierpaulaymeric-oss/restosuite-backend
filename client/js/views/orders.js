@@ -570,9 +570,11 @@ async function submitPurchaseOrder(sendImmediately) {
   }
 
   try {
+    // Server always creates as 'brouillon' regardless of the status field on POST.
+    // For "Envoyer immédiatement" we follow up with a PUT to 'envoyée' so the
+    // dispatch hook (FoodFlow + email) actually fires.
     const po = await API.createPurchaseOrder({
       supplier_id: _poSelectedSupplierId,
-      status: sendImmediately ? 'envoyée' : 'brouillon',
       items: _poItems.map(i => ({
         ingredient_id: i.ingredient_id || null,
         product_name: i.product_name || i.name,
@@ -582,7 +584,14 @@ async function submitPurchaseOrder(sendImmediately) {
       }))
     });
 
-    showToast(sendImmediately ? 'Commande envoyée' : 'Commande sauvegardée', 'success');
+    if (!sendImmediately) {
+      showToast('Brouillon enregistré', 'success');
+      location.hash = '#/orders';
+      return;
+    }
+
+    const sent = await API.updatePurchaseOrder(po.id, { status: 'envoyée' });
+    showToast(buildOrderSentMessage(sent && sent.dispatch), 'success');
     location.hash = '#/orders';
   } catch (e) {
     if (e && e.code === 'INTEGRATION_NOT_CONFIGURED') {
@@ -591,6 +600,19 @@ async function submitPurchaseOrder(sendImmediately) {
       showToast('Erreur : ' + e.message, 'error');
     }
   }
+}
+
+// Builds the success message after a PO transitions to 'envoyée'. When the
+// supplier has a FoodFlow integration, surface the external_id (client number)
+// so the restaurateur sees their identifier was transmitted to the supplier.
+function buildOrderSentMessage(dispatch) {
+  if (dispatch && dispatch.ok && dispatch.external_id) {
+    const provider = dispatch.provider === 'foodflow' ? 'FoodFlow' : (dispatch.provider || '');
+    return provider
+      ? `Commande envoyée — identifiant ${provider} ${dispatch.external_id} transmis`
+      : `Commande envoyée — identifiant ${dispatch.external_id} transmis`;
+  }
+  return 'Commande envoyée';
 }
 
 // Opens a modal pointing the user at /supplier-integrations. Used for both
@@ -787,8 +809,8 @@ function renderPODetail(po) {
 async function sendPurchaseOrder(id) {
   showConfirmModal('Envoyer la commande', 'Êtes-vous sûr de vouloir envoyer cette commande au fournisseur ?', async () => {
     try {
-      await API.updatePurchaseOrder(id, { status: 'envoyée' });
-      showToast('Commande envoyée', 'success');
+      const sent = await API.updatePurchaseOrder(id, { status: 'envoyée' });
+      showToast(buildOrderSentMessage(sent && sent.dispatch), 'success');
       location.hash = '#/orders';
     } catch (e) {
       if (e && e.code === 'INTEGRATION_NOT_CONFIGURED') {
