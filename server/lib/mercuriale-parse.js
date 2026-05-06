@@ -107,8 +107,11 @@ function findHeader(rows) {
 
 // Read an .xlsx, .xls, or .csv buffer into a normalized item array.
 // Synchronous because xlsx (sheetjs) does all parsing in-memory.
+// codepage:65001 forces UTF-8 decoding for CSVs (sheetjs defaults to Latin-1
+// otherwise, which mangles "Désignation" → "DÃ©signation" and breaks header
+// detection). XLSX is always UTF-8 internally so the option is a no-op there.
 function parseXlsxBuffer(buffer) {
-  const wb = xlsx.read(buffer, { type: 'buffer' });
+  const wb = xlsx.read(buffer, { type: 'buffer', codepage: 65001 });
   const sheetName = wb.SheetNames[0];
   if (!sheetName) return [];
   const sheet = wb.Sheets[sheetName];

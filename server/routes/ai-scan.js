@@ -8,13 +8,47 @@
 'use strict';
 
 const { Router } = require('express');
+const multer = require('multer');
 const {
   all, get, run, fs,
   GEMINI_API_KEY, buildGeminiUrl, geminiHeaders, selectModel,
-  upload,
+  upload, ALLOWED_MIME_TYPES,
 } = require('./ai-core');
+const { parseXlsxBuffer } = require('../lib/mercuriale-parse');
 
 const router = Router();
+
+// ─── Mercuriale-only uploader: image/PDF (Gemini path) + xlsx/xls/csv
+// (deterministic parser path). Kept separate from ai-core's `upload` so the
+// invoice scanner stays image/PDF-only — invoices don't ship as spreadsheets.
+const SPREADSHEET_MIME_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+  'application/vnd.ms-excel',                                           // .xls
+  'text/csv',
+  'application/csv',
+]);
+const SPREADSHEET_EXT_RE = /\.(xlsx|xls|csv)$/i;
+const MERCURIALE_MIME_TYPES = new Set([...ALLOWED_MIME_TYPES, ...SPREADSHEET_MIME_TYPES]);
+
+function isSpreadsheetUpload(file) {
+  if (!file) return false;
+  if (SPREADSHEET_MIME_TYPES.has(file.mimetype)) return true;
+  // Browsers occasionally send octet-stream for .csv/.xls — fall back to extension.
+  if (file.originalname && SPREADSHEET_EXT_RE.test(file.originalname)) return true;
+  return false;
+}
+
+const mercurialeUpload = multer({
+  dest: '/tmp/restosuite-uploads',
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (MERCURIALE_MIME_TYPES.has(file.mimetype) || (file.originalname && SPREADSHEET_EXT_RE.test(file.originalname))) {
+      cb(null, true);
+    } else {
+      cb(new Error('Type de fichier non autorisé. Formats acceptés : JPEG, PNG, WebP, GIF, PDF, XLSX, XLS, CSV.'));
+    }
+  },
+});
 
 // ═══════════════════════════════════════════
 // POST /api/ai/scan-invoice — Scan facture fournisseur via Gemini Vision
@@ -120,10 +154,79 @@ router.post('/scan-invoice', upload.single('invoice'), async (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// POST /api/ai/scan-mercuriale — Import mercuriale fournisseur via IA
-// Scan une mercuriale (liste de prix) et met à jour les prix en masse
+// POST /api/ai/scan-mercuriale — Import mercuriale fournisseur
+// XLSX/XLS/CSV → deterministic parser (lib/mercuriale-parse).
+// Image/PDF → Gemini Vision OCR.
+// Both paths return the same response shape.
 // ═══════════════════════════════════════════
-router.post('/scan-mercuriale', upload.single('mercuriale'), async (req, res) => {
+router.post('/scan-mercuriale', mercurialeUpload.single('mercuriale'), async (req, res) => {
+  // ─── Spreadsheet path: deterministic, no Gemini needed ───
+  if (req.file && isSpreadsheetUpload(req.file)) {
+    const sheetPath = req.file.path;
+    try {
+      const buffer = fs.readFileSync(sheetPath);
+      const rawItems = parseXlsxBuffer(buffer);
+      const items = rawItems.map(it => ({
+        product_name: it.name,
+        category: it.category || null,
+        unit: it.unit || 'kg',
+        conditioning: it.packaging || null,
+        price: it.price,
+        sku: it.sku || null,
+        organic: false,
+        origin: null,
+      }));
+
+      const rid = req.user && req.user.restaurant_id;
+      if (items.length > 0 && rid) {
+        const allIngredients = all(
+          'SELECT id, name FROM ingredients WHERE restaurant_id = ?',
+          [rid]
+        );
+        for (const item of items) {
+          const name = (item.product_name || '').toLowerCase().trim();
+          if (!name) continue;
+          let match = allIngredients.find(i => i.name.toLowerCase() === name);
+          if (!match) {
+            match = allIngredients.find(i => i.name.toLowerCase().includes(name) || name.includes(i.name.toLowerCase()));
+          }
+          if (!match) {
+            const firstWord = name.split(/\s+/)[0];
+            if (firstWord.length >= 3) {
+              match = allIngredients.find(i => i.name.toLowerCase().startsWith(firstWord));
+            }
+          }
+          if (match) {
+            item.ingredient_id = match.id;
+            item.matched_ingredient = match.name;
+            item.match_confidence = item.product_name.toLowerCase() === match.name.toLowerCase() ? 'exact' : 'fuzzy';
+          }
+        }
+      }
+
+      const matched = items.filter(i => i.ingredient_id).length;
+      const total = items.length;
+
+      return res.json({
+        supplier_name: null,
+        date: null,
+        items,
+        summary: {
+          total_items: total,
+          matched_items: matched,
+          unmatched_items: total - matched,
+          match_rate: total > 0 ? Math.round(matched / total * 100) : 0,
+        },
+      });
+    } catch (e) {
+      console.error('Mercuriale spreadsheet parse error:', e);
+      return res.status(400).json({ error: 'Lecture du tableur impossible' });
+    } finally {
+      try { fs.unlinkSync(sheetPath); } catch {}
+    }
+  }
+
+  // ─── Image/PDF path: Gemini Vision ───
   if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
 
   let imageBase64 = null;
