@@ -2071,56 +2071,10 @@ function renderNavGuide() {
     container.innerHTML = "";
   });
 }
-async function renderDashboard() {
+async function renderRecipes() {
   const app = document.getElementById("app");
   const perms = getPermissions();
-  let account = getAccount();
-  if (account && !account.name && typeof API !== "undefined" && typeof API.getMe === "function") {
-    try {
-      const me = await API.getMe();
-      if (me && me.account) {
-        account = __spreadValues(__spreadValues({}, account), me.account);
-        try {
-          localStorage.setItem("restosuite_account", JSON.stringify(account));
-        } catch (e) {
-        }
-      }
-    } catch (_) {
-    }
-  }
-  const userName = account && account.name || "Chef";
-  const greeting = getGreeting(userName);
-  const todayDate = formatFrenchDate(/* @__PURE__ */ new Date());
   app.innerHTML = `
-    <header id="dashboard-greeting" role="banner" style="margin-bottom:var(--space-4)">
-      <div style="padding:var(--space-4);background:var(--color-accent-light);border-radius:var(--radius-lg);border-left:4px solid var(--color-accent)">
-        <h2 style="margin:0 0 2px 0;color:var(--text-primary);font-size:var(--text-xl)">${greeting}</h2>
-        <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)"><time datetime="${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}">${todayDate}</time></p>
-      </div>
-    </header>
-
-    <div id="dashboard-nav-guide"></div>
-    <div id="dashboard-onboarding"></div>
-
-    <a href="#/haccp/ma-journee" style="display:block;text-decoration:none;margin-bottom:var(--space-4)" aria-label="Ma journ\xE9e HACCP">
-      <div style="background:var(--color-accent);border-radius:var(--radius-lg);padding:var(--space-4);display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);transition:opacity 0.15s" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-        <div style="display:flex;align-items:center;gap:var(--space-3)">
-          <i data-lucide="clipboard-check" style="width:28px;height:28px;color:white;flex-shrink:0"></i>
-          <div>
-            <div style="font-weight:700;color:white;font-size:var(--text-base)">Ma journ\xE9e HACCP</div>
-            <div style="color:rgba(255,255,255,0.85);font-size:var(--text-sm)">Temp\xE9ratures, nettoyage, r\xE9ceptions du jour</div>
-          </div>
-        </div>
-        <i data-lucide="chevron-right" style="width:20px;height:20px;color:white;flex-shrink:0"></i>
-      </div>
-    </a>
-
-    <div id="dashboard-summary" role="region" aria-label="R\xE9sum\xE9 du jour" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
-
-    <div id="dashboard-alerts" role="region" aria-live="polite" aria-label="Alertes du jour"></div>
-    <div id="ai-suggestions-container" role="region" aria-label="Suggestions IA"></div>
-    <div id="daily-tip-container" role="region" aria-label="Astuce du jour"></div>
-
     <div class="page-header">
       <h1>Fiches Techniques</h1>
       ${perms.edit_recipes ? `<a href="#/new" class="btn btn-primary" aria-label="Cr\xE9er une nouvelle fiche technique"><i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouvelle fiche</a>` : ""}
@@ -2151,8 +2105,8 @@ async function renderDashboard() {
   } catch (e) {
     showToast("Erreur de chargement", "error");
   }
-  renderDailySummary(recipes, perms);
   const listEl = document.getElementById("recipe-list");
+  if (!listEl) return;
   const searchInput = document.getElementById("recipe-search");
   let currentTypeFilter = "";
   function renderList(filter = "", typeFilter = "") {
@@ -2234,6 +2188,66 @@ async function renderDashboard() {
       renderList(searchInput.value, currentTypeFilter);
     });
   });
+}
+async function renderDashboard() {
+  const app = document.getElementById("app");
+  const perms = getPermissions();
+  let account = getAccount();
+  if (account && !account.name && typeof API !== "undefined" && typeof API.getMe === "function") {
+    try {
+      const me = await API.getMe();
+      if (me && me.account) {
+        account = __spreadValues(__spreadValues({}, account), me.account);
+        try {
+          localStorage.setItem("restosuite_account", JSON.stringify(account));
+        } catch (e) {
+        }
+      }
+    } catch (_) {
+    }
+  }
+  const userName = account && account.name || "Chef";
+  const greeting = getGreeting(userName);
+  const todayDate = formatFrenchDate(/* @__PURE__ */ new Date());
+  app.innerHTML = `
+    <header id="dashboard-greeting" role="banner" style="margin-bottom:var(--space-4)">
+      <div style="padding:var(--space-4);background:var(--color-accent-light);border-radius:var(--radius-lg);border-left:4px solid var(--color-accent)">
+        <h2 style="margin:0 0 2px 0;color:var(--text-primary);font-size:var(--text-xl)">${greeting}</h2>
+        <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)"><time datetime="${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}">${todayDate}</time></p>
+      </div>
+    </header>
+
+    <div id="dashboard-nav-guide"></div>
+    <div id="dashboard-onboarding"></div>
+
+    <a href="#/haccp/ma-journee" style="display:block;text-decoration:none;margin-bottom:var(--space-4)" aria-label="Ma journ\xE9e HACCP">
+      <div style="background:var(--color-accent);border-radius:var(--radius-lg);padding:var(--space-4);display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);transition:opacity 0.15s" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+        <div style="display:flex;align-items:center;gap:var(--space-3)">
+          <i data-lucide="clipboard-check" style="width:28px;height:28px;color:white;flex-shrink:0"></i>
+          <div>
+            <div style="font-weight:700;color:white;font-size:var(--text-base)">Ma journ\xE9e HACCP</div>
+            <div style="color:rgba(255,255,255,0.85);font-size:var(--text-sm)">Temp\xE9ratures, nettoyage, r\xE9ceptions du jour</div>
+          </div>
+        </div>
+        <i data-lucide="chevron-right" style="width:20px;height:20px;color:white;flex-shrink:0"></i>
+      </div>
+    </a>
+
+    <div id="dashboard-summary" role="region" aria-label="R\xE9sum\xE9 du jour" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)"></div>
+
+    <div id="dashboard-alerts" role="region" aria-live="polite" aria-label="Alertes du jour"></div>
+    <div id="ai-suggestions-container" role="region" aria-label="Suggestions IA"></div>
+    <div id="daily-tip-container" role="region" aria-label="Astuce du jour"></div>
+  `;
+  lucide.createIcons();
+  let recipes = [];
+  try {
+    const response = await API.getRecipes();
+    recipes = response.recipes || [];
+  } catch (e) {
+    showToast("Erreur de chargement", "error");
+  }
+  renderDailySummary(recipes, perms);
   renderNavGuide();
   renderOnboardingChecklist();
   loadAISuggestions();
@@ -2452,10 +2466,10 @@ function renderDailySummary(recipes, perms) {
   if (perms.view_costs && recipes.length > 0) {
     const totalCost = recipes.reduce((sum, r) => sum + (r.total_cost || 0), 0);
     html += `
-      <button type="button" data-scroll-to="recipe-list" aria-label="Co\xFBt total mati\xE8re \u2014 voir les fiches" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;display:block;width:100%;cursor:pointer;font:inherit;color:inherit;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-success)';this.style.boxShadow='0 0 0 2px rgba(var(--color-success-rgb,34,197,94),0.15)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
+      <a href="#/recipes" role="group" aria-label="Co\xFBt total mati\xE8re \u2014 voir les fiches" style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);text-align:center;text-decoration:none;display:block;color:inherit;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s" onmouseover="this.style.borderColor='var(--color-success)';this.style.boxShadow='0 0 0 2px rgba(var(--color-success-rgb,34,197,94),0.15)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''">
         <div style="font-size:var(--text-2xl);font-weight:700;color:var(--color-success)">${formatCurrency(totalCost)}</div>
         <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:4px">Co\xFBt total mati\xE8re</div>
-      </button>
+      </a>
     `;
   }
   html += `
@@ -2481,12 +2495,6 @@ function renderDailySummary(recipes, perms) {
     `;
   }
   summaryEl.innerHTML = html;
-  summaryEl.querySelectorAll("button[data-scroll-to]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const target = document.getElementById(btn.dataset.scrollTo);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  });
   if (typeof API !== "undefined" && typeof API.getAnalyticsCovers === "function") {
     API.getAnalyticsCovers(30).then((c) => {
       const valEl = document.getElementById("dashboard-covers-value");
@@ -31186,6 +31194,8 @@ const Router = {
     for (const route of this.routes) {
       const match = path.match(route.pattern);
       if (match) {
+        const appEl = document.getElementById("app");
+        if (appEl) appEl.innerHTML = "";
         route.handler(...match.slice(1));
         try {
           window.UI && window.UI.enhanceAll && window.UI.enhanceAll();
@@ -31534,7 +31544,7 @@ function renderTrialHeaderBadge() {
 function registerRoutes() {
   if (Router.routes.length > 0) return;
   Router.add(/^\/$/, renderDashboard);
-  Router.add(/^\/recipes$/, renderDashboard);
+  Router.add(/^\/recipes$/, renderRecipes);
   Router.add(/^\/new$/, () => renderRecipeForm(null));
   Router.add(/^\/recipe\/(\d+)$/, (id) => renderRecipeDetail(parseInt(id)));
   Router.add(/^\/edit\/(\d+)$/, (id) => renderRecipeForm(parseInt(id)));

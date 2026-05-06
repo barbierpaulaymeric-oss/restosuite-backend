@@ -123,6 +123,16 @@ const Router = {
     for (const route of this.routes) {
       const match = path.match(route.pattern);
       if (match) {
+        // Clear #app before invoking the handler so that any leftover
+        // content from the previous view cannot bleed into the new one
+        // (audit 2026-05-06: users on / clicking "Fiches Techniques"
+        // saw the previous dashboard's greeting + Ma journée stacked
+        // above the new view because async route handlers awaited data
+        // before writing innerHTML — leaving stale DOM visible during
+        // the gap). Handlers immediately set innerHTML to skeletons or
+        // their first render, so the blank flash is imperceptible.
+        const appEl = document.getElementById('app');
+        if (appEl) appEl.innerHTML = '';
         route.handler(...match.slice(1));
         // Belt-and-suspenders alongside the MutationObserver in
         // ui-components.js: catch any data-ui elements that views
