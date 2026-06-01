@@ -192,6 +192,9 @@ if (!IS_TEST) {
   app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'client', 'landing.html'));
   });
+  app.get(['/blog', '/blog/'], (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'client', 'blog', 'index.html'));
+  });
   app.get('/sw.js', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'client', 'sw.js'));
   });

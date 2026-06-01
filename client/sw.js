@@ -1,10 +1,10 @@
-// Bumped 2026-05-06 (v46): bouton "Imprimer cette table" par carte QR (mode
-// d'impression single-card via classe body), bouton "Envoyer" du formulaire
-// de commande déclenche maintenant réellement l'envoi (POST brouillon + PUT
-// envoyée → dispatch FoodFlow + email), et l'identifiant client FoodFlow
-// (external_id) est inclus dans la confirmation après envoi pour rassurer
-// le restaurateur que son numéro a bien été transmis au fournisseur.
-const CACHE_NAME = 'restosuite-v46';
+// Bumped 2026-06-01 (v47): SEO — JSON-LD Organization + BreadcrumbList sur
+// landing, noscript fallback pour .reveal (contenu visible sans JS), nouvel
+// article /blog/logiciel-haccp-restaurant.html (1500+ mots, cible « logiciel
+// HACCP restaurant »), route Express /blog → client/blog/index.html (avant
+// la route catch-all SPA qui renvoyait landing.html et perdait le canonical
+// du blog), sitemap.xml complété avec tous les articles.
+const CACHE_NAME = 'restosuite-v47';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

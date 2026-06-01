@@ -192,6 +192,13 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'client', 'landing.html'));
 });
 
+// Blog index — explicit route so /blog and /blog/ serve client/blog/index.html
+// instead of falling through to the SPA catch-all (which returned landing.html
+// with the homepage's canonical and confused Google's indexing of blog articles).
+app.get(['/blog', '/blog/'], (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'blog', 'index.html'));
+});
+
 // PWA: serve sw.js and manifest.json from root
 app.get('/sw.js', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'client', 'sw.js'));
