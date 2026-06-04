@@ -26,6 +26,7 @@ const { db, get, all, run } = require('../../db');
 const { processInbound, pickAttachment } = require('./process-inbound');
 const { buildOrderXlsx } = require('./build-outbound');
 const { matchRestaurant, extractSupplierNamesFromXlsx } = require('./match-restaurant');
+const { escapeHtml } = require('../email-signature');
 
 const ADMIN_ALERT_EMAIL = 'barbierpaulaymeric@gmail.com';
 
@@ -484,12 +485,16 @@ async function dispatchOrderEmail({ rid, supplier_id, po_id, sendFn }) {
     const { sendOrderEmail } = require('./smtp-client');
     return sendOrderEmail(args);
   });
+  const restoName = (restaurant && restaurant.name) || '';
   try {
     await sender({
       to: supplier.email,
       bcc: ownerEmail || undefined,
-      subject: `Bon de commande ${po.reference} — ${restaurant && restaurant.name}`,
-      text: `Bonjour,\n\nVeuillez trouver ci-joint le bon de commande ${po.reference}.\n\nCordialement,\n${restaurant && restaurant.name}\n\n— Envoyé automatiquement par RestoSuite.`,
+      subject: `Bon de commande ${po.reference} — ${restoName}`,
+      text: `Bonjour,\n\nVeuillez trouver ci-joint le bon de commande ${po.reference}.\n\nCordialement,\n${restoName}`,
+      html: `<p>Bonjour,</p>`
+        + `<p>Veuillez trouver ci-joint le bon de commande <strong>${escapeHtml(po.reference)}</strong>.</p>`
+        + `<p>Cordialement,<br><strong>${escapeHtml(restoName)}</strong></p>`,
       xlsxBuffer,
       filename: `commande-${po.reference}.xlsx`,
     });

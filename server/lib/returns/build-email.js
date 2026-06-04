@@ -156,8 +156,6 @@ function buildHtml({ request, items, restaurant, supplier, deliveryNote, integra
 
   <p style="margin-top:24px">Merci de prendre en charge cette demande dans les meilleurs délais.</p>
   <p>Bien cordialement,<br><strong>${escapeHtml(restaurant && restaurant.name ? restaurant.name : '')}</strong></p>
-  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-  <p style="color:#9ca3af;font-size:12px">Email envoyé via RestoSuite</p>
 </body></html>`;
 }
 

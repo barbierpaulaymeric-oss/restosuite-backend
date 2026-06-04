@@ -6,6 +6,7 @@
 // this module is intentionally not unit-tested.
 
 const nodemailer = require('nodemailer');
+const { applySignature } = require('../email-signature');
 
 let _transport = null;
 
@@ -32,28 +33,37 @@ function getTransport() {
   return _transport;
 }
 
-async function sendOrderEmail({ to, bcc, subject, text, xlsxBuffer, filename }) {
+async function sendOrderEmail({ to, bcc, subject, text, html, xlsxBuffer, filename, attachments }) {
   const transport = getTransport();
+  // applySignature appends the branded RestoSuite signature (logo + tagline +
+  // links) and returns the logo CID attachment alongside any caller extras.
+  const sig = applySignature({ text, html, attachments });
   const msg = {
     from: process.env.MERCURIALE_EMAIL,
     to,
     subject,
-    text,
-    attachments: [{ filename, content: xlsxBuffer }],
+    text: sig.text,
+    attachments: [{ filename, content: xlsxBuffer }, ...sig.attachments],
   };
+  if (sig.html) msg.html = sig.html;
   if (bcc) msg.bcc = bcc;
   return transport.sendMail(msg);
 }
 
-async function sendPlainEmail({ to, subject, text, html }) {
+async function sendPlainEmail({ to, cc, bcc, subject, text, html, attachments }) {
   const transport = getTransport();
-  return transport.sendMail({
+  const sig = applySignature({ text, html, attachments });
+  const msg = {
     from: process.env.MERCURIALE_EMAIL,
     to,
     subject,
-    text,
-    html,
-  });
+    text: sig.text,
+  };
+  if (sig.html) msg.html = sig.html;
+  if (sig.attachments.length) msg.attachments = sig.attachments;
+  if (cc) msg.cc = cc;
+  if (bcc) msg.bcc = bcc;
+  return transport.sendMail(msg);
 }
 
 module.exports = { sendOrderEmail, sendPlainEmail, getTransport };
