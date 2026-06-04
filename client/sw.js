@@ -1,10 +1,13 @@
+// Bumped 2026-06-04 (v50): Intégration Umami (analytics self-hosted, sans cookie)
+// via /js/umami.js sur la landing, le blog et l'app + events data-umami-event
+// (cta-essai-gratuit, inscription-submit, blog-click).
 // Bumped 2026-06-04 (v49): Nouveau portail admin plateforme (#/admin-dashboard).
 // Vue PA réservée aux administrateurs : KPI (restaurateurs inscrits, nouveaux
 // cette semaine/ce mois, restaurants, jamais reconnectés), tableau des
 // restaurateurs trié par date d'inscription avec pastilles d'activité
 // (vert = actif, ambre > 14j, rouge = jamais reconnecté) + compteur de jours
 // depuis la dernière connexion. Le lien Admin de la nav pointe désormais ici.
-const CACHE_NAME = 'restosuite-v49';
+const CACHE_NAME = 'restosuite-v50';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

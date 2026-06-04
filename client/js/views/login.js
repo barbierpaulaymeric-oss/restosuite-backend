@@ -400,7 +400,7 @@ class LoginView {
 
           <div id="reg-error" role="alert" aria-live="assertive" style="color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:20px"></div>
 
-          <button class="btn btn-primary" id="reg-submit" disabled aria-disabled="true" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
+          <button class="btn btn-primary" id="reg-submit" data-umami-event="inscription-submit" disabled aria-disabled="true" style="margin-top:var(--space-3);width:100%;padding:12px;font-size:var(--text-base)">
             ${isSupplier ? 'Créer mon compte fournisseur' : 'Créer mon compte'}
           </button>
 
