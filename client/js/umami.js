@@ -13,8 +13,8 @@
 (function () {
   'use strict';
 
-  var UMAMI_URL = 'UMAMI_URL_PLACEHOLDER';
-  var WEBSITE_ID = 'UMAMI_WEBSITE_ID_PLACEHOLDER';
+  var UMAMI_URL = 'https://restosuite-analytics.onrender.com';
+  var WEBSITE_ID = 'd90b73e4-de98-40eb-9deb-46e9c3258af9';
 
   // Pas encore configuré → on ne charge rien.
   if (UMAMI_URL.indexOf('PLACEHOLDER') !== -1 || WEBSITE_ID.indexOf('PLACEHOLDER') !== -1) {

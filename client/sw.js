@@ -11,7 +11,7 @@
 // restaurateurs trié par date d'inscription avec pastilles d'activité
 // (vert = actif, ambre > 14j, rouge = jamais reconnecté) + compteur de jours
 // depuis la dernière connexion. Le lien Admin de la nav pointe désormais ici.
-const CACHE_NAME = 'restosuite-v52';
+const CACHE_NAME = 'restosuite-v53';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
