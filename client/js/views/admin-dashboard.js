@@ -30,7 +30,7 @@ class AdminDashboardView {
         </button>
       </div>
 
-      <div id="admin-stats-row" class="kpi-grid" style="margin-bottom:1.25rem">
+      <div id="admin-stats-row" class="admin-stats-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;margin-bottom:1.25rem">
         <div class="loading-spinner" style="grid-column:1/-1"></div>
       </div>
 
@@ -52,25 +52,11 @@ class AdminDashboardView {
       </div>
     `;
 
-    // Style local pour les pastilles d'activité (injecté une seule fois)
-    if (!document.getElementById('admin-dashboard-styles')) {
-      const style = document.createElement('style');
-      style.id = 'admin-dashboard-styles';
-      style.textContent = `
-        .admin-dot{display:inline-block;width:9px;height:9px;border-radius:999px;flex-shrink:0}
-        .admin-activity{display:inline-flex;align-items:center;gap:.4rem;white-space:nowrap;font-size:.8rem}
-        .admin-activity-label{font-weight:600}
-        /* KPIs compacts : grille 3 colonnes, cartes réduites pour libérer le tableau */
-        #admin-stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
-        #admin-stats-row .kpi-card{padding:.7rem .75rem;display:flex;flex-direction:column;align-items:flex-start;text-align:left}
-        #admin-stats-row .kpi-icon{font-size:1rem;margin-bottom:2px;opacity:.8}
-        #admin-stats-row .kpi-value{font-size:1.5rem;line-height:1.1;font-weight:700}
-        #admin-stats-row .kpi-label{font-size:.72rem;margin-top:2px}
-        #admin-stats-row .kpi-card[style*="1/-1"]{flex-direction:row;align-items:center;gap:1rem;flex-wrap:wrap}
-        @media (max-width:640px){#admin-stats-row{grid-template-columns:repeat(2,1fr)}}
-      `;
-      document.head.appendChild(style);
-    }
+    // Note : les styles (pastilles d'activité + KPIs compacts) sont définis dans
+    // client/css/style.css (.admin-stats-row / .admin-dot …). On évite un <style>
+    // injecté dynamiquement, bloqué par certains bloqueurs de pub (sheet: null).
+    // La grille de base est aussi posée en inline sur #admin-stats-row pour résister
+    // au blocage ; le CSS gère le détail des cartes et le responsive.
 
     if (window.lucide) lucide.createIcons();
 

@@ -3067,6 +3067,22 @@ tr:has(td[colspan]) td {
 .kpi-label { font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-1); }
 .kpi-detail { font-size: var(--text-xs); color: var(--text-tertiary); margin-top: var(--space-1); }
 
+/* ─── Dashboard Admin : KPIs compacts + pastilles d'activité ───
+   Déplacé ici depuis un <style> injecté dynamiquement (bloqué par certains
+   bloqueurs de pub → sheet: null). La grille de base est posée en inline sur
+   #admin-stats-row ; ces règles gèrent les cartes et le responsive. */
+.admin-dot { display:inline-block; width:9px; height:9px; border-radius:999px; flex-shrink:0; }
+.admin-activity { display:inline-flex; align-items:center; gap:.4rem; white-space:nowrap; font-size:.8rem; }
+.admin-activity-label { font-weight:600; }
+.admin-stats-row .kpi-card { padding:.7rem .75rem; display:flex; flex-direction:column; align-items:flex-start; text-align:left; }
+.admin-stats-row .kpi-icon { font-size:1rem; margin-bottom:2px; opacity:.8; }
+.admin-stats-row .kpi-value { font-size:1.5rem; line-height:1.1; font-weight:700; }
+.admin-stats-row .kpi-label { font-size:.72rem; margin-top:2px; }
+.admin-stats-row .kpi-card[style*="1/-1"] { flex-direction:row; align-items:center; gap:1rem; flex-wrap:wrap; }
+@media (max-width:640px) {
+  .admin-stats-row { grid-template-columns:repeat(2,1fr) !important; }
+}
+
 /* Font mono helper */
 .font-mono { font-family: var(--font-mono); }
 .text-danger { color: var(--color-danger) !important; }
