@@ -102,6 +102,7 @@ const JS_FILES = [
   'js/views/command-palette.js',
   'js/views/errors-log.js',
   'js/views/admin.js',
+  'js/views/admin-dashboard.js',
   'js/floating-ai-bubble.js',
   'js/router.js',
   'js/app.js',

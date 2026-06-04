@@ -51,6 +51,7 @@ const ROUTE_ROLES = {
   '/settings/sanitary-approval': ['gerant'],
   '/import-mercuriale': ['gerant'],
   '/admin': ['admin'],
+  '/admin-dashboard': ['admin', 'gerant'],
   '/chef': ['gerant'],
 };
 

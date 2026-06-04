@@ -452,6 +452,7 @@ function registerRoutes() {
   Router.add(/^\/returns\/(\d+)$/, (id) => { location.hash = '#/retours/' + id; });
   Router.add(/^\/docs$/, () => { location.hash = '#/fabrication-diagrams'; });
   Router.add(/^\/admin$/, renderAdmin);
+  Router.add(/^\/admin-dashboard$/, renderAdminDashboard);
 }
 
 function bootApp(role, account, opts = {}) {

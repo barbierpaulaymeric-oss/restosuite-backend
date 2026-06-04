@@ -1,10 +1,10 @@
-// Bumped 2026-06-04 (v48): Fix envoi SMTP des bons de commande — l'envoi email
-// échouait silencieusement quand le fournisseur n'avait pas d'adresse email
-// (cas FoodFlow / Julie). Le serveur expose désormais email_dispatch dans la
-// réponse PUT et l'UI avertit clairement « aucun email transmis » au lieu
-// d'afficher « Commande envoyée ». SMTP : timeouts explicites + secure dérivé
-// du port (parité avec IMAP) pour éviter les blocages TLS silencieux.
-const CACHE_NAME = 'restosuite-v48';
+// Bumped 2026-06-04 (v49): Nouveau portail admin plateforme (#/admin-dashboard).
+// Vue PA réservée aux administrateurs : KPI (restaurateurs inscrits, nouveaux
+// cette semaine/ce mois, restaurants, jamais reconnectés), tableau des
+// restaurateurs trié par date d'inscription avec pastilles d'activité
+// (vert = actif, ambre > 14j, rouge = jamais reconnecté) + compteur de jours
+// depuis la dernière connexion. Le lien Admin de la nav pointe désormais ici.
+const CACHE_NAME = 'restosuite-v49';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
