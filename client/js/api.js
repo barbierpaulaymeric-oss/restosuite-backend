@@ -219,6 +219,33 @@ const API = {
   getRecipePdf(id) {
     return this.request(`/recipes/${id}/pdf`);
   },
+  // Import fiches techniques — multipart upload, parse only (no DB write).
+  // Mirrors scanMercuriale: cookie via credentials, plus CSRF + legacy Bearer.
+  async previewRecipeImport(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const headers = {};
+    if (__csrfToken) headers['X-CSRF-Token'] = __csrfToken;
+    const legacyToken = localStorage.getItem('restosuite_token');
+    if (legacyToken) headers['Authorization'] = 'Bearer ' + legacyToken;
+    const res = await fetch(this.base + '/recipes/import/preview', {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || 'Lecture du fichier impossible');
+    }
+    return res.json();
+  },
+  importRecipes(recipes) {
+    return this.request('/recipes/import', { method: 'POST', body: { recipes } });
+  },
+  recipeImportTemplateUrl() {
+    return this.base + '/recipes/import/template';
+  },
 
   // Auth — each login response carries `csrf_token`; stash it in memory so
   // subsequent mutating requests can echo it in X-CSRF-Token.

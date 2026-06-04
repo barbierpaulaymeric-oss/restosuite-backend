@@ -6,6 +6,7 @@
 const ROUTE_ROLES = {
   '/': ['gerant', 'cuisinier', 'equipier'],
   '/recipes': ['gerant', 'cuisinier', 'equipier'],
+  '/import-recipes': ['gerant'],
   '/new': ['gerant'],
   '/recipe/': ['gerant', 'cuisinier', 'equipier'],
   '/edit/': ['gerant'],

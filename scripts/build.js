@@ -19,6 +19,7 @@ const JS_FILES = [
   'js/views/dashboard.js',
   'js/views/recipe-detail.js',
   'js/views/recipe-form.js',
+  'js/views/recipe-import.js',
   'js/views/ingredients.js',
   'js/views/stock-dashboard.js',
   'js/views/stock-reception.js',

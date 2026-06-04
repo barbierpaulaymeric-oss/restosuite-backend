@@ -110,6 +110,7 @@ const NAV_GROUPS = {
 
 const ROUTE_TO_GROUP = {
   '/': 'cuisine', '/recipes': 'cuisine', '/new': 'cuisine', '/ingredients': 'cuisine',
+  '/import-recipes': 'cuisine',
   '/stock': 'cuisine', '/recipe': 'cuisine', '/edit': 'cuisine',
   '/orders': 'operations', '/suppliers': 'operations', '/supplier-integrations': 'operations',
   '/deliveries': 'operations', '/service': 'operations', '/messages': 'operations',
@@ -359,6 +360,7 @@ function registerRoutes() {
 
   Router.add(/^\/$/, renderDashboard);
   Router.add(/^\/recipes$/, renderRecipes);
+  Router.add(/^\/import-recipes$/, renderRecipeImport);
   Router.add(/^\/new$/, () => renderRecipeForm(null));
   Router.add(/^\/recipe\/(\d+)$/, (id) => renderRecipeDetail(parseInt(id)));
   Router.add(/^\/edit\/(\d+)$/, (id) => renderRecipeForm(parseInt(id)));

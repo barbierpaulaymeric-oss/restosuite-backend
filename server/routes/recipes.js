@@ -1,10 +1,108 @@
 const { Router } = require('express');
-const { all, get, run } = require('../db');
+const multer = require('multer');
+const fs = require('fs');
+const { db, all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
 const { getRecipeAllergens, INCO_ALLERGENS, computeCrossContaminationForRecipe, maxSeverity: allergenMaxSeverity } = require('./allergens');
 const { validate, recipeValidation } = require('../middleware/validate');
+const { parseRecipeWorkbook, MAX_RECIPES, MAX_INGREDIENTS_PER_RECIPE } = require('../lib/recipe-import-parse');
 const router = Router();
 router.use(requireAuth);
+
+// ─── Recipe-import uploader: spreadsheets only (xlsx/xls/csv). Photos/PDF and
+// pasted text go through Alto (see ai-assistant.js), which produces structured
+// create_recipe actions — keeping this endpoint a deterministic parser path.
+const SPREADSHEET_EXT_RE = /\.(xlsx|xls|csv)$/i;
+const SPREADSHEET_MIME_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+  'application/vnd.ms-excel',                                          // .xls
+  'text/csv', 'application/csv', 'application/octet-stream',           // .csv (some browsers)
+]);
+const recipeUpload = multer({
+  dest: '/tmp/restosuite-uploads',
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 Mo
+  fileFilter: (req, file, cb) => {
+    if (SPREADSHEET_MIME_TYPES.has(file.mimetype) || (file.originalname && SPREADSHEET_EXT_RE.test(file.originalname))) {
+      cb(null, true);
+    } else {
+      cb(new Error('Type de fichier non autorisé. Formats acceptés : Excel (.xlsx, .xls) ou CSV.'));
+    }
+  },
+});
+
+// ─── Shared recipe-creation core, reused by POST / and POST /import. Resolves
+// each ingredient by id or name (creating it when absent), computes net_quantity
+// from waste %, then writes the recipe + its ingredients + steps. Returns the
+// new recipe id. Wrapped in a transaction by the callers so a recipe and all of
+// its children commit (or roll back) atomically.
+function insertFullRecipeInner(rid, data) {
+  const { name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, ingredients, steps, recipe_type } = data;
+
+  const info = run(
+    'INSERT INTO recipes (restaurant_id, name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, recipe_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [rid, name, category || null, portions || 1, prep_time_min || null, cooking_time_min || null, selling_price || null, notes || null, recipe_type || 'plat']
+  );
+  const recipeId = info.lastInsertRowid;
+
+  if (ingredients && ingredients.length > 0) {
+    for (const ing of ingredients) {
+      if (ing.sub_recipe_id) {
+        run(
+          'INSERT INTO recipe_ingredients (restaurant_id, recipe_id, ingredient_id, sub_recipe_id, gross_quantity, net_quantity, unit, notes) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)',
+          [rid, recipeId, ing.sub_recipe_id, ing.gross_quantity || 1, ing.gross_quantity || 1, 'portion', ing.notes || null]
+        );
+        continue;
+      }
+
+      let ingredientId = ing.ingredient_id;
+      const ingName = ing.name || ing.ingredient_name;
+      if (!ingredientId && ingName) {
+        const existing = get('SELECT id FROM ingredients WHERE name = ? AND restaurant_id = ?', [ingName.trim().toLowerCase(), rid]);
+        if (existing) {
+          ingredientId = existing.id;
+        } else {
+          const newIng = run(
+            'INSERT INTO ingredients (restaurant_id, name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [rid, ingName.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
+          );
+          ingredientId = newIng.lastInsertRowid;
+        }
+      }
+      if (!ingredientId) continue; // no id and no name → nothing to link
+      const wastePercent = ing.custom_waste_percent ?? ing.waste_percent ?? null;
+      const grossQty = ing.gross_quantity;
+      const netQty = ing.net_quantity ?? (wastePercent != null ? grossQty * (1 - wastePercent / 100) : grossQty);
+      run(
+        'INSERT INTO recipe_ingredients (restaurant_id, recipe_id, ingredient_id, gross_quantity, net_quantity, unit, custom_waste_percent, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [rid, recipeId, ingredientId, grossQty, netQty, ing.unit || 'g', wastePercent, ing.notes || null]
+      );
+    }
+  }
+
+  if (steps && steps.length > 0) {
+    steps.forEach((step, i) => {
+      const instruction = typeof step === 'string' ? step : step.instruction;
+      run('INSERT INTO recipe_steps (restaurant_id, recipe_id, step_number, instruction) VALUES (?, ?, ?, ?)', [rid, recipeId, i + 1, instruction]);
+    });
+  }
+
+  return recipeId;
+}
+const insertFullRecipe = db.transaction((rid, data) => insertFullRecipeInner(rid, data));
+
+// First-recipe activation stamp (time-to-value). Idempotent via the
+// `first_recipe_at IS NULL` guard, so only the very first fiche created by a
+// restaurant flips the timer — whether via the form, Alto, or a bulk import.
+// Best-effort: instrumentation must never break recipe creation.
+function stampFirstRecipeActivation(rid) {
+  try {
+    run(
+      `UPDATE accounts SET first_recipe_at = datetime('now'), activated_at = datetime('now')
+       WHERE restaurant_id = ? AND is_owner = 1 AND first_recipe_at IS NULL`,
+      [rid]
+    );
+  } catch (_) { /* instrumentation non bloquante */ }
+}
 
 // Returns { hasPrice: bool, source: 'supplier'|'ingredient'|null }
 function getIngredientPriceSource(ingredientId, rid) {
@@ -346,6 +444,204 @@ router.get('/availability', (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// RECIPE IMPORT — fiches techniques depuis un fichier (Excel/CSV)
+//
+// Two-step flow mirroring the mercuriale scanner so the restaurateur always
+// reviews before anything is written:
+//   1. POST /import/preview — upload a spreadsheet, parse it, return the
+//      detected recipes WITHOUT touching the database.
+//   2. POST /import — the (reviewed/corrected) recipes come back as JSON and
+//      are created in one pass, each recipe atomic.
+//   • GET /import/template — a pre-formatted .xlsx the chef can fill in.
+//
+// Declared BEFORE /:id so Express doesn't match "import" as a recipe id.
+// ═══════════════════════════════════════════
+
+// POST /api/recipes/import/preview — parse only, no DB writes.
+router.post('/import/preview', recipeUpload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Fichier requis (Excel ou CSV).' });
+  const filePath = req.file.path;
+  try {
+    const buffer = fs.readFileSync(filePath);
+    const { recipes, format, warnings } = parseRecipeWorkbook(buffer);
+    const ingredientCount = recipes.reduce((n, r) => n + (r.ingredients ? r.ingredients.length : 0), 0);
+    res.json({
+      recipes,
+      format,
+      warnings,
+      summary: {
+        recipe_count: recipes.length,
+        ingredient_count: ingredientCount,
+      },
+    });
+  } catch (e) {
+    console.error('Recipe import preview error:', e);
+    res.status(400).json({ error: 'Lecture du fichier impossible. Vérifiez le format (Excel ou CSV).' });
+  } finally {
+    try { fs.unlinkSync(filePath); } catch {}
+  }
+});
+
+const ALLOWED_RECIPE_TYPES = new Set(['plat', 'sous_recette', 'base']);
+
+// Coerce one reviewed recipe coming back from the preview UI into the shape
+// insertFullRecipe expects, dropping anything unusable. Returns null when the
+// recipe has no usable name.
+function sanitizeImportRecipe(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const name = String(raw.name || '').trim().slice(0, 200);
+  if (!name) return null;
+
+  let portions = parseInt(raw.portions, 10);
+  if (!Number.isInteger(portions) || portions <= 0) portions = 1;
+
+  let sellingPrice = null;
+  if (raw.selling_price != null && raw.selling_price !== '') {
+    const sp = Number(raw.selling_price);
+    if (Number.isFinite(sp) && sp >= 0) sellingPrice = sp;
+  }
+
+  const recipeType = ALLOWED_RECIPE_TYPES.has(raw.recipe_type) ? raw.recipe_type : 'plat';
+  const category = raw.category ? String(raw.category).trim().slice(0, 80) : null;
+
+  const ingredients = [];
+  if (Array.isArray(raw.ingredients)) {
+    for (const ing of raw.ingredients) {
+      if (!ing) continue;
+      const ingName = String(ing.name || ing.ingredient_name || '').trim();
+      if (!ingName) continue;
+      const qty = Number(ing.gross_quantity);
+      // recipe_ingredients.gross_quantity is NOT NULL — skip quantity-less lines
+      // (the user was prompted to fill them in the preview; if still empty we
+      // drop the line rather than write a meaningless 0).
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+      const out = {
+        name: ingName.slice(0, 200),
+        gross_quantity: qty,
+        unit: ing.unit ? String(ing.unit).trim().slice(0, 16) : 'g',
+      };
+      if (ing.price_per_unit != null && ing.price_per_unit !== '') {
+        const pp = Number(ing.price_per_unit);
+        if (Number.isFinite(pp) && pp > 0) {
+          out.price_per_unit = pp;
+          out.price_unit = ing.price_unit ? String(ing.price_unit).trim().slice(0, 16) : out.unit;
+        }
+      }
+      ingredients.push(out);
+      if (ingredients.length >= MAX_INGREDIENTS_PER_RECIPE) break;
+    }
+  }
+
+  const steps = Array.isArray(raw.steps)
+    ? raw.steps.map(s => (typeof s === 'string' ? s : (s && s.instruction))).filter(Boolean).slice(0, 100)
+    : [];
+
+  return { name, category, portions, selling_price: sellingPrice, recipe_type: recipeType, ingredients, steps };
+}
+
+// POST /api/recipes/import — commit reviewed recipes.
+router.post('/import', (req, res) => {
+  try {
+    const rid = req.user.restaurant_id;
+    const incoming = Array.isArray(req.body && req.body.recipes) ? req.body.recipes : null;
+    if (!incoming || incoming.length === 0) {
+      return res.status(400).json({ error: 'Aucune fiche à importer.' });
+    }
+    if (incoming.length > MAX_RECIPES) {
+      return res.status(400).json({ error: `Trop de fiches (max ${MAX_RECIPES} par import).` });
+    }
+
+    let imported = 0;
+    const errors = [];
+    const recipeIds = [];
+
+    for (let i = 0; i < incoming.length; i++) {
+      const data = sanitizeImportRecipe(incoming[i]);
+      if (!data) {
+        errors.push({ index: i, name: (incoming[i] && incoming[i].name) || `Fiche ${i + 1}`, reason: 'Nom de fiche manquant' });
+        continue;
+      }
+      try {
+        const id = insertFullRecipe(rid, data);
+        recipeIds.push(id);
+        imported++;
+      } catch (e) {
+        console.error('Recipe import row error:', e);
+        errors.push({ index: i, name: data.name, reason: 'Erreur lors de la création' });
+      }
+    }
+
+    if (imported > 0) stampFirstRecipeActivation(rid);
+
+    res.status(imported > 0 ? 201 : 400).json({
+      imported,
+      failed: errors.length,
+      total: incoming.length,
+      errors,
+      recipe_ids: recipeIds,
+    });
+  } catch (e) {
+    console.error('Recipe import error:', e);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/recipes/import/template — modèle Excel pré-formaté à remplir.
+router.get('/import/template', async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'RestoSuite';
+    const ws = wb.addWorksheet('Fiches techniques');
+
+    ws.columns = [
+      { header: 'Recette', key: 'recette', width: 28 },
+      { header: 'Catégorie', key: 'categorie', width: 16 },
+      { header: 'Portions', key: 'portions', width: 10 },
+      { header: 'Prix de vente', key: 'pv', width: 14 },
+      { header: 'Ingrédient', key: 'ingredient', width: 24 },
+      { header: 'Quantité', key: 'quantite', width: 10 },
+      { header: 'Unité', key: 'unite', width: 10 },
+      { header: 'Coût unitaire', key: 'cout', width: 14 },
+    ];
+
+    // Header styling — bold on accent background.
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F6F54' } };
+    headerRow.alignment = { vertical: 'middle' };
+    headerRow.height = 20;
+
+    // Worked example — one recipe over several ingredient rows. The recipe-level
+    // columns (portions, prix de vente, catégorie) only need to be filled on the
+    // first row of each recipe; leave them blank to continue the same recipe.
+    const example = [
+      ['Bœuf bourguignon', 'Plats', 4, 18.5, 'Bœuf à braiser', 800, 'g', 12.5],
+      ['', '', '', '', 'Carottes', 300, 'g', 1.2],
+      ['', '', '', '', 'Vin rouge', 50, 'cl', ''],
+      ['', '', '', '', 'Oignons', 200, 'g', 0.9],
+      ['Salade de chèvre chaud', 'Entrées', 2, 9.5, 'Mesclun', 100, 'g', 2.0],
+      ['', '', '', '', 'Fromage de chèvre', 120, 'g', 4.5],
+      ['', '', '', '', 'Pain de campagne', 80, 'g', ''],
+    ];
+    example.forEach(r => ws.addRow(r));
+
+    // Light grey for the example rows so it's obviously a sample.
+    for (let r = 2; r <= example.length + 1; r++) {
+      ws.getRow(r).font = { color: { argb: 'FF6B7280' }, italic: true };
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="modele-fiches-techniques-restosuite.xlsx"');
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (e) {
+    console.error('Recipe template error:', e);
+    res.status(500).json({ error: 'Erreur génération modèle' });
+  }
+});
+
 router.get('/:id', (req, res) => {
   const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
@@ -434,67 +730,12 @@ router.post('/', validate(recipeValidation), (req, res) => {
       }
     }
 
-    const info = run(
-      'INSERT INTO recipes (restaurant_id, name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, recipe_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [rid, name, category || null, portions || 1, prep_time_min || null, cooking_time_min || null, selling_price || null, notes || null, recipe_type || 'plat']
-    );
-    const recipeId = info.lastInsertRowid;
+    const recipeId = insertFullRecipe(rid, {
+      name, category, portions, prep_time_min, cooking_time_min, selling_price, notes, ingredients, steps, recipe_type,
+    });
 
-    if (ingredients && ingredients.length > 0) {
-      for (const ing of ingredients) {
-        if (ing.sub_recipe_id) {
-          // Sub-recipe ingredient
-          run(
-            'INSERT INTO recipe_ingredients (restaurant_id, recipe_id, ingredient_id, sub_recipe_id, gross_quantity, net_quantity, unit, notes) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)',
-            [rid, recipeId, ing.sub_recipe_id, ing.gross_quantity || 1, ing.gross_quantity || 1, 'portion', ing.notes || null]
-          );
-          continue;
-        }
-
-        let ingredientId = ing.ingredient_id;
-        const ingName = ing.name || ing.ingredient_name;
-        if (!ingredientId && ingName) {
-          const existing = get('SELECT id FROM ingredients WHERE name = ? AND restaurant_id = ?', [ingName.trim().toLowerCase(), rid]);
-          if (existing) {
-            ingredientId = existing.id;
-          } else {
-            const newIng = run(
-              'INSERT INTO ingredients (restaurant_id, name, category, default_unit, waste_percent, price_per_unit, price_unit) VALUES (?, ?, ?, ?, ?, ?, ?)',
-              [rid, ingName.trim().toLowerCase(), ing.category || null, ing.unit || 'g', ing.waste_percent || 0, ing.price_per_unit || 0, ing.price_unit || 'kg']
-            );
-            ingredientId = newIng.lastInsertRowid;
-          }
-        }
-        const wastePercent = ing.custom_waste_percent ?? ing.waste_percent ?? null;
-        const grossQty = ing.gross_quantity;
-        const netQty = ing.net_quantity ?? (wastePercent != null ? grossQty * (1 - wastePercent / 100) : grossQty);
-        run(
-          'INSERT INTO recipe_ingredients (restaurant_id, recipe_id, ingredient_id, gross_quantity, net_quantity, unit, custom_waste_percent, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [rid, recipeId, ingredientId, grossQty, netQty, ing.unit || 'g', wastePercent, ing.notes || null]
-        );
-      }
-    }
-
-    if (steps && steps.length > 0) {
-      steps.forEach((step, i) => {
-        const instruction = typeof step === 'string' ? step : step.instruction;
-        run('INSERT INTO recipe_steps (restaurant_id, recipe_id, step_number, instruction) VALUES (?, ?, ?, ?)', [rid, recipeId, i + 1, instruction]);
-      });
-    }
-
-    // Activation tracking (time-to-value) — stampe first_recipe_at / activated_at
-    // sur le compte gérant du restaurant la première fois qu'une fiche est créée.
-    // Le guard `first_recipe_at IS NULL` rend l'opération idempotente : seule la
-    // 1re fiche déclenche le stamp, ce qui donne une mesure propre du délai
-    // inscription → activation (cf. marketing/retention-study.md). Best-effort :
-    // une erreur d'instrumentation ne doit jamais faire échouer la création.
-    try {
-      run(
-        `UPDATE accounts SET first_recipe_at = datetime('now'), activated_at = datetime('now')
-         WHERE restaurant_id = ? AND is_owner = 1 AND first_recipe_at IS NULL`,
-        [rid]
-      );
-    } catch (_) { /* instrumentation non bloquante */ }
+    // Activation tracking (time-to-value) — voir stampFirstRecipeActivation.
+    stampFirstRecipeActivation(rid);
 
     res.status(201).json(getFullRecipe(recipeId, rid));
   } catch (e) {

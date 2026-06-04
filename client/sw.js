@@ -1,3 +1,8 @@
+// Bumped 2026-06-04 (v54): Import de fiches techniques depuis un fichier Excel/CSV
+// — page dédiée #/import-recipes (upload → aperçu éditable → import), modèle
+// Excel téléchargeable, endpoints POST /api/recipes/import(/preview) + GET
+// /api/recipes/import/template, entrées d'import (page fiches, hero dashboard),
+// et affordance « Coller mes fiches » dans Alto.
 // Bumped 2026-06-04 (v52): Quick wins rétention — email de bienvenue à
 // l'inscription, dashboard « premier jour » (hero CTA 3 options au lieu du mur
 // de zéros), mention de l'import de fiches existantes, instrumentation
@@ -11,7 +16,7 @@
 // restaurateurs trié par date d'inscription avec pastilles d'activité
 // (vert = actif, ambre > 14j, rouge = jamais reconnecté) + compteur de jours
 // depuis la dernière connexion. Le lien Admin de la nav pointe désormais ici.
-const CACHE_NAME = 'restosuite-v53';
+const CACHE_NAME = 'restosuite-v54';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

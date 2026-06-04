@@ -102,7 +102,10 @@ async function renderRecipes() {
   app.innerHTML = `
     <div class="page-header">
       <h1>Fiches Techniques</h1>
-      ${perms.edit_recipes ? `<a href="#/new" class="btn btn-primary" aria-label="Créer une nouvelle fiche technique"><i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouvelle fiche</a>` : ''}
+      ${perms.edit_recipes ? `<div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+        <a href="#/import-recipes" class="btn btn-secondary" aria-label="Importer des fiches techniques depuis un fichier"><i data-lucide="upload" style="width:18px;height:18px" aria-hidden="true"></i> Importer</a>
+        <a href="#/new" class="btn btn-primary" aria-label="Créer une nouvelle fiche technique"><i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouvelle fiche</a>
+      </div>` : ''}
     </div>
     <div class="search-bar" role="search">
       <label for="recipe-search" class="visually-hidden">Rechercher une fiche</label>
@@ -167,7 +170,7 @@ async function renderRecipes() {
           ${perms.edit_recipes ? '<a href="#/new" class="btn btn-primary" aria-label="Créer une nouvelle fiche technique">Nouvelle fiche</a>' : ''}
           ${perms.edit_recipes ? `
           <p style="margin-top:var(--space-4);font-size:var(--text-sm);color:var(--text-secondary)">
-            Vous avez déjà des fiches techniques ? <a href="#/ia" style="color:var(--color-accent);font-weight:600;text-decoration:none">Importez-les en quelques clics</a> — recopiez ou dictez vos fiches papier ou Excel à Alto, pas besoin de tout retaper.
+            Vous avez déjà des fiches sur Excel ? <a href="#/import-recipes" style="color:var(--color-accent);font-weight:600;text-decoration:none">Importez-les en quelques clics</a> — ou dictez/collez-les à <a href="#/ia" style="color:var(--color-accent);font-weight:600;text-decoration:none">Alto</a>. Pas besoin de tout retaper.
           </p>` : ''}
         </div>
       `;
@@ -667,11 +670,11 @@ function renderFirstDayHero() {
             <p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Parlez, Alto rédige la fiche et calcule les coûts.</p>
           </div>
         </a>
-        <a href="#/ia" style="${optionStyle}" onmouseover="${hover}" onmouseout="${unhover}" aria-label="Importez vos fiches existantes">
+        <a href="#/import-recipes" style="${optionStyle}" onmouseover="${hover}" onmouseout="${unhover}" aria-label="Importez vos fiches existantes depuis un fichier Excel">
           <i data-lucide="upload" style="width:22px;height:22px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
           <div>
-            <strong style="font-size:var(--text-sm)">Importez vos fiches existantes</strong>
-            <p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Déjà des fiches sur papier ou Excel ? Recopiez-les ou dictez-les à Alto, il les met en forme. Pas besoin de tout retaper.</p>
+            <strong style="font-size:var(--text-sm)">Importez vos fiches Excel</strong>
+            <p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Déjà des fiches sur Excel ou CSV ? Importez le fichier, vérifiez l'aperçu, c'est créé. Pas besoin de tout retaper.</p>
           </div>
         </a>
         <a href="#/new" style="${optionStyle}" onmouseover="${hover}" onmouseout="${unhover}" aria-label="Tapez votre recette manuellement">

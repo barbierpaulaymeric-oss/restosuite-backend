@@ -32,7 +32,9 @@ async function renderAIAssistant() {
               <button class="ai-suggestion" onclick="sendAISuggestion('J\\'ai nettoyé les plans de travail, la trancheuse et les frigos')"><i data-lucide="sparkles" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" aria-hidden="true"></i>Nettoyages</button>
               <button class="ai-suggestion" onclick="sendAISuggestion('Refroidissement blanquette, départ 72°C, arrivée 8°C en 1h45')"><i data-lucide="snowflake" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" aria-hidden="true"></i>Refroidissement</button>
               <button class="ai-suggestion" onclick="sendAISuggestion('Quel est mon food cost moyen ?')"><i data-lucide="bar-chart-2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" aria-hidden="true"></i>Food cost</button>
+              <button class="ai-suggestion" onclick="startRecipePaste()"><i data-lucide="clipboard-paste" style="width:14px;height:14px;vertical-align:middle;margin-right:4px" aria-hidden="true"></i>Coller mes fiches</button>
             </div>
+            <p style="margin-top:10px;font-size:var(--text-xs);color:var(--text-tertiary)">Astuce : pour un fichier Excel ou CSV, <a href="#/import-recipes" style="color:var(--color-accent);font-weight:600;text-decoration:none">l'import dédié</a> est plus rapide.</p>
           </div>
         </div>
       </div>
@@ -131,6 +133,23 @@ async function renderAIAssistant() {
 
 function sendAISuggestion(text) {
   if (!_aiLoading) sendAIMessage(text);
+}
+
+// "Coller mes fiches" — guide the user to paste a recipe list/table straight
+// into Alto. We focus the input and prime it with a short instruction so the
+// model treats the pasted block as recipes to create (see the batch rule in
+// server/routes/ai-assistant.js). For Excel/CSV files the dedicated importer
+// (#/import-recipes) is faster — surfaced as a hint above.
+function startRecipePaste() {
+  const input = document.getElementById('ai-input');
+  if (!input) return;
+  input.value = 'Crée mes fiches techniques à partir de ceci :\n';
+  input.placeholder = 'Collez ici votre liste de recettes / ingrédients…';
+  input.focus();
+  // Put the caret at the end so the paste lands after the instruction.
+  const len = input.value.length;
+  try { input.setSelectionRange(len, len); } catch {}
+  showToast('Collez vos fiches (texte, tableau ou liste) puis envoyez — Alto les met en forme', 'info');
 }
 
 let _aiVoiceRecognition = null;
