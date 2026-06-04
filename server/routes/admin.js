@@ -24,6 +24,38 @@ const ADMIN_EMAILS = (() => {
   return Array.from(new Set([...DEFAULT_ADMIN_EMAILS, ...fromEnv]));
 })();
 
+// ─── Filtrage des comptes démo / test ───
+// Ces comptes servent aux démonstrations et aux tests ; ils ne doivent jamais
+// apparaître dans le dashboard admin ni gonfler les statistiques de la plateforme.
+const DEMO_EMAILS = [
+  'demo@restosuite.fr',
+  'marcdupontbrasserie@test.com',
+  'marie@bistrot-marie.fr',
+  'kenji@sakura-paris.fr',
+];
+
+// Renvoie une condition SQL (positive) qui matche un compte démo à partir d'une
+// colonne email, plus les paramètres associés. On combine une liste explicite et
+// des motifs (« @test. », « demo@ ») pour attraper aussi les futurs comptes de test.
+function demoMatch(col) {
+  const placeholders = DEMO_EMAILS.map(() => '?').join(', ');
+  return {
+    sql: `(LOWER(${col}) IN (${placeholders}) OR LOWER(${col}) LIKE '%@test.%' OR LOWER(${col}) LIKE 'demo@%')`,
+    params: DEMO_EMAILS.map(e => e.toLowerCase()),
+  };
+}
+
+// Sous-requête renvoyant les restaurant_id liés à un compte propriétaire démo,
+// afin d'exclure ces restaurants des listes et des compteurs.
+function demoRestaurantIds() {
+  const dm = demoMatch('a2.email');
+  return {
+    sql: `SELECT a2.restaurant_id FROM accounts a2
+          WHERE a2.is_owner = 1 AND a2.restaurant_id IS NOT NULL AND ${dm.sql}`,
+    params: dm.params,
+  };
+}
+
 function requireAdmin(req, res, next) {
   let email = (req.user && req.user.email || '').toLowerCase();
   // Older JWTs (pre-email-claim) only carry { id }; fall back to DB lookup so
@@ -43,6 +75,7 @@ router.use(requireAuth, requireAdmin);
 // ─── GET /api/admin/users ───
 router.get('/users', (req, res) => {
   try {
+    const dm = demoMatch('a.email');
     const users = all(`
       SELECT a.id, a.email, a.name, a.first_name, a.last_name, a.role,
              a.created_at, a.trial_start, a.last_login,
@@ -50,9 +83,9 @@ router.get('/users', (req, res) => {
              COALESCE(r.plan, 'free') AS plan
       FROM accounts a
       LEFT JOIN restaurants r ON r.id = a.restaurant_id
-      WHERE a.is_owner = 1
+      WHERE a.is_owner = 1 AND NOT ${dm.sql}
       ORDER BY a.created_at DESC
-    `);
+    `, dm.params);
     res.json({ users });
   } catch (e) {
     console.error('Admin /users error:', e);
@@ -63,27 +96,37 @@ router.get('/users', (req, res) => {
 // ─── GET /api/admin/stats ───
 router.get('/stats', (req, res) => {
   try {
-    const totalUsers = get('SELECT COUNT(*) AS c FROM accounts WHERE is_owner = 1').c;
-    const totalRestaurants = get('SELECT COUNT(*) AS c FROM restaurants').c;
+    const dm = demoMatch('a.email');
+    const dr = demoRestaurantIds();
+
+    const totalUsers = get(`
+      SELECT COUNT(*) AS c FROM accounts a
+      WHERE a.is_owner = 1 AND NOT ${dm.sql}
+    `, dm.params).c;
+
+    const totalRestaurants = get(`
+      SELECT COUNT(*) AS c FROM restaurants r
+      WHERE r.id NOT IN (${dr.sql})
+    `, dr.params).c;
 
     const byPlan = all(`
       SELECT COALESCE(r.plan, 'free') AS plan, COUNT(*) AS count
       FROM accounts a
       LEFT JOIN restaurants r ON r.id = a.restaurant_id
-      WHERE a.is_owner = 1
+      WHERE a.is_owner = 1 AND NOT ${dm.sql}
       GROUP BY COALESCE(r.plan, 'free')
       ORDER BY count DESC
-    `);
+    `, dm.params);
 
     const thisWeek = get(`
-      SELECT COUNT(*) AS c FROM accounts
-      WHERE is_owner = 1 AND created_at >= datetime('now', '-7 days')
-    `).c;
+      SELECT COUNT(*) AS c FROM accounts a
+      WHERE a.is_owner = 1 AND a.created_at >= datetime('now', '-7 days') AND NOT ${dm.sql}
+    `, dm.params).c;
 
     const thisMonth = get(`
-      SELECT COUNT(*) AS c FROM accounts
-      WHERE is_owner = 1 AND created_at >= datetime('now', '-30 days')
-    `).c;
+      SELECT COUNT(*) AS c FROM accounts a
+      WHERE a.is_owner = 1 AND a.created_at >= datetime('now', '-30 days') AND NOT ${dm.sql}
+    `, dm.params).c;
 
     res.json({ totalUsers, totalRestaurants, byPlan, thisWeek, thisMonth });
   } catch (e) {
@@ -95,6 +138,7 @@ router.get('/stats', (req, res) => {
 // ─── GET /api/admin/restaurants ───
 router.get('/restaurants', (req, res) => {
   try {
+    const dr = demoRestaurantIds();
     const restaurants = all(`
       SELECT r.id, r.name, r.type, r.city, r.created_at,
              COALESCE(r.plan, 'free') AS plan,
@@ -102,9 +146,10 @@ router.get('/restaurants', (req, res) => {
              MAX(a.last_login) AS last_activity
       FROM restaurants r
       LEFT JOIN accounts a ON a.restaurant_id = r.id
+      WHERE r.id NOT IN (${dr.sql})
       GROUP BY r.id
       ORDER BY r.created_at DESC
-    `);
+    `, dr.params);
     res.json({ restaurants });
   } catch (e) {
     console.error('Admin /restaurants error:', e);
