@@ -165,6 +165,10 @@ async function renderRecipes() {
           <h3>Créez votre première fiche technique</h3>
           <p>Dictez votre recette, l'IA fait le reste — coûts, portions, procédure.</p>
           ${perms.edit_recipes ? '<a href="#/new" class="btn btn-primary" aria-label="Créer une nouvelle fiche technique">Nouvelle fiche</a>' : ''}
+          ${perms.edit_recipes ? `
+          <p style="margin-top:var(--space-4);font-size:var(--text-sm);color:var(--text-secondary)">
+            Vous avez déjà des fiches techniques ? <a href="#/ia" style="color:var(--color-accent);font-weight:600;text-decoration:none">Importez-les en quelques clics</a> — recopiez ou dictez vos fiches papier ou Excel à Alto, pas besoin de tout retaper.
+          </p>` : ''}
         </div>
       `;
       lucide.createIcons();
@@ -269,6 +273,7 @@ async function renderDashboard() {
       </div>
     </header>
 
+    <div id="dashboard-first-day"></div>
     <div id="dashboard-nav-guide"></div>
     <div id="dashboard-onboarding"></div>
 
@@ -301,17 +306,29 @@ async function renderDashboard() {
     showToast('Erreur de chargement', 'error');
   }
 
-  // Render summary section (uses recipe count + total cost for KPI tiles)
-  renderDailySummary(recipes, perms);
+  if (recipes.length === 0) {
+    // Premier jour — aucune fiche technique. On remplace le « mur de zéros »
+    // (KPIs à 0 + suggestions IA « indisponibles ») par un hero CTA qui met en
+    // scène le premier « aha moment » : créer une fiche. On garde juste le
+    // conseil du jour pour une note positive (cf. marketing/retention-study.md).
+    renderFirstDayHero();
+    renderDailyTip();
+    // KPIs (#dashboard-summary), suggestions IA et alertes restent vides : rien
+    // à 0 n'est affiché, donc rien de décourageant.
+  } else {
+    // Render summary section (uses recipe count + total cost for KPI tiles)
+    renderDailySummary(recipes, perms);
+
+    // AI Suggestions card
+    loadAISuggestions();
+  }
 
   // Nav orientation guide (dismissible, shown once per major version)
   renderNavGuide();
 
-  // Onboarding checklist (shown until all 4 steps complete)
+  // Onboarding checklist (shown until all 4 steps complete) — placée sous le
+  // hero CTA du premier jour quand le compte est encore vide.
   renderOnboardingChecklist();
-
-  // AI Suggestions card
-  loadAISuggestions();
 
   // Fetch daily alerts
   try {
@@ -573,22 +590,8 @@ function renderDailySummary(recipes, perms) {
     </a>
   `;
 
-  // Daily tip
-  const dailyTip = getDailyTip();
-  const tipEl = document.getElementById('daily-tip-container');
-  if (tipEl) {
-    tipEl.innerHTML = `
-      <aside role="complementary" aria-labelledby="daily-tip-heading" style="background:linear-gradient(135deg, var(--color-accent-light), var(--bg-elevated));border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
-        <div style="display:flex;gap:var(--space-3);align-items:flex-start">
-          <span style="font-size:24px" aria-hidden="true">💡</span>
-          <div>
-            <h3 id="daily-tip-heading" style="margin:0 0 4px 0;font-size:var(--text-sm);font-weight:600;color:var(--text-primary)">Conseil du jour</h3>
-            <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)">${dailyTip}</p>
-          </div>
-        </div>
-      </aside>
-    `;
-  }
+  // Daily tip (rendu à part pour pouvoir l'afficher aussi sur le dashboard vide)
+  renderDailyTip();
 
   summaryEl.innerHTML = html;
 
@@ -610,6 +613,78 @@ function renderDailySummary(recipes, perms) {
       if (valEl) valEl.textContent = '—';
     });
   }
+}
+
+// Conseil du jour — extrait de renderDailySummary pour être réutilisable sur le
+// dashboard « premier jour » (où les KPIs sont masqués mais où l'on garde cette
+// note positive).
+function renderDailyTip() {
+  const tipEl = document.getElementById('daily-tip-container');
+  if (!tipEl) return;
+  const dailyTip = getDailyTip();
+  tipEl.innerHTML = `
+    <aside role="complementary" aria-labelledby="daily-tip-heading" style="background:linear-gradient(135deg, var(--color-accent-light), var(--bg-elevated));border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
+      <div style="display:flex;gap:var(--space-3);align-items:flex-start">
+        <span style="font-size:24px" aria-hidden="true">💡</span>
+        <div>
+          <h3 id="daily-tip-heading" style="margin:0 0 4px 0;font-size:var(--text-sm);font-weight:600;color:var(--text-primary)">Conseil du jour</h3>
+          <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)">${dailyTip}</p>
+        </div>
+      </div>
+    </aside>
+  `;
+}
+
+// Hero CTA « premier jour » — affiché à la place du mur de zéros quand le compte
+// n'a encore aucune fiche technique. Trois portes d'entrée pour déclencher le
+// premier succès (créer une fiche), dont l'IMPORT de fiches existantes : les
+// chefs qui ont déjà des fiches sur papier/Excel ne veulent pas tout retaper.
+// (cf. marketing/retention-study.md, QW3 + demande PA sur l'import.)
+function renderFirstDayHero() {
+  const container = document.getElementById('dashboard-first-day');
+  if (!container) return;
+  const perms = getPermissions();
+  if (!perms.edit_recipes) { container.innerHTML = ''; return; }
+
+  const optionStyle = 'display:flex;gap:var(--space-3);align-items:flex-start;text-decoration:none;color:inherit;background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:var(--space-3);transition:border-color 0.15s,box-shadow 0.15s';
+  const hover = "this.style.borderColor='var(--color-accent)';this.style.boxShadow='0 0 0 2px var(--color-accent-light)'";
+  const unhover = "this.style.borderColor='';this.style.boxShadow=''";
+
+  container.innerHTML = `
+    <section role="region" aria-labelledby="first-day-heading" style="background:linear-gradient(135deg, var(--color-accent-light), var(--bg-elevated));border:1px solid var(--color-accent);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)">
+      <div style="display:flex;gap:var(--space-3);align-items:flex-start;margin-bottom:var(--space-4)">
+        <span style="font-size:28px" aria-hidden="true">🎙️</span>
+        <div>
+          <h2 id="first-day-heading" style="margin:0 0 4px 0;font-size:var(--text-lg);color:var(--text-primary)">Créez votre première fiche technique</h2>
+          <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)">Trois façons de commencer — choisissez la plus simple pour vous. En 2 minutes, RestoSuite calcule votre coût matière et votre food cost.</p>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--space-3)">
+        <a href="#/ia" style="${optionStyle}" onmouseover="${hover}" onmouseout="${unhover}" aria-label="Dictez votre recette à Alto">
+          <i data-lucide="mic" style="width:22px;height:22px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
+          <div>
+            <strong style="font-size:var(--text-sm)">Dictez votre recette à Alto</strong>
+            <p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Parlez, Alto rédige la fiche et calcule les coûts.</p>
+          </div>
+        </a>
+        <a href="#/ia" style="${optionStyle}" onmouseover="${hover}" onmouseout="${unhover}" aria-label="Importez vos fiches existantes">
+          <i data-lucide="upload" style="width:22px;height:22px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
+          <div>
+            <strong style="font-size:var(--text-sm)">Importez vos fiches existantes</strong>
+            <p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Déjà des fiches sur papier ou Excel ? Recopiez-les ou dictez-les à Alto, il les met en forme. Pas besoin de tout retaper.</p>
+          </div>
+        </a>
+        <a href="#/new" style="${optionStyle}" onmouseover="${hover}" onmouseout="${unhover}" aria-label="Tapez votre recette manuellement">
+          <i data-lucide="keyboard" style="width:22px;height:22px;color:var(--color-accent);flex-shrink:0;margin-top:2px" aria-hidden="true"></i>
+          <div>
+            <strong style="font-size:var(--text-sm)">Tapez votre recette manuellement</strong>
+            <p style="margin:2px 0 0;font-size:var(--text-xs);color:var(--text-secondary)">Remplissez la fiche vous-même, champ par champ.</p>
+          </div>
+        </a>
+      </div>
+    </section>
+  `;
+  if (window.lucide) lucide.createIcons({ nodes: [container] });
 }
 
 function getDailyTip() {

@@ -311,6 +311,15 @@ router.post('/register', async (req, res) => {
     const { token, csrf } = generateToken(account);
     issueAuthCookie(res, token);
 
+    // Email de bienvenue — fire-and-forget : ne JAMAIS bloquer la réponse
+    // d'inscription sur l'envoi SMTP (un OVH lent ferait timeout le register).
+    // La signature brandée (logo + slogan + liens) est ajoutée automatiquement
+    // par sendPlainEmail → applySignature. Premier maillon de la lutte contre le
+    // churn J1 (cf. marketing/retention-study.md, QW1).
+    sendWelcomeEmail(account).catch(e => {
+      console.error('Welcome email error:', e.message);
+    });
+
     res.json({
       token,
       csrf_token: csrf,
@@ -332,6 +341,69 @@ router.post('/register', async (req, res) => {
     res.status(500).json({ error: 'Erreur lors de l\'inscription' });
   }
 });
+
+// ─── Email de bienvenue (post-inscription) ───
+// Accueil chaleureux + rappel de l'essai gratuit + 3 premières actions concrètes,
+// avec un lien profond vers l'app. Objectif : poser un « rendez-vous mental » et
+// donner une porte de retour à un restaurateur qui teste l'outil entre deux
+// services puis ferme l'onglet. Best-effort : si le SMTP n'est pas configuré
+// (dev/test) on ne fait rien.
+const APP_URL = 'https://www.restosuite.fr/app';
+
+async function sendWelcomeEmail(account) {
+  // En test/dev sans identifiants OVH, on n'essaie même pas de joindre le SMTP.
+  if (!process.env.MERCURIALE_EMAIL || !process.env.MERCURIALE_PASSWORD) return;
+
+  const { sendPlainEmail } = require('../lib/mercuriale-mail/smtp-client');
+  const { escapeHtml } = require('../lib/email-signature');
+  const firstName = (account.first_name || '').trim() || 'Chef';
+  const subject = `Bienvenue sur RestoSuite, ${firstName} !`;
+
+  const text =
+`Bonjour ${firstName},
+
+Bienvenue sur RestoSuite — l'outil pensé pour les restaurateurs qui veulent
+piloter leur cuisine sans y passer leurs nuits. Ravis de vous compter parmi nous !
+
+Votre essai gratuit de 60 jours vient de démarrer : profitez-en pour explorer
+l'outil sans aucune limite, et sans engagement.
+
+Pour démarrer du bon pied, voici 3 actions à faire en quelques minutes :
+
+  1. Créez votre première fiche technique — dictez votre recette, RestoSuite
+     calcule le coût matière et le food cost pour vous.
+  2. Configurez vos zones de température HACCP — pour des relevés en un geste.
+  3. Ajoutez un fournisseur — et générez vos bons de commande en un clic.
+
+Accédez à votre espace : ${APP_URL}
+
+Une question, un blocage ? Répondez simplement à cet email, on vous lit.
+
+À très vite,
+L'équipe RestoSuite`;
+
+  const html =
+`<p>Bonjour <strong>${escapeHtml(firstName)}</strong>,</p>
+<p>Bienvenue sur <strong>RestoSuite</strong> — l'outil pensé pour les restaurateurs
+qui veulent piloter leur cuisine sans y passer leurs nuits. Ravis de vous compter parmi nous&nbsp;!</p>
+<p>Votre <strong>essai gratuit de 60&nbsp;jours</strong> vient de démarrer&nbsp;: profitez-en pour
+explorer l'outil sans aucune limite, et sans engagement.</p>
+<p>Pour démarrer du bon pied, voici 3 actions à faire en quelques minutes&nbsp;:</p>
+<ol style="padding-left:20px;line-height:1.6">
+  <li><strong>Créez votre première fiche technique</strong> — dictez votre recette,
+      RestoSuite calcule le coût matière et le food cost pour vous.</li>
+  <li><strong>Configurez vos zones de température HACCP</strong> — pour des relevés en un geste.</li>
+  <li><strong>Ajoutez un fournisseur</strong> — et générez vos bons de commande en un clic.</li>
+</ol>
+<p style="margin:24px 0">
+  <a href="${APP_URL}" style="display:inline-block;background:#C45A18;color:#fff;text-decoration:none;
+     font-weight:600;padding:12px 24px;border-radius:8px">Accéder à mon espace RestoSuite</a>
+</p>
+<p style="color:#6b7280;font-size:13px">Une question, un blocage&nbsp;? Répondez simplement à cet email, on vous lit.</p>
+<p>À très vite,<br>L'équipe RestoSuite</p>`;
+
+  await sendPlainEmail({ to: account.email, subject, text, html });
+}
 
 // ─── POST /api/auth/register-supplier ───
 // Self-registration for a supplier company. Creates a `suppliers` row with

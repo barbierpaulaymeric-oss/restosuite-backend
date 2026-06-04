@@ -2182,6 +2182,27 @@ try {
   console.warn('⚠️ terms_accepted_at migration error:', e.message);
 }
 
+// ─── Migration: activation tracking on accounts (time-to-value) ───
+// first_recipe_at : timestamp de la 1re fiche technique créée dans le restaurant
+//                   (stampé une seule fois, sur le compte gérant, par routes/recipes.js).
+// activated_at    : timestamp d'activation du compte. Aujourd'hui = first_recipe_at
+//                   (créer une fiche EST l'« aha moment »), colonne distincte pour
+//                   pouvoir faire évoluer la définition d'activation sans casser la mesure.
+// Permet de mesurer le taux d'activation J0 et la rétention (cf. marketing/retention-study.md).
+try {
+  const accCols = all("PRAGMA table_info(accounts)");
+  if (!accCols.some(c => c.name === 'first_recipe_at')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN first_recipe_at DATETIME");
+    console.log('✅ Migration: added first_recipe_at to accounts');
+  }
+  if (!accCols.some(c => c.name === 'activated_at')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN activated_at DATETIME");
+    console.log('✅ Migration: added activated_at to accounts');
+  }
+} catch (e) {
+  console.warn('⚠️ activation tracking migration error:', e.message);
+}
+
 }
 
 module.exports = { runMigrations };

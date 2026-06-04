@@ -81,6 +81,53 @@ describe('POST /api/auth/register', () => {
   });
 });
 
+describe('Activation tracking (first_recipe_at / activated_at)', () => {
+  function registerOwner() {
+    const email = `activation-${Date.now()}-${Math.random().toString(36).slice(2)}@test.fr`;
+    return request(app)
+      .post('/api/auth/register')
+      .send({ email, password: 'Secure1pass', first_name: 'Camille', accepted_terms: true });
+  }
+
+  it('stamps first_recipe_at + activated_at on the owner when the first recipe is created', async () => {
+    const reg = await registerOwner();
+    expect(reg.status).toBe(200);
+    const token = reg.body.token;
+    const accountId = reg.body.account.id;
+
+    const { get } = require('../db');
+    const before = get('SELECT first_recipe_at, activated_at FROM accounts WHERE id = ?', [accountId]);
+    expect(before.first_recipe_at).toBeNull();
+    expect(before.activated_at).toBeNull();
+
+    const recipe = await request(app)
+      .post('/api/recipes')
+      .set({ Authorization: `Bearer ${token}` })
+      .send({ name: 'Fiche activation', portions: 4 });
+    expect(recipe.status).toBe(201);
+
+    const after = get('SELECT first_recipe_at, activated_at FROM accounts WHERE id = ?', [accountId]);
+    expect(after.first_recipe_at).toBeTruthy();
+    expect(after.activated_at).toBeTruthy();
+  });
+
+  it('does not overwrite first_recipe_at on subsequent recipes (idempotent)', async () => {
+    const reg = await registerOwner();
+    const token = reg.body.token;
+    const accountId = reg.body.account.id;
+    const auth = { Authorization: `Bearer ${token}` };
+    const { get } = require('../db');
+
+    await request(app).post('/api/recipes').set(auth).send({ name: 'Première', portions: 2 });
+    const stamp = get('SELECT first_recipe_at FROM accounts WHERE id = ?', [accountId]).first_recipe_at;
+    expect(stamp).toBeTruthy();
+
+    await request(app).post('/api/recipes').set(auth).send({ name: 'Deuxième', portions: 2 });
+    const after = get('SELECT first_recipe_at FROM accounts WHERE id = ?', [accountId]).first_recipe_at;
+    expect(after).toBe(stamp);
+  });
+});
+
 describe('POST /api/auth/register-supplier', () => {
   const validBody = () => ({
     company_name: 'Boucherie Martin',

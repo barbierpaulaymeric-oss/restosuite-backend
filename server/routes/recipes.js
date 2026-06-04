@@ -482,6 +482,20 @@ router.post('/', validate(recipeValidation), (req, res) => {
       });
     }
 
+    // Activation tracking (time-to-value) — stampe first_recipe_at / activated_at
+    // sur le compte gérant du restaurant la première fois qu'une fiche est créée.
+    // Le guard `first_recipe_at IS NULL` rend l'opération idempotente : seule la
+    // 1re fiche déclenche le stamp, ce qui donne une mesure propre du délai
+    // inscription → activation (cf. marketing/retention-study.md). Best-effort :
+    // une erreur d'instrumentation ne doit jamais faire échouer la création.
+    try {
+      run(
+        `UPDATE accounts SET first_recipe_at = datetime('now'), activated_at = datetime('now')
+         WHERE restaurant_id = ? AND is_owner = 1 AND first_recipe_at IS NULL`,
+        [rid]
+      );
+    } catch (_) { /* instrumentation non bloquante */ }
+
     res.status(201).json(getFullRecipe(recipeId, rid));
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
