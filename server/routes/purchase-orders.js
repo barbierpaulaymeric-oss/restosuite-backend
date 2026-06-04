@@ -48,7 +48,7 @@ router.get('/', (req, res) => {
     // Enrich with items
     const enriched = orders.map(po => {
       const items = all(`
-        SELECT poi.*, i.name as ingredient_name, i.default_unit as ingredient_unit
+        SELECT poi.*, COALESCE(i.name, poi.product_name) as ingredient_name, i.default_unit as ingredient_unit
         FROM purchase_order_items poi
         LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
         WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?
@@ -148,7 +148,7 @@ router.get('/analytics', (req, res) => {
 
     // Top purchased items
     const topItems = all(`
-      SELECT poi.ingredient_id, i.name as ingredient_name,
+      SELECT poi.ingredient_id, COALESCE(i.name, poi.product_name) as ingredient_name,
              SUM(poi.quantity) as total_qty, poi.unit,
              AVG(poi.unit_price) as avg_price,
              SUM(poi.total_price) as total_spent,
@@ -157,7 +157,7 @@ router.get('/analytics', (req, res) => {
       JOIN purchase_orders po ON po.id = poi.purchase_order_id AND po.restaurant_id = ?
       LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
       WHERE poi.restaurant_id = ? AND po.status = 'réceptionnée' AND date(po.created_at) >= ?
-      GROUP BY poi.ingredient_id
+      GROUP BY poi.ingredient_id, poi.product_name
       ORDER BY total_spent DESC
       LIMIT 20
     `, [rid, rid, rid, dateFrom]);
@@ -232,7 +232,7 @@ router.get('/:id', (req, res) => {
     if (!po) return res.status(404).json({ error: 'Commande introuvable' });
 
     const items = all(`
-      SELECT poi.*, i.name as ingredient_name, i.default_unit as ingredient_unit
+      SELECT poi.*, COALESCE(i.name, poi.product_name) as ingredient_name, i.default_unit as ingredient_unit
       FROM purchase_order_items poi
       LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
       WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?
@@ -324,7 +324,7 @@ router.post('/', (req, res) => {
       [rid, poId, rid]
     );
     const poItems = all(
-      `SELECT poi.*, i.name as ingredient_name
+      `SELECT poi.*, COALESCE(i.name, poi.product_name) as ingredient_name
        FROM purchase_order_items poi
        LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
        WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,
@@ -530,7 +530,7 @@ router.put('/:id', (req, res) => {
       [rid, id, rid]
     );
     const updatedItems = all(
-      `SELECT poi.*, i.name as ingredient_name
+      `SELECT poi.*, COALESCE(i.name, poi.product_name) as ingredient_name
        FROM purchase_order_items poi
        LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
        WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,
@@ -628,7 +628,7 @@ router.post('/:id/receive', (req, res) => {
       [rid, id, rid]
     );
     const updatedItems = all(
-      `SELECT poi.*, i.name as ingredient_name
+      `SELECT poi.*, COALESCE(i.name, poi.product_name) as ingredient_name
        FROM purchase_order_items poi
        LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
        WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,
@@ -734,7 +734,7 @@ router.post('/:id/clone', (req, res) => {
       [rid, newId, rid]
     );
     const newItems = all(
-      `SELECT poi.*, i.name as ingredient_name
+      `SELECT poi.*, COALESCE(i.name, poi.product_name) as ingredient_name
        FROM purchase_order_items poi
        LEFT JOIN ingredients i ON i.id = poi.ingredient_id AND i.restaurant_id = ?
        WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,

@@ -206,7 +206,7 @@ async function showSuggestionsModal() {
             <tbody>
               ${group.items.map(item => `
                 <tr style="border-top:1px solid var(--border-color);padding:8px 0">
-                  <td style="padding:8px">${escapeHtml(item.ingredient_name)}</td>
+                  <td style="padding:8px">${escapeHtml(item.ingredient_name || item.product_name || '—')}</td>
                   <td style="padding:8px;text-align:right">${item.current_quantity} ${escapeHtml(item.unit)} <span style="color:var(--text-secondary)">(min: ${item.min_quantity})</span></td>
                 </tr>
               `).join('')}
@@ -794,7 +794,7 @@ function renderPODetail(po) {
             const lineTotal = item.quantity * (item.unit_price || 0);
             return `
               <tr style="border-bottom:1px solid var(--border-color)">
-                <td style="padding:8px">${escapeHtml(item.ingredient_name)}</td>
+                <td style="padding:8px">${escapeHtml(item.ingredient_name || item.product_name || '—')}</td>
                 <td style="padding:8px;text-align:right">${item.quantity}</td>
                 <td style="padding:8px;text-align:right">${escapeHtml(item.unit || '—')}</td>
                 <td style="padding:8px;text-align:right">${formatCurrency(item.unit_price)}</td>
