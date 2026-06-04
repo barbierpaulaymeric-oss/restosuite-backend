@@ -1,10 +1,10 @@
-// Bumped 2026-06-01 (v47): SEO — JSON-LD Organization + BreadcrumbList sur
-// landing, noscript fallback pour .reveal (contenu visible sans JS), nouvel
-// article /blog/logiciel-haccp-restaurant.html (1500+ mots, cible « logiciel
-// HACCP restaurant »), route Express /blog → client/blog/index.html (avant
-// la route catch-all SPA qui renvoyait landing.html et perdait le canonical
-// du blog), sitemap.xml complété avec tous les articles.
-const CACHE_NAME = 'restosuite-v47';
+// Bumped 2026-06-04 (v48): Fix envoi SMTP des bons de commande — l'envoi email
+// échouait silencieusement quand le fournisseur n'avait pas d'adresse email
+// (cas FoodFlow / Julie). Le serveur expose désormais email_dispatch dans la
+// réponse PUT et l'UI avertit clairement « aucun email transmis » au lieu
+// d'afficher « Commande envoyée ». SMTP : timeouts explicites + secure dérivé
+// du port (parité avec IMAP) pour éviter les blocages TLS silencieux.
+const CACHE_NAME = 'restosuite-v48';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

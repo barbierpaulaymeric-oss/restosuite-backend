@@ -591,7 +591,7 @@ async function submitPurchaseOrder(sendImmediately) {
     }
 
     const sent = await API.updatePurchaseOrder(po.id, { status: 'envoyée' });
-    showToast(buildOrderSentMessage(sent && sent.dispatch), 'success');
+    showToast(buildOrderSentMessage(sent), orderSentWithoutEmail(sent) ? 'error' : 'success');
     location.hash = '#/orders';
   } catch (e) {
     if (e && e.code === 'INTEGRATION_NOT_CONFIGURED') {
@@ -602,17 +602,33 @@ async function submitPurchaseOrder(sendImmediately) {
   }
 }
 
-// Builds the success message after a PO transitions to 'envoyée'. When the
-// supplier has a FoodFlow integration, surface the external_id (client number)
-// so the restaurateur sees their identifier was transmitted to the supplier.
-function buildOrderSentMessage(dispatch) {
+// Builds the message after a PO transitions to 'envoyée'. When the supplier has
+// a FoodFlow integration, surface the external_id (client number) so the
+// restaurateur sees their identifier was transmitted. When the supplier has no
+// email, warn explicitly — otherwise a silently-skipped send reads as success
+// and the restaurateur believes the supplier received the order.
+function buildOrderSentMessage(sent) {
+  const dispatch = sent && sent.dispatch;
+  const email = sent && sent.email_dispatch;
+  let base;
   if (dispatch && dispatch.ok && dispatch.external_id) {
     const provider = dispatch.provider === 'foodflow' ? 'FoodFlow' : (dispatch.provider || '');
-    return provider
+    base = provider
       ? `Commande envoyée — identifiant ${provider} ${dispatch.external_id} transmis`
       : `Commande envoyée — identifiant ${dispatch.external_id} transmis`;
+  } else {
+    base = 'Commande envoyée';
   }
-  return 'Commande envoyée';
+  if (email && email.attempted === false && email.reason === 'no_supplier_email') {
+    return "Commande marquée envoyée, mais AUCUN email n'a été transmis : ce fournisseur n'a pas d'adresse email. Ajoutez-la dans Fournisseurs pour l'envoi automatique.";
+  }
+  return base;
+}
+
+// True when the order was marked sent but no email could actually be dispatched.
+function orderSentWithoutEmail(sent) {
+  const email = sent && sent.email_dispatch;
+  return !!(email && email.attempted === false && email.reason === 'no_supplier_email');
 }
 
 // Opens a modal pointing the user at /supplier-integrations. Used for both
@@ -810,7 +826,7 @@ async function sendPurchaseOrder(id) {
   showConfirmModal('Envoyer la commande', 'Êtes-vous sûr de vouloir envoyer cette commande au fournisseur ?', async () => {
     try {
       const sent = await API.updatePurchaseOrder(id, { status: 'envoyée' });
-      showToast(buildOrderSentMessage(sent && sent.dispatch), 'success');
+      showToast(buildOrderSentMessage(sent), orderSentWithoutEmail(sent) ? 'error' : 'success');
       location.hash = '#/orders';
     } catch (e) {
       if (e && e.code === 'INTEGRATION_NOT_CONFIGURED') {

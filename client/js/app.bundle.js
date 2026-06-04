@@ -15953,7 +15953,7 @@ async function submitPurchaseOrder(sendImmediately) {
       return;
     }
     const sent = await API.updatePurchaseOrder(po.id, { status: "envoy\xE9e" });
-    showToast(buildOrderSentMessage(sent && sent.dispatch), "success");
+    showToast(buildOrderSentMessage(sent), orderSentWithoutEmail(sent) ? "error" : "success");
     location.hash = "#/orders";
   } catch (e) {
     if (e && e.code === "INTEGRATION_NOT_CONFIGURED") {
@@ -15963,12 +15963,24 @@ async function submitPurchaseOrder(sendImmediately) {
     }
   }
 }
-function buildOrderSentMessage(dispatch) {
+function buildOrderSentMessage(sent) {
+  const dispatch = sent && sent.dispatch;
+  const email = sent && sent.email_dispatch;
+  let base;
   if (dispatch && dispatch.ok && dispatch.external_id) {
     const provider = dispatch.provider === "foodflow" ? "FoodFlow" : dispatch.provider || "";
-    return provider ? `Commande envoy\xE9e \u2014 identifiant ${provider} ${dispatch.external_id} transmis` : `Commande envoy\xE9e \u2014 identifiant ${dispatch.external_id} transmis`;
+    base = provider ? `Commande envoy\xE9e \u2014 identifiant ${provider} ${dispatch.external_id} transmis` : `Commande envoy\xE9e \u2014 identifiant ${dispatch.external_id} transmis`;
+  } else {
+    base = "Commande envoy\xE9e";
   }
-  return "Commande envoy\xE9e";
+  if (email && email.attempted === false && email.reason === "no_supplier_email") {
+    return "Commande marqu\xE9e envoy\xE9e, mais AUCUN email n'a \xE9t\xE9 transmis : ce fournisseur n'a pas d'adresse email. Ajoutez-la dans Fournisseurs pour l'envoi automatique.";
+  }
+  return base;
+}
+function orderSentWithoutEmail(sent) {
+  const email = sent && sent.email_dispatch;
+  return !!(email && email.attempted === false && email.reason === "no_supplier_email");
 }
 function showIntegrationNotConfiguredModal(serverMessage) {
   const message = serverMessage || "Veuillez d'abord connecter votre compte FoodFlow dans Int\xE9grations \u2192 Connecter FoodFlow avec votre num\xE9ro client \xE0 5 chiffres. Sans cet identifiant, le fournisseur ne pourra pas traiter votre commande.";
@@ -16141,7 +16153,7 @@ async function sendPurchaseOrder(id) {
   showConfirmModal("Envoyer la commande", "\xCAtes-vous s\xFBr de vouloir envoyer cette commande au fournisseur ?", async () => {
     try {
       const sent = await API.updatePurchaseOrder(id, { status: "envoy\xE9e" });
-      showToast(buildOrderSentMessage(sent && sent.dispatch), "success");
+      showToast(buildOrderSentMessage(sent), orderSentWithoutEmail(sent) ? "error" : "success");
       location.hash = "#/orders";
     } catch (e) {
       if (e && e.code === "INTEGRATION_NOT_CONFIGURED") {

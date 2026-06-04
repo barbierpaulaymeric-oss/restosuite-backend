@@ -347,6 +347,7 @@ router.put('/:id', (req, res) => {
 
     const { status, notes, expected_delivery, items } = req.body;
     let dispatchSummary = null;
+    let emailDispatch = null;
 
     // Status transitions
     if (status) {
@@ -430,14 +431,39 @@ router.put('/:id', (req, res) => {
 
         // Email dispatch (parallel path): if the supplier has an email and the
         // mercuriale mailbox is configured, send the PO Excel via OVH SMTP.
-        // Fire-and-forget so a slow SMTP server can't stall the HTTP response.
-        if (process.env.MERCURIALE_EMAIL && process.env.MERCURIALE_PASSWORD) {
+        // Fire-and-forget so a slow SMTP server can't stall the HTTP response —
+        // but we surface a synchronous *intent* in email_dispatch so the client
+        // can warn the user when nothing will be sent (e.g. supplier has no
+        // email). Without this, a missing supplier email failed silently and the
+        // restaurateur believed the order had reached the supplier.
+        const supRow = get('SELECT email FROM suppliers WHERE id = ? AND restaurant_id = ?', [po.supplier_id, rid]);
+        const supplierEmail = supRow && supRow.email ? String(supRow.email).trim() : '';
+        if (!process.env.MERCURIALE_EMAIL || !process.env.MERCURIALE_PASSWORD) {
+          emailDispatch = { attempted: false, reason: 'mailbox_not_configured' };
+        } else if (!supplierEmail) {
+          emailDispatch = { attempted: false, reason: 'no_supplier_email' };
+          console.warn(`📧 Order email NOT sent (PO ${po.reference}): supplier #${po.supplier_id} has no email`);
+        } else {
+          emailDispatch = { attempted: true, to: supplierEmail };
           try {
             const { dispatchOrderEmail } = require('../lib/mercuriale-mail');
             dispatchOrderEmail({ rid, supplier_id: po.supplier_id, po_id: id })
               .then(r => {
                 if (r.ok) console.log(`📧 Order email sent to ${r.to} for PO ${po.reference}`);
-                else console.warn(`📧 Order email skipped (PO ${po.reference}): ${r.error}`);
+                else console.warn(`📧 Order email FAILED (PO ${po.reference}): ${r.error}`);
+                // Persist the outcome so a swallowed SMTP error is recoverable
+                // from the audit trail instead of living only in Render logs.
+                try {
+                  const { writeAudit } = require('../lib/audit-log');
+                  writeAudit({
+                    restaurant_id: rid,
+                    account_id: req.user && req.user.id,
+                    table_name: 'purchase_orders',
+                    record_id: id,
+                    action: 'update',
+                    new_values: { email_dispatch: { ok: !!r.ok, to: r.to || supplierEmail, error: r.error || null } },
+                  });
+                } catch (_) { /* audit best-effort */ }
               })
               .catch(e => console.warn('📧 Order email error:', e.message));
           } catch (e) {
@@ -510,7 +536,7 @@ router.put('/:id', (req, res) => {
        WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,
       [rid, id, rid]
     );
-    res.json({ ...updated, items: updatedItems, dispatch: dispatchSummary });
+    res.json({ ...updated, items: updatedItems, dispatch: dispatchSummary, email_dispatch: emailDispatch });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }

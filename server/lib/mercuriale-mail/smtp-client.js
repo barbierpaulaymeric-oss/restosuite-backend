@@ -11,14 +11,23 @@ let _transport = null;
 
 function getTransport() {
   if (_transport) return _transport;
+  // 465 = implicit TLS (secure), 587 = STARTTLS (secure must be false). Derive
+  // `secure` from the port so an env override to 587 doesn't deadlock the TLS
+  // handshake — that was the failure mode behind the IMAP timeouts.
+  const port = Number(process.env.MERCURIALE_SMTP_PORT) || 465;
   _transport = nodemailer.createTransport({
     host: process.env.MERCURIALE_SMTP_HOST || 'ssl0.ovh.net',
-    port: Number(process.env.MERCURIALE_SMTP_PORT) || 465,
-    secure: true,
+    port,
+    secure: port === 465,
     auth: {
       user: process.env.MERCURIALE_EMAIL,
       pass: process.env.MERCURIALE_PASSWORD,
     },
+    // Explicit timeouts (parity with imap-client) so a slow/blocked OVH socket
+    // surfaces as a rejected promise instead of hanging the fire-and-forget send.
+    connectionTimeout: Number(process.env.MERCURIALE_SMTP_CONNECT_TIMEOUT_MS) || 20000,
+    greetingTimeout: Number(process.env.MERCURIALE_SMTP_GREETING_TIMEOUT_MS) || 16000,
+    socketTimeout: Number(process.env.MERCURIALE_SMTP_SOCKET_TIMEOUT_MS) || 30000,
   });
   return _transport;
 }
