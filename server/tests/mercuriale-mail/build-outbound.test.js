@@ -17,27 +17,27 @@ function readSheet(buf) {
 }
 
 describe('buildOrderXlsx', () => {
-  test('returns a non-empty Buffer', () => {
-    const buf = buildOrderXlsx({ restaurant: RESTAURANT, supplier: SUPPLIER, integration: null, po: PO, items: ITEMS });
+  test('returns a non-empty Buffer', async () => {
+    const buf = await buildOrderXlsx({ restaurant: RESTAURANT, supplier: SUPPLIER, integration: null, po: PO, items: ITEMS });
     expect(Buffer.isBuffer(buf)).toBe(true);
     expect(buf.length).toBeGreaterThan(100);
   });
 
-  test('includes restaurant name + PO reference + supplier name', () => {
-    const buf = buildOrderXlsx({ restaurant: RESTAURANT, supplier: SUPPLIER, integration: null, po: PO, items: ITEMS });
+  test('includes restaurant name + PO reference + supplier name', async () => {
+    const buf = await buildOrderXlsx({ restaurant: RESTAURANT, supplier: SUPPLIER, integration: null, po: PO, items: ITEMS });
     const flat = JSON.stringify(readSheet(buf));
     expect(flat).toContain('TestRestoSuite');
     expect(flat).toContain('PO-2026-0001');
     expect(flat).toContain('Metro Paris');
   });
 
-  test('omits external_id row when no integration', () => {
-    const buf = buildOrderXlsx({ restaurant: RESTAURANT, supplier: SUPPLIER, integration: null, po: PO, items: ITEMS });
+  test('omits external_id row when no integration', async () => {
+    const buf = await buildOrderXlsx({ restaurant: RESTAURANT, supplier: SUPPLIER, integration: null, po: PO, items: ITEMS });
     expect(JSON.stringify(readSheet(buf))).not.toContain('FoodFlow ID');
   });
 
-  test('includes external_id when integration provided', () => {
-    const buf = buildOrderXlsx({
+  test('includes external_id when integration provided', async () => {
+    const buf = await buildOrderXlsx({
       restaurant: RESTAURANT, supplier: SUPPLIER,
       integration: { provider: 'foodflow', external_id: 'FF-METRO-42' },
       po: PO, items: ITEMS,
@@ -47,8 +47,8 @@ describe('buildOrderXlsx', () => {
     expect(flat).toContain('FF-METRO-42');
   });
 
-  test('one row per item with name+qty+unit+price', () => {
-    const buf = buildOrderXlsx({ restaurant: RESTAURANT, supplier: SUPPLIER, integration: null, po: PO, items: ITEMS });
+  test('one row per item with name+qty+unit+price', async () => {
+    const buf = await buildOrderXlsx({ restaurant: RESTAURANT, supplier: SUPPLIER, integration: null, po: PO, items: ITEMS });
     const rows = readSheet(buf);
     const tomateRow = rows.find(r => Array.isArray(r) && r.includes('Tomate'));
     expect(tomateRow).toBeDefined();

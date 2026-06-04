@@ -479,7 +479,7 @@ async function dispatchOrderEmail({ rid, supplier_id, po_id, sendFn }) {
     ? ownerRow.email
     : null;
 
-  const xlsxBuffer = buildOrderXlsx({ restaurant, supplier, integration, po, items });
+  const xlsxBuffer = await buildOrderXlsx({ restaurant, supplier, integration, po, items });
   const sender = sendFn || (async (args) => {
     const { sendOrderEmail } = require('./smtp-client');
     return sendOrderEmail(args);
