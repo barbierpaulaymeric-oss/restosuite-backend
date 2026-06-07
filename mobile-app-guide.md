@@ -1,187 +1,203 @@
-# RestoSuite — Guide app mobile (iOS / iPadOS / macOS / Android)
+# RestoSuite Cuisine — Guide app mobile native (iOS / iPadOS / macOS / Android)
 
-> **Principe** : l'app mobile est un **wrapper WebView natif** autour de la version
-> web de production. Elle charge directement `https://www.restosuite.fr/app` —
-> **rien n'est servi localement**. Conséquence directe : **toutes les mises à jour
-> web sont instantanées** sur mobile, sans recompiler ni resoumettre aux stores.
-> On ne repasse par les stores que pour modifier l'enveloppe native (icône, splash,
-> permissions, version, plugins).
+> **Ce que c'est** : une **vraie app mobile native** avec une **UI custom dédiée
+> cuisine** (pas un wrapper WebView de la version web). Pensée pour la **mise en
+> place et le service** : gros boutons (gants/mains mouillées), contraste élevé
+> (néons), mode sombre, navigation par onglets en bas, dictée vocale omniprésente,
+> consultation des fiches **hors-ligne**.
+>
+> Elle parle au **même backend** que le web (`https://www.restosuite.fr/api`) avec
+> le **même compte / JWT**. Mais l'interface est entièrement séparée et réduite à ce
+> qui sert en cuisine.
 
-Stack : [Capacitor 8](https://capacitorjs.com) — pas de framework JS, l'app reste
-une SPA vanilla servie par Express.
-
----
-
-## 1. Architecture
-
-```
-capacitor.config.ts        → config commune (appId, server.url, splash, status bar)
-assets/                    → sources icône + splash (logo.png 1024×1024, fond #0f1115)
-ios/                       → projet Xcode (Swift Package Manager, PAS CocoaPods)
-android/                   → projet Android Studio (Gradle)
-client/                    → webDir requis par Capacitor (non utilisé tant que server.url est défini)
-```
-
-- **appId** : `fr.restosuite.app`
-- **appName** : `RestoSuite`
-- **server.url** : `https://www.restosuite.fr/app` (prod, mises à jour instantanées)
-- **Thème** : fond sombre `#0f1115`, status bar texte clair (`style: DARK`)
-- **Permissions** : caméra (scan étiquettes HACCP), micro + reconnaissance vocale (dictée Alto), photos/fichiers (import BL & fiches techniques)
+Stack : **Capacitor 8** + **UI vanilla JS custom** (cohérent avec le projet : pas de
+framework). Le code de l'UI mobile est embarqué dans l'app (bundlé), donc consultable
+hors connexion.
 
 ---
 
-## 2. Prérequis
+## 1. Pourquoi Capacitor + UI custom (et pas React Native, ni un wrapper)
+
+- **Pas un wrapper** : on ne charge plus `restosuite.fr/app`. L'UI mobile est un code
+  dédié (`mobile/www`) embarqué dans l'app → expérience native, offline, et écrans
+  pensés cuisine.
+- **Capacitor plutôt que React Native** : l'infra Capacitor (iOS/Android) est déjà en
+  place, et le projet est explicitement « vanilla JS, pas de framework ». RN imposerait
+  un toolchain et un langage étrangers à l'équipe. Capacitor réutilise les mêmes
+  compétences web et le même client API.
+- **CapacitorHttp** est activé : les appels API passent par la couche **HTTP native**,
+  donc **aucun problème de CORS** ni de cookies cross-origin. L'auth utilise le **token
+  Bearer** renvoyé dans le body de `/api/auth/smart-login`.
+
+---
+
+## 2. Structure du projet
+
+```
+mobile/
+└── www/                      ← webDir Capacitor (UI embarquée)
+    ├── index.html            shell + boot splash
+    ├── css/theme.css         thème sombre cuisine (tokens, gros boutons, contraste)
+    └── js/
+        ├── config.js         apiBase, clés de stockage, couleurs marque
+        ├── api.js            client API (Bearer + CSRF), gestion 401/offline
+        ├── auth.js           login/logout (smart-login), compte courant
+        ├── store.js          cache offline (fetchWithCache) pour les fiches
+        ├── router.js         routeur hash minimal
+        ├── ui.js             helpers DOM + icônes inline + toast
+        ├── app.js            point d'entrée : shell, tab bar, micro, garde auth
+        └── screens/
+            ├── service.js     écran d'accueil « Service » (actions rapides)
+            ├── fiches.js      fiches techniques (recherche + offline)
+            ├── haccp.js       relevés T° (2 taps), checklist, minuterie
+            ├── receptions.js  contrôle livraison vs commande
+            ├── commandes.js   renouveler une commande fournisseur
+            ├── alto.js        assistant vocal (Web Speech), startVoice()
+            └── login.js       connexion (compte RestoSuite)
+
+capacitor.config.ts           webDir: mobile/www, CapacitorHttp, splash, status bar
+ios/  android/                projets natifs (sync via cap)
+assets/                       sources icône + splash (logo.png 1024×1024)
+```
+
+### Navigation (tab bar basse, pas de hamburger)
+
+5 onglets : **Fiches · HACCP · Réceptions · Commandes · Alto**.
+L'app s'ouvre sur l'écran **Service** (accueil) — le logo/titre du header y ramène.
+
+### Ce qui est volontairement absent
+
+Dashboard analytics, configuration (tables/zones/équipe), gestion administrative
+(factures/exports compta), admin plateforme → restent sur le web.
+
+---
+
+## 3. Prérequis
 
 | Plateforme | Outils |
 |---|---|
-| **iOS / iPadOS / macOS** | macOS + **Xcode 15+**, compte **Apple Developer** (99 €/an). Pas besoin de CocoaPods (Capacitor 8 = Swift Package Manager). |
-| **Android** | **Android Studio** (Hedgehog+), JDK 17, un compte **Google Play Console** (25 $ une fois). |
-| **Commun** | Node.js 18+, repo cloné, `npm install`. |
+| **iOS / iPadOS / macOS** | macOS + **Xcode 15+**, compte **Apple Developer** (99 €/an). SPM (pas CocoaPods). |
+| **Android** | **Android Studio** + JDK 17, compte **Google Play Console** (25 $). |
+| **Commun** | Node.js 18+, `npm install`. |
 
 ---
 
-## 3. Scripts npm
+## 4. Développer l'UI mobile
+
+L'UI est en ES modules vanilla, aucun build requis. Pour itérer dans un navigateur :
 
 ```bash
-npm run cap:sync       # copie config + assets vers iOS et Android (les deux)
-npm run cap:ios        # sync iOS puis ouvre Xcode
-npm run cap:android    # sync Android puis ouvre Android Studio
-npm run cap:copy       # copie uniquement (sans mettre à jour les plugins natifs)
+npx http-server mobile/www -p 5599 -c-1
+# puis http://localhost:5599
 ```
 
-> Comme `server.url` pointe vers la prod, `cap:sync` ne « déploie » pas de code web —
-> il propage seulement la config native (icône, splash, permissions, plugins).
+> En dev navigateur, `CapacitorHttp` n'est pas actif → les appels API sont soumis au
+> CORS. Pour tester les appels réseau réels, lance sur **simulateur/appareil** (étapes
+> ci-dessous), où le HTTP natif contourne le CORS.
 
----
-
-## 4. Build & test iOS / iPadOS
+### Scripts npm
 
 ```bash
-npm install
-npm run cap:ios          # = npx cap sync ios && npx cap open ios
+npm run cap:sync       # copie mobile/www + config vers iOS et Android
+npm run cap:ios        # sync iOS + ouvre Xcode
+npm run cap:android    # sync Android + ouvre Android Studio
+npm run cap:copy       # copie web seule (sans maj plugins natifs)
 ```
 
-Dans Xcode :
+Après **chaque** modif de `mobile/www`, lancer `npm run cap:sync` pour la propager
+aux projets natifs.
 
-1. Sélectionne le projet **App** → target **App** → onglet **Signing & Capabilities**.
-2. Coche **Automatically manage signing** et choisis ton **Team** Apple Developer.
-3. Choisis un appareil/simulateur en haut, puis **▶ Run** (Cmd+R).
+---
 
-> ⚠️ Ouvre `ios/App/App.xcodeproj` (PAS `.xcworkspace` — Capacitor 8 utilise SPM).
-
-### Régénérer l'icône / le splash
+## 5. Build & test iOS / iPadOS
 
 ```bash
-# Remplace assets/logo.png (1024×1024) puis :
-npx @capacitor/assets generate --ios \
-  --iconBackgroundColor '#0f1115' --iconBackgroundColorDark '#0f1115' \
-  --splashBackgroundColor '#0f1115' --splashBackgroundColorDark '#0f1115'
+npm install && npm run cap:ios
 ```
 
----
+Dans Xcode : target **App** → **Signing & Capabilities** → *Automatically manage
+signing* + ton **Team** → choisir un appareil/simulateur → **▶ Run**.
 
-## 5. Build & test macOS
+> Ouvrir `ios/App/App.xcodeproj` (PAS `.xcworkspace` — Capacitor 8 = SPM).
 
-Capacitor n'a pas de plateforme macOS dédiée → on utilise **Mac Catalyst** sur le
-projet iOS existant (l'app iPad tourne nativement sur Mac, Apple Silicon & Intel) :
+## 6. Build & test macOS
 
-1. Dans Xcode, target **App** → onglet **General** → section **Supported Destinations**.
-2. Ajoute **Mac (Mac Catalyst)** (ou **Mac (Designed for iPad)** pour une mise en route immédiate).
-3. Onglet **Signing & Capabilities** : vérifie le signing pour la destination Mac.
-4. Sélectionne **My Mac (Mac Catalyst)** comme destination, puis **▶ Run**.
+Mac Catalyst sur le target iOS : target **App** → **General** → **Supported
+Destinations** → ajouter **Mac (Mac Catalyst)** → destination *My Mac* → **▶ Run**.
 
-> Pour l'App Store macOS, la soumission se fait depuis le **même** target via App Store
-> Connect (un seul build couvre iOS/iPadOS/macOS Catalyst).
-
----
-
-## 6. Build & test Android
+## 7. Build & test Android
 
 ```bash
-npm install
-npm run cap:android      # = npx cap sync android && npx cap open android
+npm install && npm run cap:android
 ```
 
-Dans Android Studio :
+Android Studio : laisser Gradle sync → choisir émulateur/appareil → **▶ Run**.
 
-1. Laisse Gradle se synchroniser.
-2. Choisis un émulateur ou un appareil branché, puis **▶ Run**.
+---
 
-### Régénérer l'icône / le splash
+## 8. Permissions natives
+
+Déjà configurées (les fonctions caméra/micro sont des **API web** dans la WebView ;
+les chaînes natives autorisent le système à les accorder) :
+
+- **iOS** `ios/App/App/Info.plist` : `NSCameraUsageDescription`,
+  `NSMicrophoneUsageDescription`, `NSSpeechRecognitionUsageDescription`,
+  `NSPhotoLibraryUsageDescription`.
+- **Android** `android/app/src/main/AndroidManifest.xml` : `CAMERA`, `RECORD_AUDIO`,
+  `MODIFY_AUDIO_SETTINGS`, `READ_EXTERNAL_STORAGE`.
+
+---
+
+## 9. Icônes & splash
+
+Source : `assets/logo.png` (1024×1024), fond `#0E1626`.
 
 ```bash
-npx @capacitor/assets generate --android \
-  --iconBackgroundColor '#0f1115' --iconBackgroundColorDark '#0f1115' \
-  --splashBackgroundColor '#0f1115' --splashBackgroundColorDark '#0f1115'
+npx @capacitor/assets generate --ios --android \
+  --iconBackgroundColor '#0E1626' --iconBackgroundColorDark '#0E1626' \
+  --splashBackgroundColor '#0E1626' --splashBackgroundColorDark '#0E1626'
 ```
 
 ---
 
-## 7. Versionner l'app
+## 10. Versionnement & soumission
 
-| Plateforme | Où | Quoi incrémenter |
-|---|---|---|
-| iOS / macOS | Xcode → target App → General | **Version** (ex. 1.0.1) + **Build** (entier croissant) |
-| Android | `android/app/build.gradle` | `versionName` (ex. "1.0.1") + `versionCode` (entier croissant) |
+| Plateforme | Version |
+|---|---|
+| iOS / macOS | Xcode → target App → General : **Version** + **Build** |
+| Android | `android/app/build.gradle` : `versionName` + `versionCode` |
 
-> Rappel : on ne bump la version **que** pour un changement de l'enveloppe native.
-> Un changement web pur (UI, features, fixes) est déjà live via `server.url` — pas de resoumission.
-
----
-
-## 8. Soumission App Store (iOS / iPadOS / macOS)
-
-1. Xcode → **Product › Archive** (destination = *Any iOS Device* / *Mac Catalyst*).
-2. Fenêtre Organizer → **Distribute App** → **App Store Connect** → upload.
-3. Sur [App Store Connect](https://appstoreconnect.apple.com) : crée la fiche app
-   (bundle `fr.restosuite.app`), captures d'écran, description, mots-clés, politique
-   de confidentialité (URL requise).
-4. Sélectionne le build uploadé, renseigne les déclarations de confidentialité
-   (caméra, micro), puis **Submit for Review**.
-
-> **⚠️ Guideline App Store 4.2** — Apple rejette parfois les apps qui ne sont « qu'un
-> site web emballé ». Mets en avant les fonctions natives : **scan caméra des
-> étiquettes HACCP** et **dictée vocale Alto**. Démontre-les dans les captures et la
-> note de review.
+- **App Store** : Xcode → *Product › Archive* → *Distribute App* → App Store Connect.
+  Renseigner les déclarations confidentialité (caméra, micro). L'app native dédiée
+  écarte le risque guideline 4.2 (« simple site emballé »).
+- **Play Store** : Android Studio → *Generate Signed Bundle (.aab)* → Play Console
+  (data safety : caméra, micro). Conserver le keystore / activer Play App Signing.
 
 ---
 
-## 9. Soumission Play Store (Android)
+## 11. Auth & réseau — notes techniques
 
-1. Android Studio → **Build › Generate Signed Bundle / APK** → **Android App Bundle (.aab)**.
-2. Crée/forme un **keystore** de signature (à **conserver précieusement** — il signe toutes les MAJ).
-   Idéalement, active **Play App Signing** (Google gère la clé de release).
-3. Sur [Play Console](https://play.google.com/console) : crée l'app, remplis la fiche
-   (description, captures, icône 512, bannière), la déclaration de confidentialité et
-   le questionnaire de contenu/data safety (caméra, micro).
-4. Upload le `.aab` sur une piste (Internal testing → Production) puis publie.
-
----
-
-## 10. Notes techniques
-
-- **Service Worker** : `client/sw.js` est *network-first* → compatible wrapper distant,
-  il sert le cache uniquement hors-ligne et ne bloque pas le bridge Capacitor. Le SW
-  exécuté dans la WebView est celui servi par la prod (origine `www.restosuite.fr`).
-- **Permissions WebView** : la caméra (`getUserMedia` / scan) et le micro (Web Speech /
-  dictée Alto) sont des **API web** appelées dans la WebView. Les chaînes de permission
-  natives (Info.plist côté iOS, AndroidManifest côté Android) sont requises pour que le
-  système autorise ces API — c'est déjà configuré.
-- **`allowNavigation`** : limité à `restosuite.fr` / `www.restosuite.fr`. Les liens
-  externes s'ouvrent dans le navigateur système, pas dans la WebView.
-- **Plugins natifs installés** : `@capacitor/camera`, `@capacitor/splash-screen`,
-  `@capacitor/status-bar`. Ajout futur : `npm i @capacitor/<plugin>` puis `npm run cap:sync`.
+- **Login** : `POST /api/auth/smart-login` → `{ token, csrf_token, account }`. Le
+  `token` (Bearer) est stocké en `localStorage['restosuite_token']`, le `csrf_token`
+  en mémoire (header `X-CSRF-Token` sur les mutations).
+- **CapacitorHttp** patche `fetch` en natif → pas de CORS. **En fallback** (si on
+  désactivait CapacitorHttp), il faudrait ajouter les origines WebView
+  (`capacitor://localhost`, `http://localhost`) à `PROD_CORS_ALLOWLIST` dans
+  `server/app.js`.
+- **Offline** : `store.js` met en cache les fiches (`fetchWithCache`) ; l'écran tente
+  le réseau puis retombe sur le cache (bandeau « hors-ligne »).
+- **Endpoints utilisés** : `/api/recipes` (fiches), `/api/purchase-orders` (commandes),
+  `/api/haccp` (relevés — POST à brancher), `/api/orders`, `/api/suppliers`.
 
 ---
 
-## 11. Checklist mise à jour
+## 12. État actuel (structure de base posée)
 
-**Changement web pur (UI / feature / fix)** → `npm run build`, bump SW (`client/sw.js`),
-deploy prod. **Rien à faire côté stores**, c'est live immédiatement.
+✅ Structure projet · navigation 5 onglets · écran **Service** (actions rapides) ·
+login · thème cuisine · client API + auth + cache offline · saisie T° HACCP (2 taps) ·
+fiches (recherche + offline) · dictée Alto (Web Speech) · icônes/splash.
 
-**Changement natif (icône, splash, permission, version, plugin)** :
-1. Modifier la config / les assets.
-2. `npm run cap:sync`.
-3. Bump version + build/versionCode.
-4. Archive + upload (App Store Connect / Play Console).
-5. Soumettre pour review.
+🔜 À implémenter ensuite : POST relevés T°, checklist HACCP du jour (`/api/haccp-plan`),
+détail fiche (`/recipes/:id` + allergènes), scan BL caméra + contrôle ligne à ligne,
+minuteries multiples, renouvellement commande (POST), notifications push (alertes T°,
+rappels HACCP).

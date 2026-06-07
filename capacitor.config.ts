@@ -1,48 +1,47 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 /**
- * RestoSuite — wrapper WebView natif (iOS / iPadOS / macOS Catalyst / Android).
+ * RestoSuite Cuisine — app mobile native (iOS / iPadOS / macOS Catalyst / Android).
  *
- * L'app ne sert PAS les fichiers localement : elle charge directement la version
- * web de production (https://www.restosuite.fr/app) dans la WebView native.
- * Avantage : les mises à jour sont instantanées, sans repasser par les stores.
+ * ⚠️ Ce N'EST PAS un wrapper WebView de la prod. C'est une UI custom dédiée
+ * cuisine (dossier `mobile/www`), bundlée DANS l'app et pensée pour la mise en
+ * place et le service (gros boutons, contraste élevé, dictée, offline fiches).
  *
- * Le dossier `webDir` (client) reste requis par Capacitor pour le `sync`, mais
- * son contenu n'est pas utilisé tant que `server.url` est défini.
+ * L'app parle au MÊME backend que le web (https://www.restosuite.fr/api) avec le
+ * même JWT. Les requêtes passent par CapacitorHttp (couche HTTP native) → pas de
+ * restriction CORS ni de problème de cookies cross-origin ; on s'appuie sur le
+ * token Bearer renvoyé par /api/auth/smart-login.
+ *
+ * Pas de `server.url` : le code web est embarqué, donc consultable hors-ligne.
  */
 const config: CapacitorConfig = {
   appId: 'fr.restosuite.app',
-  appName: 'RestoSuite',
-  webDir: 'client',
-  server: {
-    // Pointe vers la prod : mises à jour instantanées sans recompiler/resoumettre.
-    url: 'https://www.restosuite.fr/app',
-    // Domaines autorisés à rester dans la WebView (les autres ouvrent Safari/Chrome).
-    allowNavigation: ['www.restosuite.fr', 'restosuite.fr'],
-  },
+  appName: 'RestoSuite Cuisine',
+  webDir: 'mobile/www',
   ios: {
     scrollEnabled: true,
-    // Barre de statut intégrée au contenu (thème sombre RestoSuite).
     contentInset: 'always',
   },
   android: {
-    // Autorise le chargement HTTPS uniquement (pas de cleartext en prod).
     allowMixedContent: false,
   },
   plugins: {
+    // HTTP natif : contourne CORS pour les appels cross-origin vers l'API prod.
+    CapacitorHttp: {
+      enabled: true,
+    },
     SplashScreen: {
-      launchShowDuration: 1500,
+      launchShowDuration: 1200,
       launchAutoHide: true,
-      backgroundColor: '#0f1115',
+      backgroundColor: '#0E1626',
       showSpinner: false,
       androidScaleType: 'CENTER_CROP',
       splashFullScreen: true,
       splashImmersive: true,
     },
     StatusBar: {
-      // Thème sombre : texte clair sur fond sombre.
       style: 'DARK',
-      backgroundColor: '#0f1115',
+      backgroundColor: '#0E1626',
       overlaysWebView: false,
     },
     Camera: {},

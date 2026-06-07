@@ -1,0 +1,16 @@
+// Configuration globale de l'app mobile cuisine.
+export const CONFIG = {
+  // Backend partagé avec la version web (même API, même JWT).
+  // Les requêtes passent par CapacitorHttp (natif) → pas de souci CORS cross-origin.
+  apiBase: 'https://www.restosuite.fr/api',
+
+  appName: 'RestoSuite Cuisine',
+  version: '1.0.0',
+
+  // Clés de stockage local — alignées sur la version web pour partage éventuel.
+  tokenKey: 'restosuite_token',
+  accountKey: 'restosuite_account',
+
+  // Couleurs marque (référence ; la source de vérité est theme.css).
+  colors: { navy: '#1B2A4A', orange: '#E8722A', accent: '#C45A18' },
+};
