@@ -2104,10 +2104,13 @@ async function renderRecipes() {
   app.innerHTML = `
     <div class="page-header">
       <h1>Fiches Techniques</h1>
-      ${perms.edit_recipes ? `<div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+        <button type="button" class="btn btn-secondary" id="btn-allergen-pdf" onclick="downloadAllergenCard()" aria-label="T\xE9l\xE9charger la carte des allerg\xE8nes au format PDF (obligation INCO)"><i data-lucide="shield-alert" style="width:18px;height:18px" aria-hidden="true"></i> Carte allerg\xE8nes PDF</button>
+        ${perms.edit_recipes ? `
         <a href="#/import-recipes" class="btn btn-secondary" aria-label="Importer des fiches techniques depuis un fichier"><i data-lucide="upload" style="width:18px;height:18px" aria-hidden="true"></i> Importer</a>
         <a href="#/new" class="btn btn-primary" aria-label="Cr\xE9er une nouvelle fiche technique"><i data-lucide="plus" style="width:18px;height:18px" aria-hidden="true"></i> Nouvelle fiche</a>
-      </div>` : ""}
+        ` : ""}
+      </div>
     </div>
     <div class="search-bar" role="search">
       <label for="recipe-search" class="visually-hidden">Rechercher une fiche</label>
