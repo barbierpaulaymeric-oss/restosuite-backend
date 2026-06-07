@@ -3,6 +3,8 @@ export const CONFIG = {
   // Backend partagé avec la version web (même API, même JWT).
   // Les requêtes passent par CapacitorHttp (natif) → pas de souci CORS cross-origin.
   apiBase: 'https://www.restosuite.fr/api',
+  // Origine pour les fichiers servis à la racine (photos de fiches dans /uploads…).
+  assetBase: 'https://www.restosuite.fr',
 
   appName: 'RestoSuite Cuisine',
   version: '1.0.0',

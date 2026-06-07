@@ -232,7 +232,135 @@ button, input, textarea, select { font-family: inherit; }
 .toast.ok { border-color: var(--ok); }
 .toast.error { border-color: var(--danger); }
 
-/* Login */
+/* ── Segmented control (onglets internes : T° / Checklist / Minuterie) ── */
+.seg { display: grid; gap: 8px; }
+.seg-btn { min-height: 52px; }
+
+/* ── Détail fiche technique ──────────────────────────────────── */
+.detail-back {
+  display: inline-flex; align-items: center; gap: 8px; width: auto;
+  padding: 0 16px; min-height: 48px; margin-bottom: 4px;
+}
+.detail-hero {
+  width: 100%; height: 180px; border-radius: var(--radius); object-fit: cover;
+  background: var(--surface-2); border: 1px solid var(--line); margin-bottom: 6px;
+}
+.detail-name { font-size: 24px; font-weight: 800; letter-spacing: -.4px; margin: 6px 0 2px; }
+.detail-cat { color: var(--text-dim); font-size: 14px; font-weight: 600; }
+
+/* Bandeau d'infos clés (portions / prép / cuisson) */
+.meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+.meta-cell {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 12px 10px; text-align: center;
+}
+.meta-cell .mc-val { font-size: 20px; font-weight: 800; }
+.meta-cell .mc-lbl { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .6px; font-weight: 700; margin-top: 2px; }
+
+/* Food cost — carte mise en avant */
+.cost-card {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px;
+}
+.cost-card .cc { text-align: center; }
+.cost-card .cc-val { font-size: 22px; font-weight: 800; }
+.cost-card .cc-lbl { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; margin-top: 4px; }
+.cost-card .cc-val.good { color: var(--ok); }
+.cost-card .cc-val.warn { color: var(--warn); }
+.cost-card .cc-val.bad { color: var(--danger); }
+
+/* Lignes ingrédients */
+.ing-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); margin-bottom: 8px;
+}
+.ing-row .ing-name { flex: 1; font-size: 16px; font-weight: 600; }
+.ing-row .ing-qty { font-size: 16px; font-weight: 800; color: var(--orange); white-space: nowrap; }
+.ing-row .ing-sub { font-size: 12px; color: var(--text-faint); }
+.ing-row.missing .ing-qty { color: var(--warn); }
+
+/* Section allergènes — 14 INCO, présents bien visibles */
+.allergen-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.allergen-chip {
+  display: flex; align-items: center; gap: 10px; min-height: 56px;
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  background: var(--surface); border: 1px solid var(--line); opacity: .4;
+}
+.allergen-chip .ac-emoji { font-size: 22px; }
+.allergen-chip .ac-name { font-size: 14px; font-weight: 600; }
+.allergen-chip.present {
+  opacity: 1; background: rgba(229,72,77,.14); border-color: var(--danger);
+}
+.allergen-chip.present .ac-name { font-weight: 800; color: var(--text); }
+.allergen-none { color: var(--ok); font-weight: 700; padding: 10px 2px; }
+
+/* Note dictée (modification Alto) */
+.dictation-note {
+  background: rgba(232,114,42,.12); border: 1px solid var(--orange); border-radius: var(--radius-sm);
+  padding: 14px 16px; margin-top: 10px; font-size: 15px; line-height: 1.4;
+}
+.dictation-note .dn-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--orange); font-weight: 800; margin-bottom: 4px; }
+
+/* ── HACCP : relevé T° ───────────────────────────────────────── */
+.zone-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.zone-btn {
+  min-height: var(--tap); border-radius: var(--radius-sm); cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); color: var(--text);
+  font-size: 15px; font-weight: 700; padding: 8px 10px; line-height: 1.2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.zone-btn .zb-range { font-size: 11px; color: var(--text-faint); font-weight: 600; }
+.zone-btn.sel { background: linear-gradient(135deg, var(--orange), var(--accent)); border-color: transparent; color: #fff; }
+.zone-btn.sel .zb-range { color: rgba(255,255,255,.85); }
+
+.temp-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); margin-bottom: 8px;
+}
+.temp-row .tr-main { flex: 1; }
+.temp-row .tr-zone { font-size: 15px; font-weight: 700; }
+.temp-row .tr-time { font-size: 12px; color: var(--text-faint); }
+.temp-row .tr-val { font-size: 22px; font-weight: 800; }
+.temp-row .tr-val.ok { color: var(--ok); }
+.temp-row.alert { background: rgba(229,72,77,.14); border-color: var(--danger); }
+.temp-row.alert .tr-val { color: var(--danger); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+
+/* ── HACCP : checklist ───────────────────────────────────────── */
+.progress { height: 14px; border-radius: 999px; background: var(--surface-2); overflow: hidden; border: 1px solid var(--line); }
+.progress-bar { height: 100%; background: linear-gradient(90deg, var(--orange), var(--accent)); width: 0; transition: width .35s ease; }
+.progress-meta { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: var(--text-dim); margin: 8px 2px 16px; }
+
+.check-item {
+  display: flex; align-items: center; gap: 14px; min-height: var(--tap);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 12px 14px; margin-bottom: 10px; cursor: pointer;
+}
+.check-item:active { background: var(--surface-2); }
+.check-box {
+  width: 34px; height: 34px; flex: 0 0 auto; border-radius: 9px;
+  border: 2px solid var(--line); display: grid; place-items: center; color: transparent;
+}
+.check-item.done .check-box { background: var(--ok); border-color: var(--ok); color: #fff; }
+.check-item.done .ci-name { color: var(--text-dim); text-decoration: line-through; }
+.check-item .ci-main { flex: 1; }
+.check-item .ci-name { font-size: 16px; font-weight: 700; }
+.check-item .ci-sub { font-size: 12px; color: var(--text-faint); }
+
+/* ── Minuteries ──────────────────────────────────────────────── */
+.timer-presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 12px; }
+.preset-btn { min-height: 56px; font-size: 16px; padding: 0; }
+.timer-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px 16px; margin-bottom: 10px;
+}
+.timer-card.ringing { border-color: var(--danger); background: rgba(229,72,77,.14); animation: blink 1s steps(1) infinite; }
+.timer-card .tc-top { display: flex; align-items: baseline; gap: 10px; }
+.timer-card .tc-name { flex: 1; font-size: 16px; font-weight: 700; }
+.timer-card .tc-time { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+.timer-card .tc-actions { display: flex; gap: 8px; margin-top: 10px; }
+.timer-card .tc-actions .btn { min-height: 48px; font-size: 15px; }
+
 .login-wrap { min-height: 100%; display: flex; flex-direction: column; justify-content: center;
   padding: calc(var(--safe-top) + 24px) 24px calc(var(--safe-bottom) + 24px); gap: 16px; }
 .login-wrap .login-brand { text-align: center; margin-bottom: 12px; }
@@ -241,3 +369,82 @@ button, input, textarea, select { font-family: inherit; }
   background: linear-gradient(135deg, var(--orange), var(--accent)); font-weight: 800; }
 .login-wrap h1 { font-size: 24px; margin: 0; }
 .login-wrap p { color: var(--text-dim); margin: 4px 0 0; }
+
+/* ── Commandes : ligne + stepper quantité (gros doigts) ──────────── */
+.order-line {
+  display: flex; align-items: center; gap: 12px; min-height: var(--tap);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 10px 14px; margin-bottom: 10px;
+}
+.order-line .lr-main { flex: 1; min-width: 0; }
+.order-line .lr-title { font-size: 16px; font-weight: 700; }
+.order-line .lr-sub { font-size: 13px; color: var(--text-dim); }
+.qty-stepper { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.qty-btn {
+  width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--text); font-size: 26px; font-weight: 700;
+  line-height: 1; display: grid; place-items: center; cursor: pointer;
+}
+.qty-btn:active { transform: scale(.94); background: var(--orange); color: #fff; }
+.qty-val { min-width: 40px; text-align: center; font-size: 18px; font-weight: 800; }
+.order-total {
+  margin-top: 4px; padding: 14px 16px; border-radius: var(--radius-sm);
+  background: var(--surface-2); border: 1px solid var(--line);
+  font-size: 17px; font-weight: 800; text-align: right;
+}
+
+/* ── Alto : interface de chat ────────────────────────────────────── */
+.chat-screen { display: flex; flex-direction: column; min-height: 100%; }
+.chat-head { margin-bottom: 12px; }
+.chat-thread { flex: 1; display: flex; flex-direction: column; gap: 10px; padding-bottom: 6px; }
+.chat-row { display: flex; }
+.chat-row.user { justify-content: flex-end; }
+.chat-row.alto { justify-content: flex-start; }
+.chat-bubble {
+  max-width: 82%; padding: 12px 16px; border-radius: 18px;
+  font-size: 16px; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word;
+  -webkit-user-select: text; user-select: text;
+}
+.chat-bubble.user { background: linear-gradient(135deg, var(--orange), var(--accent)); color: #fff; border-bottom-right-radius: 6px; }
+.chat-bubble.alto { background: var(--surface); border: 1px solid var(--line); color: var(--text); border-bottom-left-radius: 6px; }
+.chat-bubble.typing { display: flex; gap: 5px; align-items: center; }
+.chat-bubble.typing .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); animation: alto-typing 1.2s infinite; }
+.chat-bubble.typing .dot:nth-child(2) { animation-delay: .2s; }
+.chat-bubble.typing .dot:nth-child(3) { animation-delay: .4s; }
+@keyframes alto-typing { 0%,60%,100% { opacity: .25; } 30% { opacity: 1; } }
+
+.chat-chips { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 10px; -webkit-overflow-scrolling: touch; }
+.chip {
+  flex: 0 0 auto; padding: 10px 14px; border-radius: 999px; min-height: 44px;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--text-dim);
+  font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.chip:active { background: var(--surface); color: var(--text); }
+
+.chat-input-bar {
+  position: sticky; bottom: 0; display: flex; gap: 8px; align-items: center;
+  padding: 10px 0 calc(var(--safe-bottom) + 2px);
+  background: var(--bg);
+}
+.chat-input-bar .field { flex: 1; }
+.chat-mic, .chat-send {
+  width: 56px; height: 56px; flex: 0 0 auto; border-radius: 14px; border: 0;
+  display: grid; place-items: center; cursor: pointer; color: #fff;
+}
+.chat-mic { background: var(--surface-2); border: 1px solid var(--line); color: var(--text); }
+.chat-send { background: linear-gradient(135deg, var(--orange), var(--accent)); }
+.chat-mic:active, .chat-send:active { transform: scale(.95); }
+
+/* ── Allergènes : pastilles 14 INCO ──────────────────────────────── */
+.allergen-card { margin: 14px 0 4px; }
+.allergen-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.allergen-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.allergen-pastille {
+  display: flex; align-items: center; gap: 10px; min-height: 52px;
+  padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line);
+}
+.allergen-pastille .ap-icon { font-size: 22px; line-height: 1; }
+.allergen-pastille .ap-name { font-size: 14px; font-weight: 600; }
+.allergen-pastille.on { background: rgba(229,72,77,.16); border-color: var(--danger); }
+.allergen-pastille.on .ap-name { color: var(--text); font-weight: 800; }
+.allergen-pastille.off { opacity: .38; }

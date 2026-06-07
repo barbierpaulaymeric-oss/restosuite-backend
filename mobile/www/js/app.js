@@ -6,10 +6,12 @@ import { defineRoutes, startRouter, navigate, onRouteChange } from './router.js'
 import { startVoice } from './screens/alto.js';
 import { ServiceScreen } from './screens/service.js';
 import { FichesScreen } from './screens/fiches.js';
+import { FicheDetailScreen } from './screens/fiche-detail.js';
 import { HaccpScreen } from './screens/haccp.js';
 import { ReceptionsScreen } from './screens/receptions.js';
 import { CommandesScreen } from './screens/commandes.js';
 import { AltoScreen } from './screens/alto.js';
+import { AllergenesScreen } from './screens/allergenes.js';
 import { LoginScreen } from './screens/login.js';
 
 const root = document.getElementById('root');
@@ -30,12 +32,9 @@ defineRoutes({
   receptions: ReceptionsScreen,
   commandes: CommandesScreen,
   alto: AltoScreen,
-  // Détail d'une fiche — placeholder (à brancher sur GET /recipes/:id).
-  fiche: (query) => h('div', {}, [
-    h('button', { class: 'btn btn-ghost', style: 'width:auto; padding:0 16px', onclick: () => history.back() }, '← Retour'),
-    h('div', { style: 'height:16px' }),
-    emptyState('fiches', 'Fiche technique', `Détail fiche #${query.get('id') || '?'} — ingrédients, étapes, allergènes (à implémenter).`),
-  ]),
+  allergenes: AllergenesScreen,
+  // Détail d'une fiche — ingrédients, food cost, allergènes INCO, dictée Alto.
+  fiche: FicheDetailScreen,
 });
 
 function mountShell() {

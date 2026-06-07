@@ -1,8 +1,10 @@
-// Alto — assistant vocal omniprésent (dictée + recherche mains-libres).
+// Alto — assistant vocal omniprésent (dictée + recherche mains-libres) +
+// interface de chat (texte ou voix) branchée sur POST /api/ai/chef.
 // Utilise l'API Web Speech (SpeechRecognition) disponible dans la WebView ;
 // la permission micro est déclarée côté natif (Info.plist / AndroidManifest).
-import { h, icon, toast, emptyState } from '../ui.js';
+import { h, icon, toast } from '../ui.js';
 import { navigate } from '../router.js';
+import { API } from '../api.js';
 
 function getRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -38,15 +40,94 @@ export function startVoice(mode = 'command', onResult) {
   try { rec.start(); } catch { toast('Micro occupé', 'error'); }
 }
 
+// Suggestions rapides — pré-remplissent la saisie, le chef complète le nom du plat.
+const QUICK_PROMPTS = [
+  'Food cost du ',
+  'Allergènes du ',
+  'Recette ',
+];
+
 export function AltoScreen() {
-  return h('div', {}, [
-    h('div', { class: 'screen-title' }, 'Alto'),
-    h('p', { class: 'section-label', style: 'margin-top:-8px' }, 'Assistant vocal cuisine'),
-    h('div', { class: 'quick-grid' }, [
-      h('button', { class: 'quick-tile', onclick: () => startVoice('search') }, [h('div', { class: 'qt-icon' }, [icon('search', 26)]), h('div', {}, [h('div', { class: 'qt-label' }, 'Chercher une fiche')])]),
-      h('button', { class: 'quick-tile', onclick: () => startVoice('command') }, [h('div', { class: 'qt-icon' }, [icon('thermometer', 26)]), h('div', {}, [h('div', { class: 'qt-label' }, 'Dicter un relevé')])]),
+  // Historique conversationnel envoyé à l'API (format { role, text }).
+  const history = [];
+
+  const thread = h('div', { class: 'chat-thread' });
+
+  function scrollToEnd() {
+    // Le conteneur de scroll est .app-main ; on défile après le rendu.
+    requestAnimationFrame(() => {
+      const main = document.querySelector('.app-main');
+      if (main) main.scrollTop = main.scrollHeight;
+    });
+  }
+
+  function bubble(role, text) {
+    return h('div', { class: 'chat-row ' + role }, [
+      h('div', { class: 'chat-bubble ' + role }, text),
+    ]);
+  }
+
+  function addMessage(role, text) {
+    thread.append(bubble(role, text));
+    scrollToEnd();
+  }
+
+  function typingIndicator() {
+    const el = h('div', { class: 'chat-row alto' }, [
+      h('div', { class: 'chat-bubble alto typing' }, [
+        h('span', { class: 'dot' }), h('span', { class: 'dot' }), h('span', { class: 'dot' }),
+      ]),
+    ]);
+    thread.append(el);
+    scrollToEnd();
+    return el;
+  }
+
+  async function send(text) {
+    const msg = (text || '').trim();
+    if (!msg) return;
+    input.value = '';
+    addMessage('user', msg);
+    history.push({ role: 'user', text: msg });
+
+    const typing = typingIndicator();
+    sendBtn.disabled = true;
+    try {
+      const data = await API.post('/ai/chef', { message: msg, conversation_history: history.slice(-10) });
+      typing.remove();
+      const reply = (data && data.reply) ? data.reply : 'Je n\'ai pas pu répondre.';
+      addMessage('alto', reply);
+      history.push({ role: 'model', text: reply });
+    } catch (e) {
+      typing.remove();
+      const offline = e && e.code === 'NETWORK';
+      addMessage('alto', offline ? 'Hors-ligne — Alto a besoin d\'une connexion.' : 'Erreur — réessayez dans un instant.');
+    } finally {
+      sendBtn.disabled = false;
+    }
+  }
+
+  const input = h('input', {
+    class: 'field', type: 'text', placeholder: 'Posez votre question à Alto…',
+    onkeydown: (e) => { if (e.key === 'Enter') send(input.value); },
+  });
+  const micBtn = h('button', { class: 'chat-mic', 'aria-label': 'Dictée', onclick: () => startVoice('chat', (t) => { input.value = t; send(t); }) }, [icon('mic', 24)]);
+  const sendBtn = h('button', { class: 'chat-send', 'aria-label': 'Envoyer', onclick: () => send(input.value) }, [icon('check', 24)]);
+
+  const chips = h('div', { class: 'chat-chips' }, QUICK_PROMPTS.map((p) =>
+    h('button', { class: 'chip', onclick: () => { input.value = p; input.focus(); } }, p)
+  ));
+
+  // Message d'accueil.
+  addMessage('alto', 'Bonjour 👋 Je suis Alto, votre assistant cuisine. Posez-moi une question sur vos plats, food cost, allergènes ou recettes.');
+
+  return h('div', { class: 'chat-screen' }, [
+    h('div', { class: 'chat-head' }, [
+      h('div', { class: 'screen-title', style: 'margin:0' }, 'Alto'),
+      h('p', { class: 'section-label', style: 'margin:2px 0 0' }, 'Assistant cuisine'),
     ]),
-    h('div', { style: 'height:16px' }),
-    emptyState('alto', 'Dites une commande', 'Ex. « Cherche la fiche du tartare », « Relevé frigo 1 à 4 degrés ».'),
+    thread,
+    chips,
+    h('div', { class: 'chat-input-bar' }, [input, micBtn, sendBtn]),
   ]);
 }

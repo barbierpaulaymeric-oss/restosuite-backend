@@ -35,7 +35,7 @@ export function ServiceScreen() {
     h('div', { class: 'section-label' }, 'Consulter'),
     h('div', { class: 'quick-grid' }, [
       tile({ iconName: 'fiches', label: 'Fiches techniques', sub: 'Recherche vocale', onClick: () => navigate('fiches') }),
-      tile({ iconName: 'allergen', label: 'Allergènes', sub: 'Par plat', onClick: () => navigate('fiches', { filter: 'allergenes' }) }),
+      tile({ iconName: 'allergen', label: 'Allergènes', sub: 'Par plat', onClick: () => navigate('allergenes') }),
     ]),
 
     h('div', { class: 'section-label' }, 'Renouveler'),
