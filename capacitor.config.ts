@@ -18,9 +18,15 @@ const config: CapacitorConfig = {
   appId: 'fr.restosuite.app',
   appName: 'RestoSuite Cuisine',
   webDir: 'mobile/www',
+  // Fond sombre de la WebView native : évite les flashs/barres blanches pendant
+  // l'ouverture du clavier, l'overscroll et avant le premier rendu.
+  backgroundColor: '#0E1626',
   ios: {
     scrollEnabled: true,
-    contentInset: 'always',
+    // 'never' : on gère TOUTES les marges sûres (notch, Home Indicator) en CSS
+    // via env(safe-area-inset-*). 'always' faisait doublon et faussait le calcul.
+    contentInset: 'never',
+    backgroundColor: '#0E1626',
   },
   android: {
     allowMixedContent: false,
@@ -42,7 +48,9 @@ const config: CapacitorConfig = {
     StatusBar: {
       style: 'DARK',
       backgroundColor: '#0E1626',
-      overlaysWebView: false,
+      // true : la WebView occupe tout l'écran (full-bleed) et env(safe-area-inset-top)
+      // renvoie la vraie hauteur de la Dynamic Island → le header se décale via CSS.
+      overlaysWebView: true,
     },
     Camera: {},
   },

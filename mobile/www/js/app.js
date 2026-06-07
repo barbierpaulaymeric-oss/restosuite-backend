@@ -16,6 +16,36 @@ import { LoginScreen } from './screens/login.js';
 
 const root = document.getElementById('root');
 
+// ── Clavier logiciel iOS ──────────────────────────────────────────
+// La WebView ne redimensionne pas toujours quand le clavier s'ouvre : la tab bar
+// (position:fixed) et le micro flottant restent alors visibles DERRIÈRE le
+// clavier. On mesure la hauteur réellement visible via visualViewport, on pose
+// --kb (hauteur du clavier) et on ajoute body.keyboard-open → le CSS masque la
+// tab bar / le FAB et relève la barre de saisie Alto au-dessus du clavier.
+function setupKeyboardChrome() {
+  const vv = window.visualViewport;
+  const el = document.documentElement;
+  let raf = 0;
+  function update() {
+    raf = 0;
+    // Hauteur masquée en bas = fenêtre layout − viewport visible − décalage haut.
+    const hidden = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+    const open = hidden > 90; // seuil : ignore les barres d'accessoires fines
+    document.body.classList.toggle('keyboard-open', open);
+    el.style.setProperty('--kb', (open ? hidden : 0) + 'px');
+  }
+  function schedule() { if (!raf) raf = requestAnimationFrame(update); }
+  if (vv) {
+    vv.addEventListener('resize', schedule);
+    vv.addEventListener('scroll', schedule);
+  }
+  window.addEventListener('resize', schedule);
+  // Filet : à la perte de focus d'un champ, on referme l'état clavier.
+  document.addEventListener('focusout', () => setTimeout(schedule, 50));
+  update();
+}
+setupKeyboardChrome();
+
 // Onglets bas — exactement les 5 destinations demandées.
 const TABS = [
   { name: 'fiches', label: 'Fiches', icon: 'fiches' },
@@ -64,9 +94,12 @@ function mountShell() {
   root.replaceChildren(h('div', { class: 'app-shell' }, [header, view, tabbar, mic]));
   root.removeAttribute('aria-busy');
 
-  // Surligne l'onglet actif (Service n'est pas un onglet → aucun actif).
+  // Surligne l'onglet actif (Service n'est pas un onglet → aucun actif) et
+  // expose la route courante sur <body> pour le CSS (ex : masquer le FAB micro
+  // sur l'écran Alto qui a déjà son propre micro).
   onRouteChange((name) => {
     tabbar.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+    document.body.dataset.route = name;
   });
 
   startRouter(view);
