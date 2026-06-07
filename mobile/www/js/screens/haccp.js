@@ -126,7 +126,9 @@ function Checklist() {
       meta,
       ...items,
     );
-    requestAnimationFrame(() => { bar.style.width = pct + '%'; });
+    // Largeur posée juste après le montage : la transition CSS anime depuis 0,
+    // mais l'état reste correct même si rAF est throttlé (onglet non focalisé).
+    bar.style.width = pct + '%';
 
     function refreshProgress() {
       const d = tasks.filter((x) => x.done_today).length;
