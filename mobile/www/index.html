@@ -19,6 +19,76 @@
       <div class="boot-spinner" role="status" aria-label="Chargement"></div>
     </div>
   </div>
+
+  <!--
+    Filet de sécurité — script CLASSIQUE (pas un module) : il s'exécute même si
+    le module ES échoue à charger/parser dans WKWebView. Sans console sur un
+    iPhone, un plantage silencieux d'app.js laisse le boot-splash sombre affiché
+    → ce que l'utilisateur perçoit comme « écran noir ». Ici on rend l'erreur
+    réelle VISIBLE à l'écran, avec des styles inline (marche même si theme.css
+    n'a pas chargé).
+  -->
+  <script>
+    (function () {
+      var shown = false;
+      function showError(title, detail) {
+        if (shown) return;
+        shown = true;
+        var root = document.getElementById('root');
+        if (!root) return;
+        root.removeAttribute('aria-busy');
+        root.innerHTML =
+          '<div style="position:fixed;inset:0;background:#0E1626;color:#F4F7FB;' +
+          'font-family:-apple-system,system-ui,sans-serif;padding:24px;' +
+          'padding-top:calc(env(safe-area-inset-top,0px) + 24px);' +
+          'display:flex;flex-direction:column;gap:14px;overflow:auto;">' +
+          '<div style="font-weight:800;font-size:20px;color:#E5484D;">⚠️ RestoSuite n\'a pas pu démarrer</div>' +
+          '<div style="font-size:15px;color:#A9B6CE;line-height:1.5;">' + title + '</div>' +
+          (detail
+            ? '<pre style="white-space:pre-wrap;word-break:break-word;background:#16223A;' +
+              'border:1px solid #2C3E63;border-radius:12px;padding:14px;font-size:12px;' +
+              'color:#F4F7FB;margin:0;">' + detail + '</pre>'
+            : '') +
+          '<button onclick="window.location.reload()" style="margin-top:8px;' +
+          'background:linear-gradient(135deg,#E8722A,#C45A18);color:#fff;border:0;' +
+          'border-radius:14px;padding:16px;font-size:16px;font-weight:700;">Réessayer</button>' +
+          '</div>';
+      }
+      function fmt(e) {
+        if (!e) return '';
+        if (e.error && e.error.stack) return String(e.error.stack);
+        if (e.reason) return String(e.reason && e.reason.stack ? e.reason.stack : e.reason);
+        if (e.message) return e.message + (e.filename ? '\n' + e.filename + ':' + e.lineno : '');
+        return String(e);
+      }
+      window.addEventListener('error', function (e) {
+        // Échec de chargement d'une ressource (ex : module ES qui ne se charge pas)
+        var t = e.target;
+        if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
+          showError(
+            'Une ressource n\'a pas pu être chargée. Vérifiez que le build iOS est à jour (cap sync + rebuild Xcode).',
+            (t.src || t.href || '') + '\n' + fmt(e)
+          );
+          return;
+        }
+        showError('Une erreur JavaScript a interrompu le démarrage.', fmt(e));
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        showError('Une promesse rejetée a interrompu le démarrage.', fmt(e));
+      });
+      // Watchdog : si après 8 s le boot n'a pas retiré aria-busy, on prévient.
+      window.__bootWatchdog = setTimeout(function () {
+        var root = document.getElementById('root');
+        if (root && root.getAttribute('aria-busy') === 'true') {
+          showError(
+            'Le chargement n\'a pas abouti (les modules JavaScript ne se sont peut-être pas exécutés dans la WebView).',
+            'Boot bloqué après 8 s.'
+          );
+        }
+      }, 8000);
+    })();
+  </script>
+
   <script type="module" src="./js/app.js"></script>
 </body>
 </html>
