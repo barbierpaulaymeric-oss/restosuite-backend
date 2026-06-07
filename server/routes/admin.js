@@ -8,6 +8,7 @@
 const express = require('express');
 const { all, get } = require('../db');
 const { requireAuth } = require('./auth');
+const { demoMatchSql } = require('../lib/demo-accounts');
 
 const router = express.Router();
 
@@ -27,23 +28,9 @@ const ADMIN_EMAILS = (() => {
 // ─── Filtrage des comptes démo / test ───
 // Ces comptes servent aux démonstrations et aux tests ; ils ne doivent jamais
 // apparaître dans le dashboard admin ni gonfler les statistiques de la plateforme.
-const DEMO_EMAILS = [
-  'demo@restosuite.fr',
-  'marcdupontbrasserie@test.com',
-  'marie@bistrot-marie.fr',
-  'kenji@sakura-paris.fr',
-];
-
-// Renvoie une condition SQL (positive) qui matche un compte démo à partir d'une
-// colonne email, plus les paramètres associés. On combine une liste explicite et
-// des motifs (« @test. », « demo@ ») pour attraper aussi les futurs comptes de test.
-function demoMatch(col) {
-  const placeholders = DEMO_EMAILS.map(() => '?').join(', ');
-  return {
-    sql: `(LOWER(${col}) IN (${placeholders}) OR LOWER(${col}) LIKE '%@test.%' OR LOWER(${col}) LIKE 'demo@%')`,
-    params: DEMO_EMAILS.map(e => e.toLowerCase()),
-  };
-}
+// La liste + la logique de matching vivent dans lib/demo-accounts.js (partagées
+// avec le mailer de rétention pour ne jamais diverger).
+const demoMatch = demoMatchSql;
 
 // Sous-requête renvoyant les restaurant_id liés à un compte propriétaire démo,
 // afin d'exclure ces restaurants des listes et des compteurs.

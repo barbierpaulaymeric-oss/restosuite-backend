@@ -6,7 +6,9 @@
 
 const sentEmails = [];
 jest.mock('../lib/mercuriale-mail/smtp-client', () => ({
-  sendPlainEmail: jest.fn(async (msg) => { sentEmails.push(msg); return { messageId: 'mock' }; }),
+  // Les relances partent depuis contact@ (sendContactEmail), jamais depuis
+  // mercuriale@ (sendPlainEmail) dont la boîte est pollée pour les fournisseurs.
+  sendContactEmail: jest.fn(async (msg) => { sentEmails.push(msg); return { messageId: 'mock' }; }),
 }));
 
 // runRetentionCycle est env-gated : il faut des creds SMTP « présents ».
@@ -69,12 +71,26 @@ describe('runRetentionCycle', () => {
     expect(sentEmails).toHaveLength(0);
   });
 
-  it('exclut les comptes démo / test', async () => {
+  it('exclut les comptes démo / test (motifs ET liste explicite)', async () => {
+    // Motifs « demo@ » / « @test. »
     makeOwner({ email: 'demo@restosuite.fr', ageDays: 3 });
     makeOwner({ email: 'marc@test.com', ageDays: 3 });
+    // Liste explicite : ces comptes démo ne matchent AUCUN motif → ils n'étaient
+    // pas filtrés avant le partage de demoMatchSql (bounces sur les relances).
+    makeOwner({ email: 'marie@bistrot-marie.fr', ageDays: 3 });
+    makeOwner({ email: 'kenji@sakura-paris.fr', ageDays: 3 });
     const r = await runRetentionCycle();
     expect(r.sent).toBe(0);
     expect(sentEmails).toHaveLength(0);
+  });
+
+  it('envoie la relance depuis contact@ avec un Reply-To contact@', async () => {
+    makeOwner({ email: 'j1@resto.fr', ageDays: 1 });
+    await runRetentionCycle();
+    // (sendContactEmail est mocké : on vérifie ici que le bon chemin d'envoi est
+    // emprunté ; le from/replyTo contact@ sont posés dans smtp-client.)
+    expect(sentEmails).toHaveLength(1);
+    expect(sentEmails[0].to).toBe('j1@resto.fr');
   });
 
   it('ne relance pas un compte trop récent (< 1 jour)', async () => {

@@ -22,6 +22,7 @@
 
 const { all, run } = require('../db');
 const { escapeHtml } = require('./email-signature');
+const { demoMatchSql } = require('./demo-accounts');
 
 const APP_URL = 'https://www.restosuite.fr/app';
 const TRIAL_DAYS = 60;
@@ -169,12 +170,17 @@ async function runRetentionCycle() {
     return { sent: 0, candidates: 0, reason: 'smtp-disabled' };
   }
 
-  const { sendPlainEmail } = require('./mercuriale-mail/smtp-client');
+  const { sendContactEmail } = require('./mercuriale-mail/smtp-client');
 
   // Comptes gérants non activés, avec un email réel (hors démo/test). On calcule
   // l'ancienneté en jours directement en SQL (julianday). Le seuil minimum est
   // celui de la première étape : inutile de remonter des comptes trop récents.
+  // L'exclusion démo/test partage sa logique avec le dashboard admin via
+  // demoMatchSql (liste explicite + motifs) : marie@bistrot-marie.fr et
+  // kenji@sakura-paris.fr sont des comptes démo sans motif @test./demo@, ils ne
+  // seraient pas filtrés par les seuls motifs.
   const minDays = STAGES[0].minDays;
+  const dm = demoMatchSql('a.email');
   const candidates = all(
     `SELECT a.id, a.email, a.first_name,
             (julianday('now') - julianday(a.created_at)) AS age_days
@@ -182,10 +188,9 @@ async function runRetentionCycle() {
      WHERE a.is_owner = 1
        AND a.first_recipe_at IS NULL
        AND a.email IS NOT NULL AND TRIM(a.email) <> ''
-       AND LOWER(a.email) NOT LIKE '%@test.%'
-       AND LOWER(a.email) NOT LIKE 'demo@%'
+       AND NOT ${dm.sql}
        AND (julianday('now') - julianday(a.created_at)) >= ?`,
-    [minDays]
+    [...dm.params, minDays]
   );
 
   let sent = 0;
@@ -205,7 +210,7 @@ async function runRetentionCycle() {
     const { text, html } = stage.build(firstName, { remainingDays });
 
     try {
-      await sendPlainEmail({ to: acc.email, subject: stage.subject, text, html });
+      await sendContactEmail({ to: acc.email, subject: stage.subject, text, html });
       // Journalise APRÈS l'envoi réussi. INSERT OR IGNORE : pas de doublon si
       // deux ticks se chevauchaient (l'index unique tranche).
       run(

@@ -354,7 +354,7 @@ async function sendWelcomeEmail(account) {
   // En test/dev sans identifiants OVH, on n'essaie même pas de joindre le SMTP.
   if (!process.env.MERCURIALE_EMAIL || !process.env.MERCURIALE_PASSWORD) return;
 
-  const { sendPlainEmail } = require('../lib/mercuriale-mail/smtp-client');
+  const { sendContactEmail } = require('../lib/mercuriale-mail/smtp-client');
   const { escapeHtml } = require('../lib/email-signature');
   const firstName = (account.first_name || '').trim() || 'Chef';
   const subject = `Bienvenue sur RestoSuite, ${firstName} !`;
@@ -402,7 +402,7 @@ explorer l'outil sans aucune limite, et sans engagement.</p>
 <p style="color:#6b7280;font-size:13px">Une question, un blocage&nbsp;? Répondez simplement à cet email, on vous lit.</p>
 <p>À très vite,<br>L'équipe RestoSuite</p>`;
 
-  await sendPlainEmail({ to: account.email, subject, text, html });
+  await sendContactEmail({ to: account.email, subject, text, html });
 }
 
 // ─── POST /api/auth/register-supplier ───
