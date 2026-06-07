@@ -298,6 +298,7 @@ app.use('/api/tiac', require('./routes/tiac'));
 app.use('/api/fabrication-diagrams', require('./routes/fabrication-diagrams'));
 app.use('/api/errors', require('./routes/errors').router);
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/cron', require('./routes/cron'));
 
 // Admin endpoints — JWT required (gérant only)
 app.post('/api/admin/backup', requireAuth, (req, res) => {
@@ -422,6 +423,14 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     require('./lib/mercuriale-mail/poller').startPoller();
   } catch (e) {
     console.warn('📧 Mercuriale poller failed to start:', e.message);
+  }
+
+  // Relances anti-churn (J+1/J+3/J+7) pour les comptes non activés. Env-gated
+  // (SMTP requis), s'auto-désactive sans creds OVH. Cf. lib/retention-mailer.js.
+  try {
+    require('./lib/retention-mailer').startRetentionMailer();
+  } catch (e) {
+    console.warn('📧 Relances rétention: démarrage échoué —', e.message);
   }
 });
 

@@ -2203,6 +2203,26 @@ try {
   console.warn('⚠️ activation tracking migration error:', e.message);
 }
 
+// ─── Migration: journal des relances anti-churn (J+1 / J+3 / J+7) ───
+// Une ligne par (compte, type de relance) effectivement envoyé, pour ne JAMAIS
+// renvoyer deux fois la même relance même si le job tourne toutes les heures.
+// L'index unique rend l'INSERT idempotent (INSERT OR IGNORE).
+// Voir server/lib/retention-mailer.js et marketing/retention-study.md.
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS retention_emails_sent (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_id INTEGER NOT NULL REFERENCES accounts(id),
+      email_type TEXT NOT NULL,
+      sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_retention_emails_unique
+           ON retention_emails_sent(account_id, email_type)`);
+} catch (e) {
+  console.warn('⚠️ retention_emails_sent migration error:', e.message);
+}
+
 }
 
 module.exports = { runMigrations };
