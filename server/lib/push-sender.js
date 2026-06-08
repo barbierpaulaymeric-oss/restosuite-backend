@@ -117,8 +117,10 @@ async function sendToAccount(accountId, payload) {
       const reason = (e && e.reason) || (e && e.message) || 'Unknown';
       const statusCode = (e && e.statusCode) || null;
       let purged = false;
-      // BadDeviceToken / Unregistered : token mort, on le purge.
-      if (reason === 'BadDeviceToken' || reason === 'Unregistered') {
+      // BadDeviceToken / Unregistered / BadEnvironmentKeyInToken : token mort
+      // ou liés à un mauvais environnement (sandbox vs prod) → on purge pour
+      // qu'un nouveau token plus récent (re-login depuis l'app) puisse passer.
+      if (reason === 'BadDeviceToken' || reason === 'Unregistered' || reason === 'BadEnvironmentKeyInToken') {
         try { run('DELETE FROM device_push_tokens WHERE id = ?', [row.id]); purged = true; } catch {}
         console.warn(`[push-sender] token ${reason}, purgé (id=${row.id})`);
       } else {
