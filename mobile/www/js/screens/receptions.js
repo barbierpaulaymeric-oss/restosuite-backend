@@ -179,7 +179,12 @@ export function ReceptionsScreen() {
       });
       renderScanResult(data);
     } catch (e) {
-      toast(e && e.code === 'NETWORK' ? 'Hors-ligne — scan impossible' : 'Échec du scan', 'error');
+      // Remonte le vrai message du serveur pour debug (Gemini timeout, payload
+      // trop gros, endpoint pas encore déployé sur Render, etc.).
+      const detail = e && e.code === 'NETWORK'
+        ? 'Hors-ligne — scan impossible'
+        : ((e && e.message) || 'Échec du scan');
+      toast(detail, 'error');
       showList();
     }
   }

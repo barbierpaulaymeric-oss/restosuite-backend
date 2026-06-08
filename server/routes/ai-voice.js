@@ -145,46 +145,145 @@ router.post('/modify-voice', async (req, res) => {
 
     const actions = JSON.parse(content);
 
-    // Apply supplier preferences immediately
+    // Helpers — fuzzy match d'un ingrédient existant pour le tenant.
+    function findOrCreateIngredient(name) {
+      const n = (name || '').trim();
+      if (!n) return null;
+      let row = get('SELECT * FROM ingredients WHERE LOWER(name) = LOWER(?) AND restaurant_id = ?', [n, rid]);
+      if (row) return row;
+      row = get('SELECT * FROM ingredients WHERE LOWER(name) LIKE ? AND restaurant_id = ? ORDER BY LENGTH(name) ASC LIMIT 1',
+        [`%${n.toLowerCase()}%`, rid]);
+      if (row) return row;
+      try {
+        const info = run('INSERT INTO ingredients (restaurant_id, name, unit) VALUES (?, ?, ?)', [rid, n, 'kg']);
+        return get('SELECT * FROM ingredients WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
+      } catch { return null; }
+    }
+    // Trouve la ligne recipe_ingredients qui contient un ingrédient donné dans
+    // la fiche courante (par nom approximatif).
+    function findRecipeLine(recId, name) {
+      if (!recId || !name) return null;
+      return get(`
+        SELECT ri.* FROM recipe_ingredients ri
+          JOIN ingredients i ON i.id = ri.ingredient_id AND i.restaurant_id = ?
+         WHERE ri.recipe_id = ? AND ri.restaurant_id = ?
+           AND LOWER(i.name) LIKE ?
+         ORDER BY LENGTH(i.name) ASC LIMIT 1`,
+        [rid, recId, rid, `%${name.toLowerCase().trim()}%`]
+      );
+    }
+
+    // Application des actions retournées par Gemini. supplier_preference est
+    // appliqué globalement ou sur la fiche ; les autres types nécessitent un
+    // recipe_id (sinon on les marque comme non-applicables).
     if (actions.actions) {
       for (const action of actions.actions) {
-        if (action.type === 'supplier_preference') {
-          // Find or create supplier (scoped to caller tenant)
-          let supplier = get('SELECT * FROM suppliers WHERE LOWER(name) = LOWER(?) AND restaurant_id = ?', [action.supplier_name, rid]);
-          if (!supplier) {
-            const info = run(
-              'INSERT INTO suppliers (restaurant_id, name, quality_rating, quality_notes) VALUES (?, ?, ?, ?)',
-              [rid, action.supplier_name, action.quality_rating || 3, action.reason || null]
-            );
-            supplier = get('SELECT * FROM suppliers WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
-          }
-
-          // Find ingredient (scoped to caller tenant)
-          const ingredient = get('SELECT * FROM ingredients WHERE LOWER(name) LIKE ? AND restaurant_id = ?',
-            [`%${action.ingredient_name.toLowerCase()}%`, rid]);
-
-          if (supplier && ingredient) {
-            // Save preference
-            try {
+        try {
+          if (action.type === 'supplier_preference') {
+            let supplier = get('SELECT * FROM suppliers WHERE LOWER(name) = LOWER(?) AND restaurant_id = ?', [action.supplier_name, rid]);
+            if (!supplier) {
+              const info = run(
+                'INSERT INTO suppliers (restaurant_id, name, quality_rating, quality_notes) VALUES (?, ?, ?, ?)',
+                [rid, action.supplier_name, action.quality_rating || 3, action.reason || null]
+              );
+              supplier = get('SELECT * FROM suppliers WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
+            }
+            const ingredient = findOrCreateIngredient(action.ingredient_name);
+            if (supplier && ingredient) {
               run(
                 `INSERT OR REPLACE INTO ingredient_supplier_prefs (restaurant_id, ingredient_id, recipe_id, supplier_id, reason)
                  VALUES (?, ?, ?, ?, ?)`,
                 [rid, ingredient.id, action.scope === 'recipe' ? recipe_id : null, supplier.id, action.reason || null]
               );
-
-              // Also update ingredient's preferred supplier if global
               if (action.scope === 'global') {
                 run('UPDATE ingredients SET preferred_supplier_id = ? WHERE id = ? AND restaurant_id = ?', [supplier.id, ingredient.id, rid]);
               }
-
               action.applied = true;
               action.supplier_id = supplier.id;
               action.ingredient_id = ingredient.id;
-            } catch (e) {
+            } else {
               action.applied = false;
-              action.error = e.message;
+              action.error = 'Fournisseur ou ingrédient introuvable';
             }
+
+          } else if (action.type === 'substitute' || action.type === 'substitution') {
+            if (!recipe_id) { action.applied = false; action.error = 'recipe_id requis'; continue; }
+            const oldName = action.from || action.old_ingredient || action.original;
+            const newName = action.to || action.new_ingredient || action.replacement;
+            const line = findRecipeLine(recipe_id, oldName);
+            const target = findOrCreateIngredient(newName);
+            if (line && target) {
+              run('UPDATE recipe_ingredients SET ingredient_id = ? WHERE id = ? AND restaurant_id = ?',
+                [target.id, line.id, rid]);
+              action.applied = true;
+            } else {
+              action.applied = false;
+              action.error = !line ? `Ingrédient "${oldName}" introuvable dans la fiche` : `Substitut "${newName}" indéfini`;
+            }
+
+          } else if (action.type === 'quantity_change' || action.type === 'change_quantity') {
+            if (!recipe_id) { action.applied = false; action.error = 'recipe_id requis'; continue; }
+            const line = findRecipeLine(recipe_id, action.ingredient_name);
+            const qty = Number(action.new_quantity);
+            if (line && qty > 0) {
+              const newUnit = action.unit || line.unit;
+              run('UPDATE recipe_ingredients SET gross_quantity = ?, unit = ? WHERE id = ? AND restaurant_id = ?',
+                [qty, newUnit, line.id, rid]);
+              action.applied = true;
+            } else {
+              action.applied = false;
+              action.error = !line ? 'Ingrédient introuvable dans la fiche' : 'Quantité invalide';
+            }
+
+          } else if (action.type === 'add_ingredient') {
+            if (!recipe_id) { action.applied = false; action.error = 'recipe_id requis'; continue; }
+            const target = findOrCreateIngredient(action.ingredient_name);
+            const qty = Number(action.quantity);
+            if (target && qty > 0) {
+              run(
+                `INSERT INTO recipe_ingredients (restaurant_id, recipe_id, ingredient_id, gross_quantity, unit, notes)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [rid, recipe_id, target.id, qty, action.unit || 'g', action.notes || null]
+              );
+              action.applied = true;
+            } else {
+              action.applied = false;
+              action.error = !target ? 'Ingrédient indéfini' : 'Quantité invalide';
+            }
+
+          } else if (action.type === 'remove_ingredient') {
+            if (!recipe_id) { action.applied = false; action.error = 'recipe_id requis'; continue; }
+            const line = findRecipeLine(recipe_id, action.ingredient_name);
+            if (line) {
+              run('DELETE FROM recipe_ingredients WHERE id = ? AND restaurant_id = ?', [line.id, rid]);
+              action.applied = true;
+            } else {
+              action.applied = false;
+              action.error = 'Ingrédient introuvable dans la fiche';
+            }
+
+          } else if (action.type === 'note') {
+            if (!recipe_id) { action.applied = false; action.error = 'recipe_id requis'; continue; }
+            const note = (action.text || action.content || '').trim();
+            if (note) {
+              // Append à recipes.notes pour conserver l'historique des observations chef.
+              run(
+                `UPDATE recipes SET notes = COALESCE(notes || char(10), '') || ? WHERE id = ? AND restaurant_id = ?`,
+                [note, recipe_id, rid]
+              );
+              action.applied = true;
+            } else {
+              action.applied = false;
+              action.error = 'Note vide';
+            }
+
+          } else {
+            action.applied = false;
+            action.error = 'Type d\'action non supporté: ' + action.type;
           }
+        } catch (e) {
+          action.applied = false;
+          action.error = e.message;
         }
       }
     }
