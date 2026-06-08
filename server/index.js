@@ -297,6 +297,7 @@ app.use('/api/sanitary', require('./routes/sanitary-settings'));
 app.use('/api/tiac', require('./routes/tiac'));
 app.use('/api/fabrication-diagrams', require('./routes/fabrication-diagrams'));
 app.use('/api/errors', require('./routes/errors').router);
+app.use('/api/devices', require('./routes/devices'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/cron', require('./routes/cron'));
 
