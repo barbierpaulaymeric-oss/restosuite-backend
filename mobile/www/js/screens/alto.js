@@ -1,10 +1,19 @@
 // Alto — assistant vocal omniprésent (dictée + recherche mains-libres) +
 // interface de chat (texte ou voix) branchée sur POST /api/ai/chef.
-// Utilise l'API Web Speech (SpeechRecognition) disponible dans la WebView ;
-// la permission micro est déclarée côté natif (Info.plist / AndroidManifest).
+//
+// En natif iOS : on utilise le plugin Capacitor SpeechRecognition (Apple Speech
+// Framework) — WKWebView fait planter `webkitSpeechRecognition` silencieusement
+// sur de nombreux iPhone (timeout immédiat, no-speech). En web/preview ou si le
+// plugin n'est pas disponible, on retombe sur Web Speech API.
 import { h, icon, toast } from '../ui.js';
 import { navigate } from '../router.js';
 import { API } from '../api.js';
+
+function getNativeSR() {
+  const C = window.Capacitor;
+  if (!C || !C.isNativePlatform || !C.isNativePlatform()) return null;
+  return (C.Plugins && C.Plugins.SpeechRecognition) || null;
+}
 
 function getRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -16,28 +25,90 @@ function getRecognition() {
   return r;
 }
 
+// Traduit le code d'erreur Web Speech en message lisible.
+function webSpeechErrorMsg(err) {
+  switch (err) {
+    case 'no-speech': return 'Je n\'ai pas entendu — parlez plus fort ou plus près du micro';
+    case 'audio-capture': return 'Micro inaccessible — vérifiez les autorisations';
+    case 'not-allowed':
+    case 'service-not-allowed': return 'Dictée refusée — Réglages → RestoSuite Cuisine → Micro + Reconnaissance vocale';
+    case 'network': return 'Réseau requis pour la dictée — vérifiez votre connexion';
+    case 'aborted': return null; // toggle stop, pas d'erreur à afficher
+    default: return 'Dictée indisponible (' + err + ')';
+  }
+}
+
 /**
  * Lance une écoute vocale.
- * @param {'search'|'command'} mode  'search' route vers les fiches avec le terme dicté.
+ * @param {'search'|'command'|'chat'} mode  'search' route vers les fiches avec le terme dicté.
  * @param {(text:string)=>void} [onResult]
  */
-export function startVoice(mode = 'command', onResult) {
-  const rec = getRecognition();
-  if (!rec) { toast('Dictée non disponible sur cet appareil', 'error'); return; }
-
+export async function startVoice(mode = 'command', onResult) {
+  const native = getNativeSR();
   const micBtn = document.querySelector('.mic-btn');
   micBtn && micBtn.classList.add('listening');
-  toast('Parlez…');
 
-  rec.onresult = (e) => {
-    const text = e.results[0][0].transcript.trim();
+  function deliver(text) {
+    micBtn && micBtn.classList.remove('listening');
+    if (!text) return;
     if (onResult) return onResult(text);
-    if (mode === 'search') { navigate('fiches'); setTimeout(() => { const f = document.querySelector('input[type="search"]'); if (f) { f.value = text; f.dispatchEvent(new Event('input')); } }, 60); }
-    else toast('Entendu : ' + text, 'ok');
+    if (mode === 'search') {
+      navigate('fiches');
+      setTimeout(() => { const f = document.querySelector('input[type="search"]'); if (f) { f.value = text; f.dispatchEvent(new Event('input')); } }, 60);
+    } else toast('Entendu : ' + text, 'ok');
+  }
+
+  // ── Voie 1 : plugin natif (iOS / Android) ──────────────────────────
+  if (native) {
+    try {
+      // Demande explicite des permissions (micro + reconnaissance vocale iOS).
+      const perms = await native.checkPermissions().catch(() => ({}));
+      if (perms.speechRecognition !== 'granted') {
+        const r = await native.requestPermissions().catch(() => ({}));
+        if (r.speechRecognition && r.speechRecognition !== 'granted') {
+          micBtn && micBtn.classList.remove('listening');
+          toast('Dictée refusée — Réglages → RestoSuite Cuisine → Micro + Reconnaissance vocale', 'error');
+          return;
+        }
+      }
+      const avail = await native.available().catch(() => ({ available: false }));
+      if (!avail.available) {
+        micBtn && micBtn.classList.remove('listening');
+        toast('Reconnaissance vocale indisponible sur cet appareil', 'error');
+        return;
+      }
+
+      toast('Parlez…');
+      const result = await native.start({
+        language: 'fr-FR',
+        maxResults: 1,
+        prompt: '',
+        partialResults: false,
+        popup: false,
+      });
+      const matches = (result && result.matches) || [];
+      deliver((matches[0] || '').trim());
+      return;
+    } catch (e) {
+      micBtn && micBtn.classList.remove('listening');
+      toast('Dictée échouée (' + ((e && e.message) || 'inconnu') + ')', 'error');
+      return;
+    }
+  }
+
+  // ── Voie 2 : fallback Web Speech (preview navigateur) ──────────────
+  const rec = getRecognition();
+  if (!rec) { micBtn && micBtn.classList.remove('listening'); toast('Dictée non disponible sur cet appareil', 'error'); return; }
+
+  toast('Parlez…');
+  rec.onresult = (e) => deliver(e.results[0][0].transcript.trim());
+  rec.onerror = (e) => {
+    micBtn && micBtn.classList.remove('listening');
+    const msg = webSpeechErrorMsg(e && e.error);
+    if (msg) toast(msg, 'error');
   };
-  rec.onerror = () => toast('Je n\'ai pas entendu', 'error');
   rec.onend = () => micBtn && micBtn.classList.remove('listening');
-  try { rec.start(); } catch { toast('Micro occupé', 'error'); }
+  try { rec.start(); } catch { micBtn && micBtn.classList.remove('listening'); toast('Micro occupé', 'error'); }
 }
 
 // Suggestions rapides — pré-remplissent la saisie, le chef complète le nom du plat.

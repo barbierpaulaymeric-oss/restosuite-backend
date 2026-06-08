@@ -86,7 +86,7 @@ function mountShell() {
   // Le titre/logo ramène à l'écran d'accueil « Service ».
   const header = h('header', { class: 'app-header' }, [
     h('button', { class: 'brand', onclick: () => navigate('service') }, [
-      h('span', { class: 'brand-mark' }, 'RS'),
+      h('img', { class: 'brand-mark', src: './assets/logo-restosuite.png', alt: 'RestoSuite' }),
       h('span', {}, 'Service'),
     ]),
     h('div', { class: 'header-spacer' }),

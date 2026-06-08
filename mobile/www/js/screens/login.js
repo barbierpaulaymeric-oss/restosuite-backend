@@ -40,7 +40,7 @@ export function LoginScreen(onSuccess) {
 
   return h('div', { class: 'login-wrap' }, [
     h('div', { class: 'login-brand' }, [
-      h('div', { class: 'brand-mark' }, 'RS'),
+      h('img', { class: 'brand-mark', src: './assets/logo-restosuite.png', alt: 'RestoSuite' }),
       h('h1', {}, 'RestoSuite Cuisine'),
       h('p', {}, 'Connectez-vous avec votre compte RestoSuite'),
     ]),

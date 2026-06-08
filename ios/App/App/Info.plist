@@ -51,6 +51,8 @@
 	<string>RestoSuite utilise la caméra pour scanner les étiquettes de traçabilité alimentaire</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>RestoSuite accède à vos photos pour importer des étiquettes de traçabilité</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>RestoSuite peut enregistrer une photo (BL scannée, fiche) dans votre photothèque</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>RestoSuite utilise le microphone pour la dictée vocale de l'assistant Alto</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
