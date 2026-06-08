@@ -89,10 +89,10 @@ function isEnabled() { return getClient() !== null; }
  * Envoie une notification à un compte (tous ses tokens iOS enregistrés).
  * @param {number} accountId
  * @param {{title?:string, body:string, badge?:number, data?:object, sound?:string}} payload
- * @returns {Promise<{sent:number, failed:number, skipped:number}>}
+ * @returns {Promise<{sent:number, failed:number, skipped:number, failures:Array<{reason,statusCode,tokenId,purged}>}>}
  */
 async function sendToAccount(accountId, payload) {
-  const stats = { sent: 0, failed: 0, skipped: 0 };
+  const stats = { sent: 0, failed: 0, skipped: 0, failures: [] };
   const c = getClient();
   if (!c) { stats.skipped++; return stats; }
 
@@ -114,14 +114,17 @@ async function sendToAccount(accountId, payload) {
       stats.sent++;
     } catch (e) {
       stats.failed++;
+      const reason = (e && e.reason) || (e && e.message) || 'Unknown';
+      const statusCode = (e && e.statusCode) || null;
+      let purged = false;
       // BadDeviceToken / Unregistered : token mort, on le purge.
-      const reason = (e && e.reason) || '';
       if (reason === 'BadDeviceToken' || reason === 'Unregistered') {
-        try { run('DELETE FROM device_push_tokens WHERE id = ?', [row.id]); } catch {}
+        try { run('DELETE FROM device_push_tokens WHERE id = ?', [row.id]); purged = true; } catch {}
         console.warn(`[push-sender] token ${reason}, purgé (id=${row.id})`);
       } else {
-        console.warn('[push-sender] échec envoi:', reason || e.message);
+        console.warn(`[push-sender] échec envoi (token=${row.id}):`, reason, 'status=', statusCode);
       }
+      stats.failures.push({ reason, statusCode, tokenId: row.id, purged });
     }
   }
   return stats;

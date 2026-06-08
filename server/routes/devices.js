@@ -99,7 +99,9 @@ router.post('/test-push', async (req, res) => {
       body: 'Notification de test reçue ✓',
       data: { kind: 'test_push' },
     });
-    res.json({ ok: true, ...result });
+    // On expose APNS_PRODUCTION pour diagnostiquer rapidement les sandbox/prod mismatch.
+    const apnsHost = process.env.APNS_PRODUCTION === '1' ? 'production' : 'development';
+    res.json({ ok: true, apnsHost, ...result });
   } catch (e) {
     console.error('devices/test-push error:', e);
     res.status(500).json({ error: 'Erreur envoi test', detail: e.message });
