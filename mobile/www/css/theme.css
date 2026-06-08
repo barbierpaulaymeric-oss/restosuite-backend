@@ -249,6 +249,13 @@ body[data-route="alto"] .mic-btn { display: none; }
   text-align: center; padding: 6px;
 }
 
+/* Bandeau "X enregistrements en attente d'envoi" (file hors-ligne) */
+.pending-banner {
+  background: rgba(232,169,58,.16); color: var(--warn);
+  border-bottom: 1px solid var(--warn);
+  padding: 8px 16px; font-weight: 700; font-size: 13px; text-align: center;
+}
+
 /* Toast */
 .toast-wrap { position: fixed; left: 16px; right: 16px; bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 90px);
   z-index: 50; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
@@ -479,3 +486,73 @@ body.keyboard-open .chat-input-bar { bottom: var(--kb); }
 .allergen-pastille.on { background: rgba(229,72,77,.16); border-color: var(--danger); }
 .allergen-pastille.on .ap-name { color: var(--text); font-weight: 800; }
 .allergen-pastille.off { opacity: .38; }
+
+/* ═══════════════════════════════════════════════════════════════
+   Responsive — iPad portrait/paysage + Mac Catalyst.
+   Cuisine pro = souvent une tablette murale en paysage. On élargit
+   les grilles et on plafonne la largeur du contenu pour rester
+   lisible sans tirer les boutons à pleine largeur.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* iPad portrait & tablette ≥ 768 px */
+@media (min-width: 768px) {
+  :root { --tabbar-h: 78px; }
+
+  .app-main {
+    padding-left: max(24px, env(safe-area-inset-left));
+    padding-right: max(24px, env(safe-area-inset-right));
+  }
+  .app-main > * { max-width: 880px; margin-left: auto; margin-right: auto; }
+
+  .quick-grid { grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .quick-tile { min-height: 110px; }
+  .quick-tile .qt-label { font-size: 17px; }
+
+  .allergen-grid { grid-template-columns: repeat(3, 1fr); }
+  .zone-grid { grid-template-columns: repeat(3, 1fr); }
+  .timer-presets { grid-template-columns: repeat(6, 1fr); }
+  .meta-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .cost-card { grid-template-columns: repeat(3, 1fr); }
+
+  .detail-hero { height: 260px; }
+
+  .tab { font-size: 12px; gap: 6px; }
+  .tab svg { width: 30px; height: 30px; }
+
+  .chat-bubble { max-width: 560px; font-size: 17px; }
+
+  .login-wrap { max-width: 460px; margin: 0 auto; }
+}
+
+/* iPad paysage & Mac ≥ 1024 px */
+@media (min-width: 1024px) {
+  .app-main > * { max-width: 1040px; }
+  .quick-grid { grid-template-columns: repeat(6, 1fr); }
+  .allergen-grid { grid-template-columns: repeat(4, 1fr); }
+  .zone-grid { grid-template-columns: repeat(4, 1fr); }
+  .detail-hero { height: 320px; }
+  .meta-grid { gap: 18px; }
+}
+
+/* Très grand (Mac plein écran) */
+@media (min-width: 1280px) {
+  .app-main > * { max-width: 1120px; }
+}
+
+/* Survol clavier/souris (Mac Catalyst, pointeur fin) */
+@media (hover: hover) and (pointer: fine) {
+  .quick-tile:hover, .list-row:hover, .check-item:hover,
+  .order-line:hover, .ing-row:hover { background: var(--surface-2); }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .tab:hover { color: var(--text); }
+  .tab.active:hover { color: var(--orange); }
+}
+
+/* Réduction des animations (réglage système) */
+@media (prefers-reduced-motion: reduce) {
+  .mic-btn.listening,
+  .temp-row.alert .tr-val,
+  .timer-card.ringing,
+  .chat-bubble.typing .dot { animation: none; }
+  .progress-bar { transition: none; }
+}

@@ -1,6 +1,7 @@
 // Login — mêmes identifiants que la version web (smart-login).
 import { h, icon, toast } from '../ui.js';
 import { login } from '../auth.js';
+import { isAvailable as bioAvailable, isEnabled as bioEnabled, setEnabled as setBioEnabled, wasAsked as bioAsked, markAsked as markBioAsked } from '../biometry.js';
 
 export function LoginScreen(onSuccess) {
   const email = h('input', { class: 'field', type: 'email', placeholder: 'Email', autocomplete: 'username', inputmode: 'email' });
@@ -12,6 +13,16 @@ export function LoginScreen(onSuccess) {
     btn.disabled = true; btn.textContent = 'Connexion…';
     try {
       await login(email.value, pass.value);
+      // Première connexion sur cet appareil : on propose Face/Touch ID si dispo.
+      // (On ne demande qu'UNE fois — l'utilisateur peut désactiver depuis Service.)
+      if (!bioAsked() && !bioEnabled()) {
+        markBioAsked();
+        const ok = await bioAvailable();
+        if (ok) {
+          const enable = confirm('Activer Face ID / Touch ID pour déverrouiller l\'app plus rapidement ?');
+          if (enable) setBioEnabled(true);
+        }
+      }
       onSuccess();
     } catch (e) {
       toast(e.message || 'Identifiants incorrects', 'error');

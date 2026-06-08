@@ -46,4 +46,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+    // ─── Push notifications (Capacitor PushNotifications plugin) ────────────
+    // Sans ces deux callbacks, le token APNs n'arrive jamais au plugin et
+    // l'événement `registration` côté JS reste muet. Nécessite l'entitlement
+    // Push Notifications dans Signing & Capabilities (Xcode).
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(
+            name: .capacitorDidRegisterForRemoteNotifications,
+            object: deviceToken
+        )
+    }
+
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(
+            name: .capacitorDidFailToRegisterForRemoteNotifications,
+            object: error
+        )
+    }
+
 }

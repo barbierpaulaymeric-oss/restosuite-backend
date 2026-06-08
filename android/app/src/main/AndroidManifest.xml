@@ -43,4 +43,7 @@
 
     <!-- Import/export de fichiers (fiches techniques, bons de livraison) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
+    <!-- Biométrie (empreinte / face) — déverrouillage style Face ID / Touch ID -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 </manifest>

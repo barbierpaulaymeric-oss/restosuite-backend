@@ -8,7 +8,9 @@
 // ce qui est l'usage réel d'un contrôle à quai.
 import { h, icon, emptyState, toast } from '../ui.js';
 import { API } from '../api.js';
+import { queue } from '../queue.js';
 import { fetchWithCache } from '../store.js';
+import { capturePhoto } from '../camera.js';
 
 // Statuts réceptionnables côté serveur (POST /receive).
 const RECEIVABLE = new Set(['envoyée', 'confirmée']);
@@ -84,11 +86,16 @@ function ControlView(po, onDone) {
     }
     confirmBtn.disabled = true;
     try {
-      await API.post('/purchase-orders/' + po.id + '/receive', issues.length ? { reception_notes: issues.join(' ; ') } : {});
-      toast(issues.length ? 'Réception validée avec écarts signalés' : 'Réception validée — stock mis à jour', 'ok');
+      const r = await queue.post(
+        '/purchase-orders/' + po.id + '/receive',
+        issues.length ? { reception_notes: issues.join(' ; ') } : {},
+        'Réception ' + (po.supplier_name || ('#' + po.id))
+      );
+      if (r && r.queued) toast('Réception en attente d\'envoi (hors-ligne)', 'warn');
+      else toast(issues.length ? 'Réception validée avec écarts signalés' : 'Réception validée — stock mis à jour', 'ok');
       onDone();
     } catch (e) {
-      toast(e && e.code === 'NETWORK' ? 'Hors-ligne — réception impossible' : (e.message || 'Échec de la réception'), 'error');
+      toast(e && e.message || 'Échec de la réception', 'error');
       confirmBtn.disabled = false;
     }
   }
@@ -110,9 +117,12 @@ export function ReceptionsScreen() {
 
   function showList() {
     const list = h('div', {}, [emptyState('truck', 'Chargement des livraisons…')]);
+    const scanBtn = h('button', { class: 'btn btn-primary', onclick: openScan },
+      [icon('camera', 22), 'Scanner un BL papier']);
     root.replaceChildren(
       h('div', { class: 'screen-title' }, 'Réceptions'),
-      h('p', { class: 'section-label', style: 'margin-top:-8px' }, 'Livraisons à contrôler'),
+      scanBtn,
+      h('p', { class: 'section-label' }, 'Livraisons à contrôler'),
       list,
     );
 
@@ -141,6 +151,66 @@ export function ReceptionsScreen() {
     let po = o;
     try { po = await API.get('/purchase-orders/' + o.id); } catch { /* on garde la version en cache */ }
     root.replaceChildren(ControlView(po, showList));
+  }
+
+  // ── Scan BL — photo → /api/ai/scan-delivery → résumé extrait ───────
+  async function openScan() {
+    root.replaceChildren(emptyState('camera', 'Ouverture de la caméra…'));
+    let shot;
+    try { shot = await capturePhoto({ quality: 80, source: 'prompt' }); }
+    catch (e) { toast('Caméra inaccessible', 'error'); showList(); return; }
+    if (!shot) { showList(); return; }
+    showScanned(shot);
+  }
+
+  async function showScanned(shot) {
+    root.replaceChildren(emptyState('camera', 'Alto lit le bon de livraison…'));
+    try {
+      const data = await API.post('/ai/scan-delivery', {
+        image_base64: shot.base64,
+        mime_type: shot.mimeType,
+      });
+      renderScanResult(data);
+    } catch (e) {
+      toast(e && e.code === 'NETWORK' ? 'Hors-ligne — scan impossible' : 'Échec du scan', 'error');
+      showList();
+    }
+  }
+
+  function renderScanResult(data) {
+    const items = (data && Array.isArray(data.items)) ? data.items : [];
+    const head = h('div', {}, [
+      h('button', { class: 'btn btn-ghost detail-back', onclick: showList },
+        [icon('logout', 20), 'Retour']),
+      h('div', { class: 'detail-name' }, data.supplier_name || 'Fournisseur'),
+      h('div', { class: 'detail-cat' }, [
+        data.delivery_number ? '#' + data.delivery_number : 'BL',
+        data.delivery_date ? ' · ' + data.delivery_date : '',
+        items.length ? ' · ' + items.length + ' ligne(s)' : '',
+      ].join('')),
+    ]);
+
+    const rows = items.length
+      ? items.map((it) => h('div', { class: 'card', style: 'margin-bottom:10px' }, [
+          h('div', { style: 'display:flex; gap:10px; align-items:baseline' }, [
+            h('div', { style: 'flex:1; font-size:16px; font-weight:700' },
+              it.product_name || 'Article'),
+            h('div', { class: 'ing-qty' },
+              (it.quantity != null ? it.quantity : '?') + ' ' + (it.unit || '')),
+          ]),
+          it.matched_ingredient ? h('div', { class: 'lr-sub' },
+            '↦ ' + it.matched_ingredient) : null,
+          it.batch_number || it.dlc ? h('div', { class: 'lr-sub' }, [
+            it.batch_number ? 'Lot ' + it.batch_number : '',
+            it.dlc ? (it.batch_number ? ' · ' : '') + 'DLC ' + it.dlc : '',
+          ].join('')) : null,
+        ].filter(Boolean)))
+      : [emptyState('truck', 'Aucune ligne détectée', 'Reprendre la photo cadrée et nette.')];
+
+    const note = h('p', { class: 'section-label', style: 'color:var(--text-dim)' },
+      'Scan informatif — la confirmation de réception se fait depuis la commande correspondante.');
+
+    root.replaceChildren(head, h('div', { class: 'section-label' }, 'Lignes extraites'), ...rows, note);
   }
 
   showList();

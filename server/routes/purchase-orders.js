@@ -471,6 +471,22 @@ router.put('/:id', (req, res) => {
           }
         }
       }
+
+      // Push notification : le fournisseur a confirmé la commande → on alerte
+      // toute la cuisine (multi-device par restaurant). No-op si APNs n'est
+      // pas configuré côté serveur (env-gated).
+      if (status === 'confirmée') {
+        try {
+          const supplier = get('SELECT name FROM suppliers WHERE id = ? AND restaurant_id = ?', [po.supplier_id, rid]);
+          const { sendToRestaurant } = require('../lib/push-sender');
+          // Fire-and-forget : on ne laisse pas l'envoi APNs bloquer la réponse HTTP.
+          sendToRestaurant(rid, {
+            title: 'Commande confirmée',
+            body: `${supplier ? supplier.name : 'Fournisseur'} a confirmé ${po.reference || '#' + id}`,
+            data: { kind: 'po_confirmed', po_id: id, supplier_id: po.supplier_id },
+          }).catch((e) => console.warn('[push] po_confirmed échoué:', e.message));
+        } catch (e) { console.warn('[push] po_confirmed wiring failed:', e.message); }
+      }
     }
 
     if (notes !== undefined) {

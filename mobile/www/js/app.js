@@ -3,6 +3,10 @@
 import { h, icon, emptyState } from './ui.js';
 import { isAuthed, logout } from './auth.js';
 import { defineRoutes, startRouter, navigate, onRouteChange } from './router.js';
+import { installAutoFlush, subscribe as subscribePending } from './queue.js';
+import { authenticate as bioAuthenticate, isEnabled as bioEnabled, setEnabled as setBioEnabled } from './biometry.js';
+import { initPush, teardownPush } from './push.js';
+import { installCrashReporting } from './crash.js';
 import { startVoice } from './screens/alto.js';
 import { ServiceScreen } from './screens/service.js';
 import { FichesScreen } from './screens/fiches.js';
@@ -86,12 +90,24 @@ function mountShell() {
       h('span', {}, 'Service'),
     ]),
     h('div', { class: 'header-spacer' }),
-    h('button', { class: 'header-action', 'aria-label': 'Déconnexion', onclick: () => { logout(); boot(); } }, [icon('logout', 22)]),
+    h('button', { class: 'header-action', 'aria-label': 'Déconnexion', onclick: () => { teardownPush(); logout(); boot(); } }, [icon('logout', 22)]),
   ]);
 
   const mic = h('button', { class: 'mic-btn', 'aria-label': 'Dictée Alto', onclick: () => startVoice('command') }, [icon('mic', 30)]);
 
-  root.replaceChildren(h('div', { class: 'app-shell' }, [header, view, tabbar, mic]));
+  // Bandeau "X opérations en attente" (relevés T°, checklist, etc. faits hors-ligne).
+  // Affiché juste sous le header dès qu'il y a au moins 1 opération dans l'outbox.
+  const pendingBanner = h('div', { class: 'pending-banner', style: 'display:none' }, '');
+  subscribePending((items) => {
+    const n = items.length;
+    if (n === 0) { pendingBanner.style.display = 'none'; return; }
+    pendingBanner.style.display = 'block';
+    pendingBanner.textContent = n === 1
+      ? '1 enregistrement en attente d\'envoi'
+      : n + ' enregistrements en attente d\'envoi';
+  });
+
+  root.replaceChildren(h('div', { class: 'app-shell' }, [header, pendingBanner, view, tabbar, mic]));
   root.removeAttribute('aria-busy');
 
   // Surligne l'onglet actif (Service n'est pas un onglet → aucun actif) et
@@ -105,16 +121,51 @@ function mountShell() {
   startRouter(view);
 }
 
-function boot() {
+async function boot() {
   if (!isAuthed()) {
     root.replaceChildren(LoginScreen(boot));
     root.removeAttribute('aria-busy');
     return;
   }
+  // Verrouillage biométrique : si l'utilisateur l'a activé, on demande Face ID
+  // avant de monter le shell. En cas d'échec/cancel, on garde le splash et un
+  // bouton "Réessayer" — surtout pas de déconnexion automatique (Face ID en
+  // panne, gants, masque → l'utilisateur peut juste retaper son mdp).
+  if (bioEnabled()) {
+    root.replaceChildren(LockScreen(boot));
+    root.removeAttribute('aria-busy');
+    const ok = await bioAuthenticate('Déverrouiller RestoSuite Cuisine');
+    if (!ok) return; // l'écran LockScreen propose Réessayer + Désactiver
+  }
   mountShell();
+  // Enregistrement push : APRÈS le shell pour ne pas bloquer l'affichage.
+  // initPush est no-op en web/preview ; en natif il demande la permission
+  // puis envoie le token APNs/FCM à /api/devices/register.
+  initPush();
+}
+
+// Écran de verrouillage biométrique — sobre, deux actions.
+function LockScreen(retry) {
+  return h('div', { class: 'login-wrap' }, [
+    h('div', { class: 'login-brand' }, [
+      h('div', { class: 'brand-mark' }, 'RS'),
+      h('h1', {}, 'RestoSuite Cuisine'),
+      h('p', {}, 'Authentification requise'),
+    ]),
+    h('button', { class: 'btn btn-primary', onclick: retry }, [icon('check', 22), 'Déverrouiller']),
+    h('button', { class: 'btn btn-ghost', onclick: () => { setBioEnabled(false); retry(); } }, 'Désactiver Face ID / Touch ID'),
+    h('button', { class: 'btn btn-ghost', onclick: () => { logout(); retry(); } }, 'Se déconnecter'),
+  ]);
 }
 
 // Session expirée (401) → retour au login.
 window.addEventListener('auth:expired', () => boot());
+
+// Rejoue les écritures hors-ligne en attente (boot + retour réseau).
+installAutoFlush();
+
+// Capture les erreurs JS / promesses rejetées et les remonte au serveur
+// (échantillonnage par signature, cooldown 60 s, exige JWT).
+installCrashReporting();
 
 boot();

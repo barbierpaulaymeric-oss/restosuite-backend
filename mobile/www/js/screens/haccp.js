@@ -6,6 +6,7 @@
 //       /haccp/cleaning/today, /haccp/cleaning/:id/done.
 import { h, icon, emptyState, toast } from '../ui.js';
 import { API } from '../api.js';
+import { queue } from '../queue.js';
 import { getTimers, subscribe, addTimer, toggleTimer, stopTimer, dismissRing, fmtClock } from '../timers.js';
 
 function timeFR(iso) {
@@ -67,13 +68,15 @@ function TempEntry() {
     if (isNaN(v)) { toast('Entrez une température', 'error'); return; }
     saveBtn.disabled = true;
     try {
-      const log = await API.post('/haccp/temperatures', { zone_id: selected.id, temperature: v });
-      if (log.is_alert) toast(`⚠ ${selected.name} HORS NORME : ${fmtTemp(v)}°`, 'error');
+      // queue.post : tente le réseau, met en file si hors-ligne (relevé conservé).
+      const log = await queue.post('/haccp/temperatures', { zone_id: selected.id, temperature: v }, `T° ${selected.name} ${fmtTemp(v)}°`);
+      if (log && log.queued) toast(`${selected.name} : ${fmtTemp(v)}° en attente d'envoi`, 'warn');
+      else if (log && log.is_alert) toast(`⚠ ${selected.name} HORS NORME : ${fmtTemp(v)}°`, 'error');
       else toast(`${selected.name} : ${fmtTemp(v)}° enregistré`, 'ok');
       valInput.value = '';
       loadHistory();
     } catch (e) {
-      toast(e && e.code === 'NETWORK' ? 'Hors-ligne — relevé non envoyé' : (e.message || 'Échec de l\'enregistrement'), 'error');
+      toast(e && e.message || 'Échec de l\'enregistrement', 'error');
     } finally { saveBtn.disabled = false; }
   }
 
@@ -150,11 +153,11 @@ function Checklist() {
         // Validation optimiste : on coche tout de suite, on annule si l'API échoue.
         t.done_today = true; el.classList.add('done'); refreshProgress();
         try {
-          await API.post('/haccp/cleaning/' + t.id + '/done', {});
-          toast(`✓ ${t.name}`, 'ok');
+          const r = await queue.post('/haccp/cleaning/' + t.id + '/done', {}, 'Checklist: ' + (t.name || 'tâche'));
+          toast(r && r.queued ? `${t.name} (en attente d\'envoi)` : `✓ ${t.name}`, r && r.queued ? 'warn' : 'ok');
         } catch (e) {
           t.done_today = false; el.classList.remove('done'); refreshProgress();
-          toast(e && e.code === 'NETWORK' ? 'Hors-ligne — non enregistré' : 'Échec', 'error');
+          toast('Échec', 'error');
         }
       }
       return el;

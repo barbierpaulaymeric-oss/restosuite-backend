@@ -55,5 +55,11 @@
 	<string>RestoSuite utilise le microphone pour la dictée vocale de l'assistant Alto</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>RestoSuite utilise la reconnaissance vocale pour la dictée de l'assistant Alto</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Face ID permet de déverrouiller RestoSuite Cuisine plus rapidement, sans retaper votre mot de passe à chaque service.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

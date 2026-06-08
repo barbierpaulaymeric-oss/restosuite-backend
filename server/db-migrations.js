@@ -2223,6 +2223,29 @@ try {
   console.warn('⚠️ retention_emails_sent migration error:', e.message);
 }
 
+// ─── Push notifications : tokens d'appareil enregistrés par l'app mobile ───
+// Un même token peut être réenregistré (rotation, réinstallation, switch de
+// compte) → UNIQUE sur token, on UPSERT à l'enregistrement. La table reste
+// petite (1-3 lignes par utilisateur), pas d'index FK supplémentaire.
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS device_push_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_id INTEGER NOT NULL REFERENCES accounts(id),
+      restaurant_id INTEGER NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      platform TEXT NOT NULL CHECK (platform IN ('ios','android')),
+      app_version TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_device_tokens_account
+           ON device_push_tokens(account_id)`);
+} catch (e) {
+  console.warn('⚠️ device_push_tokens migration error:', e.message);
+}
+
 }
 
 module.exports = { runMigrations };

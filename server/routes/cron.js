@@ -11,6 +11,7 @@
 const express = require('express');
 const router = express.Router();
 const { runRetentionCycle } = require('../lib/retention-mailer');
+const { runHaccpReminderCycle } = require('../lib/haccp-push-reminder');
 
 function requireCronSecret(req, res, next) {
   const secret = process.env.CRON_SECRET;
@@ -31,6 +32,18 @@ router.get('/retention-check', requireCronSecret, async (req, res) => {
     res.json({ ok: true, ...result });
   } catch (e) {
     console.error('Cron retention-check error:', e.message);
+    res.status(500).json({ error: 'Erreur interne' });
+  }
+});
+
+// GET /api/cron/haccp-reminder — push de relance T° si la cuisine a oublié
+// (no-op si APNs non configuré ; anti-doublon journalier par restaurant).
+router.get('/haccp-reminder', requireCronSecret, async (req, res) => {
+  try {
+    const result = await runHaccpReminderCycle();
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    console.error('Cron haccp-reminder error:', e.message);
     res.status(500).json({ error: 'Erreur interne' });
   }
 });

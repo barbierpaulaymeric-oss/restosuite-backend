@@ -123,22 +123,85 @@ export function FicheDetailScreen(query) {
             ])))
         : h('div', { class: 'allergen-none' }, '✓ Aucun allergène majeur déclaré'),
 
-      // Dictée modification
+      // Dictée modification — envoie le texte à /api/ai/modify-voice qui :
+      //  • applique IMMÉDIATEMENT les préférences fournisseur (action.applied=true)
+      //  • renvoie une liste structurée d'actions pour le reste (à confirmer sur web)
       h('div', { style: 'height:18px' }),
       h('button', { class: 'btn btn-primary', onclick: () => {
-        startVoice('command', (text) => {
+        startVoice('command', async (text) => {
           if (!text) return;
           noteSlot.replaceChildren(h('div', { class: 'dictation-note' }, [
             h('div', { class: 'dn-lbl' }, 'Modification dictée'),
             h('div', {}, text),
+            h('div', { class: 'dn-lbl', style: 'margin-top:10px' }, 'Alto réfléchit…'),
           ]));
-          toast('Modification notée', 'ok');
+          try {
+            const r = await API.post('/ai/modify-voice', { text, recipe_id: Number(id) });
+            renderActions(text, r);
+          } catch (e) {
+            noteSlot.replaceChildren(h('div', { class: 'dictation-note' }, [
+              h('div', { class: 'dn-lbl' }, 'Modification dictée (non envoyée)'),
+              h('div', {}, text),
+              h('div', { class: 'dn-lbl', style: 'color:var(--warn); margin-top:10px' },
+                e && e.code === 'NETWORK' ? 'Hors-ligne — Alto inaccessible' : 'Alto n\'a pas pu traiter la demande'),
+            ]));
+            toast('Alto indisponible', 'error');
+          }
         });
       } }, [icon('mic', 22), 'Dicter une modification à Alto']),
       noteSlot,
       h('div', { style: 'height:24px' }),
     ];
     body.replaceChildren(...parts.filter(Boolean));
+
+    // Affichage des actions renvoyées par /ai/modify-voice.
+    // Le serveur applique automatiquement les `supplier_preference` (drapeau
+    // `applied:true`). Les autres types (substitution ingrédient, changement
+    // de quantité, etc.) sont juste comprises par l'IA et listées ici pour
+    // validation depuis l'app web — pas d'édition silencieuse côté mobile.
+    function renderActions(text, payload) {
+      const actions = (payload && Array.isArray(payload.actions)) ? payload.actions : [];
+      const lines = actions.map(describeAction).filter(Boolean);
+      const appliedCount = actions.filter((a) => a.applied).length;
+
+      noteSlot.replaceChildren(h('div', { class: 'dictation-note' }, [
+        h('div', { class: 'dn-lbl' }, 'Modification dictée'),
+        h('div', {}, text),
+        h('div', { class: 'dn-lbl', style: 'margin-top:12px' },
+          actions.length === 0 ? 'Alto n\'a identifié aucune action' :
+          appliedCount > 0 ? `Alto a compris (${appliedCount} appliquée${appliedCount > 1 ? 's' : ''} sur ${actions.length})` :
+          `Alto a compris (${actions.length} action${actions.length > 1 ? 's' : ''} à valider sur l\'app web)`),
+        ...(lines.length ? [h('ul', { style: 'margin:6px 0 0; padding-left:18px; line-height:1.5' },
+          lines.map((s) => h('li', {}, s)))] : []),
+      ]));
+
+      if (appliedCount > 0) toast(`✓ ${appliedCount} préférence(s) enregistrée(s)`, 'ok');
+      else if (actions.length > 0) toast('Action notée — valider sur l\'app web', 'warn');
+    }
+
+    function describeAction(a) {
+      if (!a || !a.type) return null;
+      const flag = a.applied ? '✓ ' : '· ';
+      switch (a.type) {
+        case 'supplier_preference':
+          return `${flag}Préférence fournisseur : ${a.supplier_name || '?'} pour ${a.ingredient_name || '?'}` +
+                 (a.reason ? ` (« ${a.reason} »)` : '');
+        case 'substitute':
+        case 'substitution':
+          return `${flag}Substituer ${a.from || '?'} par ${a.to || '?'}`;
+        case 'quantity_change':
+        case 'change_quantity':
+          return `${flag}Quantité ${a.ingredient_name || '?'} → ${a.new_quantity || '?'} ${a.unit || ''}`;
+        case 'add_ingredient':
+          return `${flag}Ajouter ${a.ingredient_name || '?'} (${a.quantity || '?'} ${a.unit || ''})`;
+        case 'remove_ingredient':
+          return `${flag}Retirer ${a.ingredient_name || '?'}`;
+        case 'note':
+          return `${flag}Note : ${a.text || a.content || ''}`;
+        default:
+          return `${flag}${a.type}` + (a.summary ? ` — ${a.summary}` : '');
+      }
+    }
   }
 
   (async () => {

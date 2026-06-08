@@ -154,6 +154,93 @@ router.post('/scan-invoice', upload.single('invoice'), async (req, res) => {
 });
 
 // ═══════════════════════════════════════════
+// POST /api/ai/scan-delivery — Scan d'un bon de livraison via Gemini Vision
+//
+// Cuisine pro : à la réception, le chef photographie le BL papier pour
+// extraire les lignes et comparer avec le contrôle (écarts qté, manquant).
+// Différence avec /scan-invoice : on n'attend ni prix unitaire ni totaux —
+// un BL n'en porte pas (le tarif vient de la mercuriale).
+// ═══════════════════════════════════════════
+router.post('/scan-delivery', upload.single('delivery'), async (req, res) => {
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+
+  let imageBase64 = null;
+  let mimeType = 'image/jpeg';
+  let filePath = null;
+
+  if (req.file) {
+    filePath = req.file.path;
+    imageBase64 = fs.readFileSync(filePath).toString('base64');
+    mimeType = req.file.mimetype || 'image/jpeg';
+  } else if (req.body && req.body.image_base64) {
+    imageBase64 = req.body.image_base64.replace(/^data:image\/\w+;base64,/, '');
+    mimeType = req.body.mime_type || 'image/jpeg';
+  }
+
+  if (!imageBase64) {
+    if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
+    return res.status(400).json({ error: 'Image requise (fichier ou base64)' });
+  }
+
+  const prompt = "Extrais les données de ce bon de livraison fournisseur de restaurant. Retourne un JSON: supplier_name, delivery_number, delivery_date, items (array de {product_name, quantity, unit, batch_number, dlc}). Pas de prix : le BL n'en porte pas. Si un champ n'est pas visible, mets null.";
+
+  try {
+    const response = await fetch(buildGeminiUrl(selectModel('scan-invoice', req.user?.restaurant_id)), {
+      signal: AbortSignal.timeout(30000),
+      method: 'POST',
+      headers: geminiHeaders(),
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { text: prompt },
+          { inlineData: { mimeType, data: imageBase64 } },
+        ]}],
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('Gemini Vision (BL) error:', err);
+      if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
+      return res.status(502).json({ error: 'Erreur service IA', details: err });
+    }
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!content) {
+      if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
+      return res.status(502).json({ error: 'Réponse IA vide' });
+    }
+
+    const parsed = JSON.parse(content);
+
+    // Match product_name avec les ingrédients du tenant (PENTEST_REPORT).
+    const rid = req.user && req.user.restaurant_id;
+    if (parsed.items && Array.isArray(parsed.items)) {
+      for (const item of parsed.items) {
+        const name = (item.product_name || '').toLowerCase().trim();
+        if (!name) continue;
+        let match = get('SELECT id, name FROM ingredients WHERE LOWER(name) = ? AND restaurant_id = ?', [name, rid]);
+        if (!match) {
+          match = get('SELECT id, name FROM ingredients WHERE LOWER(name) LIKE ? AND restaurant_id = ? ORDER BY LENGTH(name) ASC LIMIT 1', [`%${name}%`, rid]);
+        }
+        if (match) {
+          item.ingredient_id = match.id;
+          item.matched_ingredient = match.name;
+        }
+      }
+    }
+
+    res.json(parsed);
+  } catch (e) {
+    console.error('Delivery scan error:', e);
+    if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
+    res.status(500).json({ error: 'Erreur scan BL' });
+  } finally {
+    if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
+  }
+});
+
+// ═══════════════════════════════════════════
 // POST /api/ai/scan-mercuriale — Import mercuriale fournisseur
 // XLSX/XLS/CSV → deterministic parser (lib/mercuriale-parse).
 // Image/PDF → Gemini Vision OCR.
