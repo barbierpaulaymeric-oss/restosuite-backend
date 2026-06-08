@@ -25,7 +25,13 @@ export function LoginScreen(onSuccess) {
       }
       onSuccess();
     } catch (e) {
-      toast(e.message || 'Identifiants incorrects', 'error');
+      // Sur mauvais identifiants, garder l'email et ne vider QUE le mot de passe.
+      const msg = (e && e.code === 'BAD_CREDENTIALS')
+        ? 'Mot de passe ou identifiant incorrect'
+        : (e.message || 'Connexion échouée');
+      toast(msg, 'error');
+      pass.value = '';
+      pass.focus();
       btn.disabled = false; btn.textContent = 'Se connecter';
     }
   }

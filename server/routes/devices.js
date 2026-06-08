@@ -83,4 +83,27 @@ router.delete('/', (req, res) => {
   }
 });
 
+// POST /api/devices/test-push — envoie une notif de test à TOUS les devices
+// du compte courant. Pratique pour valider la chaîne APNs en 1 requête sans
+// devoir passer par une commande fournisseur. Pas de payload nécessaire.
+router.post('/test-push', async (req, res) => {
+  try {
+    const { sendToAccount, isEnabled } = require('../lib/push-sender');
+    if (!isEnabled()) {
+      return res.status(503).json({
+        error: 'APNs non configuré côté serveur (APNS_KEY_ID / APNS_TEAM_ID / APNS_SIGNING_KEY manquants)',
+      });
+    }
+    const result = await sendToAccount(req.user.id, {
+      title: 'RestoSuite Cuisine',
+      body: 'Notification de test reçue ✓',
+      data: { kind: 'test_push' },
+    });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    console.error('devices/test-push error:', e);
+    res.status(500).json({ error: 'Erreur envoi test', detail: e.message });
+  }
+});
+
 module.exports = router;

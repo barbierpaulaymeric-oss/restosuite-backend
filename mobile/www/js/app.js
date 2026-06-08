@@ -111,10 +111,19 @@ function mountShell() {
   root.removeAttribute('aria-busy');
 
   // Surligne l'onglet actif (Service n'est pas un onglet → aucun actif) et
-  // expose la route courante sur <body> pour le CSS (ex : masquer le FAB micro
-  // sur l'écran Alto qui a déjà son propre micro).
+  // expose la route courante sur <body> pour le CSS. Les sous-routes (fiche,
+  // allergenes) appartiennent à l'onglet Fiches → on les map pour que la barre
+  // basse reste lisible quand l'utilisateur descend dans un détail.
+  const TAB_OF = {
+    fiches: 'fiches', fiche: 'fiches', allergenes: 'fiches',
+    haccp: 'haccp',
+    receptions: 'receptions',
+    commandes: 'commandes',
+    alto: 'alto',
+  };
   onRouteChange((name) => {
-    tabbar.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+    const activeTab = TAB_OF[name] || null;
+    tabbar.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === activeTab));
     document.body.dataset.route = name;
   });
 

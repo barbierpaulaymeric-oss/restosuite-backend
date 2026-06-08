@@ -158,7 +158,14 @@ export function ReceptionsScreen() {
     root.replaceChildren(emptyState('camera', 'Ouverture de la caméra…'));
     let shot;
     try { shot = await capturePhoto({ quality: 80, source: 'prompt' }); }
-    catch (e) { toast('Caméra inaccessible', 'error'); showList(); return; }
+    catch (e) {
+      const msg = (e && e.code === 'PERMISSION_DENIED')
+        ? e.message
+        : (e && e.message) || 'Caméra inaccessible';
+      toast(msg, 'error');
+      showList();
+      return;
+    }
     if (!shot) { showList(); return; }
     showScanned(shot);
   }

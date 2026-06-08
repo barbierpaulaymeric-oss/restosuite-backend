@@ -41,11 +41,22 @@ async function request(path, options = {}) {
   }
 
   if (res.status === 401) {
-    // Session expirée → on purge et on laisse l'app rediriger vers le login.
-    setToken(null);
-    csrfToken = null;
-    window.dispatchEvent(new CustomEvent('auth:expired'));
-    throw new ApiError('Session expirée', 401, 'UNAUTHORIZED');
+    // Premier 401 (avant login) = mauvais identifiants → on NE jette PAS
+    // l'app en mode session expirée (qui re-monte LoginScreen et perd
+    // l'email saisi). Seul un 401 ALORS QU'ON AVAIT un token = vraie
+    // expiration de session.
+    const hadToken = !!token;
+    if (hadToken) {
+      setToken(null);
+      csrfToken = null;
+      window.dispatchEvent(new CustomEvent('auth:expired'));
+    }
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(
+      hadToken ? 'Session expirée' : (data.error || 'Identifiants incorrects'),
+      401,
+      hadToken ? 'UNAUTHORIZED' : 'BAD_CREDENTIALS'
+    );
   }
 
   const data = await res.json().catch(() => ({}));

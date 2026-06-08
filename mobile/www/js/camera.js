@@ -21,6 +21,25 @@ export async function capturePhoto(opts = {}) {
   const quality = opts.quality ?? 80;
 
   if (plugin) {
+    // iOS et Android exigent qu'on DEMANDE explicitement les permissions
+    // caméra / photothèque avant le premier getPhoto. Si on saute l'étape,
+    // getPhoto throw "User denied access" SANS afficher le prompt système →
+    // l'utilisateur n'a même pas l'occasion d'accepter.
+    try {
+      const status = (plugin.checkPermissions && await plugin.checkPermissions()) || {};
+      const needCamera = (opts.source === 'camera') || (opts.source === 'prompt');
+      const needPhotos = (opts.source === 'gallery') || (opts.source === 'prompt');
+      const toAsk = [];
+      if (needCamera && status.camera !== 'granted') toAsk.push('camera');
+      if (needPhotos && status.photos !== 'granted' && status.photos !== 'limited') toAsk.push('photos');
+      if (toAsk.length && plugin.requestPermissions) {
+        await plugin.requestPermissions({ permissions: toAsk });
+      }
+    } catch (e) {
+      // pas bloquant : getPhoto re-demandera de toute façon
+      console.warn('[camera] permission check failed', e);
+    }
+
     try {
       const photo = await plugin.getPhoto({
         quality,
@@ -37,8 +56,15 @@ export async function capturePhoto(opts = {}) {
         mimeType: 'image/' + (photo.format || 'jpeg'),
       };
     } catch (e) {
-      // userCancelled n'est pas une erreur réelle.
-      if (e && /cancel/i.test(e.message || '')) return null;
+      const msg = (e && (e.message || e.errorMessage)) || '';
+      // userCancelled / "User cancelled photos app" n'est pas une erreur réelle.
+      if (/cancel/i.test(msg)) return null;
+      // Permission denied : on remonte un message clair.
+      if (/denied|permission/i.test(msg)) {
+        const err = new Error('Accès caméra refusé. Activez-le dans Réglages → RestoSuite Cuisine.');
+        err.code = 'PERMISSION_DENIED';
+        throw err;
+      }
       throw e;
     }
   }

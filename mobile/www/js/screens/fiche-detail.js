@@ -127,32 +127,46 @@ export function FicheDetailScreen(query) {
       //  • applique IMMÉDIATEMENT les préférences fournisseur (action.applied=true)
       //  • renvoie une liste structurée d'actions pour le reste (à confirmer sur web)
       h('div', { style: 'height:18px' }),
-      h('button', { class: 'btn btn-primary', onclick: () => {
-        startVoice('command', async (text) => {
-          if (!text) return;
-          noteSlot.replaceChildren(h('div', { class: 'dictation-note' }, [
-            h('div', { class: 'dn-lbl' }, 'Modification dictée'),
-            h('div', {}, text),
-            h('div', { class: 'dn-lbl', style: 'margin-top:10px' }, 'Alto réfléchit…'),
-          ]));
-          try {
-            const r = await API.post('/ai/modify-voice', { text, recipe_id: Number(id) });
-            renderActions(text, r);
-          } catch (e) {
-            noteSlot.replaceChildren(h('div', { class: 'dictation-note' }, [
-              h('div', { class: 'dn-lbl' }, 'Modification dictée (non envoyée)'),
-              h('div', {}, text),
-              h('div', { class: 'dn-lbl', style: 'color:var(--warn); margin-top:10px' },
-                e && e.code === 'NETWORK' ? 'Hors-ligne — Alto inaccessible' : 'Alto n\'a pas pu traiter la demande'),
-            ]));
-            toast('Alto indisponible', 'error');
-          }
-        });
-      } }, [icon('mic', 22), 'Dicter une modification à Alto']),
+      h('button', { class: 'btn btn-primary', onclick: () => dictate() }, [icon('mic', 22), 'Dicter une modification à Alto']),
       noteSlot,
       h('div', { style: 'height:24px' }),
     ];
     body.replaceChildren(...parts.filter(Boolean));
+
+    // Lance la dictée + envoie au serveur. Factorisé pour pouvoir réessayer.
+    function dictate(prefillText) {
+      const run = async (text) => {
+        if (!text) return;
+        noteSlot.replaceChildren(h('div', { class: 'dictation-note' }, [
+          h('div', { class: 'dn-lbl' }, 'Modification dictée'),
+          h('div', {}, text),
+          h('div', { class: 'dn-lbl', style: 'margin-top:10px' }, 'Alto réfléchit…'),
+        ]));
+        try {
+          const r = await API.post('/ai/modify-voice', { text, recipe_id: Number(id) });
+          renderActions(text, r);
+        } catch (e) {
+          // On expose le message serveur (utile pour Gemini timeout / quota).
+          const detail = (e && e.code === 'NETWORK')
+            ? 'Hors-ligne — Alto inaccessible'
+            : ((e && e.message) || 'Alto n\'a pas pu traiter la demande');
+          noteSlot.replaceChildren(h('div', { class: 'dictation-note' }, [
+            h('div', { class: 'dn-lbl' }, 'Modification dictée (non envoyée)'),
+            h('div', {}, text),
+            h('div', { class: 'dn-lbl', style: 'color:var(--warn); margin-top:10px' }, detail),
+            h('div', { style: 'display:flex; gap:8px; margin-top:10px' }, [
+              h('button', { class: 'btn btn-primary', style: 'width:auto; min-height:44px; padding:0 16px',
+                onclick: () => run(text) }, 'Réessayer'),
+              h('button', { class: 'btn btn-ghost', style: 'width:auto; min-height:44px; padding:0 16px',
+                onclick: () => dictate() }, 'Re-dicter'),
+            ]),
+          ]));
+          toast('Alto indisponible', 'error');
+        }
+      };
+      if (prefillText) return run(prefillText);
+      startVoice('command', run);
+    }
 
     // Affichage des actions renvoyées par /ai/modify-voice.
     // Le serveur applique automatiquement les `supplier_preference` (drapeau
