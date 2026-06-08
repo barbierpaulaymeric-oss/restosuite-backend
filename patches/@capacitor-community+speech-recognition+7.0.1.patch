@@ -1,0 +1,35 @@
+diff --git a/node_modules/@capacitor-community/speech-recognition/Package.swift b/node_modules/@capacitor-community/speech-recognition/Package.swift
+new file mode 100644
+index 0000000..0eb3087
+--- /dev/null
++++ b/node_modules/@capacitor-community/speech-recognition/Package.swift
+@@ -0,0 +1,29 @@
++// swift-tools-version: 5.9
++// Ajout local : le plugin community ne fournit pas encore de Package.swift.
++// Capacitor 8 fonctionne en SPM-first et ignore les plugins qui n'en ont pas.
++// Cette config minimale expose les sources iOS du plugin (Plugin.swift/.h/.m)
++// au package CapApp-SPM via le mécanisme standard registerPlugin / @objc.
++import PackageDescription
++
++let package = Package(
++    name: "CapacitorCommunitySpeechRecognition",
++    platforms: [.iOS(.v14)],
++    products: [
++        .library(
++            name: "CapacitorCommunitySpeechRecognition",
++            targets: ["CapacitorCommunitySpeechRecognition"])
++    ],
++    dependencies: [
++        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "8.0.0")
++    ],
++    targets: [
++        .target(
++            name: "CapacitorCommunitySpeechRecognition",
++            dependencies: [
++                .product(name: "Capacitor", package: "capacitor-swift-pm"),
++                .product(name: "Cordova", package: "capacitor-swift-pm")
++            ],
++            path: "ios/Plugin",
++            publicHeadersPath: ".")
++    ]
++)

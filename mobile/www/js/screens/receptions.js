@@ -184,40 +184,150 @@ export function ReceptionsScreen() {
     }
   }
 
+  // Récap éditable d'un BL scanné : tous les champs sont modifiables
+  // (l'IA peut se tromper). Bouton valider → POST /from-scan crée le PO
+  // directement au statut réceptionnée + stock mouvementé côté serveur.
   function renderScanResult(data) {
-    const items = (data && Array.isArray(data.items)) ? data.items : [];
-    const head = h('div', {}, [
-      h('button', { class: 'btn btn-ghost detail-back', onclick: showList },
-        [icon('logout', 20), 'Retour']),
-      h('div', { class: 'detail-name' }, data.supplier_name || 'Fournisseur'),
-      h('div', { class: 'detail-cat' }, [
-        data.delivery_number ? '#' + data.delivery_number : 'BL',
-        data.delivery_date ? ' · ' + data.delivery_date : '',
-        items.length ? ' · ' + items.length + ' ligne(s)' : '',
-      ].join('')),
-    ]);
+    const state = {
+      supplier_name: (data && data.supplier_name) || '',
+      delivery_number: (data && data.delivery_number) || '',
+      delivery_date: (data && data.delivery_date) || '',
+      items: ((data && Array.isArray(data.items)) ? data.items : []).map((it) => ({
+        product_name: it.product_name || '',
+        quantity: it.quantity != null ? it.quantity : '',
+        unit: it.unit || 'kg',
+        unit_price: it.unit_price != null ? it.unit_price : '',
+        total_price: it.total_price != null ? it.total_price : '',
+      })),
+    };
 
-    const rows = items.length
-      ? items.map((it) => h('div', { class: 'card', style: 'margin-bottom:10px' }, [
-          h('div', { style: 'display:flex; gap:10px; align-items:baseline' }, [
-            h('div', { style: 'flex:1; font-size:16px; font-weight:700' },
-              it.product_name || 'Article'),
-            h('div', { class: 'ing-qty' },
-              (it.quantity != null ? it.quantity : '?') + ' ' + (it.unit || '')),
+    function field(label, value, onChange, opts = {}) {
+      const inp = h('input', {
+        class: 'field', value: value == null ? '' : String(value),
+        type: opts.type || 'text', inputmode: opts.inputmode || undefined,
+        step: opts.step || undefined,
+        placeholder: opts.placeholder || '',
+        oninput: (e) => onChange(e.target.value),
+        style: opts.style || '',
+      });
+      return h('div', { style: 'margin-bottom:10px' }, [
+        h('div', { class: 'section-label', style: 'margin:0 0 4px' }, label),
+        inp,
+      ]);
+    }
+
+    function renderItemRow(it, i) {
+      const removeBtn = h('button', {
+        class: 'btn btn-ghost', style: 'width:auto; min-height:36px; padding:0 12px; font-size:13px',
+        onclick: () => { state.items.splice(i, 1); paint(); },
+      }, 'Supprimer la ligne');
+
+      return h('div', { class: 'card', style: 'margin-bottom:10px' }, [
+        h('div', { class: 'section-label', style: 'margin:0 0 6px' }, 'Article ' + (i + 1)),
+        field('Désignation', it.product_name, (v) => { it.product_name = v; }),
+        h('div', { style: 'display:flex; gap:8px' }, [
+          h('div', { style: 'flex:1' }, [
+            field('Quantité', it.quantity, (v) => { it.quantity = v; }, { type: 'number', inputmode: 'decimal', step: '0.01' }),
           ]),
-          it.matched_ingredient ? h('div', { class: 'lr-sub' },
-            '↦ ' + it.matched_ingredient) : null,
-          it.batch_number || it.dlc ? h('div', { class: 'lr-sub' }, [
-            it.batch_number ? 'Lot ' + it.batch_number : '',
-            it.dlc ? (it.batch_number ? ' · ' : '') + 'DLC ' + it.dlc : '',
-          ].join('')) : null,
-        ].filter(Boolean)))
-      : [emptyState('truck', 'Aucune ligne détectée', 'Reprendre la photo cadrée et nette.')];
+          h('div', { style: 'flex:1' }, [
+            field('Unité', it.unit, (v) => { it.unit = v; }, { placeholder: 'kg, l, pièce…' }),
+          ]),
+        ]),
+        h('div', { style: 'display:flex; gap:8px' }, [
+          h('div', { style: 'flex:1' }, [
+            field('PU € (HT)', it.unit_price, (v) => { it.unit_price = v; recomputeTotal(it); }, { type: 'number', inputmode: 'decimal', step: '0.01' }),
+          ]),
+          h('div', { style: 'flex:1' }, [
+            field('Total €', it.total_price, (v) => { it.total_price = v; }, { type: 'number', inputmode: 'decimal', step: '0.01' }),
+          ]),
+        ]),
+        h('div', { style: 'text-align:right' }, [removeBtn]),
+      ]);
+    }
+    function recomputeTotal(it) {
+      const q = parseFloat(it.quantity); const pu = parseFloat(it.unit_price);
+      if (!isNaN(q) && !isNaN(pu)) it.total_price = (q * pu).toFixed(2);
+    }
+    function addItem() {
+      state.items.push({ product_name: '', quantity: '', unit: 'kg', unit_price: '', total_price: '' });
+      paint();
+    }
 
-    const note = h('p', { class: 'section-label', style: 'color:var(--text-dim)' },
-      'Scan informatif — la confirmation de réception se fait depuis la commande correspondante.');
+    function computeGrandTotal() {
+      return state.items.reduce((s, it) => s + (parseFloat(it.total_price) || 0), 0);
+    }
 
-    root.replaceChildren(head, h('div', { class: 'section-label' }, 'Lignes extraites'), ...rows, note);
+    async function validate() {
+      if (!state.supplier_name.trim()) {
+        toast('Nom du fournisseur requis', 'error');
+        return;
+      }
+      const items = state.items
+        .filter((it) => (it.product_name || '').trim() && parseFloat(it.quantity) > 0)
+        .map((it) => ({
+          product_name: it.product_name.trim(),
+          quantity: parseFloat(it.quantity) || 0,
+          unit: (it.unit || 'pièce').trim(),
+          unit_price: parseFloat(it.unit_price) || 0,
+          total_price: parseFloat(it.total_price) || 0,
+        }));
+      if (items.length === 0) { toast('Au moins une ligne valide requise', 'error'); return; }
+
+      validateBtn.disabled = true; validateBtn.textContent = 'Enregistrement…';
+      try {
+        await API.post('/purchase-orders/from-scan', {
+          supplier_name: state.supplier_name.trim(),
+          delivery_number: state.delivery_number.trim() || null,
+          delivery_date: state.delivery_date.trim() || null,
+          items,
+        });
+        toast('Réception enregistrée — stock mis à jour', 'ok');
+        showList();
+      } catch (e) {
+        toast((e && e.message) || 'Échec de la validation', 'error');
+        validateBtn.disabled = false;
+        validateBtn.textContent = 'Valider la réception';
+      }
+    }
+
+    const validateBtn = h('button', { class: 'btn btn-primary', onclick: validate },
+      [icon('check', 22), 'Valider la réception']);
+    const cancelBtn = h('button', { class: 'btn btn-ghost', onclick: showList }, 'Annuler');
+
+    function paint() {
+      const headBlock = h('div', { class: 'card', style: 'margin-bottom:14px' }, [
+        h('div', { class: 'detail-name', style: 'margin:0 0 8px' }, 'BL scanné'),
+        h('p', { class: 'lr-sub', style: 'margin:0 0 14px' }, 'Vérifiez les valeurs extraites par Alto, ajustez si besoin, puis validez.'),
+        field('Fournisseur', state.supplier_name, (v) => { state.supplier_name = v; }),
+        h('div', { style: 'display:flex; gap:8px' }, [
+          h('div', { style: 'flex:1' }, [field('N° BL', state.delivery_number, (v) => { state.delivery_number = v; })]),
+          h('div', { style: 'flex:1' }, [field('Date', state.delivery_date, (v) => { state.delivery_date = v; }, { type: 'date' })]),
+        ]),
+      ]);
+
+      const rows = state.items.length
+        ? state.items.map(renderItemRow)
+        : [emptyState('truck', 'Aucune ligne détectée', 'Ajoutez une ligne manuellement ci-dessous.')];
+
+      const addBtn = h('button', { class: 'btn btn-ghost', onclick: addItem }, [icon('plus', 20), 'Ajouter une ligne']);
+      const total = h('div', { class: 'order-total' }, 'Total estimé : ' + computeGrandTotal().toFixed(2).replace('.', ',') + ' €');
+
+      root.replaceChildren(
+        h('button', { class: 'btn btn-ghost detail-back', onclick: showList }, [icon('logout', 20), 'Retour']),
+        headBlock,
+        h('div', { class: 'section-label' }, 'Lignes (' + state.items.length + ')'),
+        ...rows,
+        addBtn,
+        h('div', { style: 'height:8px' }),
+        total,
+        h('div', { style: 'height:14px' }),
+        validateBtn,
+        h('div', { style: 'height:8px' }),
+        cancelBtn,
+        h('div', { style: 'height:24px' }),
+      );
+    }
+    paint();
   }
 
   showList();

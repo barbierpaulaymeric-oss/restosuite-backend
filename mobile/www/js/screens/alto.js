@@ -5,6 +5,9 @@
 // Framework) — WKWebView fait planter `webkitSpeechRecognition` silencieusement
 // sur de nombreux iPhone (timeout immédiat, no-speech). En web/preview ou si le
 // plugin n'est pas disponible, on retombe sur Web Speech API.
+//
+// UX : un overlay plein écran avec pulse pendant l'écoute + état "réflexion"
+// après capture. Bouton Annuler à tout moment.
 import { h, icon, toast } from '../ui.js';
 import { navigate } from '../router.js';
 import { API } from '../api.js';
@@ -25,7 +28,6 @@ function getRecognition() {
   return r;
 }
 
-// Traduit le code d'erreur Web Speech en message lisible.
 function webSpeechErrorMsg(err) {
   switch (err) {
     case 'no-speech': return 'Je n\'ai pas entendu — parlez plus fort ou plus près du micro';
@@ -33,52 +35,105 @@ function webSpeechErrorMsg(err) {
     case 'not-allowed':
     case 'service-not-allowed': return 'Dictée refusée — Réglages → RestoSuite Cuisine → Micro + Reconnaissance vocale';
     case 'network': return 'Réseau requis pour la dictée — vérifiez votre connexion';
-    case 'aborted': return null; // toggle stop, pas d'erreur à afficher
+    case 'aborted': return null;
     default: return 'Dictée indisponible (' + err + ')';
   }
 }
 
+// ── Overlay d'écoute / réflexion ─────────────────────────────────
+function openVoiceModal({ onCancel }) {
+  const stateEl = h('div', { class: 'voice-state' }, 'À l\'écoute…');
+  const subEl = h('div', { class: 'voice-sub' }, 'Parlez normalement, je vous écoute');
+  const pulse = h('div', { class: 'voice-pulse' }, [icon('mic', 56)]);
+  const cancelBtn = h('button', { class: 'btn btn-ghost', onclick: () => onCancel && onCancel() }, 'Annuler');
+  const modal = h('div', { class: 'voice-modal' }, [
+    pulse, stateEl, subEl,
+    h('div', { class: 'voice-actions' }, [cancelBtn]),
+  ]);
+  document.body.append(modal);
+
+  return {
+    el: modal,
+    setHeard(text) {
+      stateEl.textContent = 'Entendu';
+      subEl.textContent = text || '';
+    },
+    setThinking() {
+      modal.classList.add('thinking');
+      stateEl.textContent = 'Alto réfléchit…';
+      subEl.textContent = '';
+      pulse.replaceChildren(h('div', { class: 'voice-thinking-dots' }, [
+        h('span', {}), h('span', {}), h('span', {}),
+      ]));
+    },
+    setError(msg) {
+      modal.classList.remove('thinking');
+      stateEl.textContent = 'Erreur';
+      subEl.textContent = msg || 'Erreur inconnue';
+      pulse.style.background = 'var(--danger)';
+    },
+    close() { modal.remove(); },
+  };
+}
+
 /**
  * Lance une écoute vocale.
- * @param {'search'|'command'|'chat'} mode  'search' route vers les fiches avec le terme dicté.
+ * @param {'search'|'command'|'chat'} mode
  * @param {(text:string)=>void} [onResult]
  */
 export async function startVoice(mode = 'command', onResult) {
   const native = getNativeSR();
-  const micBtn = document.querySelector('.mic-btn');
-  micBtn && micBtn.classList.add('listening');
+  let cancelled = false;
+
+  const modal = openVoiceModal({
+    onCancel: () => {
+      cancelled = true;
+      if (native && native.stop) { native.stop().catch(() => {}); }
+      modal.close();
+    },
+  });
 
   function deliver(text) {
-    micBtn && micBtn.classList.remove('listening');
+    if (cancelled) return;
+    modal.setHeard(text);
+    setTimeout(() => modal.close(), 600);
     if (!text) return;
     if (onResult) return onResult(text);
     if (mode === 'search') {
       navigate('fiches');
       setTimeout(() => { const f = document.querySelector('input[type="search"]'); if (f) { f.value = text; f.dispatchEvent(new Event('input')); } }, 60);
-    } else toast('Entendu : ' + text, 'ok');
+    } else {
+      toast('Entendu : ' + text, 'ok');
+    }
   }
 
-  // ── Voie 1 : plugin natif (iOS / Android) ──────────────────────────
+  function failClose(msg) {
+    if (cancelled) return;
+    modal.setError(msg);
+    setTimeout(() => modal.close(), 2200);
+    if (msg) toast(msg, 'error');
+  }
+
+  // ── Voie 1 : plugin natif (iOS / Android) ────────────────────────
   if (native) {
     try {
-      // Demande explicite des permissions (micro + reconnaissance vocale iOS).
       const perms = await native.checkPermissions().catch(() => ({}));
       if (perms.speechRecognition !== 'granted') {
         const r = await native.requestPermissions().catch(() => ({}));
         if (r.speechRecognition && r.speechRecognition !== 'granted') {
-          micBtn && micBtn.classList.remove('listening');
-          toast('Dictée refusée — Réglages → RestoSuite Cuisine → Micro + Reconnaissance vocale', 'error');
-          return;
+          return failClose('Dictée refusée — Réglages → RestoSuite Cuisine → Micro + Reconnaissance vocale');
         }
       }
       const avail = await native.available().catch(() => ({ available: false }));
-      if (!avail.available) {
-        micBtn && micBtn.classList.remove('listening');
-        toast('Reconnaissance vocale indisponible sur cet appareil', 'error');
-        return;
-      }
+      if (!avail.available) return failClose('Reconnaissance vocale indisponible sur cet appareil');
 
-      toast('Parlez…');
+      // Watchdog : si rien ne revient en 15s, on coupe proprement.
+      const watchdog = setTimeout(() => {
+        if (cancelled) return;
+        try { native.stop && native.stop(); } catch {}
+        failClose('Je n\'ai rien entendu — réessayez plus près du micro');
+      }, 15000);
+
       const result = await native.start({
         language: 'fr-FR',
         maxResults: 1,
@@ -86,29 +141,38 @@ export async function startVoice(mode = 'command', onResult) {
         partialResults: false,
         popup: false,
       });
+      clearTimeout(watchdog);
       const matches = (result && result.matches) || [];
-      deliver((matches[0] || '').trim());
+      const text = (matches[0] || '').trim();
+      if (!text) return failClose('Je n\'ai rien entendu');
+      deliver(text);
       return;
     } catch (e) {
-      micBtn && micBtn.classList.remove('listening');
-      toast('Dictée échouée (' + ((e && e.message) || 'inconnu') + ')', 'error');
-      return;
+      return failClose('Dictée échouée (' + ((e && e.message) || 'inconnu') + ')');
     }
   }
 
-  // ── Voie 2 : fallback Web Speech (preview navigateur) ──────────────
+  // ── Voie 2 : fallback Web Speech (preview navigateur) ────────────
   const rec = getRecognition();
-  if (!rec) { micBtn && micBtn.classList.remove('listening'); toast('Dictée non disponible sur cet appareil', 'error'); return; }
+  if (!rec) return failClose('Dictée non disponible sur cet appareil');
 
-  toast('Parlez…');
-  rec.onresult = (e) => deliver(e.results[0][0].transcript.trim());
-  rec.onerror = (e) => {
-    micBtn && micBtn.classList.remove('listening');
-    const msg = webSpeechErrorMsg(e && e.error);
-    if (msg) toast(msg, 'error');
+  // Watchdog identique côté Web Speech (souvent silencieux).
+  const watchdog = setTimeout(() => {
+    try { rec.stop(); } catch {}
+    failClose('Je n\'ai rien entendu — réessayez');
+  }, 15000);
+
+  rec.onresult = (e) => {
+    clearTimeout(watchdog);
+    deliver(e.results[0][0].transcript.trim());
   };
-  rec.onend = () => micBtn && micBtn.classList.remove('listening');
-  try { rec.start(); } catch { micBtn && micBtn.classList.remove('listening'); toast('Micro occupé', 'error'); }
+  rec.onerror = (e) => {
+    clearTimeout(watchdog);
+    const msg = webSpeechErrorMsg(e && e.error);
+    failClose(msg);
+  };
+  rec.onend = () => clearTimeout(watchdog);
+  try { rec.start(); } catch { failClose('Micro occupé'); }
 }
 
 // Suggestions rapides — pré-remplissent la saisie, le chef complète le nom du plat.
@@ -125,7 +189,6 @@ export function AltoScreen() {
   const thread = h('div', { class: 'chat-thread' });
 
   function scrollToEnd() {
-    // Le conteneur de scroll est .app-main ; on défile après le rendu.
     requestAnimationFrame(() => {
       const main = document.querySelector('.app-main');
       if (main) main.scrollTop = main.scrollHeight;
@@ -189,7 +252,6 @@ export function AltoScreen() {
     h('button', { class: 'chip', onclick: () => { input.value = p; input.focus(); } }, p)
   ));
 
-  // Message d'accueil.
   addMessage('alto', 'Bonjour 👋 Je suis Alto, votre assistant cuisine. Posez-moi une question sur vos plats, food cost, allergènes ou recettes.');
 
   return h('div', { class: 'chat-screen' }, [

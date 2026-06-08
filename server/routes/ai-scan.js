@@ -182,7 +182,7 @@ router.post('/scan-delivery', upload.single('delivery'), async (req, res) => {
     return res.status(400).json({ error: 'Image requise (fichier ou base64)' });
   }
 
-  const prompt = "Extrais les données de ce bon de livraison fournisseur de restaurant. Retourne un JSON: supplier_name, delivery_number, delivery_date, items (array de {product_name, quantity, unit, batch_number, dlc}). Pas de prix : le BL n'en porte pas. Si un champ n'est pas visible, mets null.";
+  const prompt = "Extrais les données de ce bon de livraison fournisseur de restaurant. Retourne un JSON: supplier_name, delivery_number, delivery_date (format YYYY-MM-DD), items (array de {product_name, quantity, unit, unit_price, total_price, batch_number, dlc}), total_ht, total_ttc. Les prix peuvent figurer ou non sur le BL — si présents, les extraire ; si absents, mettre null. Si un champ n'est pas visible, mets null.";
 
   try {
     const response = await fetch(buildGeminiUrl(selectModel('scan-invoice', req.user?.restaurant_id)), {

@@ -763,4 +763,103 @@ router.post('/:id/clone', (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// POST /api/purchase-orders/from-scan
+//
+// Crée directement une commande au statut "réceptionnée" à partir d'un BL
+// scanné + édité par le chef (workflow réception au quai). Si le fournisseur
+// n'existe pas encore, on le crée minimalement (nom seul). Pas de dispatch
+// fournisseur, pas d'email — la marchandise est déjà là physiquement.
+//
+// Body attendu : {
+//   supplier_name: string,
+//   delivery_number?: string,
+//   delivery_date?: 'YYYY-MM-DD',
+//   reception_notes?: string,
+//   items: [{ product_name, quantity, unit, unit_price?, total_price? }],
+// }
+// ═══════════════════════════════════════════
+router.post('/from-scan', (req, res) => {
+  const rid = req.user.restaurant_id;
+  const { supplier_name, delivery_number, delivery_date, reception_notes, items } = req.body || {};
+
+  if (!supplier_name || typeof supplier_name !== 'string') {
+    return res.status(400).json({ error: 'supplier_name requis' });
+  }
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'items requis (≥1 ligne)' });
+  }
+
+  try {
+    // 1. Trouver ou créer le fournisseur (match case-insensitive sur le nom).
+    let supplier = get(
+      'SELECT * FROM suppliers WHERE LOWER(name) = LOWER(?) AND restaurant_id = ?',
+      [supplier_name.trim(), rid]
+    );
+    if (!supplier) {
+      const info = run(
+        'INSERT INTO suppliers (restaurant_id, name) VALUES (?, ?)',
+        [rid, supplier_name.trim()]
+      );
+      supplier = get('SELECT * FROM suppliers WHERE id = ? AND restaurant_id = ?', [info.lastInsertRowid, rid]);
+    }
+
+    // 2. Référence interne + totaux
+    const reference = delivery_number
+      ? `BL-${delivery_number}`
+      : `BL-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-4)}`;
+
+    let total = 0;
+    const cleaned = items.map((it) => {
+      const qty = Number(it.quantity) || 0;
+      const up = Number(it.unit_price) || 0;
+      const tp = Number(it.total_price) || (qty * up);
+      total += tp;
+      return {
+        product_name: String(it.product_name || '').slice(0, 200),
+        quantity: qty,
+        unit: String(it.unit || 'pièce').slice(0, 20),
+        unit_price: up,
+        total_price: tp,
+      };
+    });
+
+    // 3. Créer le PO au statut réceptionnée (saut des étapes envoyée/confirmée).
+    const poInfo = run(
+      `INSERT INTO purchase_orders
+         (restaurant_id, supplier_id, reference, status, total_amount, notes, received_at, expected_delivery)
+       VALUES (?, ?, ?, 'réceptionnée', ?, ?, CURRENT_TIMESTAMP, ?)`,
+      [rid, supplier.id, reference, total, reception_notes || null, delivery_date || null]
+    );
+    const poId = poInfo.lastInsertRowid;
+
+    // 4. Insérer les lignes
+    for (const it of cleaned) {
+      run(
+        `INSERT INTO purchase_order_items
+           (purchase_order_id, restaurant_id, product_name, quantity, unit, unit_price, total_price)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [poId, rid, it.product_name, it.quantity, it.unit, it.unit_price, it.total_price]
+      );
+    }
+
+    const po = get(
+      `SELECT po.*, s.name as supplier_name
+         FROM purchase_orders po
+         LEFT JOIN suppliers s ON s.id = po.supplier_id AND s.restaurant_id = ?
+        WHERE po.id = ? AND po.restaurant_id = ?`,
+      [rid, poId, rid]
+    );
+    const lines = all(
+      `SELECT * FROM purchase_order_items WHERE purchase_order_id = ? AND restaurant_id = ?`,
+      [poId, rid]
+    );
+
+    res.status(201).json({ ...po, items: lines });
+  } catch (e) {
+    console.error('purchase-orders/from-scan error:', e);
+    res.status(500).json({ error: 'Erreur création réception', detail: e.message });
+  }
+});
+
 module.exports = router;
