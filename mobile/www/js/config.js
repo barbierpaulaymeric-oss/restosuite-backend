@@ -14,5 +14,5 @@ export const CONFIG = {
   accountKey: 'restosuite_account',
 
   // Couleurs marque (référence ; la source de vérité est theme.css).
-  colors: { navy: '#1B2A4A', orange: '#E8722A', accent: '#C45A18' },
+  colors: { navy: '#2D8B5E', orange: '#2D8B5E', accent: '#1F7A4D' },
 };
