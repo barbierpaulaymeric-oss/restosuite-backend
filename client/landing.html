@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="fr" data-theme="dark">
+<html lang="fr" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>RestoSuite — Logiciel gestion restaurant | Fiches techniques, HACCP, stock</title>
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#1B2A4A">
+  <meta name="theme-color" content="#FAF8F5">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="RestoSuite">
@@ -33,8 +33,8 @@
   <meta name="twitter:title" content="RestoSuite — Gestion restaurant intelligente">
   <meta name="twitter:description" content="Fiches techniques, HACCP, stock, commandes. Saisie vocale IA. 60 jours gratuit.">
   <meta name="twitter:image" content="https://www.restosuite.fr/assets/og-social-card.jpg">
-  <meta name="theme-color" content="#E8722A" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#FAF8F5" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#FAF8F5" media="(prefers-color-scheme: light)">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -218,13 +218,12 @@
 <body>
 
   <!-- Loading screen (shown during cold start / slow API) -->
-  <div id="loading-screen" style="display:none; position:fixed; inset:0; z-index:9999; background:#0F1923; align-items:center; justify-content:center; flex-direction:column;">
+  <div id="loading-screen" style="display:none; position:fixed; inset:0; z-index:9999; background:#FAF8F5; align-items:center; justify-content:center; flex-direction:column;">
     <img src="assets/logo-full.svg" alt="RestoSuite" style="height:80px; margin-bottom:24px;">
-    <div style="color:#F7F5F2; font-family:Inter,sans-serif; font-size:18px; font-weight:600; margin-bottom:16px;">RestoSuite</div>
-    <div style="width:200px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
-      <div id="loading-bar" style="width:0%; height:100%; background:#E8722A; border-radius:2px; transition:width 0.5s;"></div>
+    <div style="width:200px; height:4px; background:rgba(44,44,44,0.1); border-radius:2px; overflow:hidden;">
+      <div id="loading-bar" style="width:0%; height:100%; background:#1F7A4D; border-radius:2px; transition:width 0.5s;"></div>
     </div>
-    <div style="color:#8899aa; font-size:13px; margin-top:12px;" id="loading-text">Chargement...</div>
+    <div style="color:#6E6A5E; font-size:13px; margin-top:12px;" id="loading-text">Chargement...</div>
   </div>
   <script src="/js/app-init.js"></script>
 
