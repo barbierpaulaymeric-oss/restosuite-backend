@@ -5,21 +5,9 @@
 // ─── Theme Init (before paint) ───
 (function() {
   const savedTheme = localStorage.getItem('restosuite_theme');
-  if (savedTheme) {
-    document.documentElement.setAttribute('data-theme', savedTheme);
-  } else {
-    // Auto-detect from system preference
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-  }
+  // Brand default is the cream/light identity. Dark mode stays available via the toggle.
+  document.documentElement.setAttribute('data-theme', savedTheme || 'light');
 })();
-
-// Listen for system preference changes
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-  if (!localStorage.getItem('restosuite_theme')) {
-    document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-  }
-});
 
 // ─── Nav group definitions ───
 const NAV_GROUPS = {

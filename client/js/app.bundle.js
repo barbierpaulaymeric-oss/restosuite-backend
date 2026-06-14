@@ -31999,18 +31999,8 @@ const Router = {
 };
 (function() {
   const savedTheme = localStorage.getItem("restosuite_theme");
-  if (savedTheme) {
-    document.documentElement.setAttribute("data-theme", savedTheme);
-  } else {
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
-  }
+  document.documentElement.setAttribute("data-theme", savedTheme || "light");
 })();
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
-  if (!localStorage.getItem("restosuite_theme")) {
-    document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
-  }
-});
 const NAV_GROUPS = {
   cuisine: {
     label: "Cuisine",
