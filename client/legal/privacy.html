@@ -256,10 +256,12 @@
         <p>Nous mettons en œuvre les mesures techniques et organisationnelles appropriées pour protéger vos données :</p>
         <ul>
           <li>Chiffrement des communications (HTTPS/TLS)</li>
-          <li>Authentification par code PIN</li>
-          <li>Accès restreint aux données selon les rôles</li>
+          <li>Chiffrement de la base de données au repos (SQLCipher / AES-256), conformément à l'article 32 du RGPD</li>
+          <li>Mots de passe stockés sous forme de condensats (hachage bcrypt), jamais en clair</li>
+          <li>Authentification par mot de passe ou code PIN, avec limitation des tentatives</li>
+          <li>Accès restreint aux données selon les rôles et isolation entre établissements</li>
           <li>Sauvegardes régulières</li>
-          <li>Hébergement sécurisé avec Render</li>
+          <li>Hébergement sécurisé dans l'Union européenne (Render, région Frankfurt)</li>
         </ul>
       </section>
 
