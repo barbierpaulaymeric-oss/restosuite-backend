@@ -951,3 +951,23 @@ function logout() {
   location.hash = '';
   location.reload();
 }
+
+// « Changer d'utilisateur » — revient au sélecteur d'équipe SANS déconnecter le
+// compte/restaurant (la session reste active). Un autre membre choisit son profil
+// et saisit son PIN ; sa session écrase alors la précédente. À ne pas confondre
+// avec logout() (déconnexion complète du compte, dans Réglages).
+function switchUser() {
+  clearTrialStatusInterval();
+  const login = new LoginView();
+  let acc = {};
+  try { acc = JSON.parse(localStorage.getItem('restosuite_account') || '{}'); } catch {}
+  login.restaurantName = acc.restaurant_name || acc.restaurant || 'Mon restaurant';
+  login.restaurantId = acc.restaurant_id || null;
+  login.mode = 'team-picker';
+  login.render(); // affiche tout de suite l'écran ; la liste se remplit ci-dessous
+  if (typeof API !== 'undefined' && API.getStaffMembers) {
+    API.getStaffMembers()
+      .then(r => { login.staffMembers = (r && (r.members || r)) || []; login.render(); })
+      .catch(() => {});
+  }
+}

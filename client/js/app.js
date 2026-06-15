@@ -61,7 +61,7 @@ const NAV_GROUPS = {
       { label: 'Journal erreurs',     route: '/errors-log',         icon: 'bug',          roles: ['gerant'] },
       { label: 'Agrément sanitaire',  route: '/settings/sanitary-approval', icon: 'badge-check', roles: ['gerant'] },
       { label: 'Horaires de service', route: '/settings/service-hours',     icon: 'clock',       roles: ['gerant'] },
-      { label: 'Se déconnecter',      route: null,               icon: 'log-out',      roles: ['gerant','cuisinier','equipier'], action: 'logout' },
+      { label: 'Changer d\'utilisateur', route: null,            icon: 'users',        roles: ['gerant','cuisinier','equipier'], action: 'switch-user' },
     ]
   },
   pilotage: {
@@ -552,8 +552,10 @@ function initNavGroups(role) {
     const currentPath = location.hash.replace('#', '') || '/';
 
     function renderItem(item) {
-      if (item.action === 'logout') {
-        return `<button class="nav-panel-item nav-panel-item--danger" onclick="logout()">
+      if (item.action === 'switch-user' || item.action === 'logout') {
+        const fn = item.action === 'switch-user' ? 'switchUser()' : 'logout()';
+        const danger = item.action === 'logout' ? ' nav-panel-item--danger' : '';
+        return `<button class="nav-panel-item${danger}" onclick="${fn}">
           <i data-lucide="${item.icon}"></i>
           <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
         </button>`;
@@ -688,10 +690,11 @@ function initMobileNav(role) {
         const isActive = item.route && (path === item.route || (item.route !== '/' && path.startsWith(item.route)));
 
         let el;
-        if (item.action === 'logout') {
+        if (item.action === 'switch-user' || item.action === 'logout') {
           el = document.createElement('button');
-          el.className = 'mobile-nav-item mobile-nav-item--danger';
-          el.addEventListener('click', () => { closeOverlay(); logout(); });
+          el.className = 'mobile-nav-item' + (item.action === 'logout' ? ' mobile-nav-item--danger' : '');
+          const fn = item.action === 'switch-user' ? switchUser : logout;
+          el.addEventListener('click', () => { closeOverlay(); fn(); });
         } else {
           el = document.createElement('a');
           el.href = '#' + item.route;

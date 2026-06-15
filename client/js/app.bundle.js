@@ -21142,6 +21142,26 @@ function logout() {
   location.hash = "";
   location.reload();
 }
+function switchUser() {
+  clearTrialStatusInterval();
+  const login = new LoginView();
+  let acc = {};
+  try {
+    acc = JSON.parse(localStorage.getItem("restosuite_account") || "{}");
+  } catch (e) {
+  }
+  login.restaurantName = acc.restaurant_name || acc.restaurant || "Mon restaurant";
+  login.restaurantId = acc.restaurant_id || null;
+  login.mode = "team-picker";
+  login.render();
+  if (typeof API !== "undefined" && API.getStaffMembers) {
+    API.getStaffMembers().then((r) => {
+      login.staffMembers = r && (r.members || r) || [];
+      login.render();
+    }).catch(() => {
+    });
+  }
+}
 function renderSupplierLogin() {
   const app = document.getElementById("app");
   const nav = document.getElementById("nav");
@@ -32052,7 +32072,7 @@ const NAV_GROUPS = {
       { label: "Journal erreurs", route: "/errors-log", icon: "bug", roles: ["gerant"] },
       { label: "Agr\xE9ment sanitaire", route: "/settings/sanitary-approval", icon: "badge-check", roles: ["gerant"] },
       { label: "Horaires de service", route: "/settings/service-hours", icon: "clock", roles: ["gerant"] },
-      { label: "Se d\xE9connecter", route: null, icon: "log-out", roles: ["gerant", "cuisinier", "equipier"], action: "logout" }
+      { label: "Changer d'utilisateur", route: null, icon: "users", roles: ["gerant", "cuisinier", "equipier"], action: "switch-user" }
     ]
   },
   pilotage: {
@@ -32511,8 +32531,10 @@ function initNavGroups(role) {
     if (!group) return;
     const currentPath = location.hash.replace("#", "") || "/";
     function renderItem(item) {
-      if (item.action === "logout") {
-        return `<button class="nav-panel-item nav-panel-item--danger" onclick="logout()">
+      if (item.action === "switch-user" || item.action === "logout") {
+        const fn = item.action === "switch-user" ? "switchUser()" : "logout()";
+        const danger = item.action === "logout" ? " nav-panel-item--danger" : "";
+        return `<button class="nav-panel-item${danger}" onclick="${fn}">
           <i data-lucide="${item.icon}"></i>
           <span class="nav-panel-item__label">${escapeHtml(item.label)}</span>
         </button>`;
@@ -32628,12 +32650,13 @@ function initMobileNav(role) {
         const path = currentPath();
         const isActive = item.route && (path === item.route || item.route !== "/" && path.startsWith(item.route));
         let el;
-        if (item.action === "logout") {
+        if (item.action === "switch-user" || item.action === "logout") {
           el = document.createElement("button");
-          el.className = "mobile-nav-item mobile-nav-item--danger";
+          el.className = "mobile-nav-item" + (item.action === "logout" ? " mobile-nav-item--danger" : "");
+          const fn = item.action === "switch-user" ? switchUser : logout;
           el.addEventListener("click", () => {
             closeOverlay();
-            logout();
+            fn();
           });
         } else {
           el = document.createElement("a");

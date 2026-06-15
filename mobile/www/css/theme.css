@@ -9,6 +9,7 @@
   --navy:        #2D8B5E;  /* vert de marque (ex-navy) */
   --orange:      #2D8B5E;  /* gradient haut — vert de marque (ex-orange) */
   --accent:      #1F7A4D;  /* gradient bas / interactif — vert d'action */
+  --accent-bright: #43C088; /* vert vif lisible sur fond pine (onglet actif) */
   --gold:        #D4A843;  /* accent or (icônes, gros chiffres) */
 
   /* Fonds sombres (dérivés du pine, désaturés pour réduire l'éblouissement) */
@@ -92,7 +93,7 @@ button, input, textarea, select { font-family: inherit; }
 .app-header {
   display: flex; align-items: center; gap: 12px;
   padding: calc(var(--safe-top) + 12px) calc(18px + var(--safe-right)) 12px calc(18px + var(--safe-left));
-  background: var(--navy);
+  background: var(--surface);
   border-bottom: 1px solid var(--line);
   position: sticky; top: 0; z-index: 20;
 }
@@ -124,7 +125,7 @@ button, input, textarea, select { font-family: inherit; }
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
   display: grid; grid-template-columns: repeat(5, 1fr);
-  background: var(--navy);
+  background: var(--surface);
   border-top: 1px solid var(--line);
   padding-bottom: var(--safe-bottom);
   padding-left: var(--safe-left); padding-right: var(--safe-right);
@@ -145,8 +146,8 @@ body.keyboard-open .mic-btn { display: none; }
   padding: 8px 2px; cursor: pointer; min-height: var(--tap);
 }
 .tab svg { width: 26px; height: 26px; }
-.tab.active { color: var(--orange); }
-.tab.active svg { stroke: var(--orange); }
+.tab.active { color: var(--accent-bright); }
+.tab.active svg { stroke: var(--accent-bright); }
 
 /* ── Composants génériques ───────────────────────────────────── */
 .screen-title { font-size: 26px; font-weight: 800; letter-spacing: -.5px; margin: 4px 0 16px; }
