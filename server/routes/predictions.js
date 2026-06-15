@@ -25,7 +25,9 @@ try {
 router.use(requireAuth);
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+// Key goes in the x-goog-api-key header (below), never in the URL query — a URL
+// with the key can leak into logs / error traces. See audit finding D3.
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
 
 // ═══════════════════════════════════════════
 // Prédictions IA — Anticipation de la demande
@@ -184,7 +186,7 @@ router.get('/demand', async (req, res) => {
     res.json(result);
   } catch (e) {
     console.error('Predictions error:', e);
-    res.status(500).json({ error: 'Erreur prédictions', details: e.message });
+    res.status(500).json({ error: 'Erreur prédictions', details: process.env.NODE_ENV === 'production' ? undefined : e.message });
   }
 });
 
@@ -255,7 +257,7 @@ Réponds avec UN seul paragraphe concis et actionable.`;
 
     const response = await fetch(GEMINI_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY || '' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.5, maxOutputTokens: 256 }

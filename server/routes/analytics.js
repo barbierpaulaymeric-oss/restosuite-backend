@@ -6,7 +6,9 @@ const router = Router();
 router.use(requireAuth);
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+// Key goes in the x-goog-api-key header (below), never in the URL query — a URL
+// with the key can leak into logs / error traces. See audit finding D3.
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
 
 // ─── AI Insights Cache (1h) — per-tenant to prevent cross-tenant leak ───
 const _insightsCache = new Map(); // rid -> { insights, time }
@@ -563,27 +565,45 @@ router.get('/haccp', (req, res) => {
         AND tl.restaurant_id = ? AND tz.restaurant_id = ?
     `, [sevenDaysAgo, rid, rid]).c;
 
-    // Daily scores (30 days)
+    // Daily scores (30 days) — three GROUP BY aggregations instead of 90 per-day
+    // point queries (N+1). `recorded_at >= ?` is sargable (ISO strings sort
+    // lexically) so the new idx_temperature_logs_rid_recorded index is usable;
+    // the date() bucketing only groups the already-narrowed rows.
+    const scoresWindowStart = new Date(Date.now() - 29 * 86400000).toISOString().split('T')[0];
+
+    // Total temp logs per day (no zone join — mirrors the original dayTempTotal,
+    // which counted every log including those whose zone was later deleted).
+    const tempTotalByDay = new Map();
+    for (const r of all(
+      `SELECT date(recorded_at) AS d, COUNT(*) AS c FROM temperature_logs
+       WHERE restaurant_id = ? AND recorded_at >= ? GROUP BY date(recorded_at)`,
+      [rid, scoresWindowStart]
+    )) tempTotalByDay.set(r.d, r.c);
+
+    const tempOkByDay = new Map();
+    for (const r of all(`
+      SELECT date(tl.recorded_at) AS d, COUNT(*) AS c FROM temperature_logs tl
+      JOIN temperature_zones tz ON tz.id = tl.zone_id
+      WHERE tl.restaurant_id = ? AND tz.restaurant_id = ? AND tl.recorded_at >= ?
+        AND tl.temperature >= tz.min_temp AND tl.temperature <= tz.max_temp
+      GROUP BY date(tl.recorded_at)
+    `, [rid, rid, scoresWindowStart])) tempOkByDay.set(r.d, r.c);
+
+    const cleanDoneByDay = new Map();
+    for (const r of all(`
+      SELECT date(cl.completed_at) AS d, COUNT(DISTINCT cl.task_id) AS c FROM cleaning_logs cl
+      JOIN cleaning_tasks ct ON ct.id = cl.task_id
+      WHERE cl.restaurant_id = ? AND ct.restaurant_id = ? AND ct.frequency = 'daily'
+        AND cl.completed_at >= ?
+      GROUP BY date(cl.completed_at)
+    `, [rid, rid, scoresWindowStart])) cleanDoneByDay.set(r.d, r.c);
+
     const dailyScores = [];
     for (let i = 29; i >= 0; i--) {
       const d = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
-
-      const dayTempTotal = get(`SELECT COUNT(*) as c FROM temperature_logs WHERE date(recorded_at) = ? AND restaurant_id = ?`, [d, rid]).c;
-      const dayTempOk = get(`
-        SELECT COUNT(*) as c FROM temperature_logs tl
-        JOIN temperature_zones tz ON tz.id = tl.zone_id
-        WHERE date(tl.recorded_at) = ?
-          AND tl.temperature >= tz.min_temp AND tl.temperature <= tz.max_temp
-          AND tl.restaurant_id = ? AND tz.restaurant_id = ?
-      `, [d, rid, rid]).c;
-
-      const dayCleanDone = get(`
-        SELECT COUNT(DISTINCT cl.task_id) as c FROM cleaning_logs cl
-        JOIN cleaning_tasks ct ON ct.id = cl.task_id
-        WHERE date(cl.completed_at) = ? AND ct.frequency = 'daily'
-          AND cl.restaurant_id = ? AND ct.restaurant_id = ?
-      `, [d, rid, rid]).c;
-
+      const dayTempTotal = tempTotalByDay.get(d) || 0;
+      const dayTempOk = tempOkByDay.get(d) || 0;
+      const dayCleanDone = cleanDoneByDay.get(d) || 0;
       dailyScores.push({
         date: d,
         temp_score: dayTempTotal > 0 ? Math.round((dayTempOk / dayTempTotal) * 100) : null,
@@ -692,7 +712,7 @@ Règles :
 
     const geminiRes = await fetch(GEMINI_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY || '' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }

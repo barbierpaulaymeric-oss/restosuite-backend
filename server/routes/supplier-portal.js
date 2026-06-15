@@ -45,7 +45,7 @@ function getJwtSecret() {
 }
 
 function hashPin(pin) {
-  return bcrypt.hashSync(pin, 10);
+  return bcrypt.hashSync(pin, 12);
 }
 
 function verifyPin(pin, hash) {
@@ -290,7 +290,7 @@ router.post('/invite', requireAuth, (req, res) => {
     if (existingEmail) {
       return res.status(409).json({ error: 'Cet email est déjà utilisé par un autre fournisseur' });
     }
-    const passwordHash = bcrypt.hashSync(password, 10);
+    const passwordHash = bcrypt.hashSync(password, 12);
     run('UPDATE suppliers SET email = ?, password_hash = ?, contact_name = ? WHERE id = ? AND restaurant_id = ?',
       [emailLower, passwordHash, name || supplier.name, supplier_id, rid]);
   }
@@ -1209,7 +1209,7 @@ router.post('/import-mercuriale', requireSupplierAuth, mercurialeUpload.single('
       return res.status(500).json({ error: 'Extraction PDF indisponible (clé IA non configurée)' });
     }
     if (e && (e.code === 'GEMINI_HTTP' || e.code === 'GEMINI_EMPTY' || e.code === 'GEMINI_INVALID_JSON')) {
-      return res.status(502).json({ error: e.message });
+      return res.status(502).json({ error: process.env.NODE_ENV === 'production' ? 'Extraction PDF indisponible (réessayez)' : e.message });
     }
     console.error('Mercuriale import error:', e);
     return res.status(500).json({ error: 'Erreur lecture du fichier' });

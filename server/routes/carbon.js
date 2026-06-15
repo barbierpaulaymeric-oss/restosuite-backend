@@ -199,7 +199,7 @@ router.get('/recipes', (req, res) => {
     });
   } catch (e) {
     console.error('Carbon recipes error:', e);
-    res.status(500).json({ error: 'Erreur calcul bilan carbone', details: e.message });
+    res.status(500).json({ error: 'Erreur calcul bilan carbone', details: process.env.NODE_ENV === 'production' ? undefined : e.message });
   }
 });
 

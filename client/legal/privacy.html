@@ -7,7 +7,7 @@
   <meta name="description" content="Politique de confidentialité et protection des données personnelles de RestoSuite, conforme RGPD.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/legal/legal.css">
 </head>
 <body>
@@ -44,8 +44,9 @@
           <li><a href="#transferts">Transferts de données</a></li>
           <li><a href="#conservation">Durée de conservation</a></li>
           <li><a href="#droits">Vos droits</a></li>
-          <li><a href="#cookies">Cookies</a></li>
+          <li><a href="#cookies">Cookies et mesure d'audience</a></li>
           <li><a href="#securite">Sécurité</a></li>
+          <li><a href="#ia">Intelligence artificielle (Alto)</a></li>
           <li><a href="#modifications">Modifications</a></li>
           <li><a href="#contact">Contact</a></li>
         </ol>
@@ -69,8 +70,11 @@
 
         <h3>Données d'identification</h3>
         <ul>
+          <li>Adresse email</li>
+          <li>Prénom et nom</li>
+          <li>Numéro de téléphone (notamment pour les contacts fournisseurs)</li>
           <li>Nom ou pseudonyme (choisi lors de la création du compte)</li>
-          <li>Code PIN (stocké de manière sécurisée)</li>
+          <li>Code PIN équipe (stocké de manière sécurisée)</li>
           <li>Rôle dans l'établissement (gérant, équipier)</li>
         </ul>
 
@@ -81,6 +85,15 @@
           <li>Données de stock (quantités, mouvements, réceptions)</li>
           <li>Données HACCP (relevés de température, plans de nettoyage, traçabilité)</li>
           <li>Informations fournisseurs (noms, contacts)</li>
+        </ul>
+
+        <h3>Données de santé du personnel (catégorie particulière)</h3>
+        <p>Pour répondre à ses obligations en matière d'hygiène et de sécurité alimentaire, l'établissement peut être amené à enregistrer, via le registre de santé du personnel, des données relevant d'une <strong>catégorie particulière au sens de l'article 9 du RGPD</strong> : arrêts maladie, blessures, aptitudes médicales et formations hygiène des membres de l'équipe.</p>
+        <ul>
+          <li><strong>Finalité</strong> — Suivi des obligations d'hygiène et d'aptitude du personnel (santé et sécurité sanitaire en cuisine).</li>
+          <li><strong>Base légale</strong> — Article 9.2.b du RGPD (obligations et droits spécifiques en matière de droit du travail et de sécurité-santé), conjointement aux obligations sanitaires issues du règlement (CE) n° 852/2004 et de l'arrêté du 21 décembre 2009 (formation et aptitude du personnel manipulant des denrées alimentaires, démarche HACCP).</li>
+          <li><strong>Accès</strong> — L'accès à ces données est restreint au gérant de l'établissement.</li>
+          <li><strong>Droits</strong> — Ces données sont incluses dans l'export de vos données (droit d'accès) et sont supprimées lors de la suppression de votre compte (droit à l'effacement).</li>
         </ul>
 
         <h3>Données techniques</h3>
@@ -151,6 +164,11 @@
               <td><strong>Render</strong> (Render Services Inc.)</td>
               <td>Hébergement de l'application et de la base de données</td>
               <td>États-Unis</td>
+            </tr>
+            <tr>
+              <td><strong>OVH</strong> (OVH SAS)</td>
+              <td>Acheminement des emails transactionnels (SMTP)</td>
+              <td>France / Union européenne</td>
             </tr>
             <tr>
               <td><strong>Stripe</strong> (Stripe Inc.)</td>
@@ -227,9 +245,9 @@
       </section>
 
       <section id="cookies">
-        <h2>8. Cookies</h2>
-        <p>RestoSuite utilise uniquement des <strong>cookies strictement nécessaires</strong> au fonctionnement du service (authentification, préférences de session). Aucun cookie de traçage publicitaire n'est utilisé.</p>
-        <p>Ces cookies techniques ne nécessitent pas votre consentement conformément aux recommandations de la CNIL.</p>
+        <h2>8. Cookies et mesure d'audience</h2>
+        <p>RestoSuite utilise des <strong>cookies et un stockage local strictement nécessaires</strong> au fonctionnement du service (authentification, session, préférences). Conformément aux recommandations de la CNIL, ces traceurs techniques ne nécessitent pas votre consentement. Aucun cookie de traçage publicitaire n'est utilisé.</p>
+        <p>La <strong>mesure d'audience</strong> est assurée par <strong>Umami</strong>, une solution que nous hébergeons nous-mêmes et qui <strong>n'utilise aucun cookie</strong> ni identifiant persistant. Cette mesure n'est activée qu'<strong>après votre consentement explicite</strong>, recueilli via le bandeau affiché lors de votre première visite : le script de mesure d'audience n'est chargé qu'en cas d'acceptation. Si vous choisissez « Refuser », aucun outil de mesure d'audience n'est chargé.</p>
       </section>
 
       <section id="securite">
@@ -244,13 +262,20 @@
         </ul>
       </section>
 
+      <section id="ia">
+        <h2>10. Intelligence artificielle (Alto)</h2>
+        <p>RestoSuite intègre un assistant, <strong>Alto</strong>, qui s'appuie sur le modèle <strong>Google Gemini</strong> (hébergé aux États-Unis) pour la saisie vocale et l'aide à la rédaction.</p>
+        <p>Avant tout envoi à Google, vos saisies (messages au chat, dictée vocale) font l'objet d'un <strong>caviardage</strong> : les données personnelles identifiables sont supprimées afin de limiter les informations transmises au modèle.</p>
+        <p>Les réponses fournies par Alto sont <strong>générées automatiquement par une intelligence artificielle</strong>. Elles sont communiquées à titre indicatif, peuvent contenir des erreurs ou des imprécisions et <strong>ne se substituent pas à un avis professionnel</strong> (notamment en matière sanitaire, réglementaire ou comptable). Cette information vous est délivrée en application de l'obligation de transparence prévue par le règlement européen sur l'intelligence artificielle (EU AI Act, article 50).</p>
+      </section>
+
       <section id="modifications">
-        <h2>10. Modifications</h2>
+        <h2>11. Modifications</h2>
         <p>Nous pouvons mettre à jour cette politique de confidentialité pour refléter l'évolution du service ou des obligations légales. Les modifications substantielles seront notifiées par email. La date de dernière mise à jour est indiquée en haut de cette page.</p>
       </section>
 
       <section id="contact">
-        <h2>11. Contact</h2>
+        <h2>12. Contact</h2>
         <p>Pour toute question relative à la protection de vos données personnelles :</p>
         <div class="legal-info-box">
           <p><strong>DPO — Paul-Aymeric Barbier</strong></p>

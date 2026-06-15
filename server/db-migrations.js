@@ -2246,6 +2246,18 @@ try {
   console.warn('⚠️ device_push_tokens migration error:', e.message);
 }
 
+// Composite indexes for the analytics dashboard hot paths (per-tenant time-range
+// scans). Lets the daily-scores aggregation seek by restaurant_id then range over
+// the timestamp instead of scanning every row in the tenant.
+try {
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_temperature_logs_rid_recorded
+           ON temperature_logs(restaurant_id, recorded_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_cleaning_logs_rid_completed
+           ON cleaning_logs(restaurant_id, completed_at)`);
+} catch (e) {
+  console.warn('⚠️ analytics composite index migration error:', e.message);
+}
+
 }
 
 module.exports = { runMigrations };

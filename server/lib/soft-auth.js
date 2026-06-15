@@ -30,7 +30,7 @@ function softAuth(req, res, next) {
     if (cookies.jwt) token = cookies.jwt;
   }
   if (token) {
-    try { req.user = jwt.verify(token, secret); } catch {}
+    try { req.user = jwt.verify(token, secret, { algorithms: ['HS256'] }); } catch {}
   }
   next();
 }

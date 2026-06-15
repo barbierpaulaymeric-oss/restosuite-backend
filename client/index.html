@@ -11,12 +11,17 @@
   <link rel="icon" href="assets/favicon.ico" sizes="any">
   <link rel="icon" type="image/svg+xml" href="assets/logo-icon.svg">
   <title>RestoSuite</title>
+  <!-- App shell behind login — keep it out of the search index (the public,
+       indexable pages are the landing + blog). -->
+  <meta name="robots" content="noindex">
+  <meta name="description" content="RestoSuite — application de gestion pour restaurateurs (HACCP, fiches techniques, stocks, IA).">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Caveat:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Caveat:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="/manifest.json">
-  <link rel="shortcut icon" href="favicon.png">
+  <link rel="shortcut icon" href="assets/favicon.png">
   <script src="/js/lucide.min.js"></script>
   <script defer src="/js/umami.js"></script>
 </head>

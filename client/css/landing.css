@@ -36,7 +36,7 @@
       --border-light: #F0EDE6;
       --border-paper: rgba(42,42,40,0.12);
 
-      --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-mono: 'JetBrains Mono', 'Courier New', monospace;
       --font-serif: 'Fraunces', 'Georgia', 'Times New Roman', serif;
       --font-hand: 'Caveat', 'Brush Script MT', cursive;

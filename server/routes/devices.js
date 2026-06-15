@@ -104,7 +104,7 @@ router.post('/test-push', async (req, res) => {
     res.json({ ok: true, apnsHost, ...result });
   } catch (e) {
     console.error('devices/test-push error:', e);
-    res.status(500).json({ error: 'Erreur envoi test', detail: e.message });
+    res.status(500).json({ error: 'Erreur envoi test', detail: process.env.NODE_ENV === 'production' ? undefined : e.message });
   }
 });
 

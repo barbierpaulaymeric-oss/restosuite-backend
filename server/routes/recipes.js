@@ -440,7 +440,7 @@ router.get('/availability', (req, res) => {
 
     res.json({ summary, items: availability });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur calcul disponibilité', details: e.message });
+    res.status(500).json({ error: 'Erreur calcul disponibilité', details: process.env.NODE_ENV === 'production' ? undefined : e.message });
   }
 });
 

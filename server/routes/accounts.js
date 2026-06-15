@@ -12,7 +12,7 @@ const { writeAudit } = require('../lib/audit-log');
 const router = express.Router();
 
 function hashPin(pin) {
-  return bcrypt.hashSync(pin, 10);
+  return bcrypt.hashSync(pin, 12);
 }
 
 function verifyPin(pin, hash) {
@@ -489,6 +489,13 @@ router.get('/:id/export', requireAuth, (req, res) => {
     haccp_decision_tree_results: safeAll('SELECT * FROM haccp_decision_tree_results WHERE restaurant_id = ?', [rid]),
     training_records: safeAll('SELECT * FROM training_records WHERE restaurant_id = ?', [rid]),
     allergen_management_plan: safeAll('SELECT * FROM allergen_management_plan WHERE restaurant_id = ?', [rid]),
+    // Personal / staff data — RGPD Art.15 (right of access) must cover these too.
+    // staff_health_records holds Art.9 special-category data (maladie/blessure).
+    staff_health_records: safeAll('SELECT * FROM staff_health_records WHERE restaurant_id = ?', [rid]),
+    staff_members: safeAll('SELECT * FROM staff_members WHERE restaurant_id = ?', [rid]),
+    staff_shifts: safeAll('SELECT * FROM staff_shifts WHERE restaurant_id = ?', [rid]),
+    witness_meals: safeAll('SELECT * FROM witness_meals WHERE restaurant_id = ?', [rid]),
+    messages: safeAll('SELECT * FROM messages WHERE restaurant_id = ?', [rid]),
   } : {};
 
   const exportData = {
@@ -540,15 +547,21 @@ router.delete('/self', (req, res) => {
     }
 
     // Clean up tenant-scoped data tables. order_items / recipe_ingredients / delivery_note_items
-    // don't carry restaurant_id directly — delete via their parent row.
-    const tenantTables = [
-      'recipes', 'ingredients', 'stock', 'stock_movements',
-      'suppliers', 'supplier_prices', 'supplier_accounts', 'supplier_catalog',
-      'price_change_notifications', 'price_history',
-      'temperature_logs', 'cleaning_logs', 'traceability_logs',
-      'orders', 'purchase_orders', 'delivery_notes',
-      'referrals'
-    ];
+    // don't carry restaurant_id directly — delete via their parent row (below).
+    // RGPD Art.17 (right to erasure) requires this wipe to be EXHAUSTIVE, so we
+    // enumerate every table carrying a restaurant_id column dynamically instead of
+    // maintaining a hand-written list that silently drifts (it had been missing
+    // staff_health_records, staff_shifts, messages, witness_meals…). `accounts` and
+    // `restaurants` are deleted explicitly at the end, so they're excluded here.
+    const tenantTables = all(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`
+    )
+      .map(r => r.name)
+      .filter(t => t !== 'accounts' && t !== 'restaurants')
+      .filter(t => {
+        try { return db.prepare(`PRAGMA table_info(${t})`).all().some(c => c.name === 'restaurant_id'); }
+        catch { return false; }
+      });
 
     // Delete child rows first (they join through parents that carry restaurant_id)
     try { run('DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE restaurant_id = ?)', [restaurantId]); } catch {}

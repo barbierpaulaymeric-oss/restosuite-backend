@@ -10,7 +10,7 @@
 const { Router } = require('express');
 const {
   all, get, run,
-  GEMINI_API_KEY, buildGeminiUrl, geminiHeaders, selectModel,
+  GEMINI_API_KEY, buildGeminiUrl, geminiHeaders, selectModel, scrubPII,
   VOICE_PARSE_SYSTEM, VOICE_MODIFY_SYSTEM,
 } = require('./ai-core');
 
@@ -27,7 +27,7 @@ router.post('/parse-voice', async (req, res) => {
       method: 'POST',
       headers: geminiHeaders(),
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `Transcription vocale du chef :\n"${text}"\n\nAnalyse cette transcription et retourne la fiche technique en JSON.` }] }],
+        contents: [{ parts: [{ text: `Transcription vocale du chef :\n"${scrubPII(text)}"\n\nAnalyse cette transcription et retourne la fiche technique en JSON.` }] }],
         systemInstruction: { parts: [{ text: VOICE_PARSE_SYSTEM }] },
         generationConfig: { responseMimeType: 'application/json', temperature: 0.2 }
       })
@@ -36,7 +36,7 @@ router.post('/parse-voice', async (req, res) => {
     if (!response.ok) {
       const err = await response.text();
       console.error('Gemini error:', err);
-      return res.status(502).json({ error: 'AI service error', details: err });
+      return res.status(502).json({ error: 'AI service error', details: process.env.NODE_ENV === 'production' ? undefined : err });
     }
 
     const data = await response.json();
@@ -128,7 +128,7 @@ router.post('/modify-voice', async (req, res) => {
       method: 'POST',
       headers: geminiHeaders(),
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `Instruction vocale du chef :\n"${text}"${recipeContext}\n\nAnalyse et retourne les actions à effectuer en JSON.` }] }],
+        contents: [{ parts: [{ text: `Instruction vocale du chef :\n"${scrubPII(text)}"${recipeContext}\n\nAnalyse et retourne les actions à effectuer en JSON.` }] }],
         systemInstruction: { parts: [{ text: VOICE_MODIFY_SYSTEM }] },
         generationConfig: { responseMimeType: 'application/json', temperature: 0.2 }
       })
@@ -136,7 +136,7 @@ router.post('/modify-voice', async (req, res) => {
 
     if (!response.ok) {
       const err = await response.text();
-      return res.status(502).json({ error: 'AI service error', details: err });
+      return res.status(502).json({ error: 'AI service error', details: process.env.NODE_ENV === 'production' ? undefined : err });
     }
 
     const data = await response.json();

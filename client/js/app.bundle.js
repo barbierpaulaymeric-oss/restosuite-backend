@@ -30390,7 +30390,7 @@ async function showCustomerDetail(id) {
           <div style="font-size:var(--text-sm)">
             ${c.transactions.slice(0, 10).map((t) => `
               <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light)">
-                <span class="text-secondary">${t.description || t.type}</span>
+                <span class="text-secondary">${escapeHtml(t.description || t.type)}</span>
                 <span style="font-weight:600;color:${t.points >= 0 ? "var(--color-success)" : "var(--color-danger)"}">${t.points >= 0 ? "+" : ""}${t.points} pts</span>
               </div>
             `).join("")}
@@ -30468,7 +30468,7 @@ async function loadCrmRewards() {
                 <div style="width:48px;height:48px;border-radius:12px;background:rgba(236,72,153,0.1);display:flex;align-items:center;justify-content:center;font-size:1.5rem">\u{1F381}</div>
                 <div style="flex:1">
                   <div style="font-weight:600">${escapeHtml(r.name)}</div>
-                  <div class="text-secondary text-sm">${r.description || ""}</div>
+                  <div class="text-secondary text-sm">${escapeHtml(r.description || "")}</div>
                   <div class="text-secondary" style="font-size:10px">${r.times_redeemed} fois utilis\xE9e</div>
                 </div>
                 <div style="text-align:right">

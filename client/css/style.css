@@ -3,7 +3,7 @@
    Dark mode par défaut · Mobile-first · Touch-optimized
    ═══════════════════════════════════════════ */
 
-/* Fonts loaded via <link> in index.html (Outfit + Fraunces + Caveat + JetBrains Mono) */
+/* Fonts loaded via <link> in index.html (Inter + Fraunces + Caveat + JetBrains Mono) */
 
 /* ─── Design Tokens ─── */
 :root {
@@ -81,7 +81,7 @@
   --grain-overlay: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.14  0 0 0 0 0.13  0 0 0 0 0.11  0 0 0 0.22 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
 
   /* Font families */
-  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-serif: 'Fraunces', 'Georgia', 'Times New Roman', serif;
   --font-hand: 'Caveat', 'Brush Script MT', cursive;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;

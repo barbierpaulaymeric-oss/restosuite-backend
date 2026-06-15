@@ -477,7 +477,7 @@ router.delete('/:id', (req, res) => {
       stock_restored: stockRestored.length > 0 ? stockRestored : undefined
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur lors de l\'annulation', details: e.message });
+    res.status(500).json({ error: 'Erreur lors de l\'annulation', details: process.env.NODE_ENV === 'production' ? undefined : e.message });
   }
 });
 

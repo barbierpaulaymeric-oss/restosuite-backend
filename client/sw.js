@@ -16,7 +16,7 @@
 // restaurateurs trié par date d'inscription avec pastilles d'activité
 // (vert = actif, ambre > 14j, rouge = jamais reconnecté) + compteur de jours
 // depuis la dernière connexion. Le lien Admin de la nav pointe désormais ici.
-const CACHE_NAME = 'restosuite-v57';
+const CACHE_NAME = 'restosuite-v59';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
@@ -79,11 +79,14 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        // Clone and cache
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, clone);
-        });
+        // Cache only successful responses — never poison the cache with a 404/500
+        // (otherwise an error page gets served from cache when offline).
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, clone);
+          });
+        }
         return response;
       })
       .catch(() => {

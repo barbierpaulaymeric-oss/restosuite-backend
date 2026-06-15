@@ -858,7 +858,7 @@ router.post('/from-scan', (req, res) => {
     res.status(201).json({ ...po, items: lines });
   } catch (e) {
     console.error('purchase-orders/from-scan error:', e);
-    res.status(500).json({ error: 'Erreur création réception', detail: e.message });
+    res.status(500).json({ error: 'Erreur création réception', detail: process.env.NODE_ENV === 'production' ? undefined : e.message });
   }
 });
 

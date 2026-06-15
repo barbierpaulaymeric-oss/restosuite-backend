@@ -131,17 +131,31 @@ if (heroVideoWrapper && heroVideo) {
   heroVideo.addEventListener('pause', function() { heroVideoWrapper.classList.remove('playing'); });
 }
 
-// Cookie banner
-(function() {
-  var consent = localStorage.getItem('rs_cookie_consent');
-  if (!consent) {
-    var banner = document.getElementById('cookie-banner');
-    if (banner) banner.style.display = 'flex';
-  }
-})();
+// Cookie banner — show on first visit. Deferred to DOMContentLoaded because this
+// script tag sits just ABOVE the #cookie-banner markup in the DOM, so the element
+// does not exist yet at parse time (it never showed before this guard).
+function rsInitCookieBanner() {
+  if (localStorage.getItem('rs_cookie_consent')) return; // visitor already chose
+  var banner = document.getElementById('cookie-banner');
+  if (banner) banner.style.display = 'flex';
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', rsInitCookieBanner);
+} else {
+  rsInitCookieBanner();
+}
 
 function cookieChoice(accepted) {
   localStorage.setItem('rs_cookie_consent', accepted ? 'accepted' : 'refused');
   var banner = document.getElementById('cookie-banner');
   if (banner) banner.style.display = 'none';
+  // On acceptance, load audience measurement immediately (umami.js self-gates on
+  // the same rs_cookie_consent flag, so this is the only place it gets kicked off
+  // without waiting for the next page load). On refusal: nothing loads.
+  if (accepted) {
+    var s = document.createElement('script');
+    s.defer = true;
+    s.src = '/js/umami.js';
+    document.head.appendChild(s);
+  }
 }

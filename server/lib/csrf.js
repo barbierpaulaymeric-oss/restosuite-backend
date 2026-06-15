@@ -26,7 +26,7 @@ function isExemptPath(p) {
   if (p.startsWith('/api/auth/register')) return true;
   if (p.startsWith('/api/auth/pin-login')) return true;
   if (p.startsWith('/api/auth/staff-login')) return true;
-  if (p.startsWith('/api/auth/staff-pin')) return true; // covers /staff-pin and /staff-pin/create
+  if (p === '/api/auth/staff-pin') return true; // login only; /staff-pin/create is requireAuth → keep CSRF on it
   if (p.startsWith('/api/stripe/webhook')) return true;
   if (p.startsWith('/api/public/')) return true;
   if (p.startsWith('/api/supplier-portal/')) return true;
@@ -52,7 +52,7 @@ function csrfProtection(req, res, next) {
 
   let decoded;
   try {
-    decoded = jwt.verify(cookies.jwt, secret);
+    decoded = jwt.verify(cookies.jwt, secret, { algorithms: ['HS256'] });
   } catch {
     // Bad/expired cookie — let requireAuth handle the 401 uniformly.
     return next();

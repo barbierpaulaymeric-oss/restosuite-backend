@@ -21,6 +21,16 @@
     return;
   }
 
+  // RGPD : la mesure d'audience ne se charge QU'APRÈS consentement explicite.
+  // Le bandeau cookies de la landing écrit rs_cookie_consent dans localStorage ;
+  // tant qu'il n'est pas « accepted » (absent ou « refused »), on ne charge rien
+  // et on n'émet aucune requête réseau — le bouton « Refuser » est donc réellement
+  // effectif, sur la landing, le blog comme dans l'app. (Umami est sans cookie,
+  // mais on respecte tout de même le refus.)
+  try {
+    if (localStorage.getItem('rs_cookie_consent') !== 'accepted') return;
+  } catch (e) { return; }
+
   var SCRIPT_SRC = UMAMI_URL.replace(/\/+$/, '') + '/script.js';
   var MAX_RETRIES = 2;     // tentatives supplémentaires après le 1er échec
   var RETRY_DELAY = 5000;  // 5 s — laisse le temps au service Render de se réveiller

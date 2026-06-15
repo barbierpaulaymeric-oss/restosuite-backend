@@ -3,7 +3,7 @@
 //
 // Replaces native form controls with styled, accessible vanilla-JS
 // components matching the design system (navy / orange / cream, 6px
-// inputs, Outfit body, no heavy shadows).
+// inputs, Inter body, no heavy shadows).
 //
 // Usage:
 //   - Auto-enhance any element with `data-ui="custom"` (or "toggle" for

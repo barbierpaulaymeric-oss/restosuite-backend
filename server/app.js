@@ -10,6 +10,7 @@ const rateLimit = require('express-rate-limit');
 require('./db'); // initializes tables synchronously
 const { requireAuth } = require('./routes/auth');
 const { requireActiveOrTrial } = require('./middleware/plan-gate');
+const { backupDatabase } = require('./backup');
 const { appendError, LOG_PATH, MAX_LINES } = require('./routes/errors');
 const { requestId } = require('./lib/request-id');
 const logger = require('./lib/logger');
@@ -76,11 +77,16 @@ app.use(cors({
 
 app.disable('x-powered-by');
 
-// HTTP → HTTPS redirect in production
+// HTTP → HTTPS + apex → www canonicalization in production.
+// One 301 to the single canonical origin (https://www.restosuite.fr) avoids
+// duplicate-content (apex and www both answering 200) and split cookies/sessions.
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
-    if (req.headers['x-forwarded-proto'] !== 'https') {
-      return res.redirect(301, `https://${req.hostname}${req.url}`);
+    const isHttps = req.headers['x-forwarded-proto'] === 'https';
+    const isApex = req.hostname === 'restosuite.fr';
+    if (!isHttps || isApex) {
+      const canonicalHost = isApex ? 'www.restosuite.fr' : req.hostname;
+      return res.redirect(301, `https://${canonicalHost}${req.url}`);
     }
     next();
   });
@@ -131,9 +137,27 @@ app.use('/api/accounts/login', authLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/pin-login', authLimiter);
-app.use('/api/auth/staff-login', authLimiter);
-app.use('/api/auth/staff-pin', authLimiter);
+app.use('/api/auth/smart-login', authLimiter); // password brute-force surface — audit finding A1
 app.use('/api/auth/logout', authLimiter);
+
+// Staff auth — 4-digit PINs are brute-forceable, keep the limit tight.
+const staffAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: IS_TEST ? 100000 : 20,
+  message: { error: 'Trop de tentatives, réessayez dans 15 minutes' },
+});
+app.use('/api/auth/staff-login', staffAuthLimiter);
+app.use('/api/auth/staff-pin', staffAuthLimiter);
+
+// Supplier portal auth — same tight limit as main auth.
+const supplierAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: IS_TEST ? 100000 : 20,
+  message: { error: 'Trop de tentatives, réessayez dans 15 minutes' },
+});
+app.use('/api/supplier-portal/company-login', supplierAuthLimiter);
+app.use('/api/supplier-portal/member-pin', supplierAuthLimiter);
+app.use('/api/supplier-portal/quick-login', supplierAuthLimiter);
 
 // Admin endpoints (backup, export-db, etc.) — strict per-IP limit
 const adminLimiter = rateLimit({
@@ -289,16 +313,20 @@ app.use('/api/water', require('./routes/water'));
 app.use('/api/pms-audit', require('./routes/pms-audit'));
 app.use('/api/pms', require('./routes/pms-export'));
 app.use('/api/exports', require('./routes/exports'));
+// staff-health MUST mount before /api/sanitary catch-all (prefix-match order).
+app.use('/api/sanitary/staff-health', require('./routes/staff-health'));
 app.use('/api/sanitary', require('./routes/sanitary-settings'));
 app.use('/api/tiac', require('./routes/tiac'));
 app.use('/api/fabrication-diagrams', require('./routes/fabrication-diagrams'));
 app.use('/api/errors', require('./routes/errors').router);
 app.use('/api/devices', require('./routes/devices'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/cron', require('./routes/cron'));
 
 // Admin endpoints — JWT required (gérant only)
 app.post('/api/admin/backup', requireAuth, (req, res) => {
   if (req.user.role !== 'gerant') return res.status(403).json({ error: 'Réservé au gérant' });
+  backupDatabase();
   res.json({ ok: true, message: 'Backup effectué' });
 });
 

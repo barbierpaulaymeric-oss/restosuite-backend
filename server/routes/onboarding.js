@@ -11,7 +11,7 @@ const { requireAuth } = require('./auth');
 const router = express.Router();
 
 function hashPin(pin) {
-  return bcrypt.hash(pin, 10);
+  return bcrypt.hash(pin, 12);
 }
 
 // All onboarding routes require auth
@@ -187,7 +187,7 @@ router.put('/step/4', async (req, res) => {
 
   // Set staff password if provided
   if (staff_password && staff_password.trim()) {
-    const staffHash = await bcrypt.hash(staff_password.trim(), 10);
+    const staffHash = await bcrypt.hash(staff_password.trim(), 12);
     run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [staffHash, account.restaurant_id]);
   }
 

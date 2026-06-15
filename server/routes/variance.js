@@ -184,7 +184,7 @@ router.get('/analysis', (req, res) => {
       items: report
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur analyse variance', details: e.message });
+    res.status(500).json({ error: 'Erreur analyse variance', details: process.env.NODE_ENV === 'production' ? undefined : e.message });
   }
 });
 

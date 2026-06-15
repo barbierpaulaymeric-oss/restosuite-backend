@@ -104,7 +104,7 @@ router.post('/scan-invoice', upload.single('invoice'), async (req, res) => {
       if (filePath) {
         try { fs.unlinkSync(filePath); } catch {}
       }
-      return res.status(502).json({ error: 'Erreur service IA', details: err });
+      return res.status(502).json({ error: 'Erreur service IA', details: process.env.NODE_ENV === 'production' ? undefined : err });
     }
 
     const data = await response.json();
@@ -202,7 +202,7 @@ router.post('/scan-delivery', upload.single('delivery'), async (req, res) => {
       const err = await response.text();
       console.error('Gemini Vision (BL) error:', err);
       if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
-      return res.status(502).json({ error: 'Erreur service IA', details: err });
+      return res.status(502).json({ error: 'Erreur service IA', details: process.env.NODE_ENV === 'production' ? undefined : err });
     }
     const data = await response.json();
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -376,7 +376,7 @@ Si un champ n'est pas visible, mets null. Extrais TOUS les produits listés, mê
       if (filePath) {
         try { fs.unlinkSync(filePath); } catch {}
       }
-      return res.status(502).json({ error: 'Erreur service IA', details: err });
+      return res.status(502).json({ error: 'Erreur service IA', details: process.env.NODE_ENV === 'production' ? undefined : err });
     }
 
     const data = await response.json();

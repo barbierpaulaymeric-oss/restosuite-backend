@@ -173,13 +173,13 @@ function generateToken(account) {
   const token = jwt.sign(
     { id: account.id, email: account.email, role: account.role, restaurant_id: account.restaurant_id, jti, csrf },
     getJwtSecret(),
-    { expiresIn: JWT_EXPIRY }
+    { expiresIn: JWT_EXPIRY, algorithm: 'HS256' }
   );
   return { token, csrf };
 }
 
 function hashPin(pin) {
-  return bcrypt.hash(pin, 10);
+  return bcrypt.hash(pin, 12);
 }
 
 function verifyPin(pin, hash) {
@@ -208,7 +208,7 @@ function requireAuth(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Token requis' });
 
   try {
-    const decoded = jwt.verify(token, getJwtSecret());
+    const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
     if (isTokenRevoked(decoded.jti)) {
       return res.status(401).json({ error: 'Token révoqué' });
     }
@@ -259,7 +259,7 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
 
     // Create restaurant (empty)
     const restaurantResult = run('INSERT INTO restaurants (name) VALUES (?)', ['Mon restaurant']);
@@ -277,7 +277,7 @@ router.post('/register', async (req, res) => {
         try { run('DELETE FROM restaurants WHERE id = ?', [restaurantId]); } catch {}
         return res.status(400).json({ error: "Le mot de passe équipe doit faire 8 caractères avec une majuscule et un chiffre" });
       }
-      const staffHash = await bcrypt.hash(sp, 10);
+      const staffHash = await bcrypt.hash(sp, 12);
       run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [staffHash, restaurantId]);
     }
 
@@ -454,7 +454,7 @@ router.post('/register-supplier', async (req, res) => {
   }
 
   try {
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
     // restaurant_id is NULL on self-registration: the supplier exists in the
     // platform but isn't yet attached to any restaurant. The first restaurant
     // that invites them by email adopts the row (sets restaurant_id).
@@ -907,7 +907,7 @@ router.put('/staff-password', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Aucun restaurant associé' });
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const hashedPassword = await bcrypt.hash(password, 12);
   run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [hashedPassword, account.restaurant_id]);
 
   res.json({ success: true });
