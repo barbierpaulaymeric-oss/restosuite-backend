@@ -5,6 +5,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const { BCRYPT_ROUNDS } = require('../lib/bcrypt-cost');
 const { all, get, run } = require('../db');
 const { getAccountStatusById } = require('../middleware/trial');
 const { requireAuth, JWT_SECRET } = require('./auth');
@@ -12,7 +13,7 @@ const { writeAudit } = require('../lib/audit-log');
 const router = express.Router();
 
 function hashPin(pin) {
-  return bcrypt.hashSync(pin, 12);
+  return bcrypt.hashSync(pin, BCRYPT_ROUNDS);
 }
 
 function verifyPin(pin, hash) {

@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { BCRYPT_ROUNDS } = require('../lib/bcrypt-cost');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const { all, get, run } = require('../db');
@@ -45,7 +46,7 @@ function getJwtSecret() {
 }
 
 function hashPin(pin) {
-  return bcrypt.hashSync(pin, 12);
+  return bcrypt.hashSync(pin, BCRYPT_ROUNDS);
 }
 
 function verifyPin(pin, hash) {
@@ -290,7 +291,7 @@ router.post('/invite', requireAuth, (req, res) => {
     if (existingEmail) {
       return res.status(409).json({ error: 'Cet email est déjà utilisé par un autre fournisseur' });
     }
-    const passwordHash = bcrypt.hashSync(password, 12);
+    const passwordHash = bcrypt.hashSync(password, BCRYPT_ROUNDS);
     run('UPDATE suppliers SET email = ?, password_hash = ?, contact_name = ? WHERE id = ? AND restaurant_id = ?',
       [emailLower, passwordHash, name || supplier.name, supplier_id, rid]);
   }

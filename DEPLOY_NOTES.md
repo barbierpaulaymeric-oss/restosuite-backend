@@ -130,16 +130,23 @@ sélection du membre **Jean Dupont** → PIN `1111`.
 La base peut être chiffrée au repos via `better-sqlite3-multiple-ciphers` (SQLCipher).
 C'est **opt-in** : sans `DB_ENCRYPTION_KEY`, la base reste en clair (dev/tests inchangés).
 
-### Activation en production (séquence à respecter)
+### Activation en production (chiffrement AU BOOT — pas de script shell)
+Le chiffrement se fait automatiquement au démarrage de l'app, quand elle est la
+SEULE connexion à la base. (Lancer `encrypt-db.js` à la main pendant que le service
+tourne échoue avec `SQLITE_BUSY` / « database is locked » : l'app garde la base
+ouverte ; le script n'obtient jamais le verrou exclusif. Le script ne sert donc
+qu'en local, service arrêté.)
+
 1. Générer une clé : `openssl rand -hex 32` (64 caractères hex). **La stocker dans un
    gestionnaire de mots de passe**, jamais dans le repo. Sa perte = données irrécupérables.
-2. Le code déployé fonctionne déjà en clair tant que `DB_ENCRYPTION_KEY` n'est pas défini.
-3. Sur le shell Render, chiffrer la base existante **une seule fois** :
-   `DB_ENCRYPTION_KEY=<clé> node server/scripts/encrypt-db.js`
-   (crée un backup `*.plaintext-backup-*` à côté, chiffre en place, vérifie.)
-4. Définir `DB_ENCRYPTION_KEY` dans les variables d'environnement Render, puis redéployer/redémarrer.
-   Au boot, `db.js` ouvre la base chiffrée ; clé absente ou erronée ⇒ refus de démarrer (fail-fast).
-5. Une fois la prod vérifiée, supprimer le backup en clair laissé par le script.
+2. Render → Environment → ajouter `DB_ENCRYPTION_KEY` = `<la clé>` → Save.
+3. Render redémarre le service. Au premier boot avec la clé, `db.js` détecte que la
+   base est encore en clair, en fait une copie `*.plaintext-backup-*`, puis la chiffre
+   en place (`PRAGMA rekey`) avant de servir. Les boots suivants ouvrent simplement la
+   base chiffrée ; clé absente ou erronée ⇒ refus de démarrer (fail-fast).
+4. Vérifier que l'app revient en 200 (`/api/health`).
+5. **Supprimer les backups en clair** laissés sur `/data` (`*.plaintext-backup-*`) —
+   sinon une copie non chiffrée des données subsiste sur le disque.
 6. Mettre à jour `client/legal/privacy.html` pour mentionner le chiffrement au repos (Art. 32).
 
 ---

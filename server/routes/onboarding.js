@@ -5,13 +5,14 @@
 const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const { BCRYPT_ROUNDS } = require('../lib/bcrypt-cost');
 const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
 
 const router = express.Router();
 
 function hashPin(pin) {
-  return bcrypt.hash(pin, 12);
+  return bcrypt.hash(pin, BCRYPT_ROUNDS);
 }
 
 // All onboarding routes require auth
@@ -187,7 +188,7 @@ router.put('/step/4', async (req, res) => {
 
   // Set staff password if provided
   if (staff_password && staff_password.trim()) {
-    const staffHash = await bcrypt.hash(staff_password.trim(), 12);
+    const staffHash = await bcrypt.hash(staff_password.trim(), BCRYPT_ROUNDS);
     run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [staffHash, account.restaurant_id]);
   }
 

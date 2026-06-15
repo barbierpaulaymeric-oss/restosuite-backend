@@ -4,6 +4,7 @@
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const { BCRYPT_ROUNDS } = require('../lib/bcrypt-cost');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { all, get, run } = require('../db');
@@ -179,7 +180,7 @@ function generateToken(account) {
 }
 
 function hashPin(pin) {
-  return bcrypt.hash(pin, 12);
+  return bcrypt.hash(pin, BCRYPT_ROUNDS);
 }
 
 function verifyPin(pin, hash) {
@@ -259,7 +260,7 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     // Create restaurant (empty)
     const restaurantResult = run('INSERT INTO restaurants (name) VALUES (?)', ['Mon restaurant']);
@@ -277,7 +278,7 @@ router.post('/register', async (req, res) => {
         try { run('DELETE FROM restaurants WHERE id = ?', [restaurantId]); } catch {}
         return res.status(400).json({ error: "Le mot de passe équipe doit faire 8 caractères avec une majuscule et un chiffre" });
       }
-      const staffHash = await bcrypt.hash(sp, 12);
+      const staffHash = await bcrypt.hash(sp, BCRYPT_ROUNDS);
       run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [staffHash, restaurantId]);
     }
 
@@ -454,7 +455,7 @@ router.post('/register-supplier', async (req, res) => {
   }
 
   try {
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     // restaurant_id is NULL on self-registration: the supplier exists in the
     // platform but isn't yet attached to any restaurant. The first restaurant
     // that invites them by email adopts the row (sets restaurant_id).
@@ -907,7 +908,7 @@ router.put('/staff-password', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Aucun restaurant associé' });
   }
 
-  const hashedPassword = await bcrypt.hash(password, 12);
+  const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
   run('UPDATE restaurants SET staff_password = ? WHERE id = ?', [hashedPassword, account.restaurant_id]);
 
   res.json({ success: true });
