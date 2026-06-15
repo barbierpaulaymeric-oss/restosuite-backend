@@ -74,6 +74,14 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   } catch (e) {
     console.warn('📧 Relances rétention: démarrage échoué —', e.message);
   }
+
+  // Anonymisation RGPD des comptes inactifs >3 ans (dry-run tant que
+  // RETENTION_PURGE_ENABLED !== 'true'). Cf. lib/retention-purge.js.
+  try {
+    require('./lib/retention-purge').startRetentionPurge();
+  } catch (e) {
+    console.warn('🧹 Purge rétention: démarrage échoué —', e.message);
+  }
 });
 
 function gracefulShutdown(signal) {

@@ -2246,6 +2246,19 @@ try {
   console.warn('⚠️ device_push_tokens migration error:', e.message);
 }
 
+// anonymized_at — added LAST so it survives the "make pin nullable" table
+// recreate above (which copies the source columns into a fresh accounts table).
+// RGPD retention: marks accounts whose personal data has been anonymized.
+try {
+  const accountCols = all("PRAGMA table_info(accounts)").map(c => c.name);
+  if (!accountCols.includes('anonymized_at')) {
+    db.exec("ALTER TABLE accounts ADD COLUMN anonymized_at DATETIME");
+    console.log('✅ Migration: added anonymized_at to accounts (RGPD retention)');
+  }
+} catch (e) {
+  console.warn('⚠️ anonymized_at migration error:', e.message);
+}
+
 // Composite indexes for the analytics dashboard hot paths (per-tenant time-range
 // scans). Lets the daily-scores aggregation seek by restaurant_id then range over
 // the timestamp instead of scanning every row in the tenant.

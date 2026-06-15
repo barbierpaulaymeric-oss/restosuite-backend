@@ -12,6 +12,7 @@ const express = require('express');
 const router = express.Router();
 const { runRetentionCycle } = require('../lib/retention-mailer');
 const { runHaccpReminderCycle } = require('../lib/haccp-push-reminder');
+const { runRetentionPurge } = require('../lib/retention-purge');
 
 function requireCronSecret(req, res, next) {
   const secret = process.env.CRON_SECRET;
@@ -44,6 +45,20 @@ router.get('/haccp-reminder', requireCronSecret, async (req, res) => {
     res.json({ ok: true, ...result });
   } catch (e) {
     console.error('Cron haccp-reminder error:', e.message);
+    res.status(500).json({ error: 'Erreur interne' });
+  }
+});
+
+// GET /api/cron/purge — anonymise les comptes inactifs >3 ans (RGPD Art. 17).
+// Dry-run par défaut ; n'écrit que si RETENTION_PURGE_ENABLED=true. Passer
+// ?dry=1 force le dry-run même si l'anonymisation est activée (pour auditer).
+router.get('/purge', requireCronSecret, async (req, res) => {
+  try {
+    const dryRun = req.query.dry === '1' ? true : undefined;
+    const result = await runRetentionPurge({ dryRun });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    console.error('Cron purge error:', e.message);
     res.status(500).json({ error: 'Erreur interne' });
   }
 });

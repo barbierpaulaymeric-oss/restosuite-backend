@@ -12,12 +12,12 @@
     "test": "jest --forceExit",
     "test:watch": "jest --watch",
     "seed:demo": "node seed-demo.js",
-    "postinstall": "npm rebuild better-sqlite3"
+    "postinstall": "npm rebuild better-sqlite3-multiple-ciphers"
   },
   "dependencies": {
     "apns2": "^12.2.0",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3-multiple-ciphers": "^12.10.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
