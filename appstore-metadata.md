@@ -88,7 +88,7 @@ Voir `appstore-screenshots-guide.md` pour la procédure de capture via le simula
 - [x] `NSCameraUsageDescription`, `NSMicrophoneUsageDescription`, etc. en français
 - [x] **Capabilities push** — DÉSACTIVÉ pour la v1 (réseau-seule). Voir ci-dessous.
 - [x] Compte de démo provisionné (`demo@restosuite.fr`, mot de passe dans `seed-demo.js`, données seedées en prod)
-- [ ] Screenshots 6.7" à générer
+- [x] Screenshots 6.7" générés (1290×2796) → `~/Desktop/restosuite-shots/` (Login, Service, Fiches liste+détail food cost, HACCP T°, Commandes, Alto conversation, Réceptions)
 
 ### Push notifications — DÉSACTIVÉ en v1 (réactivable en v1.x)
 
