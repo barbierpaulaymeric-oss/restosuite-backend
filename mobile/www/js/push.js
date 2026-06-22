@@ -13,6 +13,15 @@
 import { API } from './api.js';
 import { CONFIG } from './config.js';
 
+// v1 App Store : push DÉSACTIVÉ. La capability APNs (entitlement aps-environment,
+// UIBackgroundModes remote-notification) est retirée de la v1 pour livrer une app
+// réseau-seule sans dépendre de la config Apple Developer (clé .p8 / capability
+// activée sur l'App ID). Le transport serveur (push-sender, env-gated) et les
+// déclencheurs (réception/prix/service) restent en place, dormants. Pour réactiver
+// en v1.x : passer ce flag à true, restaurer l'entitlement + UIBackgroundModes,
+// et poser APNS_KEY_ID/APNS_TEAM_ID/APNS_SIGNING_KEY côté serveur.
+const PUSH_ENABLED = false;
+
 function getPlugin() {
   const C = window.Capacitor;
   if (!C || !C.isNativePlatform || !C.isNativePlatform()) return null;
@@ -49,6 +58,7 @@ async function postToken(token, platform) {
  * envoie le token au serveur. À appeler APRÈS login (sinon l'API renvoie 401).
  */
 export async function initPush() {
+  if (!PUSH_ENABLED) return; // v1 : push désactivé (voir note en tête de fichier)
   const plugin = getPlugin();
   if (!plugin) return; // web / preview : no-op
 

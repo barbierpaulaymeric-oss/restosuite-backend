@@ -3,11 +3,10 @@
 <plist version="1.0">
 <dict>
 	<!--
-		Push Notifications — production APNs (api.push.apple.com). Utilisé en
-		build Release (TestFlight + App Store). Apple impose ce serveur pour les
-		apps signées avec un profil distribution.
+		v1 App Store : pas de capability push (réseau-seule). Pour réactiver en
+		v1.x, remettre l'APNs production :
+		<key>aps-environment</key><string>production</string>
+		(api.push.apple.com, imposé par Apple pour les profils de distribution).
 	-->
-	<key>aps-environment</key>
-	<string>production</string>
 </dict>
 </plist>

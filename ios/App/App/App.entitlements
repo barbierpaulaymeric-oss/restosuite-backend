@@ -2,9 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>aps-environment</key>
-	<string>development</string>
-	<key>com.apple.developer.aps-environment</key>
-	<string>development</string>
+	<!--
+		v1 App Store : pas de capability push. L'entitlement aps-environment a été
+		retiré pour livrer une app réseau-seule sans dépendre de la capability Push
+		Notifications activée sur l'App ID. Pour réactiver le push en v1.x : remettre
+		ici <key>aps-environment</key><string>development</string> (et production
+		dans App-Release.entitlements), repasser PUSH_ENABLED à true dans
+		mobile/www/js/push.js et restaurer UIBackgroundModes remote-notification
+		dans Info.plist.
+	-->
 </dict>
 </plist>

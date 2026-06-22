@@ -84,21 +84,19 @@ Voir `appstore-screenshots-guide.md` pour la procédure de capture via le simula
 - [x] Icône 1024×1024 sans canal alpha (conforme App Store)
 - [x] Icônes générées à toutes les tailles iPhone (20/29/40/58/60/80/87/120/180/1024)
 - [x] `NSCameraUsageDescription`, `NSMicrophoneUsageDescription`, etc. en français
-- [x] **Capabilities push** — push APNs CONSERVÉ (décision 2026-06-22, voir ci-dessous)
+- [x] **Capabilities push** — DÉSACTIVÉ pour la v1 (réseau-seule). Voir ci-dessous.
 - [ ] Compte de démo Apple à provisionner
 - [ ] Screenshots 6.7" à générer
 
-### Push notifications (CONSERVÉ)
+### Push notifications — DÉSACTIVÉ en v1 (réactivable en v1.x)
 
-Décision : on garde le push APNs. Il sert à notifier le restaurateur des **réceptions de commandes**, **changements de prix fournisseurs** et **débuts de service**. L'infra iOS est déjà câblée (entitlements dev+prod, `UIBackgroundModes: remote-notification`, callbacks `AppDelegate`, plugin Capacitor `PushNotifications`).
+Décision (2026-06-22, PA indisponible → choix raisonnable) : **la v1 est réseau-seule, sans push**. Ça évite de dépendre de la config Apple Developer (capability Push Notifications activée sur l'App ID + clé `.p8` APNs) pour soumettre, et supprime tout risque de question reviewer sur un `UIBackgroundModes` inutilisé.
 
-**À ajouter aux notes reviewer Apple** (justifie le `UIBackgroundModes: remote-notification` et l'usage de la position/micro/caméra) :
+Concrètement, retiré pour la v1 :
+- `aps-environment` dans `App.entitlements` et `App-Release.entitlements`
+- `UIBackgroundModes: remote-notification` dans `Info.plist`
+- flag `PUSH_ENABLED = false` dans `mobile/www/js/push.js` → `initPush()` no-op (aucune demande de permission notif inutile)
 
-```
-L'app envoie des notifications push pour alerter le restaurateur des événements
-métier en temps réel : réception d'une commande fournisseur, changement de prix
-d'un fournisseur, et début de service. Le mode remote-notification est utilisé
-uniquement pour traiter ces notifications APNs.
-```
+**Conservé (dormant)** : le transport serveur `push-sender.js` (env-gated, no-op tant que `APNS_*` absent) et les déclencheurs métier (réception commande, changement de prix, début de service) restent dans le code, prêts à servir.
 
-> ⚠️ **À implémenter** : les *déclencheurs* de notification (réception commande, changement prix, début service) ne sont pas encore branchés côté backend/app. Le transport push est prêt ; il reste à émettre les notifications sur ces événements. Voir le suivi de scope ci-dessous / la conversation.
+**Réactivation v1.x** : remettre `aps-environment` (dev + prod), restaurer `UIBackgroundModes`, repasser `PUSH_ENABLED` à `true`, activer la capability Push sur l'App ID, et poser `APNS_KEY_ID`/`APNS_TEAM_ID`/`APNS_SIGNING_KEY` sur Render.
