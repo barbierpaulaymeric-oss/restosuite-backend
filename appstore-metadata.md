@@ -50,12 +50,14 @@ restauration,HACCP,fiches techniques,commandes,fournisseurs,cuisine,food cost,al
 ```
 Cette app est le compagnon mobile de RestoSuite (www.restosuite.fr), un logiciel de gestion pour restaurants. L'app nécessite un compte RestoSuite pour se connecter.
 
-Compte de test : demo@restosuite.fr / [À REMPLIR PAR PA]
+Compte de test : demo@restosuite.fr / <mot de passe — voir seed-demo.js>
 
 L'app communique avec l'API à https://www.restosuite.fr/api/
 ```
 
-> ⚠️ **À compléter avant soumission** : créer/vérifier le compte de démo `demo@restosuite.fr`, renseigner le mot de passe ci-dessus, et s'assurer qu'il contient des données d'exemple (fiches techniques, fournisseurs, relevés HACCP) pour que le reviewer puisse tester sans setup.
+> ⚠️ Saisir le mot de passe directement dans App Store Connect (champ « Sign-in information »), pas dans ce fichier suivi par git. Le couple identifiant/mot de passe est la source de vérité dans `server/seed-demo.js` (`OWNER_EMAIL` / `OWNER_PASSWORD`). Compte déjà provisionné en prod avec données d'exemple (fiches, fournisseurs, relevés HACCP) ; exclu des KPI admin via `isDemoEmail` (cf. [[feedback_admin_demo_account_exclusion.md]]).
+
+> ✅ **Compte de démo prêt** : `demo@restosuite.fr` (mot de passe = `OWNER_PASSWORD` dans `server/seed-demo.js`), provisionné en prod avec données d'exemple (fiches, fournisseurs, relevés HACCP). Le reviewer peut tester sans setup.
 
 ## Captures d'écran requises
 
@@ -85,7 +87,7 @@ Voir `appstore-screenshots-guide.md` pour la procédure de capture via le simula
 - [x] Icônes générées à toutes les tailles iPhone (20/29/40/58/60/80/87/120/180/1024)
 - [x] `NSCameraUsageDescription`, `NSMicrophoneUsageDescription`, etc. en français
 - [x] **Capabilities push** — DÉSACTIVÉ pour la v1 (réseau-seule). Voir ci-dessous.
-- [ ] Compte de démo Apple à provisionner
+- [x] Compte de démo provisionné (`demo@restosuite.fr`, mot de passe dans `seed-demo.js`, données seedées en prod)
 - [ ] Screenshots 6.7" à générer
 
 ### Push notifications — DÉSACTIVÉ en v1 (réactivable en v1.x)
