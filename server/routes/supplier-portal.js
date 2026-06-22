@@ -627,6 +627,20 @@ router.put('/catalog/:id', requireSupplierAuth, (req, res) => {
       [rid, req.supplierAccount.supplier_id, product_name || item.product_name, oldPrice, newPrice, 'update']
     );
 
+    // Push : changement de prix fournisseur → on alerte la cuisine. No-op si
+    // APNs n'est pas configuré côté serveur (env-gated).
+    try {
+      const supplier = get('SELECT name FROM suppliers WHERE id = ? AND restaurant_id = ?', [req.supplierAccount.supplier_id, rid]);
+      const prod = product_name || item.product_name;
+      const arrow = newPrice > oldPrice ? '↑' : '↓';
+      const { sendToRestaurant } = require('../lib/push-sender');
+      sendToRestaurant(rid, {
+        title: 'Prix fournisseur modifié',
+        body: `${supplier ? supplier.name : 'Fournisseur'} : ${prod} ${arrow} ${Number(newPrice).toFixed(2)} €`,
+        data: { kind: 'price_changed', supplier_id: req.supplierAccount.supplier_id, product_name: prod, old_price: oldPrice, new_price: newPrice },
+      }).catch((e) => console.warn('[push] price_changed échoué:', e.message));
+    } catch (e) { console.warn('[push] price_changed wiring failed:', e.message); }
+
     // Try to update linked supplier_prices (match by product name → ingredient name)
     const linkedIngredient = get(
       'SELECT i.id FROM ingredients i JOIN supplier_prices sp ON sp.ingredient_id = i.id AND sp.restaurant_id = ? WHERE sp.supplier_id = ? AND i.restaurant_id = ? AND LOWER(i.name) = LOWER(?)',

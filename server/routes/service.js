@@ -90,6 +90,17 @@ router.post('/start', requireAuth, (req, res) => {
     const sessionId = result.lastInsertRowid;
     const session = get('SELECT * FROM service_sessions WHERE id = ?', [sessionId]);
 
+    // Push : début de service → on alerte toute la cuisine (multi-device).
+    // No-op si APNs n'est pas configuré côté serveur (env-gated).
+    try {
+      const { sendToRestaurant } = require('../lib/push-sender');
+      sendToRestaurant(account.restaurant_id, {
+        title: 'Service démarré',
+        body: 'Le service vient de commencer. Bon service !',
+        data: { kind: 'service_started', session_id: sessionId },
+      }).catch((e) => console.warn('[push] service_started échoué:', e.message));
+    } catch (e) { console.warn('[push] service_started wiring failed:', e.message); }
+
     res.json({
       success: true,
       session: {

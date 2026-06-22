@@ -650,6 +650,17 @@ router.post('/:id/receive', (req, res) => {
        WHERE poi.purchase_order_id = ? AND poi.restaurant_id = ?`,
       [rid, id, rid]
     );
+    // Push : commande réceptionnée → on alerte toute la cuisine (multi-device).
+    // No-op si APNs n'est pas configuré côté serveur (env-gated).
+    try {
+      const { sendToRestaurant } = require('../lib/push-sender');
+      sendToRestaurant(rid, {
+        title: 'Commande réceptionnée',
+        body: `${updated && updated.supplier_name ? updated.supplier_name : 'Fournisseur'} — ${po.reference || '#' + id} reçue, stock mis à jour`,
+        data: { kind: 'po_received', po_id: id, supplier_id: po.supplier_id },
+      }).catch((e) => console.warn('[push] po_received échoué:', e.message));
+    } catch (e) { console.warn('[push] po_received wiring failed:', e.message); }
+
     res.json({ ...updated, items: updatedItems, stock_updated: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
