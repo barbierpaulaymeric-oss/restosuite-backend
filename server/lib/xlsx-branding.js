@@ -18,9 +18,9 @@
 const XLSX = require('xlsx');
 
 const BRAND = {
-  ORANGE: 'E8722A',
+  ORANGE: '1F7A4D',
   WHITE: 'FFFFFF',
-  NAVY: '1B2A4A',
+  NAVY: '0F2E26',
   ROW_ALT: 'FAF7F4',
 };
 

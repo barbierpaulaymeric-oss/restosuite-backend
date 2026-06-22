@@ -14,9 +14,9 @@ const fs = require('fs');
 
 // ── Brand tokens ────────────────────────────────────────────────────────────
 const BRAND = Object.freeze({
-  ORANGE: '#E8722A',         // primary accent — calls to action, headers, footer line
-  ORANGE_SOFT: '#FFE7D5',    // table-row hover / soft tint
-  NAVY: '#1B2A4A',           // section titles
+  ORANGE: '#1F7A4D',         // primary accent — calls to action, headers, footer line
+  ORANGE_SOFT: '#E1F5EE',    // table-row hover / soft tint
+  NAVY: '#0F2E26',           // section titles
   TEXT: '#1A1A1A',           // body
   MUTED: '#6B6B6B',          // periods, generated-on
   WHITE: '#FFFFFF',

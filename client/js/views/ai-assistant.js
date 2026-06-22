@@ -102,7 +102,7 @@ async function renderAIAssistant() {
       }
 
       .ai-action-cancel:hover {
-        background:rgba(232,114,42,0.05)
+        background:rgba(31,122,77,0.06)
       }
 
       .ai-suggestion { background:var(--bg-sunken);border:1px solid var(--border-light);border-radius:20px;padding:6px 12px;font-size:var(--text-xs);cursor:pointer;white-space:nowrap;color:var(--text-primary);transition:all 0.2s }

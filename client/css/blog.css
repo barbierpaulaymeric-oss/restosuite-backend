@@ -158,7 +158,7 @@
 }
 
 .blog-content tbody tr:hover {
-  background: rgba(42, 63, 107, 0.15);
+  background: rgba(31,122,77,0.10);
 }
 
 .blog-content tbody td:first-child {
@@ -223,8 +223,8 @@
 
 /* ---- CTA box ---- */
 .blog-cta {
-  background: linear-gradient(135deg, rgba(196,90,24,0.12), rgba(196,90,24,0.04));
-  border: 1px solid rgba(196,90,24,0.25);
+  background: linear-gradient(135deg, rgba(31,122,77,0.12), rgba(31,122,77,0.04));
+  border: 1px solid rgba(31,122,77,0.25);
   border-radius: var(--radius-xl);
   padding: 32px;
   text-align: center;
@@ -263,14 +263,14 @@
   white-space: nowrap;
   background: var(--color-accent);
   color: #fff;
-  box-shadow: 0 4px 16px rgba(196,90,24,0.3);
+  box-shadow: 0 4px 16px rgba(31,122,77,0.3);
   text-decoration: none;
 }
 
 .blog-cta .btn:hover {
   background: var(--color-accent-hover);
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(196,90,24,0.4);
+  box-shadow: 0 6px 24px rgba(31,122,77,0.4);
 }
 
 .blog-cta .blog-cta__note {
@@ -417,7 +417,7 @@
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 100;
-  background: rgba(15,23,35,0.92);
+  background: rgba(250,248,245,0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-light);

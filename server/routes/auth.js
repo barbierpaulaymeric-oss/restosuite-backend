@@ -397,7 +397,7 @@ explorer l'outil sans aucune limite, et sans engagement.</p>
   <li><strong>Ajoutez un fournisseur</strong> — et générez vos bons de commande en un clic.</li>
 </ol>
 <p style="margin:24px 0">
-  <a href="${APP_URL}" style="display:inline-block;background:#C45A18;color:#fff;text-decoration:none;
+  <a href="${APP_URL}" style="display:inline-block;background:#1F7A4D;color:#fff;text-decoration:none;
      font-weight:600;padding:12px 24px;border-radius:8px">Accéder à mon espace RestoSuite</a>
 </p>
 <p style="color:#6b7280;font-size:13px">Une question, un blocage&nbsp;? Répondez simplement à cet email, on vous lit.</p>

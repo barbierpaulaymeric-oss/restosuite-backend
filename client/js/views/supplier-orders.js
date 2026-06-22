@@ -5,7 +5,7 @@
 
 const SUPPLIER_ORDER_STATUS = {
   brouillon:    { label: 'Brouillon',   color: '#94a3b8' },
-  envoyée:      { label: 'À confirmer', color: '#E8722A' },
+  envoyée:      { label: 'À confirmer', color: '#BF8A2E' },
   confirmée:    { label: 'Confirmée',   color: '#4A90D9' },
   réceptionnée: { label: 'Réceptionnée',color: '#22c55e' },
   annulée:      { label: 'Annulée',     color: '#ef4444' }
@@ -68,7 +68,7 @@ async function renderSupplierOrdersTab() {
                 <strong>${escapeHtml(o.reference || `Commande #${o.id}`)}</strong>
                 <span class="text-secondary text-sm">${escapeHtml(created)}</span>
               </div>
-              <div class="supplier-order-card__client" style="margin-top:4px;font-size:var(--text-sm);color:#1B2A4A;font-weight:500"><i data-lucide="utensils-crossed" style="width:14px;height:14px;margin-right:4px;vertical-align:-2px"></i>${escapeHtml(clientLabel)}</div>
+              <div class="supplier-order-card__client" style="margin-top:4px;font-size:var(--text-sm);color:var(--text-primary);font-weight:500"><i data-lucide="utensils-crossed" style="width:14px;height:14px;margin-right:4px;vertical-align:-2px"></i>${escapeHtml(clientLabel)}</div>
             </div>
             <span class="badge" style="background:${s.color};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md);white-space:nowrap;flex-shrink:0">
               ${escapeHtml(s.label)}

@@ -11,7 +11,7 @@ const INVOICE_STATUS_LABELS = {
 };
 
 const INVOICE_STATUS_COLORS = {
-  pending:   '#E8722A',
+  pending:   '#BF8A2E',
   validated: '#2563eb',
   paid:      '#22c55e',
   disputed:  '#ef4444',
@@ -109,7 +109,7 @@ async function loadInvoiceStats() {
       ? stats.monthly[stats.monthly.length - 1]
       : { total_ttc: 0, invoice_count: 0 };
     wrap.innerHTML = `
-      ${statCard('Mois en cours', fmtEur(month.total_ttc), `${month.invoice_count} factures`, '#E8722A')}
+      ${statCard('Mois en cours', fmtEur(month.total_ttc), `${month.invoice_count} factures`, '#BF8A2E')}
       ${statCard('À payer', fmtEur(stats.unpaid.total_ttc), `${stats.unpaid.count} factures`, '#2563eb')}
       ${statCard('En retard', fmtEur(stats.overdue.total_ttc), `${stats.overdue.count} factures`, '#ef4444')}
       ${statCard('Top fournisseur', stats.by_supplier[0] ? escapeHtml(stats.by_supplier[0].supplier_name || '—') : '—',
@@ -373,7 +373,7 @@ async function renderInvoiceReconcile(id) {
   }
 
   const s = result.summary;
-  const cleanColor = s.clean ? '#22c55e' : '#E8722A';
+  const cleanColor = s.clean ? '#22c55e' : '#BF8A2E';
 
   content.innerHTML = `
     <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
@@ -391,7 +391,7 @@ async function renderInvoiceReconcile(id) {
       </div>
     </div>
 
-    ${s.qty_discrepancies > 0 ? sectionTable('Écarts de quantité', '#E8722A',
+    ${s.qty_discrepancies > 0 ? sectionTable('Écarts de quantité', '#BF8A2E',
       ['Produit', 'BL', 'Facture', 'Écart'],
       result.qty_discrepancies.map(d => [
         escapeHtml(d.description || '—'),

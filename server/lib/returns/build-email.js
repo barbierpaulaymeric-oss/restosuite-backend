@@ -127,7 +127,7 @@ function buildHtml({ request, items, restaurant, supplier, deliveryNote, integra
   return `<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"></head>
 <body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#111827;max-width:640px;margin:0 auto;padding:24px">
-  <h2 style="color:#E8722A;margin:0 0 16px">${escapeHtml(typeLabel(request.type))} — ${escapeHtml(ref)}</h2>
+  <h2 style="color:#1F7A4D;margin:0 0 16px">${escapeHtml(typeLabel(request.type))} — ${escapeHtml(ref)}</h2>
   <p>Bonjour,</p>
   <p>Nous vous adressons une <strong>${escapeHtml(typeLabel(request.type).toLowerCase())}</strong> relative à une livraison récente.</p>
 

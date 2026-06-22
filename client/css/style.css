@@ -1053,7 +1053,7 @@ tbody tr:nth-child(even) {
 }
 
 tbody tr:hover td {
-  background: rgba(42, 63, 107, 0.2);
+  background: rgba(31,122,77,0.10);
 }
 
 td.mono, th.numeric {
@@ -1344,8 +1344,8 @@ tr:has(td[colspan]) td {
   width: 100%;
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: 0 12px 40px rgba(15, 23, 35, 0.5);
-  box-shadow: 0 12px 40px rgba(15, 23, 35, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: 0 12px 40px rgba(15,46,38, 0.5);
+  box-shadow: 0 12px 40px rgba(15,46,38, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .modal h2 {
@@ -4748,7 +4748,7 @@ body.role-salle { padding-top: 0 !important; padding-bottom: 0 !important; }
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px;
-  background: rgba(15, 23, 35, 0.95);
+  background: rgba(15,46,38, 0.95);
   border-bottom: 2px solid var(--color-accent);
   position: sticky;
   top: 0;

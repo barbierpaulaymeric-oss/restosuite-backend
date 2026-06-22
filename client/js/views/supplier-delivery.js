@@ -57,7 +57,7 @@ async function loadSupplierDeliveries() {
       return;
     }
 
-    const statusColors = { pending: '#E8722A', received: '#22c55e', partial: '#eab308', rejected: '#ef4444' };
+    const statusColors = { pending: '#BF8A2E', received: '#22c55e', partial: '#eab308', rejected: '#ef4444' };
     const statusLabels = { pending: 'En attente', received: 'Reçu', partial: 'Partiel', rejected: 'Refusé' };
 
     list.innerHTML = notes.map(n => `

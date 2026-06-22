@@ -281,7 +281,7 @@ async function renderNewOrder() {
     </div>
 
     <div style="max-width:800px">
-      <div id="po-integration-warning" hidden style="display:none;margin-bottom:16px;padding:14px 16px;background:#FFF7E6;border:1px solid #F5C36C;border-left:4px solid #E8722A;border-radius:var(--radius-md);color:#7A4300;font-size:var(--text-sm);line-height:1.5">
+      <div id="po-integration-warning" hidden style="display:none;margin-bottom:16px;padding:14px 16px;background:#FFF7E6;border:1px solid #F5C36C;border-left:4px solid #BF8A2E;border-radius:var(--radius-md);color:#7A4300;font-size:var(--text-sm);line-height:1.5">
         <strong style="display:block;margin-bottom:4px">⚠️ Compte FoodFlow non connecté</strong>
         <span>Connectez votre identifiant client dans <a href="#/supplier-integrations" style="color:#7A4300;text-decoration:underline;font-weight:600">Intégrations</a> avant d'envoyer.</span>
       </div>

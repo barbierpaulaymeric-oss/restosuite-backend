@@ -86,7 +86,7 @@ function mountShell() {
   // Le titre/logo ramène à l'écran d'accueil « Service ».
   const header = h('header', { class: 'app-header' }, [
     h('button', { class: 'brand', onclick: () => navigate('service') }, [
-      h('img', { class: 'brand-mark', src: './assets/logo-restosuite.png', alt: 'RestoSuite' }),
+      h('img', { class: 'brand-mark', src: './assets/logo-restosuite.svg', alt: 'RestoSuite' }),
       h('span', {}, 'Service'),
     ]),
     h('div', { class: 'header-spacer' }),
@@ -157,7 +157,7 @@ async function boot() {
 function LockScreen(retry) {
   return h('div', { class: 'login-wrap' }, [
     h('div', { class: 'login-brand' }, [
-      h('div', { class: 'brand-mark' }, 'RS'),
+      h('img', { class: 'brand-mark', src: './assets/logo-restosuite.svg', alt: 'RestoSuite' }),
       h('h1', {}, 'RestoSuite Cuisine'),
       h('p', {}, 'Authentification requise'),
     ]),

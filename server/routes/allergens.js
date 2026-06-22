@@ -377,7 +377,7 @@ router.get('/card-pdf', requireAuth, (req, res) => {
     const FOOTER_Y = PAGE_H - 32;
     const BODY_TOP = HEADER_BOTTOM_Y + 18;
     const BODY_BOTTOM = PAGE_H - 64;
-    const ACCENT = '#E8722A'; // RestoSuite brand orange
+    const ACCENT = '#1F7A4D'; // RestoSuite brand orange
     const HEADING = '#1a1a1a';
 
     const doc = new PDFDocument({

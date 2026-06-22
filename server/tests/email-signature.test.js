@@ -16,7 +16,7 @@ describe('email-signature', () => {
       expect(html).toContain('restaurateurs attendaient'); // apostrophe is HTML-escaped
       expect(html).toContain('https://www.restosuite.fr');
       expect(html).toContain('mailto:contact@restosuite.fr');
-      expect(html).toContain('#C45A18'); // brand orange links
+      expect(html).toContain('#0F6E56'); // brand green links
       expect(html).toContain('#6b7280'); // grey text
     });
 

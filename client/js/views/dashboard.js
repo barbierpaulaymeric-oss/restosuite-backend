@@ -513,7 +513,7 @@ function renderAISuggestions(container, data) {
     dailyHtml = `
       <div>
         <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-accent)"><span aria-hidden="true">⭐</span> Suggestion plat du jour</h4>
-        <div style="background:rgba(196,90,24,0.08);border-radius:var(--radius-md);padding:var(--space-3);border-left:3px solid var(--color-accent)">
+        <div style="background:rgba(31,122,77,0.08);border-radius:var(--radius-md);padding:var(--space-3);border-left:3px solid var(--color-accent)">
           <strong style="font-size:var(--text-base)">${escapeHtml(daily.name)}</strong>
           <p class="text-secondary" style="font-size:12px;margin-top:4px">${escapeHtml(daily.description || daily.reason || '')}</p>
           ${daily.key_ingredients && daily.key_ingredients.length > 0 ? `

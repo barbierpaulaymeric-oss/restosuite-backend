@@ -491,7 +491,7 @@ function bootApp(role, account, opts = {}) {
   Router.init();
   if (window.lucide) lucide.createIcons();
   const displayName = account ? account.name : role;
-  console.log('%c RestoSuite ', 'background:#E8722A;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600', `loaded (${displayName})`);
+  console.log('%c RestoSuite ', 'background:#2D8B5E;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600', `loaded (${displayName})`);
 
   // Trial banner — read-only / expired warnings come from the trial-status helper.
   fetchTrialStatus().then(() => renderTrialBanner());

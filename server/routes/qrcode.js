@@ -24,7 +24,7 @@ router.get('/table/:tableNumber', async (req, res) => {
       type: 'png',
       width: 400,
       margin: 2,
-      color: { dark: '#1B2A4A', light: '#FFFFFF' }
+      color: { dark: '#0F2E26', light: '#FFFFFF' }
     });
 
     res.setHeader('Content-Type', 'image/png');
@@ -50,7 +50,7 @@ router.get('/tables', async (req, res) => {
       const dataUrl = await QRCode.toDataURL(url, {
         width: 300,
         margin: 2,
-        color: { dark: '#1B2A4A', light: '#FFFFFF' }
+        color: { dark: '#0F2E26', light: '#FFFFFF' }
       });
       qrCodes.push({
         table_number: table.table_number,

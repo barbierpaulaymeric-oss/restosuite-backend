@@ -106,7 +106,7 @@ async function loadDeliveries(status) {
 }
 
 function renderDeliveryCard(d) {
-  const statusColors = { pending: '#E8722A', received: '#22c55e', partial: '#eab308', rejected: '#ef4444' };
+  const statusColors = { pending: '#BF8A2E', received: '#22c55e', partial: '#eab308', rejected: '#ef4444' };
   const statusLabels = { pending: '🟠 En attente', received: '🟢 Reçu', partial: '🟡 Partiel', rejected: '🔴 Refusé' };
   const borderColor = statusColors[d.status] || '#666';
 

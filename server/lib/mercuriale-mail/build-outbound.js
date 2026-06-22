@@ -13,8 +13,8 @@ const path = require('path');
 const ExcelJS = require('exceljs');
 
 // RestoSuite brand palette
-const NAVY = 'FF1B2A4A';   // headers / titles
-const ORANGE = 'FFC45A18'; // accents
+const NAVY = 'FF0F2E26';   // headers / titles
+const ORANGE = 'FF1F7A4D'; // accents
 const WHITE = 'FFFFFFFF';
 const ROW_ALT = 'FFFAF7F4'; // zebra striping
 const TOTAL_BG = 'FFFCE9DD'; // light orange tint behind total

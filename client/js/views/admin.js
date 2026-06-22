@@ -94,7 +94,7 @@ class AdminView {
 
   _renderStats({ totalUsers, totalRestaurants, byPlan, thisWeek, thisMonth }) {
     // Single-plan model: rows are 'free' (trial / no subscription) or 'pro' (active subscription).
-    const planColors = { free: '#94a3b8', pro: '#E8722A' };
+    const planColors = { free: '#94a3b8', pro: '#2D8B5E' };
 
     const planBadges = (byPlan || []).map(p => {
       const c = planColors[p.plan] || '#94a3b8';
@@ -157,7 +157,7 @@ class AdminView {
     const fmtFull = (dt) => dt ? new Date(dt).toLocaleString('fr-FR', { dateStyle:'short', timeStyle:'short' }) : '—';
 
     const planBadge = (plan) => {
-      const colors = { free: '#94a3b8', pro: '#E8722A' };
+      const colors = { free: '#94a3b8', pro: '#2D8B5E' };
       const c = colors[plan] || '#94a3b8';
       return `<span style="background:${c}22;color:${c};border:1px solid ${c}44;padding:.15rem .5rem;border-radius:999px;font-size:.75rem;font-weight:600;white-space:nowrap">${escapeHtml(plan || 'free')}</span>`;
     };

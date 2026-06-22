@@ -29,7 +29,7 @@ async function renderHACCPCooking() {
     const complianceColor = stats.compliance_rate == null
       ? '#666'
       : stats.compliance_rate >= 98 ? '#2D8B55'
-      : stats.compliance_rate >= 90 ? '#E8722A'
+      : stats.compliance_rate >= 90 ? '#BF8A2E'
       : '#D93025';
 
     app.innerHTML = `

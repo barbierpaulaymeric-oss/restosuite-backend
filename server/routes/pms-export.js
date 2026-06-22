@@ -259,9 +259,9 @@ const CONTENT_W = PAGE_W - 2 * PDF_MARGIN;
 function pmsSection(doc, title, yRef) {
   let y = yRef;
   if (y + 30 > 800) { doc.addPage(); y = PDF_MARGIN; }
-  doc.font('Helvetica-Bold').fontSize(10).fillColor('#1B2A4A');
-  doc.rect(PDF_MARGIN, y, CONTENT_W, 16).fill('#E8EEF8').stroke('#1B2A4A');
-  doc.fillColor('#1B2A4A').text(title.toUpperCase(), PDF_MARGIN + 6, y + 4, { width: CONTENT_W - 12 });
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#0F2E26');
+  doc.rect(PDF_MARGIN, y, CONTENT_W, 16).fill('#E1F5EE').stroke('#0F2E26');
+  doc.fillColor('#0F2E26').text(title.toUpperCase(), PDF_MARGIN + 6, y + 4, { width: CONTENT_W - 12 });
   return y + 20;
 }
 
@@ -362,7 +362,7 @@ router.get('/export/pdf', (req, res) => {
     // CCP détail
     for (const ccp of ccps) {
       if (y + 28 > 800) { doc.addPage(); y = PDF_MARGIN; }
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#1B2A4A');
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#0F2E26');
       doc.text(`CCP ${ccp.ccp_number} — ${ccp.step_name}`, PDF_MARGIN + 4, y + 2, { width: CONTENT_W - 8 });
       y += 11;
       doc.font('Helvetica').fontSize(7).fillColor('#333');
@@ -376,7 +376,7 @@ router.get('/export/pdf', (req, res) => {
     // ── Arbre de décision Codex Alimentarius (Q1-Q4) ──
     if (decisionTree.length > 0) {
       if (y + 30 > 800) { doc.addPage(); y = PDF_MARGIN; }
-      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#1B2A4A');
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#0F2E26');
       doc.text('Arbre de décision Codex Alimentarius (Q1 → Q4)', PDF_MARGIN + 2, y, { width: CONTENT_W - 4 });
       y += 13;
       doc.font('Helvetica-Oblique').fontSize(6.5).fillColor('#666');
@@ -385,7 +385,7 @@ router.get('/export/pdf', (req, res) => {
       const yn = (v) => v === 1 || v === '1' || v === true || v === 'oui' ? 'Oui' : (v === 0 || v === '0' || v === false || v === 'non' ? 'Non' : '—');
       for (const dt of decisionTree) {
         if (y + 22 > 800) { doc.addPage(); y = PDF_MARGIN; }
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#1B2A4A');
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#0F2E26');
         const head = `${dt.step_name || '—'} (${dt.hazard_type || '?'}) — ${dt.result === 'CCP' ? '✓ CCP' : (dt.result || '—')}`;
         doc.text(head, PDF_MARGIN + 4, y, { width: CONTENT_W - 8 });
         y += 10;

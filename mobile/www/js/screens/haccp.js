@@ -327,10 +327,12 @@ export function HaccpScreen(query) {
     content.replaceChildren(tab === 'temp' ? TempEntry() : tab === 'checklist' ? Checklist() : Timers());
   }
 
+  // Onglets internes : libellés seuls (les icônes les feraient déborder de leur
+  // 1/3 de colonne sur les petits iPhone — « Minuterie » est large).
   const seg = h('div', { class: 'quick-grid', style: 'grid-template-columns:1fr 1fr 1fr' }, [
-    h('button', { class: 'btn seg-btn', 'data-tab': 'temp', onclick: () => { tab = 'temp'; paintTab(); } }, [icon('thermometer', 20), 'T°']),
+    h('button', { class: 'btn seg-btn', 'data-tab': 'temp', onclick: () => { tab = 'temp'; paintTab(); } }, 'T°'),
     h('button', { class: 'btn seg-btn', 'data-tab': 'checklist', onclick: () => { tab = 'checklist'; paintTab(); } }, 'Checklist'),
-    h('button', { class: 'btn seg-btn', 'data-tab': 'timer', onclick: () => { tab = 'timer'; paintTab(); } }, [icon('timer', 20), 'Minuterie']),
+    h('button', { class: 'btn seg-btn', 'data-tab': 'timer', onclick: () => { tab = 'timer'; paintTab(); } }, 'Minuterie'),
   ]);
 
   const root = h('div', {}, [

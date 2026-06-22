@@ -93,7 +93,7 @@ if (heroActions && stickyCta) {
 var header = document.getElementById('header');
 if (header) {
   window.addEventListener('scroll', function() {
-    header.style.background = window.scrollY > 20 ? '#0F1723' : 'rgba(15, 23, 35, 0.98)';
+    header.style.background = window.scrollY > 20 ? '#FAF8F5' : 'rgba(250,248,245,0.98)';
   }, { passive: true });
 }
 

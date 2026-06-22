@@ -97,8 +97,8 @@ function activateHACCPPlanTab(tab) {
   // Update tab styles
   document.querySelectorAll('.haccp-plan-tab').forEach(btn => {
     const active = btn.dataset.tab === tab;
-    btn.style.color = active ? 'var(--color-accent, #E8722A)' : 'var(--text-secondary)';
-    btn.style.borderBottomColor = active ? 'var(--color-accent, #E8722A)' : 'transparent';
+    btn.style.color = active ? 'var(--color-accent, #1F7A4D)' : 'var(--text-secondary)';
+    btn.style.borderBottomColor = active ? 'var(--color-accent, #1F7A4D)' : 'transparent';
   });
 
   const addBtn = document.getElementById('haccp-plan-add-btn');

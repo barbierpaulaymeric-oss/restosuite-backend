@@ -12,11 +12,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const ORANGE = '#C45A18'; // brand accent — links
-const GREY = '#6b7280';   // brand muted text
+const GREEN = '#0F6E56'; // brand accent — links (vert texte AA 5.95:1)
+const GREY = '#6b7280';  // brand muted text
 
 const LOGO_CID = 'restosuite-logo';
-const LOGO_PATH = path.join(__dirname, '..', '..', 'client', 'assets', 'logo-512.png');
+const LOGO_PATH = path.join(__dirname, '..', '..', 'client', 'assets', 'icon-512.png');
 
 const TAGLINE = "RestoSuite — L'outil que les restaurateurs attendaient.";
 const SITE_URL = 'https://www.restosuite.fr';
@@ -58,7 +58,7 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
-// HTML signature block. Logo ~96px wide, tagline in grey, links in brand orange.
+// HTML signature block. Logo ~96px wide, tagline in grey, links in brand green.
 function signatureHtml() {
   const logo = logoBuffer()
     ? `<img src="cid:${LOGO_CID}" width="96" alt="RestoSuite"`
@@ -70,9 +70,9 @@ function signatureHtml() {
     ${logo}
     <p style="margin:0 0 4px;color:${GREY};font-size:13px;font-weight:600">${escapeHtml(TAGLINE)}</p>
     <p style="margin:0;color:${GREY};font-size:13px">
-      <a href="${SITE_URL}" style="color:${ORANGE};text-decoration:none">${SITE_LABEL}</a>
+      <a href="${SITE_URL}" style="color:${GREEN};text-decoration:none">${SITE_LABEL}</a>
       &nbsp;&middot;&nbsp;
-      <a href="mailto:${CONTACT_EMAIL}" style="color:${ORANGE};text-decoration:none">${CONTACT_EMAIL}</a>
+      <a href="mailto:${CONTACT_EMAIL}" style="color:${GREEN};text-decoration:none">${CONTACT_EMAIL}</a>
     </p>
   </div>`;
 }

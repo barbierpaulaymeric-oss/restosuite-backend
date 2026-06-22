@@ -14,7 +14,7 @@ const RETURN_STATUS_LABELS = {
 const RETURN_STATUS_COLORS = {
   draft:       '#6b7280',
   sent:        '#2563eb',
-  in_progress: '#E8722A',
+  in_progress: '#BF8A2E',
   resolved:    '#22c55e',
   rejected:    '#ef4444',
 };
@@ -109,7 +109,7 @@ async function loadReturnStats() {
     const stats = await API.getReturnStats();
     wrap.innerHTML = `
       ${returnStatCard('Total demandes', stats.total, 'depuis toujours', '#6b7280')}
-      ${returnStatCard('À suivre', stats.open, 'envoyées + en cours', '#E8722A')}
+      ${returnStatCard('À suivre', stats.open, 'envoyées + en cours', '#BF8A2E')}
       ${returnStatCard('Avoirs obtenus', stats.credit_total_resolved.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' €', 'cumul résolus', '#22c55e')}
       ${returnStatCard('Refusées', (stats.by_status.find(s => s.status === 'rejected') || { count: 0 }).count, 'à investiguer', '#ef4444')}
     `;

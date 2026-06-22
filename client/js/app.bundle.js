@@ -2454,7 +2454,7 @@ function renderAISuggestions(container, data) {
     dailyHtml = `
       <div>
         <h4 style="margin:0 0 8px 0;font-size:var(--text-sm);color:var(--color-accent)"><span aria-hidden="true">\u2B50</span> Suggestion plat du jour</h4>
-        <div style="background:rgba(196,90,24,0.08);border-radius:var(--radius-md);padding:var(--space-3);border-left:3px solid var(--color-accent)">
+        <div style="background:rgba(31,122,77,0.08);border-radius:var(--radius-md);padding:var(--space-3);border-left:3px solid var(--color-accent)">
           <strong style="font-size:var(--text-base)">${escapeHtml(daily.name)}</strong>
           <p class="text-secondary" style="font-size:12px;margin-top:4px">${escapeHtml(daily.description || daily.reason || "")}</p>
           ${daily.key_ingredients && daily.key_ingredients.length > 0 ? `
@@ -2797,7 +2797,7 @@ function renderCrossContaminationBlock(risk) {
   if (!risk || !risk.count || risk.count === 0) return "";
   const palette = {
     high: { bg: "rgba(217,48,37,0.08)", border: "rgba(217,48,37,0.4)", icon: "octagon-alert", label: "Risque \xE9lev\xE9" },
-    medium: { bg: "rgba(232,114,42,0.08)", border: "rgba(232,114,42,0.4)", icon: "triangle-alert", label: "Risque mod\xE9r\xE9" },
+    medium: { bg: "rgba(191,138,46,0.10)", border: "rgba(191,138,46,0.4)", icon: "triangle-alert", label: "Risque mod\xE9r\xE9" },
     low: { bg: "rgba(107,114,128,0.08)", border: "rgba(107,114,128,0.4)", icon: "info", label: "Vigilance" }
   };
   const p = palette[risk.max_severity] || palette.low;
@@ -8200,7 +8200,7 @@ async function renderHACCPCooking() {
     ]);
     const items = recordsRes.items || [];
     const complianceRateText = stats.compliance_rate == null ? "\u2014" : `${stats.compliance_rate}%`;
-    const complianceColor = stats.compliance_rate == null ? "#666" : stats.compliance_rate >= 98 ? "#2D8B55" : stats.compliance_rate >= 90 ? "#E8722A" : "#D93025";
+    const complianceColor = stats.compliance_rate == null ? "#666" : stats.compliance_rate >= 98 ? "#2D8B55" : stats.compliance_rate >= 90 ? "#BF8A2E" : "#D93025";
     app.innerHTML = `
       <div class="haccp-page">
         <div class="page-header">
@@ -11176,8 +11176,8 @@ function renderHACCPPlanShell() {
 function activateHACCPPlanTab(tab) {
   document.querySelectorAll(".haccp-plan-tab").forEach((btn) => {
     const active = btn.dataset.tab === tab;
-    btn.style.color = active ? "var(--color-accent, #E8722A)" : "var(--text-secondary)";
-    btn.style.borderBottomColor = active ? "var(--color-accent, #E8722A)" : "transparent";
+    btn.style.color = active ? "var(--color-accent, #1F7A4D)" : "var(--text-secondary)";
+    btn.style.borderBottomColor = active ? "var(--color-accent, #1F7A4D)" : "transparent";
   });
   const addBtn = document.getElementById("haccp-plan-add-btn");
   if (addBtn) addBtn.style.display = tab === "hazards" ? "" : "none";
@@ -16166,7 +16166,7 @@ async function renderNewOrder() {
     </div>
 
     <div style="max-width:800px">
-      <div id="po-integration-warning" hidden style="display:none;margin-bottom:16px;padding:14px 16px;background:#FFF7E6;border:1px solid #F5C36C;border-left:4px solid #E8722A;border-radius:var(--radius-md);color:#7A4300;font-size:var(--text-sm);line-height:1.5">
+      <div id="po-integration-warning" hidden style="display:none;margin-bottom:16px;padding:14px 16px;background:#FFF7E6;border:1px solid #F5C36C;border-left:4px solid #BF8A2E;border-radius:var(--radius-md);color:#7A4300;font-size:var(--text-sm);line-height:1.5">
         <strong style="display:block;margin-bottom:4px">\u26A0\uFE0F Compte FoodFlow non connect\xE9</strong>
         <span>Connectez votre identifiant client dans <a href="#/supplier-integrations" style="color:#7A4300;text-decoration:underline;font-weight:600">Int\xE9grations</a> avant d'envoyer.</span>
       </div>
@@ -20256,7 +20256,7 @@ function _isDemoEmail(email) {
   return !!email && _DEMO_EMAILS.has(String(email).trim().toLowerCase());
 }
 const AVATAR_COLORS = [
-  "#E8722A",
+  "#D4A843",
   "#2D8B55",
   "#4A90D9",
   "#D93025",
@@ -23597,7 +23597,7 @@ async function loadSupplierDeliveries() {
       `;
       return;
     }
-    const statusColors = { pending: "#E8722A", received: "#22c55e", partial: "#eab308", rejected: "#ef4444" };
+    const statusColors = { pending: "#BF8A2E", received: "#22c55e", partial: "#eab308", rejected: "#ef4444" };
     const statusLabels = { pending: "En attente", received: "Re\xE7u", partial: "Partiel", rejected: "Refus\xE9" };
     list.innerHTML = notes.map((n) => `
       <div class="card supplier-delivery-card" data-id="${n.id}" style="padding:var(--space-4);margin-bottom:var(--space-3);border-left:4px solid ${statusColors[n.status] || "#666"};border-radius:var(--radius-lg);background:var(--bg-elevated);cursor:pointer">
@@ -23939,7 +23939,7 @@ async function showNewDeliveryForm() {
 }
 const SUPPLIER_ORDER_STATUS = {
   brouillon: { label: "Brouillon", color: "#94a3b8" },
-  envoy\u00E9e: { label: "\xC0 confirmer", color: "#E8722A" },
+  envoy\u00E9e: { label: "\xC0 confirmer", color: "#BF8A2E" },
   confirm\u00E9e: { label: "Confirm\xE9e", color: "#4A90D9" },
   r\u00E9ceptionn\u00E9e: { label: "R\xE9ceptionn\xE9e", color: "#22c55e" },
   annul\u00E9e: { label: "Annul\xE9e", color: "#ef4444" }
@@ -23985,7 +23985,7 @@ async function renderSupplierOrdersTab() {
                 <strong>${escapeHtml(o.reference || `Commande #${o.id}`)}</strong>
                 <span class="text-secondary text-sm">${escapeHtml(created)}</span>
               </div>
-              <div class="supplier-order-card__client" style="margin-top:4px;font-size:var(--text-sm);color:#1B2A4A;font-weight:500"><i data-lucide="utensils-crossed" style="width:14px;height:14px;margin-right:4px;vertical-align:-2px"></i>${escapeHtml(clientLabel)}</div>
+              <div class="supplier-order-card__client" style="margin-top:4px;font-size:var(--text-sm);color:var(--text-primary);font-weight:500"><i data-lucide="utensils-crossed" style="width:14px;height:14px;margin-right:4px;vertical-align:-2px"></i>${escapeHtml(clientLabel)}</div>
             </div>
             <span class="badge" style="background:${s.color};color:white;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-md);white-space:nowrap;flex-shrink:0">
               ${escapeHtml(s.label)}
@@ -24575,7 +24575,7 @@ async function loadDeliveries(status) {
   }
 }
 function renderDeliveryCard(d) {
-  const statusColors = { pending: "#E8722A", received: "#22c55e", partial: "#eab308", rejected: "#ef4444" };
+  const statusColors = { pending: "#BF8A2E", received: "#22c55e", partial: "#eab308", rejected: "#ef4444" };
   const statusLabels = { pending: "\u{1F7E0} En attente", received: "\u{1F7E2} Re\xE7u", partial: "\u{1F7E1} Partiel", rejected: "\u{1F534} Refus\xE9" };
   const borderColor = statusColors[d.status] || "#666";
   return `
@@ -26502,7 +26502,7 @@ const INVOICE_STATUS_LABELS = {
   disputed: "Litige"
 };
 const INVOICE_STATUS_COLORS = {
-  pending: "#E8722A",
+  pending: "#BF8A2E",
   validated: "#2563eb",
   paid: "#22c55e",
   disputed: "#ef4444"
@@ -26589,7 +26589,7 @@ async function loadInvoiceStats() {
     const stats = await API.getInvoiceStats();
     const month = stats.monthly && stats.monthly.length ? stats.monthly[stats.monthly.length - 1] : { total_ttc: 0, invoice_count: 0 };
     wrap.innerHTML = `
-      ${statCard("Mois en cours", fmtEur(month.total_ttc), `${month.invoice_count} factures`, "#E8722A")}
+      ${statCard("Mois en cours", fmtEur(month.total_ttc), `${month.invoice_count} factures`, "#BF8A2E")}
       ${statCard("\xC0 payer", fmtEur(stats.unpaid.total_ttc), `${stats.unpaid.count} factures`, "#2563eb")}
       ${statCard("En retard", fmtEur(stats.overdue.total_ttc), `${stats.overdue.count} factures`, "#ef4444")}
       ${statCard(
@@ -26836,7 +26836,7 @@ async function renderInvoiceReconcile(id) {
     return;
   }
   const s = result.summary;
-  const cleanColor = s.clean ? "#22c55e" : "#E8722A";
+  const cleanColor = s.clean ? "#22c55e" : "#BF8A2E";
   content.innerHTML = `
     <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
       <a href="#/invoices/${id}" class="btn btn-secondary" style="display:flex;align-items:center;gap:var(--space-2)">
@@ -26855,7 +26855,7 @@ async function renderInvoiceReconcile(id) {
 
     ${s.qty_discrepancies > 0 ? sectionTable(
     "\xC9carts de quantit\xE9",
-    "#E8722A",
+    "#BF8A2E",
     ["Produit", "BL", "Facture", "\xC9cart"],
     result.qty_discrepancies.map((d) => [
       escapeHtml(d.description || "\u2014"),
@@ -27031,7 +27031,7 @@ const RETURN_STATUS_LABELS = {
 const RETURN_STATUS_COLORS = {
   draft: "#6b7280",
   sent: "#2563eb",
-  in_progress: "#E8722A",
+  in_progress: "#BF8A2E",
   resolved: "#22c55e",
   rejected: "#ef4444"
 };
@@ -27117,7 +27117,7 @@ async function loadReturnStats() {
     const stats = await API.getReturnStats();
     wrap.innerHTML = `
       ${returnStatCard("Total demandes", stats.total, "depuis toujours", "#6b7280")}
-      ${returnStatCard("\xC0 suivre", stats.open, "envoy\xE9es + en cours", "#E8722A")}
+      ${returnStatCard("\xC0 suivre", stats.open, "envoy\xE9es + en cours", "#BF8A2E")}
       ${returnStatCard("Avoirs obtenus", stats.credit_total_resolved.toLocaleString("fr-FR", { minimumFractionDigits: 2 }) + " \u20AC", "cumul r\xE9solus", "#22c55e")}
       ${returnStatCard("Refus\xE9es", (stats.by_status.find((s) => s.status === "rejected") || { count: 0 }).count, "\xE0 investiguer", "#ef4444")}
     `;
@@ -28374,7 +28374,7 @@ async function renderAIAssistant() {
       }
 
       .ai-action-cancel:hover {
-        background:rgba(232,114,42,0.05)
+        background:rgba(31,122,77,0.06)
       }
 
       .ai-suggestion { background:var(--bg-sunken);border:1px solid var(--border-light);border-radius:20px;padding:6px 12px;font-size:var(--text-xs);cursor:pointer;white-space:nowrap;color:var(--text-primary);transition:all 0.2s }
@@ -31292,7 +31292,7 @@ class AdminView {
     if (window.lucide) lucide.createIcons();
   }
   _renderStats({ totalUsers, totalRestaurants, byPlan, thisWeek, thisMonth }) {
-    const planColors = { free: "#94a3b8", pro: "#E8722A" };
+    const planColors = { free: "#94a3b8", pro: "#2D8B5E" };
     const planBadges = (byPlan || []).map((p) => {
       const c = planColors[p.plan] || "#94a3b8";
       return `<span style="display:inline-flex;align-items:center;gap:.35rem;background:${c}22;color:${c};border:1px solid ${c}44;padding:.2rem .6rem;border-radius:999px;font-size:.75rem;font-weight:600">${escapeHtml(p.plan)} <strong>${p.count}</strong></span>`;
@@ -31343,7 +31343,7 @@ class AdminView {
     const fmt = (dt) => dt ? new Date(dt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "\u2014";
     const fmtFull = (dt) => dt ? new Date(dt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "\u2014";
     const planBadge = (plan) => {
-      const colors = { free: "#94a3b8", pro: "#E8722A" };
+      const colors = { free: "#94a3b8", pro: "#2D8B5E" };
       const c = colors[plan] || "#94a3b8";
       return `<span style="background:${c}22;color:${c};border:1px solid ${c}44;padding:.15rem .5rem;border-radius:999px;font-size:.75rem;font-weight:600;white-space:nowrap">${escapeHtml(plan || "free")}</span>`;
     };
@@ -31500,7 +31500,7 @@ class AdminDashboardView {
     return { color, label, days };
   }
   _renderStats({ totalUsers, totalRestaurants, byPlan, thisWeek, thisMonth }, users) {
-    const planColors = { free: "#94a3b8", pro: "#E8722A" };
+    const planColors = { free: "#94a3b8", pro: "#2D8B5E" };
     const planBadges = (byPlan || []).map((p) => {
       const c = planColors[p.plan] || "#94a3b8";
       return `<span style="display:inline-flex;align-items:center;gap:.35rem;background:${c}22;color:${c};border:1px solid ${c}44;padding:.2rem .6rem;border-radius:999px;font-size:.75rem;font-weight:600">${escapeHtml(p.plan)} <strong>${p.count}</strong></span>`;
@@ -31553,7 +31553,7 @@ class AdminDashboardView {
     const fmt = (dt) => dt ? new Date(dt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "\u2014";
     const fmtFull = (dt) => dt ? new Date(dt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "\u2014";
     const planBadge = (plan) => {
-      const colors = { free: "#94a3b8", pro: "#E8722A" };
+      const colors = { free: "#94a3b8", pro: "#2D8B5E" };
       const c = colors[plan] || "#94a3b8";
       return `<span style="background:${c}22;color:${c};border:1px solid ${c}44;padding:.15rem .5rem;border-radius:999px;font-size:.75rem;font-weight:600;white-space:nowrap">${escapeHtml(plan || "free")}</span>`;
     };
@@ -32490,7 +32490,7 @@ function bootApp(role, account, opts = {}) {
   Router.init();
   if (window.lucide) lucide.createIcons();
   const displayName = account ? account.name : role;
-  console.log("%c RestoSuite ", "background:#E8722A;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600", `loaded (${displayName})`);
+  console.log("%c RestoSuite ", "background:#2D8B5E;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600", `loaded (${displayName})`);
   fetchTrialStatus().then(() => renderTrialBanner());
   clearTrialStatusInterval();
   _trialStatusIntervalId = setInterval(() => fetchTrialStatus().then(() => renderTrialBanner()), 5 * 60 * 1e3);

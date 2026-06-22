@@ -180,7 +180,7 @@ function renderCrossContaminationBlock(risk) {
   if (!risk || !risk.count || risk.count === 0) return '';
   const palette = {
     high:   { bg: 'rgba(217,48,37,0.08)', border: 'rgba(217,48,37,0.4)', icon: 'octagon-alert', label: 'Risque élevé' },
-    medium: { bg: 'rgba(232,114,42,0.08)', border: 'rgba(232,114,42,0.4)', icon: 'triangle-alert', label: 'Risque modéré' },
+    medium: { bg: 'rgba(191,138,46,0.10)', border: 'rgba(191,138,46,0.4)', icon: 'triangle-alert', label: 'Risque modéré' },
     low:    { bg: 'rgba(107,114,128,0.08)', border: 'rgba(107,114,128,0.4)', icon: 'info', label: 'Vigilance' },
   };
   const p = palette[risk.max_severity] || palette.low;

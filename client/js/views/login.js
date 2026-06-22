@@ -27,7 +27,7 @@ function _isDemoEmail(email) {
 }
 
 const AVATAR_COLORS = [
-  '#E8722A', '#2D8B55', '#4A90D9', '#D93025', '#E5A100',
+  '#D4A843', '#2D8B55', '#4A90D9', '#D93025', '#E5A100',
   '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316'
 ];
 

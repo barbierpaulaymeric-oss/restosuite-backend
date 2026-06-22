@@ -30,7 +30,7 @@ const TRIAL_DAYS = 60;
 // Bouton CTA orange RestoSuite (même style que l'email de bienvenue).
 function ctaButton(label) {
   return `<p style="margin:24px 0">
-  <a href="${APP_URL}" style="display:inline-block;background:#C45A18;color:#fff;text-decoration:none;
+  <a href="${APP_URL}" style="display:inline-block;background:#1F7A4D;color:#fff;text-decoration:none;
      font-weight:600;padding:12px 24px;border-radius:8px">${escapeHtml(label)}</a>
 </p>`;
 }
