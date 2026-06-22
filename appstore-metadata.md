@@ -9,6 +9,9 @@
 |---|---|
 | **Nom** | RestoSuite Cuisine |
 | **Sous-titre** | Gestion restaurant en cuisine |
+| **Bundle ID** | fr.restosuite.app |
+| **SKU** | restosuite-ios-001 |
+| **Langue principale** | Français (France) |
 | **Catégorie principale** | Économie et entreprise |
 | **Catégorie secondaire** | Productivité |
 | **Classification** | 4+ |
