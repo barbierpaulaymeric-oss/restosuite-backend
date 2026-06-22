@@ -84,10 +84,21 @@ Voir `appstore-screenshots-guide.md` pour la procédure de capture via le simula
 - [x] Icône 1024×1024 sans canal alpha (conforme App Store)
 - [x] Icônes générées à toutes les tailles iPhone (20/29/40/58/60/80/87/120/180/1024)
 - [x] `NSCameraUsageDescription`, `NSMicrophoneUsageDescription`, etc. en français
-- [ ] **Capabilities push** — voir note ci-dessous (décision en attente)
+- [x] **Capabilities push** — push APNs CONSERVÉ (décision 2026-06-22, voir ci-dessous)
 - [ ] Compte de démo Apple à provisionner
 - [ ] Screenshots 6.7" à générer
 
-### ⚠️ Push notifications
+### Push notifications (CONSERVÉ)
 
-Le code embarque le push APNs complet (entitlements dev+prod, `UIBackgroundModes: remote-notification`, callbacks `AppDelegate`, plugin Capacitor `PushNotifications`). La demande indiquait « pas de push pour la v1, juste réseau ». Décision à trancher avant soumission — voir conversation. Si le push est conservé, prévoir la justification du `UIBackgroundModes` dans les notes reviewer.
+Décision : on garde le push APNs. Il sert à notifier le restaurateur des **réceptions de commandes**, **changements de prix fournisseurs** et **débuts de service**. L'infra iOS est déjà câblée (entitlements dev+prod, `UIBackgroundModes: remote-notification`, callbacks `AppDelegate`, plugin Capacitor `PushNotifications`).
+
+**À ajouter aux notes reviewer Apple** (justifie le `UIBackgroundModes: remote-notification` et l'usage de la position/micro/caméra) :
+
+```
+L'app envoie des notifications push pour alerter le restaurateur des événements
+métier en temps réel : réception d'une commande fournisseur, changement de prix
+d'un fournisseur, et début de service. Le mode remote-notification est utilisé
+uniquement pour traiter ces notifications APNs.
+```
+
+> ⚠️ **À implémenter** : les *déclencheurs* de notification (réception commande, changement prix, début service) ne sont pas encore branchés côté backend/app. Le transport push est prêt ; il reste à émettre les notifications sur ces événements. Voir le suivi de scope ci-dessous / la conversation.
