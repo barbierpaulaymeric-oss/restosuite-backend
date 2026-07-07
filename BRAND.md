@@ -80,7 +80,7 @@ Pourquoi cette tagline :
 #### Variantes contextuelles
 
 - **Page d'accueil :** « Votre cuisine tourne. Vos chiffres suivent. »
-- **App Store :** « Gestion complète pour restaurants professionnels »
+- **App Store :** « Gestion complète pour restaurateurs »
 - **Pitch court :** « Le copilote de gestion des restaurateurs »
 
 ### Tone of Voice

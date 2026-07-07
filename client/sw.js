@@ -1,3 +1,6 @@
+// Bumped 2026-07-05 (v63): Homogénéité — CGV nettoyée (retrait du « Plan Business »
+// fantôme), chiffres marketing fidèles (23 modules HACCP au lieu de 9, 35 modules
+// intégrés), SEO blog corrigé (« restaurateurs »), copyright landing aligné au légal.
 // Bumped 2026-07-05 (v62): Audit complet — corrections HACCP (CCP1 réception &
 // CCP2 cuisson désormais actifs, plan de maîtrise sanitaire semé par restaurant),
 // FoodFlow (n° client numérique + message d'envoi honnête), export CSV sécurisé
@@ -20,7 +23,7 @@
 // restaurateurs trié par date d'inscription avec pastilles d'activité
 // (vert = actif, ambre > 14j, rouge = jamais reconnecté) + compteur de jours
 // depuis la dernière connexion. Le lien Admin de la nav pointe désormais ici.
-const CACHE_NAME = 'restosuite-v62';
+const CACHE_NAME = 'restosuite-v63';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',
