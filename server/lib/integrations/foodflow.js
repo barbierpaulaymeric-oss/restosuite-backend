@@ -16,14 +16,18 @@
 //       { ok, external_ref?, status?, error? }
 
 const NAME = 'foodflow';
-const ID_REGEX = /^FF-[A-Z0-9-]{1,40}$/i;
+// Accept the 3-12 digit numeric client number the UI + mercuriale pipeline use
+// (client/js/views/supplier-integrations.js: pattern="[0-9]{5}"), as well as the
+// legacy FF- prefixed form. Previously only FF- was accepted, so following the
+// UI's own instructions could never connect a supplier (audit 2026-07-05).
+const ID_REGEX = /^([0-9]{3,12}|FF-[A-Z0-9-]{1,40})$/i;
 
 function authenticate({ external_id }) {
   if (!external_id || typeof external_id !== 'string') {
     return { ok: false, error: 'FoodFlow ID requis' };
   }
   if (!ID_REGEX.test(external_id)) {
-    return { ok: false, error: 'FoodFlow ID invalide (format attendu: FF-XXXXX)' };
+    return { ok: false, error: 'Numéro client invalide (5 chiffres attendus, ex. 89764)' };
   }
   return { ok: true };
 }

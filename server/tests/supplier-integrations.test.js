@@ -66,12 +66,18 @@ describe('lib/integrations/foodflow', () => {
       expect(r.error).toMatch(/FoodFlow/i);
     });
 
-    it('rejects malformed external_id (must start with FF-)', async () => {
-      const r = await foodflow.authenticate({ external_id: '12345' });
-      expect(r.ok).toBe(false);
+    it('accepts the 5-digit numeric client number the UI mandates', async () => {
+      const r = await foodflow.authenticate({ external_id: '89764' });
+      expect(r.ok).toBe(true);
     });
 
-    it('accepts a well-formed FF-XXXX id', async () => {
+    it('rejects a genuinely malformed external_id', async () => {
+      expect((await foodflow.authenticate({ external_id: 'ab' })).ok).toBe(false);       // too short / non-numeric
+      expect((await foodflow.authenticate({ external_id: 'FF 1' })).ok).toBe(false);     // space
+      expect((await foodflow.authenticate({ external_id: '12' })).ok).toBe(false);       // < 3 digits
+    });
+
+    it('still accepts a legacy FF-XXXX id', async () => {
       const r = await foodflow.authenticate({ external_id: 'FF-METRO-42' });
       expect(r.ok).toBe(true);
     });

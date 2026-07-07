@@ -5,9 +5,16 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { BCRYPT_ROUNDS } = require('../lib/bcrypt-cost');
+
+// Constant-work hash used to equalize response timing when an email is unknown.
+// Without it, login returns instantly for unknown emails but spends ~250ms on
+// bcrypt for known ones — a reliable oracle to enumerate registered accounts.
+// Computed once at boot; the value never authenticates anything.
+const DUMMY_BCRYPT_HASH = bcrypt.hashSync('rs-timing-equalizer-not-a-secret', BCRYPT_ROUNDS);
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { all, get, run } = require('../db');
+const { db, all, get, run } = require('../db');
+const { seedDefaultHaccpPlan } = require('../lib/haccp-default-plan');
 const { parseCookies, serializeCookie, appendSetCookie } = require('../lib/cookie');
 
 const router = express.Router();
@@ -309,6 +316,12 @@ router.post('/register', async (req, res) => {
     const accountId = accountResult.lastInsertRowid;
     const account = get('SELECT * FROM accounts WHERE id = ?', [accountId]);
 
+    // Seed the default HACCP plan de maîtrise sanitaire for this restaurant so
+    // the dangers/CCP/arbre de décision and the DDPP export are populated from
+    // day one (previously only restaurant_id=1 had one). Non-fatal.
+    try { seedDefaultHaccpPlan(db, restaurantId); }
+    catch (planErr) { console.error('seed HACCP plan (register) failed:', planErr.message); }
+
     const { token, csrf } = generateToken(account);
     issueAuthCookie(res, token);
 
@@ -484,6 +497,7 @@ router.post('/login', async (req, res) => {
 
   const account = get('SELECT * FROM accounts WHERE email = ?', [email.trim().toLowerCase()]);
   if (!account) {
+    await bcrypt.compare(password, DUMMY_BCRYPT_HASH); // equalize timing (anti-enumeration)
     return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
   }
 
@@ -654,6 +668,7 @@ router.post('/smart-login', async (req, res) => {
   const ownerAccount = get('SELECT * FROM accounts WHERE email = ?', [normEmail]);
   if (!ownerAccount) {
     recordPinAttempt(lockoutKey, false);
+    await bcrypt.compare(password, DUMMY_BCRYPT_HASH); // equalize timing (anti-enumeration)
     return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
   }
 

@@ -5,6 +5,36 @@
 
 ---
 
+> ## ⚠️ MISE À JOUR — identité actuelle « sceau vert / or / crème » (05/07/2026)
+>
+> **Ce document décrit en partie une identité PÉRIMÉE (l'ancien bleu marine `#1B2A4A` + cuivre `#E8722A`).**
+> L'identité **réellement en production** est le système **vert / or / crème**. La **source de vérité
+> unique** est le bloc `:root` de [`client/css/style.css`](client/css/style.css). En cas de doute, c'est
+> la CSS qui fait foi, pas ce fichier. Toute production d'assets (icônes app iOS/Android, splash,
+> visuels marketing) doit partir de ces valeurs :
+>
+> | Rôle | Token | Hex |
+> |------|-------|-----|
+> | Marque / logo / aplats | `--rs-green` | `#2D8B5E` |
+> | Interactif (boutons, CTA, états actifs) | `--rs-green-strong` / `--color-accent` | `#1F7A4D` |
+> | Texte/liens verts | `--rs-green-text` | `#0F6E56` |
+> | Or (sparkle IA, gros chiffres — jamais texte courant) | `--rs-gold` | `#D4A843` |
+> | Or profond (point du logo, accent) | `--rs-gold-deep` | `#BF8A2E` |
+> | Fond page / theme-color | `--rs-cream` | `#FAF8F5` |
+> | Titres / texte principal | `--rs-ink` | `#2A2A28` |
+> | Accent **portail fournisseur** (bleu, distinct du vert restaurateur) | `--color-info` | `#2E6FA6` |
+> | Danger | `--color-danger` | `#C4422A` |
+>
+> **Typographie :** Inter (UI/texte), Fraunces (titres display serif), Caveat (accents manuscrits),
+> JetBrains Mono (données/monospace).
+>
+> **Convention de nommage :** on dit **« restaurateurs »**, jamais « restaurants professionnels ».
+>
+> Sections restant valides ci-dessous : positionnement, ton, UI kit (structure), analyse concurrentielle.
+> Sections périmées : toute mention des couleurs bleu/cuivre et de l'ancien logo.
+
+---
+
 ## Table des matières
 
 1. [Nom & Positionnement](#1-nom--positionnement)

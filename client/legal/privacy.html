@@ -191,7 +191,7 @@
         <p>Des transferts ponctuels vers les États-Unis subsistent uniquement via deux sous-traitants, encadrés par des garanties appropriées (Data Privacy Framework UE-États-Unis et/ou clauses contractuelles types) :</p>
         <ul>
           <li><strong>Stripe</strong> — traitement des paiements par carte bancaire ;</li>
-          <li><strong>Google</strong> (API Gemini) — IA et saisie vocale ; les saisies sont caviardées (suppression des données personnelles) avant envoi.</li>
+          <li><strong>Google</strong> (API Gemini) — IA, saisie vocale et lecture automatique de documents. Le caviardage (suppression des données personnelles) s'applique aux <strong>textes saisis et dictés</strong> ; en revanche, les <strong>documents et photos que vous scannez</strong> (factures, bons de livraison, mercuriales) sont transmis <strong>tels quels</strong> à Google pour extraction, sans caviardage — ils peuvent contenir des informations sur vos fournisseurs (raison sociale, SIRET, coordonnées).</li>
         </ul>
       </section>
 
@@ -267,8 +267,9 @@
 
       <section id="ia">
         <h2>10. Intelligence artificielle (Alto)</h2>
-        <p>RestoSuite intègre un assistant, <strong>Alto</strong>, qui s'appuie sur le modèle <strong>Google Gemini</strong> (hébergé aux États-Unis) pour la saisie vocale et l'aide à la rédaction.</p>
-        <p>Avant tout envoi à Google, vos saisies (messages au chat, dictée vocale) font l'objet d'un <strong>caviardage</strong> : les données personnelles identifiables sont supprimées afin de limiter les informations transmises au modèle.</p>
+        <p>RestoSuite intègre un assistant, <strong>Alto</strong>, qui s'appuie sur le modèle <strong>Google Gemini</strong> (hébergé aux États-Unis) pour la saisie vocale, l'aide à la rédaction et la lecture automatique de documents (scan de factures, bons de livraison et mercuriales).</p>
+        <p>Pour les <strong>textes saisis au chat et la dictée vocale</strong>, vos saisies font l'objet d'un <strong>caviardage</strong> avant envoi : les données personnelles identifiables (emails, téléphones, numéros type carte) sont supprimées afin de limiter les informations transmises au modèle.</p>
+        <p>En revanche, lorsque vous utilisez la <strong>lecture automatique de documents</strong>, l'image ou le PDF que vous téléversez est transmis <strong>tel quel</strong> à Google, sans caviardage possible (l'extraction nécessite le document intact). Ces documents peuvent contenir des données relatives à vos fournisseurs (raison sociale, SIRET, adresse, coordonnées). N'utilisez cette fonction que pour des documents dont vous acceptez le traitement par Google. Pour un traitement strictement européen, cette fonction pourra à l'avenir être basculée sur Google Vertex AI (région UE).</p>
         <p>Les réponses fournies par Alto sont <strong>générées automatiquement par une intelligence artificielle</strong>. Elles sont communiquées à titre indicatif, peuvent contenir des erreurs ou des imprécisions et <strong>ne se substituent pas à un avis professionnel</strong> (notamment en matière sanitaire, réglementaire ou comptable). Cette information vous est délivrée en application de l'obligation de transparence prévue par le règlement européen sur l'intelligence artificielle (EU AI Act, article 50).</p>
       </section>
 

@@ -45,9 +45,14 @@ const PRED_TTL = 4 * 60 * 60 * 1000;
 router.get('/demand', async (req, res) => {
   try {
     const rid = req.user.restaurant_id;
-    const forceRefresh = req.query.refresh === 'true';
-
     const cached = _predCache.get(rid);
+    // refresh=true is honored only past a minimum floor, so a client cannot
+    // bust the cache in a tight loop and issue uncapped Gemini calls (these
+    // routes sit outside the /api/ai rate limiter). Cost-control envelope.
+    const REFRESH_MIN_MS = 5 * 60 * 1000;
+    const forceRefresh = req.query.refresh === 'true'
+      && (!cached || (Date.now() - cached.time) >= REFRESH_MIN_MS);
+
     if (!forceRefresh && cached && (Date.now() - cached.time) < PRED_TTL) {
       return res.json({ ...cached.result, cached: true });
     }

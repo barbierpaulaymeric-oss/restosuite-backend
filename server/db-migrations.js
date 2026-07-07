@@ -1716,6 +1716,32 @@ try {
   console.warn('⚠️ Phase 2 migration error:', e.message);
 }
 
+// ─── Backfill: default HACCP plan for every restaurant that has none ───
+// Before this, the default plan (dangers/CCP/arbre de décision) was seeded once
+// globally and Phase 2 homed it all to restaurant_id=1, leaving every other
+// tenant with an EMPTY plan de maîtrise sanitaire (audit 2026-07-05, critique).
+// Runs AFTER Phase 2 so the haccp_* tables carry restaurant_id. Idempotent.
+try {
+  const restaurantsExists = db.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='restaurants'"
+  ).get();
+  const hazardCols = db.prepare("PRAGMA table_info(haccp_hazard_analysis)").all().map(c => c.name);
+  if (restaurantsExists && hazardCols.includes('restaurant_id')) {
+    const { seedDefaultHaccpPlan } = require('./lib/haccp-default-plan');
+    const restaurants = all('SELECT id FROM restaurants');
+    let seededCount = 0;
+    for (const r of restaurants) {
+      const res = seedDefaultHaccpPlan(db, r.id);
+      if (res.seeded) seededCount++;
+    }
+    if (seededCount > 0) {
+      console.log(`✅ Migration: plan HACCP par défaut semé pour ${seededCount} restaurant(s) sans plan`);
+    }
+  }
+} catch (e) {
+  console.warn('⚠️ Backfill plan HACCP par défaut error:', e.message);
+}
+
 // ─── Supplier portal v2: SKU, TVA, packaging on supplier_catalog ───
 // Each ALTER is wrapped individually so a partial-state DB (one column added,
 // others not) heals on next boot. supplier_notifications is the supplier-side

@@ -16,7 +16,13 @@ const EOL = '\r\n';
 
 function csvCell(v) {
   if (v == null) return '';
-  const s = String(v);
+  let s = String(v);
+  // CSV formula injection (CWE-1236): a cell whose first char is = + - @ (or a
+  // leading TAB / CR) is executed as a formula by Excel/LibreOffice/Sheets when
+  // the file is opened. Tenant free-text (supplier/recipe/ingredient names) flows
+  // into these cells, so a low-privilege user could plant =HYPERLINK(...) / DDE.
+  // Neutralize by prefixing a single quote — the standard OWASP mitigation.
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
   if (/[;"\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
   return s;
 }

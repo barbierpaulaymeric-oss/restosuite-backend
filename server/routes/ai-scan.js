@@ -427,10 +427,11 @@ Si un champ n'est pas visible, mets null. Extrais TOUS les produits listés, mê
       }
     }
 
-    // Try to match supplier
+    // Try to match supplier — tenant-scoped (was unscoped: leaked another
+    // restaurant's supplier names and returned a cross-tenant supplier_id).
     if (parsed.supplier_name) {
-      const supplierMatch = get('SELECT id, name FROM suppliers WHERE LOWER(name) LIKE ? ORDER BY LENGTH(name) LIMIT 1',
-        [`%${parsed.supplier_name.toLowerCase()}%`]);
+      const supplierMatch = get('SELECT id, name FROM suppliers WHERE restaurant_id = ? AND LOWER(name) LIKE ? ORDER BY LENGTH(name) LIMIT 1',
+        [req.user && req.user.restaurant_id, `%${parsed.supplier_name.toLowerCase()}%`]);
       if (supplierMatch) {
         parsed.supplier_id = supplierMatch.id;
         parsed.matched_supplier = supplierMatch.name;

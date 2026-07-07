@@ -629,10 +629,14 @@ router.get('/haccp', (req, res) => {
 router.get('/ai-insights', async (req, res) => {
   try {
     const rid = req.user.restaurant_id;
-    const forceRefresh = req.query.refresh === 'true';
-
     // Return cache if still valid (per-tenant)
     const cached = _insightsCache.get(rid);
+    // refresh=true is honored only past a minimum floor, so it can't be used to
+    // bust the cache in a loop and issue uncapped Gemini calls (this route is
+    // outside the /api/ai rate limiter). Cost-control envelope.
+    const REFRESH_MIN_MS = 5 * 60 * 1000;
+    const forceRefresh = req.query.refresh === 'true'
+      && (!cached || (Date.now() - cached.time) >= REFRESH_MIN_MS);
     if (!forceRefresh && cached && (Date.now() - cached.time) < INSIGHTS_TTL) {
       return res.json({
         insights: cached.insights,

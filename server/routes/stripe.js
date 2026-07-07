@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { get, run } = require('../db');
 const { requireAuth } = require('./auth');
+const { getAccountStatusById } = require('../middleware/trial');
 
 // Stripe is lazy-loaded to avoid crash if not installed yet
 let stripe;
@@ -202,9 +203,13 @@ router.post('/create-checkout', async (req, res) => {
     if (existing) {
       run('UPDATE subscriptions SET stripe_customer_id = ? WHERE account_id = ?', [customerId, accountId]);
     } else {
+      // Placeholder until the checkout.session.completed webhook flips this to
+      // status='active'/plan='pro'. 'incomplete' (not the dead 'free') keeps the
+      // single-plan model coherent: access stays governed by the trial window
+      // via middleware/trial.js until payment confirms.
       run(
         'INSERT INTO subscriptions (account_id, stripe_customer_id, status, plan) VALUES (?, ?, ?, ?)',
-        [accountId, customerId, 'free', 'free']
+        [accountId, customerId, 'incomplete', 'pro']
       );
     }
 
@@ -243,33 +248,19 @@ router.get('/status/:accountId', (req, res) => {
     return res.status(403).json({ error: 'Accès refusé' });
   }
 
-  const sub = get('SELECT * FROM subscriptions WHERE account_id = ?', [targetId]);
-
-  if (!sub) {
-    return res.json({
-      plan: 'free',
-      status: 'free',
-      canCreate: true,
-      limit: 5
-    });
-  }
-
-  // Recipe count scoped to target's tenant (prevents cross-tenant leakage via count).
-  const rid = target.restaurant_id;
-  const recipeCount = rid
-    ? (get('SELECT COUNT(*) as count FROM recipes WHERE restaurant_id = ?', [rid])?.count || 0)
-    : 0;
-  const isFree = sub.plan === 'free' || sub.status !== 'active';
-  const limit = isFree ? 5 : Infinity;
-  const canCreate = recipeCount < limit;
+  // Single-plan model (trial → pro, expired → read-only). The legacy
+  // free / 5-recipe-limit tier is gone: access is governed by the trial window
+  // and Stripe subscription via middleware/trial.js — never a recipe cap.
+  const { status, daysLeft, readOnly } = getAccountStatusById(targetId);
+  const sub = get('SELECT current_period_end FROM subscriptions WHERE account_id = ?', [targetId]);
 
   res.json({
-    plan: sub.plan,
-    status: sub.status,
-    canCreate,
-    limit: isFree ? 5 : null,
-    currentCount: recipeCount,
-    currentPeriodEnd: sub.current_period_end
+    plan: status === 'pro' ? 'pro' : status, // 'pro' | 'trial' | 'expired'
+    status,                                   // 'pro' | 'trial' | 'expired'
+    canCreate: !readOnly,                     // trial & pro can write; expired is read-only
+    daysLeft,
+    readOnly,
+    currentPeriodEnd: sub ? sub.current_period_end : null
   });
 });
 

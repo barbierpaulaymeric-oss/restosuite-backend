@@ -4,13 +4,16 @@
 // Seuils : 63°C min (plats), 70°C (volailles), 75°C (remise en T°)
 // ═══════════════════════════════════════════
 
+// `cat` = canonical product_category sent to the backend so the CCP2 legal
+// minimum is enforced server-side (server/lib/haccp-thresholds.js). Without it
+// the backend falls back to the 63°C baseline and volaille/haché pass too low.
 const COOKING_PRODUCT_PRESETS = [
-  { label: 'Viande rouge / poisson',    target: 63 },
-  { label: 'Porc / agneau',             target: 65 },
-  { label: 'Volaille',                  target: 70 },
-  { label: 'Viande hachée',             target: 70 },
-  { label: 'Produit remis en T° / plat témoin réchauffé', target: 75 },
-  { label: 'Œufs / plats à base d\'œuf', target: 65 },
+  { label: 'Viande rouge / poisson',    target: 63, cat: 'standard' },
+  { label: 'Porc / agneau',             target: 65, cat: 'standard' },
+  { label: 'Volaille',                  target: 70, cat: 'volaille' },       // min légal 65°C
+  { label: 'Viande hachée',             target: 70, cat: 'viande_hachee' },  // min légal 70°C
+  { label: 'Produit remis en T° / plat témoin réchauffé', target: 75, cat: 'remise_temperature' },
+  { label: 'Œufs / plats à base d\'œuf', target: 65, cat: 'standard' },
 ];
 
 async function renderHACCPCooking() {
@@ -165,7 +168,7 @@ async function showCookingModal(editId = null) {
   const nowTime = new Date().toTimeString().slice(0, 5);
 
   const presetOptions = COOKING_PRODUCT_PRESETS.map((p, i) =>
-    `<option value="${p.target}">${p.label} (≥${p.target}°C)</option>`
+    `<option value="${p.target}" data-cat="${p.cat}">${p.label} (≥${p.target}°C)</option>`
   ).join('');
 
   // Autocomplete: recipe names from the user's fiches techniques
@@ -319,10 +322,16 @@ async function showCookingModal(editId = null) {
   targetInput.addEventListener('input', updateComplianceIndicator);
   measuredInput.addEventListener('input', updateComplianceIndicator);
 
+  // Remembers the canonical category of the chosen preset so the backend can
+  // enforce the right CCP2 legal minimum. Custom (no preset) stays null → 63°C.
+  let selectedCookingCategory = existingRecord ? (existingRecord.product_category || null) : null;
   document.getElementById('cook-preset').addEventListener('change', e => {
     if (e.target.value) {
       targetInput.value = e.target.value;
+      selectedCookingCategory = e.target.selectedOptions[0]?.dataset.cat || null;
       updateComplianceIndicator();
+    } else {
+      selectedCookingCategory = null;
     }
   });
 
@@ -373,6 +382,7 @@ async function showCookingModal(editId = null) {
       cooking_time_end: document.getElementById('cook-end').value || null,
       target_temperature,
       measured_temperature,
+      product_category: selectedCookingCategory,
       corrective_action: isCompliant ? null : corrective_action,
       operator: document.getElementById('cook-operator').value.trim() || (account ? account.name : null),
       notes: document.getElementById('cook-notes').value.trim() || null,

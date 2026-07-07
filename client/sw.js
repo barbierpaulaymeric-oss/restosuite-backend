@@ -1,3 +1,7 @@
+// Bumped 2026-07-05 (v62): Audit complet — corrections HACCP (CCP1 réception &
+// CCP2 cuisson désormais actifs, plan de maîtrise sanitaire semé par restaurant),
+// FoodFlow (n° client numérique + message d'envoi honnête), export CSV sécurisé
+// (anti-injection de formule), et cohérence pricing/DA. Rebuild du bundle.
 // Bumped 2026-06-04 (v54): Import de fiches techniques depuis un fichier Excel/CSV
 // — page dédiée #/import-recipes (upload → aperçu éditable → import), modèle
 // Excel téléchargeable, endpoints POST /api/recipes/import(/preview) + GET
@@ -16,7 +20,7 @@
 // restaurateurs trié par date d'inscription avec pastilles d'activité
 // (vert = actif, ambre > 14j, rouge = jamais reconnecté) + compteur de jours
 // depuis la dernière connexion. Le lien Admin de la nav pointe désormais ici.
-const CACHE_NAME = 'restosuite-v61';
+const CACHE_NAME = 'restosuite-v62';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

@@ -135,7 +135,16 @@ router.put('/:id/receive', (req, res) => {
   const rid = req.user.restaurant_id;
   const id = Number(req.params.id);
   const { items, reception_notes } = req.body;
-  const account = req.headers['x-account-id'] ? Number(req.headers['x-account-id']) : null;
+  // "Who received the goods" is a traceability evidentiary field, so it must not
+  // be an unvalidated client header (spoofable). Trust x-account-id only if it
+  // names an account in THIS tenant (a colleague on a shared device); otherwise
+  // fall back to the authenticated user.
+  const claimedAccount = req.headers['x-account-id'] ? Number(req.headers['x-account-id']) : null;
+  let account = req.user.id ?? null;
+  if (claimedAccount) {
+    const ok = get('SELECT 1 FROM accounts WHERE id = ? AND restaurant_id = ?', [claimedAccount, rid]);
+    if (ok) account = claimedAccount;
+  }
 
   const note = get(
     `SELECT dn.*, s.name as supplier_name

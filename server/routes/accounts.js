@@ -20,6 +20,10 @@ function verifyPin(pin, hash) {
   return bcrypt.compareSync(pin, hash);
 }
 
+// Constant-work hash to equalize timing on the legacy PIN-login when the account
+// is unknown (anti-enumeration). Never authenticates anything.
+const DUMMY_ACCOUNT_PIN_HASH = bcrypt.hashSync('0000-timing-equalizer', 10);
+
 const GERANT_PERMISSIONS = {
   view_recipes: true,
   view_costs: true,
@@ -88,13 +92,13 @@ router.post('/login', (req, res) => {
       return res.status(400).json({ error: 'Le PIN doit être 4 chiffres' });
     }
 
+    // Uniform 401 for both unknown id and wrong PIN — a distinct 404 "Compte
+    // introuvable" let an attacker enumerate valid account ids by sequential
+    // integer. Equalize timing with a dummy compare when the account is absent.
     const account = get('SELECT * FROM accounts WHERE id = ?', [id]);
-    if (!account) {
-      return res.status(404).json({ error: 'Compte introuvable' });
-    }
-
-    if (!account.pin || !verifyPin(pin, account.pin)) {
-      return res.status(401).json({ error: 'PIN incorrect' });
+    if (!account || !account.pin || !verifyPin(pin, account.pin)) {
+      if (!account || !account.pin) bcrypt.compareSync(pin.toString(), DUMMY_ACCOUNT_PIN_HASH);
+      return res.status(401).json({ error: 'Identifiants incorrects' });
     }
 
     // Update last_login

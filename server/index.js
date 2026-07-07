@@ -52,14 +52,13 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   // the password (catches "!" mangled by bash history expansion, missing var,
   // wrong host). Run server/scripts/test-imap.js for a full DNS+TLS+auth probe.
   {
+    // Boot diagnostic — never log the mailbox address or any fingerprint of the
+    // password (Render captures stdout). Just whether creds are present. For a
+    // full DNS+TLS+auth probe run server/scripts/test-imap.js on demand.
     const host = process.env.MERCURIALE_IMAP_HOST || 'ssl0.ovh.net';
     const port = Number(process.env.MERCURIALE_IMAP_PORT) || 993;
-    const email = process.env.MERCURIALE_EMAIL || '(unset)';
-    const pass = process.env.MERCURIALE_PASSWORD || '';
-    const passInfo = pass
-      ? `set (len=${pass.length}, head="${pass.slice(0, 3)}", tail="${pass.slice(-3)}")`
-      : 'UNSET';
-    console.log(`📧 Mercuriale IMAP config: host=${host} port=${port} user=${email} password=${passInfo}`);
+    const credsSet = !!(process.env.MERCURIALE_EMAIL && process.env.MERCURIALE_PASSWORD);
+    console.log(`📧 Mercuriale IMAP: host=${host} port=${port} credentials=${credsSet ? 'set' : 'UNSET'}`);
   }
   try {
     require('./lib/mercuriale-mail/poller').startPoller();

@@ -184,6 +184,28 @@ router.post('/temperatures', (req, res) => {
     try {
       writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'temperature_logs', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: log });
     } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
+    // An out-of-range temperature is a deviation that a DDPP inspector expects
+    // to see documented, not just a red row. Open a non-conformité (deduped to
+    // one OPEN row per zone so repeated readings don't spam) so the deviation
+    // enters the corrective-action workflow.
+    if (isAlert) {
+      try {
+        const ncTitle = `Température hors limite : ${zone.name}`;
+        const existingOpen = get(
+          `SELECT id FROM non_conformities WHERE restaurant_id = ? AND title = ? AND status != 'clos' AND status != 'resolu' LIMIT 1`,
+          [rid, ncTitle]
+        );
+        if (!existingOpen) {
+          run(
+            `INSERT INTO non_conformities (restaurant_id, title, description, category, severity, detected_by)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [rid, ncTitle,
+             `Relevé ${temperature}°C hors des limites (${zone.min_temp}°C à ${zone.max_temp}°C) pour « ${zone.name} ». Action corrective requise (contrôle de l'équipement, transfert des denrées, maintenance).`,
+             'temperature', 'majeure', req.user.id ?? null]
+          );
+        }
+      } catch (ncErr) { console.error('auto non-conformité (température) failed:', ncErr.message); }
+    }
     res.status(201).json(log);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -332,29 +354,41 @@ router.post('/cleaning/:id/done', (req, res) => {
 router.get('/cleaning/today', (req, res) => {
   const rid = req.user.restaurant_id;
   const today = new Date().toISOString().slice(0, 10);
-  const dayOfWeek = new Date().getDay(); // 0=Sunday
-  const dayOfMonth = new Date().getDate();
+  // Period starts, so weekly/monthly obligations are due until they're actually
+  // completed within the current period — NOT only on a fixed calendar day.
+  // A restaurant closed on Monday used to silently lose its weekly cleaning duty.
+  const d = new Date(today + 'T00:00:00Z');
+  const dow = d.getUTCDay(); // 0=Sunday..6=Saturday
+  const backToMonday = dow === 0 ? 6 : dow - 1;
+  const weekStart = new Date(d.getTime() - backToMonday * 86400000).toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 7) + '-01';
 
   const tasks = all('SELECT * FROM cleaning_tasks WHERE restaurant_id = ? ORDER BY zone, name', [rid]);
-  const result = tasks.filter(task => {
-    if (task.frequency === 'daily') return true;
-    if (task.frequency === 'weekly') return dayOfWeek === 1; // Monday
-    if (task.frequency === 'monthly') return dayOfMonth === 1; // 1st of month
-    return true;
-  }).map(task => {
+  const result = tasks.map(task => {
+    // "Done for the relevant period" — today for daily, this ISO week for weekly,
+    // this month for monthly.
+    const periodStart = task.frequency === 'weekly' ? weekStart
+      : task.frequency === 'monthly' ? monthStart
+      : today;
     const lastDone = get(`
       SELECT cl.*, a.name as completed_by_name
       FROM cleaning_logs cl
       LEFT JOIN accounts a ON a.id = cl.completed_by
-      WHERE cl.task_id = ? AND cl.restaurant_id = ? AND date(cl.completed_at) = date(?)
+      WHERE cl.task_id = ? AND cl.restaurant_id = ? AND date(cl.completed_at) >= date(?)
       ORDER BY cl.completed_at DESC LIMIT 1
-    `, [task.id, rid, today]);
+    `, [task.id, rid, periodStart]);
     return {
       ...task,
-      done_today: !!lastDone,
+      done_today: !!lastDone,          // kept for client compatibility (= done this period)
+      done_this_period: !!lastDone,
       done_by: lastDone ? lastDone.completed_by_name : null,
       done_at: lastDone ? lastDone.completed_at : null
     };
+  }).filter(task => {
+    // Daily always shows. Weekly/monthly show every day until fulfilled for the
+    // period, so a periodic obligation is never dropped by a closed day.
+    if (task.frequency === 'daily') return true;
+    return !task.done_this_period;
   });
 
   const total = result.length;
@@ -389,7 +423,13 @@ router.post('/traceability', (req, res) => {
   // CCP1 reception: validate temperature against product-category legal thresholds
   //  (Arrêté 21/12/2009 Annexe IV — viande ≤4°C, surgelés ≤-18°C, mer ≤2°C, etc.)
   const tempCheck = validateReceptionTemp(product_category || null, temperature_at_reception);
-  if (!tempCheck.ok) return res.status(400).json({ error: tempCheck.error });
+  // Bad input (non-number / out of physical range) → reject. But a genuine
+  // cold-chain deviation (exceeded) must stay RECORDABLE: we log it and open a
+  // documented non-conformité rather than blocking the operator from tracing it.
+  if (!tempCheck.ok && !tempCheck.exceeded) {
+    return res.status(400).json({ error: tempCheck.error });
+  }
+  const ccp1Deviation = tempCheck.exceeded ? tempCheck.error : null;
   const info = run(
     `INSERT INTO traceability_logs (restaurant_id, product_name, supplier, batch_number, dlc, ddm, temperature_at_reception, quantity, unit, received_by, notes, etat_emballage, conformite_organoleptique, numero_bl, product_category)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -397,6 +437,19 @@ router.post('/traceability', (req, res) => {
      temperature_at_reception ?? null, quantity ?? null, unit || 'kg', received_by || null, notes || null,
      etat_emballage || null, conformite_organoleptique || null, numero_bl || null, product_category || null]
   );
+  // Document the CCP1 deviation as an open non-conformité (mirrors the fryer
+  // corrective-action flow) so a DDPP inspector sees a traced deviation workflow.
+  if (ccp1Deviation) {
+    try {
+      run(
+        `INSERT INTO non_conformities (restaurant_id, title, description, category, severity, detected_by)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [rid, `Réception non conforme : ${product_name}`,
+         `${ccp1Deviation} Lot ${batch_number || '—'}, fournisseur ${supplier || '—'}, BL ${numero_bl || '—'}.`,
+         'temperature', 'majeure', req.user.id ?? null]
+      );
+    } catch (ncErr) { console.error('auto non-conformité (réception CCP1) failed:', ncErr.message); }
+  }
   const log = get(`
     SELECT tl.*, a.name as received_by_name
     FROM traceability_logs tl
@@ -406,7 +459,7 @@ router.post('/traceability', (req, res) => {
   try {
     writeAudit({ restaurant_id: rid, account_id: req.user.id ?? null, table_name: 'traceability_logs', record_id: info.lastInsertRowid, action: 'create', old_values: null, new_values: log });
   } catch (auditErr) { console.error('audit_log write failed:', auditErr); }
-  res.status(201).json(log);
+  res.status(201).json(ccp1Deviation ? { ...log, ccp1_deviation: ccp1Deviation } : log);
 });
 
 router.get('/traceability/dlc-alerts', requireAuth, (req, res) => {

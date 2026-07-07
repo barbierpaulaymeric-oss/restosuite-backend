@@ -602,27 +602,38 @@ async function submitPurchaseOrder(sendImmediately) {
   }
 }
 
-// Builds the message after a PO transitions to 'envoyée'. When the supplier has
-// a FoodFlow integration, surface the external_id (client number) so the
-// restaurateur sees their identifier was transmitted. When the supplier has no
-// email, warn explicitly — otherwise a silently-skipped send reads as success
-// and the restaurateur believes the supplier received the order.
+// Builds the message after a PO transitions to 'envoyée'. Honesty matters here:
+// the order actually reaches the supplier by EMAIL (the FoodFlow "integration"
+// only records/attaches the client number — it makes no live API call). So the
+// copy names the real channel and never claims a provider transmission that
+// didn't happen. When no email can be sent, say so plainly.
 function buildOrderSentMessage(sent) {
   const dispatch = sent && sent.dispatch;
   const email = sent && sent.email_dispatch;
-  let base;
-  if (dispatch && dispatch.ok && dispatch.external_id) {
-    const provider = dispatch.provider === 'foodflow' ? 'FoodFlow' : (dispatch.provider || '');
-    base = provider
-      ? `Commande envoyée — identifiant ${provider} ${dispatch.external_id} transmis`
-      : `Commande envoyée — identifiant ${dispatch.external_id} transmis`;
-  } else {
-    base = 'Commande envoyée';
+  const clientRef = dispatch && dispatch.ok && dispatch.external_id ? dispatch.external_id : null;
+
+  // Nothing actually left the system → don't imply delivery.
+  if (email && email.attempted === false) {
+    if (email.reason === 'no_supplier_email') {
+      return "Commande enregistrée, mais AUCUN email n'a été envoyé : ce fournisseur n'a pas d'adresse email. Ajoutez-la dans Fournisseurs pour l'envoi automatique.";
+    }
+    if (email.reason === 'mailbox_not_configured') {
+      return "Commande enregistrée. L'envoi automatique par email n'est pas configuré — transmettez-la à votre fournisseur manuellement.";
+    }
+    return 'Commande enregistrée (aucun envoi automatique).';
   }
-  if (email && email.attempted === false && email.reason === 'no_supplier_email') {
-    return "Commande marquée envoyée, mais AUCUN email n'a été transmis : ce fournisseur n'a pas d'adresse email. Ajoutez-la dans Fournisseurs pour l'envoi automatique.";
+
+  // Email is the real delivery channel; the client number is attached to it.
+  if (email && email.attempted === true) {
+    const to = email.to ? ` à ${email.to}` : '';
+    return clientRef
+      ? `Commande envoyée par email${to} — votre n° client ${clientRef} y est joint.`
+      : `Commande envoyée par email${to}.`;
   }
-  return base;
+
+  return clientRef
+    ? `Commande envoyée — n° client ${clientRef} joint.`
+    : 'Commande envoyée.';
 }
 
 // True when the order was marked sent but no email could actually be dispatched.

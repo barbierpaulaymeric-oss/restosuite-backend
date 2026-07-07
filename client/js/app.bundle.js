@@ -8183,12 +8183,14 @@ function showCoolingUpdateModal(id, productName) {
   });
 }
 const COOKING_PRODUCT_PRESETS = [
-  { label: "Viande rouge / poisson", target: 63 },
-  { label: "Porc / agneau", target: 65 },
-  { label: "Volaille", target: 70 },
-  { label: "Viande hach\xE9e", target: 70 },
-  { label: "Produit remis en T\xB0 / plat t\xE9moin r\xE9chauff\xE9", target: 75 },
-  { label: "\u0152ufs / plats \xE0 base d'\u0153uf", target: 65 }
+  { label: "Viande rouge / poisson", target: 63, cat: "standard" },
+  { label: "Porc / agneau", target: 65, cat: "standard" },
+  { label: "Volaille", target: 70, cat: "volaille" },
+  // min légal 65°C
+  { label: "Viande hach\xE9e", target: 70, cat: "viande_hachee" },
+  // min légal 70°C
+  { label: "Produit remis en T\xB0 / plat t\xE9moin r\xE9chauff\xE9", target: 75, cat: "remise_temperature" },
+  { label: "\u0152ufs / plats \xE0 base d'\u0153uf", target: 65, cat: "standard" }
 ];
 async function renderHACCPCooking() {
   const app = document.getElementById("app");
@@ -8330,7 +8332,7 @@ async function showCookingModal(editId = null) {
   const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   const nowTime = (/* @__PURE__ */ new Date()).toTimeString().slice(0, 5);
   const presetOptions = COOKING_PRODUCT_PRESETS.map(
-    (p, i) => `<option value="${p.target}">${p.label} (\u2265${p.target}\xB0C)</option>`
+    (p, i) => `<option value="${p.target}" data-cat="${p.cat}">${p.label} (\u2265${p.target}\xB0C)</option>`
   ).join("");
   let recipeOptions = "";
   try {
@@ -8480,10 +8482,15 @@ async function showCookingModal(editId = null) {
   }
   targetInput.addEventListener("input", updateComplianceIndicator);
   measuredInput.addEventListener("input", updateComplianceIndicator);
+  let selectedCookingCategory = existingRecord ? existingRecord.product_category || null : null;
   document.getElementById("cook-preset").addEventListener("change", (e) => {
+    var _a;
     if (e.target.value) {
       targetInput.value = e.target.value;
+      selectedCookingCategory = ((_a = e.target.selectedOptions[0]) == null ? void 0 : _a.dataset.cat) || null;
       updateComplianceIndicator();
+    } else {
+      selectedCookingCategory = null;
     }
   });
   if (existingRecord && existingRecord.is_compliant === 0 && existingRecord.corrective_action) {
@@ -8527,6 +8534,7 @@ async function showCookingModal(editId = null) {
       cooking_time_end: document.getElementById("cook-end").value || null,
       target_temperature,
       measured_temperature,
+      product_category: selectedCookingCategory,
       corrective_action: isCompliant ? null : corrective_action,
       operator: document.getElementById("cook-operator").value.trim() || (account ? account.name : null),
       notes: document.getElementById("cook-notes").value.trim() || null
@@ -16438,17 +16446,21 @@ async function submitPurchaseOrder(sendImmediately) {
 function buildOrderSentMessage(sent) {
   const dispatch = sent && sent.dispatch;
   const email = sent && sent.email_dispatch;
-  let base;
-  if (dispatch && dispatch.ok && dispatch.external_id) {
-    const provider = dispatch.provider === "foodflow" ? "FoodFlow" : dispatch.provider || "";
-    base = provider ? `Commande envoy\xE9e \u2014 identifiant ${provider} ${dispatch.external_id} transmis` : `Commande envoy\xE9e \u2014 identifiant ${dispatch.external_id} transmis`;
-  } else {
-    base = "Commande envoy\xE9e";
+  const clientRef = dispatch && dispatch.ok && dispatch.external_id ? dispatch.external_id : null;
+  if (email && email.attempted === false) {
+    if (email.reason === "no_supplier_email") {
+      return "Commande enregistr\xE9e, mais AUCUN email n'a \xE9t\xE9 envoy\xE9 : ce fournisseur n'a pas d'adresse email. Ajoutez-la dans Fournisseurs pour l'envoi automatique.";
+    }
+    if (email.reason === "mailbox_not_configured") {
+      return "Commande enregistr\xE9e. L'envoi automatique par email n'est pas configur\xE9 \u2014 transmettez-la \xE0 votre fournisseur manuellement.";
+    }
+    return "Commande enregistr\xE9e (aucun envoi automatique).";
   }
-  if (email && email.attempted === false && email.reason === "no_supplier_email") {
-    return "Commande marqu\xE9e envoy\xE9e, mais AUCUN email n'a \xE9t\xE9 transmis : ce fournisseur n'a pas d'adresse email. Ajoutez-la dans Fournisseurs pour l'envoi automatique.";
+  if (email && email.attempted === true) {
+    const to = email.to ? ` \xE0 ${email.to}` : "";
+    return clientRef ? `Commande envoy\xE9e par email${to} \u2014 votre n\xB0 client ${clientRef} y est joint.` : `Commande envoy\xE9e par email${to}.`;
   }
-  return base;
+  return clientRef ? `Commande envoy\xE9e \u2014 n\xB0 client ${clientRef} joint.` : "Commande envoy\xE9e.";
 }
 function orderSentWithoutEmail(sent) {
   const email = sent && sent.email_dispatch;
