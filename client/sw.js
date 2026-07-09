@@ -1,3 +1,6 @@
+// Bumped 2026-07-05 (v64): TVA franchise en base (art. 293 B) — retrait TTC/20%
+// dans CGV, landing, mentions ; prix affiché « 39€ HT » dans l'app (subscribe, app.js).
+// + identité Android régénérée en vert (icônes/splash), config signature release.
 // Bumped 2026-07-05 (v63): Homogénéité — CGV nettoyée (retrait du « Plan Business »
 // fantôme), chiffres marketing fidèles (23 modules HACCP au lieu de 9, 35 modules
 // intégrés), SEO blog corrigé (« restaurateurs »), copyright landing aligné au légal.
@@ -23,7 +26,7 @@
 // restaurateurs trié par date d'inscription avec pastilles d'activité
 // (vert = actif, ambre > 14j, rouge = jamais reconnecté) + compteur de jours
 // depuis la dernière connexion. Le lien Admin de la nav pointe désormais ici.
-const CACHE_NAME = 'restosuite-v63';
+const CACHE_NAME = 'restosuite-v64';
 const STATIC_ASSETS = [
   '/app',
   '/css/style.css',

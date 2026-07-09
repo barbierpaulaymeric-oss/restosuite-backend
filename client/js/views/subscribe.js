@@ -38,7 +38,7 @@ function renderSubscribe() {
 
         <div class="subscribe-price">
           <span class="subscribe-amount">39€</span>
-          <span class="subscribe-period">/mois · Sans engagement</span>
+          <span class="subscribe-period">HT/mois · Sans engagement</span>
         </div>
 
         <button class="btn btn-primary subscribe-btn" id="subscribe-now">

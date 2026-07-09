@@ -26295,7 +26295,7 @@ function renderSubscribe() {
 
         <div class="subscribe-price">
           <span class="subscribe-amount">39\u20AC</span>
-          <span class="subscribe-period">/mois \xB7 Sans engagement</span>
+          <span class="subscribe-period">HT/mois \xB7 Sans engagement</span>
         </div>
 
         <button class="btn btn-primary subscribe-btn" id="subscribe-now">
@@ -32285,7 +32285,7 @@ function renderTrialBanner() {
     bannerHTML = `
       <div class="trial-banner trial-banner--expired">
         <span>Votre essai gratuit est termin\xE9. Vos donn\xE9es sont en lecture seule.</span>
-        <a href="#/subscribe" class="btn btn-primary btn-sm">Passer en Pro \u2014 39\u20AC/mois</a>
+        <a href="#/subscribe" class="btn btn-primary btn-sm">Passer en Pro \u2014 39\u20AC HT/mois</a>
       </div>
     `;
   } else if (status.status === "trial") {

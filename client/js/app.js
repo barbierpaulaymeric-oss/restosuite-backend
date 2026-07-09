@@ -269,7 +269,7 @@ function renderTrialBanner() {
     bannerHTML = `
       <div class="trial-banner trial-banner--expired">
         <span>Votre essai gratuit est terminé. Vos données sont en lecture seule.</span>
-        <a href="#/subscribe" class="btn btn-primary btn-sm">Passer en Pro — 39€/mois</a>
+        <a href="#/subscribe" class="btn btn-primary btn-sm">Passer en Pro — 39€ HT/mois</a>
       </div>
     `;
   } else if (status.status === 'trial') {
