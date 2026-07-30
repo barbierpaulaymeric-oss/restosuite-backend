@@ -18,7 +18,7 @@ const SEVERITY_CONFIG = {
 
 function statusBadge(status) {
   const c = PMS_STATUS_CONFIG[status] || { color: '#888', bg: '#f5f5f5', label: status };
-  return `<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:600;color:${c.color};background:${c.bg};border:1px solid ${c.color}33">${c.label}</span>`;
+  return `<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:600;color:${c.color};background:${c.bg};border:1px solid ${c.color}33">${escapeHtml(c.label)}</span>`;
 }
 
 function scoreColor(score) {
@@ -114,11 +114,11 @@ async function renderHACCPPmsAudit() {
                 <div style="border:1px solid var(--color-border,#e0e0e0);border-radius:8px;overflow:hidden">
                   <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--color-bg-secondary,#f8f9fa);flex-wrap:wrap">
                     <span style="font-weight:700;font-size:15px">${new Date(item.audit_date).toLocaleDateString('fr-FR')}</span>
-                    <span class="text-sm text-secondary">${item.audit_type === 'interne' ? '🏠 Interne' : '🏢 Externe'} · ${item.scope}</span>
+                    <span class="text-sm text-secondary">${item.audit_type === 'interne' ? '🏠 Interne' : '🏢 Externe'} · ${escapeHtml(item.scope)}</span>
                     <span class="text-sm">${escapeHtml(item.auditor_name)}</span>
                     ${statusBadge(item.status)}
                     ${item.overall_score !== null ? `
-                      <span style="margin-left:auto;font-size:22px;font-weight:800;color:${scoreColor(item.overall_score)}">${item.overall_score}<span style="font-size:13px;color:var(--color-text-secondary,#888)">/100</span></span>
+                      <span style="margin-left:auto;font-size:22px;font-weight:800;color:${scoreColor(item.overall_score)}">${escapeHtml(item.overall_score)}<span style="font-size:13px;color:var(--color-text-secondary,#888)">/100</span></span>
                     ` : '<span style="margin-left:auto;color:#888;font-size:13px">Score N/A</span>'}
                     <div style="display:flex;gap:6px">
                       <button class="btn btn-ghost btn-sm" onclick="openPmsAuditModal(${item.id})"><i data-lucide="edit-2" style="width:14px;height:14px"></i></button>
@@ -148,7 +148,7 @@ async function renderHACCPPmsAudit() {
                             <tr>
                               <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0);font-weight:600">${escapeHtml(f.section)}</td>
                               <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0)">${escapeHtml(f.finding)}</td>
-                              <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0);text-align:center;color:${sc.color};font-weight:600;white-space:nowrap">${sc.label}</td>
+                              <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0);text-align:center;color:${sc.color};font-weight:600;white-space:nowrap">${escapeHtml(sc.label)}</td>
                               <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0);color:var(--color-text-secondary,#666)">${escapeHtml(f.action_required || '—')}</td>
                             </tr>
                           `;

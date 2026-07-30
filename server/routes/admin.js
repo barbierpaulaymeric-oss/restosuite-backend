@@ -122,6 +122,89 @@ router.get('/stats', (req, res) => {
   }
 });
 
+// ─── GET /api/admin/funnel ───
+// Funnel agrégé côté serveur : comptes créés → première fiche → activation →
+// Checkout démarré → abonnement payé, plus la répartition par source
+// d'acquisition. Les taux ne sont renvoyés que si le dénominateur est fiable
+// (>= 5) — en dessous, l'UI affiche les valeurs absolues seulement.
+// Les clics landing/CTA vivent dans Umami (client, consentement) : ils ne sont
+// PAS additionnés ici pour ne pas mélanger deux référentiels.
+router.get('/funnel', (req, res) => {
+  try {
+    const dm = demoMatch('a.email');
+
+    const accountsCreated = get(`
+      SELECT COUNT(*) AS c FROM accounts a
+      WHERE a.is_owner = 1 AND NOT ${dm.sql}
+    `, dm.params).c;
+
+    const firstRecipe = get(`
+      SELECT COUNT(*) AS c FROM accounts a
+      WHERE a.is_owner = 1 AND a.first_recipe_at IS NOT NULL AND NOT ${dm.sql}
+    `, dm.params).c;
+
+    const activated = get(`
+      SELECT COUNT(*) AS c FROM accounts a
+      WHERE a.is_owner = 1 AND a.activated_at IS NOT NULL AND NOT ${dm.sql}
+    `, dm.params).c;
+
+    // Checkouts démarrés : lignes subscriptions créées (incomplete ou mieux)
+    const checkoutStarted = get(`
+      SELECT COUNT(DISTINCT s.account_id) AS c FROM subscriptions s
+      JOIN accounts a ON a.id = s.account_id
+      WHERE NOT ${dm.sql}
+    `, dm.params).c;
+
+    const paid = get(`
+      SELECT COUNT(DISTINCT s.account_id) AS c FROM subscriptions s
+      JOIN accounts a ON a.id = s.account_id
+      WHERE s.status = 'active' AND NOT ${dm.sql}
+    `, dm.params).c;
+
+    const bySource = all(`
+      SELECT COALESCE(NULLIF(a.acquisition_source, ''), 'inconnue') AS source, COUNT(*) AS count
+      FROM accounts a
+      WHERE a.is_owner = 1 AND NOT ${dm.sql}
+      GROUP BY COALESCE(NULLIF(a.acquisition_source, ''), 'inconnue')
+      ORDER BY count DESC
+    `, dm.params);
+
+    // Événements produit des 30 derniers jours (table product_events, sans PII)
+    const recentEvents = all(`
+      SELECT event, COUNT(*) AS count
+      FROM product_events
+      WHERE created_at >= datetime('now', '-30 days')
+      GROUP BY event
+      ORDER BY count DESC
+    `);
+
+    const MIN_DENOMINATOR = 5;
+    const rate = (num, den) => (den >= MIN_DENOMINATOR ? Math.round((num / den) * 1000) / 10 : null);
+
+    res.json({
+      funnel: {
+        accounts_created: accountsCreated,
+        first_recipe: firstRecipe,
+        activated,
+        checkout_started: checkoutStarted,
+        paid,
+      },
+      rates: {
+        // null = dénominateur trop faible pour un taux fiable
+        activation: rate(activated, accountsCreated),
+        checkout: rate(checkoutStarted, activated),
+        paid: rate(paid, accountsCreated),
+      },
+      by_source: bySource,
+      recent_events_30d: recentEvents,
+      note: 'Clics landing/CTA : voir Umami (mesure client soumise au consentement, référentiel distinct).',
+    });
+  } catch (e) {
+    console.error('Admin /funnel error:', e);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // ─── GET /api/admin/restaurants ───
 router.get('/restaurants', (req, res) => {
   try {

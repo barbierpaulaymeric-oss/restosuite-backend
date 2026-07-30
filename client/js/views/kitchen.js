@@ -276,12 +276,12 @@ function _kdsTicketHTML(ticket, lane) {
   return `
     <article class="kds-ticket ${urgent} ${fresh} ${allergyClass}" data-created-at="${o.created_at}">
       <header class="kds-ticket__head">
-        <span class="kds-ticket__table">T${o.table_number}</span>
+        <span class="kds-ticket__table">T${escapeHtml(o.table_number)}</span>
         <span class="kds-ticket__id">#${o.id}</span>
         <span class="kds-ticket__timer" data-created-at="${o.created_at}">${elapsed}′</span>
       </header>
       <div class="kds-ticket__body">
-        <div class="kds-ticket__qty">${it.quantity}×</div>
+        <div class="kds-ticket__qty">${escapeHtml(it.quantity)}×</div>
         <div class="kds-ticket__name">${escapeHtml(it.recipe_name || '?')}</div>
       </div>
       ${seatBadges}

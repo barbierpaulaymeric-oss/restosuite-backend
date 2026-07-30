@@ -89,7 +89,7 @@ async function renderSupplierIntegrations() {
             ${integ.last_sync_error ? `<div style="color:var(--color-warn)">${escapeHtml(integ.last_sync_error)}</div>` : ''}
           </div>
           <div style="display:flex;gap:var(--space-2);margin-top:var(--space-3);flex-wrap:wrap">
-            <button class="btn btn-secondary" onclick="showSupplierIntegrationSync(${integ.id}, '${escapeHtml(s.name)}')">
+            <button class="btn btn-secondary" data-sync-integ="${integ.id}" data-supplier-name="${escapeHtml(s.name)}">
               <i data-lucide="refresh-ccw" style="width:16px;height:16px"></i> Synchroniser
             </button>
             <button class="btn btn-secondary" onclick="disconnectSupplierIntegration(${integ.id})">
@@ -106,7 +106,7 @@ async function renderSupplierIntegrations() {
           <span class="badge badge-muted" data-ui="custom">Non connecté</span>
         </div>
         <div style="margin-top:var(--space-3)">
-          <button class="btn btn-primary" onclick="showSupplierIntegrationConnect(${s.id}, '${escapeHtml(s.name)}')">
+          <button class="btn btn-primary" data-connect-supplier="${s.id}" data-supplier-name="${escapeHtml(s.name)}">
             <i data-lucide="plug" style="width:16px;height:16px"></i> Connecter à FoodFlow
           </button>
         </div>
@@ -114,6 +114,21 @@ async function renderSupplierIntegrations() {
     `;
   }).join('');
   lucide.createIcons();
+
+  // Nom de fournisseur (contrôlable par tout compte du restaurant) passé par
+  // data-attribut + addEventListener, jamais en onclick inline : dans un onclick
+  // escapeHtml échoue (le navigateur redécode &#39; en ' avant de compiler le
+  // handler → chaîne refermée → XSS). Audit 2026-07-30.
+  listEl.querySelectorAll('[data-sync-integ]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      showSupplierIntegrationSync(Number(btn.dataset.syncInteg), btn.dataset.supplierName || '');
+    });
+  });
+  listEl.querySelectorAll('[data-connect-supplier]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      showSupplierIntegrationConnect(Number(btn.dataset.connectSupplier), btn.dataset.supplierName || '');
+    });
+  });
 }
 
 function showSupplierIntegrationConnect(supplierId, supplierName) {

@@ -1,15 +1,21 @@
 'use strict';
 // ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ EXPÉRIMENTAL — NON UTILISÉ EN PRODUCTION (constat audit 2026-07-30).
+//
+// Aucun module ne require ce fichier : les ~100 modules serveur utilisent
+// directement ./db.js (better-sqlite3), et c'est la décision d'architecture
+// actuelle — SQLite chiffré sur disque persistant, PostgreSQL uniquement si le
+// multi-site ou la montée en charge le justifie (voir RESTOSUITE.md
+// « Persistance » et docs/POSTGRESQL_MIGRATION.md). PostgreSQL n'est PAS
+// pris en charge aujourd'hui ; ce fichier est conservé comme esquisse
+// d'interface pour une future migration, rien de plus.
+//
 // DB adapter — forward-compatible database interface.
 //
-// Today this is a thin wrapper around ./db.js (better-sqlite3). When we
-// migrate to PostgreSQL, only this file needs to change: swap the sqlite
-// handle for a `pg` Pool and rewrite the four helpers. Callers see the same
-// API (query/get/run/all + transaction).
-//
-// Current call sites still use `require('./db')` directly. That is fine —
-// migrating them is part of the PostgreSQL cutover (see
-// docs/POSTGRESQL_MIGRATION.md). New code should prefer this adapter.
+// Thin wrapper around ./db.js (better-sqlite3). When we migrate to PostgreSQL,
+// only this file needs to change: swap the sqlite handle for a `pg` Pool and
+// rewrite the four helpers. Callers see the same API (query/get/run/all +
+// transaction).
 //
 // Parameter style: `?` placeholders (sqlite-native). The adapter will
 // translate `?` → `$1, $2, …` when the driver is switched to `pg`.

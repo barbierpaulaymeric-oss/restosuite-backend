@@ -23,11 +23,11 @@ async function renderServiceHoursSettings() {
         <div style="display:flex;gap:18px;flex-wrap:wrap">
           <label style="flex:1;min-width:180px">
             <span style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px">Heure de début</span>
-            <input type="time" id="svc-hours-start" class="form-control" value="${config.service_start || '11:30'}" lang="fr" style="font-size:1.25rem;text-align:center">
+            <input type="time" id="svc-hours-start" class="form-control" value="${escapeHtml(config.service_start || '11:30')}" lang="fr" style="font-size:1.25rem;text-align:center">
           </label>
           <label style="flex:1;min-width:180px">
             <span style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px">Heure de fin</span>
-            <input type="time" id="svc-hours-end" class="form-control" value="${config.service_end || '14:30'}" lang="fr" style="font-size:1.25rem;text-align:center">
+            <input type="time" id="svc-hours-end" class="form-control" value="${escapeHtml(config.service_end || '14:30')}" lang="fr" style="font-size:1.25rem;text-align:center">
           </label>
         </div>
 

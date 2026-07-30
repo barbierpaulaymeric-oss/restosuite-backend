@@ -55,7 +55,7 @@ async function renderHACCPTIAC() {
               <div class="card" style="border-left:4px solid ${statutColors[p.statut] || 'var(--border-light)'}">
                 <div class="card-header">
                   <span class="card-title">${escapeHtml(new Date(p.date_incident).toLocaleDateString('fr-FR'))} — ${escapeHtml(p.nb_personnes)} personne(s) touchée(s)</span>
-                  <span class="badge" style="background:${statutColors[p.statut] || 'var(--color-info)'};color:white;font-size:11px;padding:2px 8px;border-radius:20px">${statutLabels[p.statut] || p.statut}</span>
+                  <span class="badge" style="background:${statutColors[p.statut] || 'var(--color-info)'};color:white;font-size:11px;padding:2px 8px;border-radius:20px">${escapeHtml(statutLabels[p.statut] || p.statut)}</span>
                 </div>
                 <p class="text-sm" style="margin:var(--space-2) 0">${escapeHtml(p.description)}</p>
                 ${p.aliments_suspects ? `<p class="text-secondary text-sm">🍽️ <strong>Aliments suspects :</strong> ${escapeHtml(p.aliments_suspects)}</p>` : ''}

@@ -3,6 +3,26 @@ const { all, get, run } = require('../db');
 const { requireAuth } = require('./auth');
 const router = Router();
 
+// ─── Feature flag multi-site (désactivé par défaut) ───────────────────────
+// Décision produit 2026-07-30 : le multi-site n'est PAS prêt (le modèle de
+// données ne rattache pas les nouveaux établissements au compte créateur, ils
+// deviennent invisibles). Tant que MULTISITE_ENABLED !== 'true', la CRÉATION
+// et la modification de sites sont refusées (403) pour empêcher toute donnée
+// orpheline. Les lectures restent inoffensives (mono-site, filtrées par tenant)
+// et alimentent l'écran « Bientôt disponible » côté client. Réactivation =
+// implémenter la vraie tenancy (org ↔ sites) PUIS passer le flag à 'true'.
+const MULTISITE_ENABLED = process.env.MULTISITE_ENABLED === 'true';
+
+function requireMultisiteEnabled(req, res, next) {
+  if (!MULTISITE_ENABLED) {
+    return res.status(403).json({
+      error: 'La gestion multi-établissements n\'est pas encore disponible.',
+      code: 'MULTISITE_DISABLED',
+    });
+  }
+  next();
+}
+
 router.use(requireAuth);
 
 // ═══════════════════════════════════════════
@@ -63,9 +83,9 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /api/sites — Créer un nouveau site
-// Optionally accepts tables[], zones[], suppliers[] for one-shot full setup
-// (mirroring the onboarding wizard for the user's first restaurant).
-router.post('/', (req, res) => {
+// GARDÉ derrière le feature flag : sans MULTISITE_ENABLED=true, renvoie 403
+// (empêche la création d'un restaurant orphelin invisible à son créateur).
+router.post('/', requireMultisiteEnabled, (req, res) => {
   try {
     const { name, type, address, city, postal_code, phone, covers, siret, tables, zones, suppliers } = req.body;
     if (!name) return res.status(400).json({ error: 'Nom requis' });
@@ -113,8 +133,8 @@ router.post('/', (req, res) => {
   }
 });
 
-// PUT /api/sites/:id — Modifier un site
-router.put('/:id', (req, res) => {
+// PUT /api/sites/:id — Modifier un site (gardé derrière le feature flag)
+router.put('/:id', requireMultisiteEnabled, (req, res) => {
   try {
     const rid = req.user.restaurant_id;
     const id = Number(req.params.id);
@@ -143,8 +163,8 @@ router.put('/:id', (req, res) => {
   }
 });
 
-// DELETE /api/sites/:id — Supprimer un site
-router.delete('/:id', (req, res) => {
+// DELETE /api/sites/:id — Supprimer un site (gardé derrière le feature flag)
+router.delete('/:id', requireMultisiteEnabled, (req, res) => {
   try {
     const rid = req.user.restaurant_id;
     const id = Number(req.params.id);

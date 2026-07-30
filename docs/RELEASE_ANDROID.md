@@ -17,13 +17,22 @@
   ronde, et splash (disque vert sur fond pine) **régénérés depuis la source verte**
   via `@capacitor/assets`. L'ancien bleu/cuivre et le template Capacitor teal+robot
   sont supprimés.
-- Bloc `signingConfigs.release` ajouté dans `android/app/build.gradle`, **guardé** :
-  sans `keystore.properties`, rien ne change (les builds debug marchent comme avant).
-- `keystore.properties`, `*.jks`, `*.keystore` ajoutés au `.gitignore`.
+- Bloc `signingConfigs.release` dans `android/app/build.gradle`, **guardé** :
+  sans `keystore.properties`, les builds **debug** marchent comme avant.
+- **Depuis 2026-07-30 : une build release SANS keystore ÉCHOUE explicitement**
+  (garde `gradle.taskGraph.whenReady`) au lieu de retomber silencieusement sur
+  la signature debug. Un AAB/APK release signé debug est inutilisable pour le
+  Play Store ; l'échec clair évite de le découvrir après upload. Message :
+  « Build release refusée : android/keystore.properties introuvable ».
+- `keystore.properties`, `*.jks`, `*.keystore` dans `.gitignore`.
 - Template `android/keystore.properties.example`.
+- Test instrumenté `ExampleInstrumentedTest` corrigé (`fr.restosuite.app`, plus
+  le gabarit `com.getcapacitor.app`).
 
-> ⚠️ La config Gradle n'a **pas pu être build-testée ici** (ni JDK ni Android SDK
-> sur cette machine). Si `./gradlew` râle, dis-le-moi, je corrige.
+> ✅ Vérifié le 2026-07-30 avec le JDK d'Android Studio :
+> `assembleDebug` OK sans keystore, `assembleRelease` OK avec keystore présent,
+> `assembleRelease` échoue clairement quand `keystore.properties` est absent.
+> `assembleDebug` + `testDebugUnitTest` : **BUILD SUCCESSFUL**.
 
 ---
 

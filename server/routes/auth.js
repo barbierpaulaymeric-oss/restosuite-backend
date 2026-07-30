@@ -230,6 +230,22 @@ function requireAuth(req, res, next) {
 }
 
 // ─── POST /api/auth/register ───
+// Attribution d'acquisition (optionnelle, posée par la landing/le blog via la
+// query string). Valeurs bornées et filtrées — le regex retire tout ce qui
+// pourrait ressembler à un identifiant personnel (@, etc.).
+function cleanAcquisition(acq) {
+  if (!acq || typeof acq !== 'object') return {};
+  const clean = (v) =>
+    (typeof v === 'string' ? v.slice(0, 80).replace(/[^\w\s\-./àâäéèêëîïôöùûüç]/gi, '').trim() : '') || null;
+  return {
+    source: clean(acq.source),
+    medium: clean(acq.medium),
+    campaign: clean(acq.campaign),
+    content: clean(acq.content),
+    position: clean(acq.position),
+  };
+}
+
 router.post('/register', async (req, res) => {
   const { email, password, first_name, last_name, accepted_terms } = req.body;
 
@@ -269,8 +285,10 @@ router.post('/register', async (req, res) => {
   try {
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-    // Create restaurant (empty)
-    const restaurantResult = run('INSERT INTO restaurants (name) VALUES (?)', ['Mon restaurant']);
+    // Nom du restaurant fourni dès l'inscription (formulaire minimal 2026-07-30) ;
+    // retombe sur « Mon restaurant » si absent (anciens clients d'API).
+    const restaurantName = (req.body.restaurant_name || '').trim().slice(0, 120) || 'Mon restaurant';
+    const restaurantResult = run('INSERT INTO restaurants (name) VALUES (?)', [restaurantName]);
     const restaurantId = restaurantResult.lastInsertRowid;
 
     // Set staff password if provided during registration. Same security floor
@@ -299,22 +317,40 @@ router.post('/register', async (req, res) => {
     // is_creation staff-pin branch let unauthenticated attackers claim any
     // freshly-registered account (PENTEST_REPORT C2.1). The owner sets their
     // PIN from an authenticated session later.
+    const acq = cleanAcquisition(req.body.acquisition);
+    // onboarding_step = 7 : le wizard 7 étapes n'est PLUS forcé (inscription
+    // minimale 2026-07-30). L'activation passe par le dashboard « premier jour »
+    // + la checklist progressive. Le nom affiché retombe sur le nom du restaurant
+    // puis sur la partie locale de l'email tant que le profil n'est pas complété.
+    const displayName =
+      ((first_name || '').trim() + (last_name ? ' ' + last_name.trim() : '')).trim()
+      || restaurantName
+      || email.split('@')[0];
     const accountResult = run(
-      `INSERT INTO accounts (name, pin, role, permissions, email, password_hash, first_name, last_name, restaurant_id, onboarding_step, is_owner, trial_start, terms_accepted_at)
-       VALUES (?, NULL, 'gerant', ?, ?, ?, ?, ?, ?, 0, 1, datetime('now'), datetime('now'))`,
+      `INSERT INTO accounts (name, pin, role, permissions, email, password_hash, first_name, last_name, restaurant_id, onboarding_step, is_owner, trial_start, terms_accepted_at,
+                             acquisition_source, acquisition_medium, acquisition_campaign, acquisition_content, acquisition_position)
+       VALUES (?, NULL, 'gerant', ?, ?, ?, ?, ?, ?, 7, 1, datetime('now'), datetime('now'), ?, ?, ?, ?, ?)`,
       [
-        (first_name || '').trim() + (last_name ? ' ' + last_name.trim() : '') || email.split('@')[0],
+        displayName,
         permissions,
         email.trim().toLowerCase(),
         passwordHash,
         (first_name || '').trim(),
         (last_name || '').trim(),
-        restaurantId
+        restaurantId,
+        acq.source, acq.medium, acq.campaign, acq.content, acq.position
       ]
     );
 
     const accountId = accountResult.lastInsertRowid;
     const account = get('SELECT * FROM accounts WHERE id = ?', [accountId]);
+
+    // Funnel serveur : trace agrégeable de la création de compte (aucune PII).
+    try {
+      require('../lib/product-events').recordProductEvent('account_created', {
+        accountId, restaurantId, source: acq.source,
+      });
+    } catch {}
 
     // Seed the default HACCP plan de maîtrise sanitaire for this restaurant so
     // the dangers/CCP/arbre de décision and the DDPP export are populated from

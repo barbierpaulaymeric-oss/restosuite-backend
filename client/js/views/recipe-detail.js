@@ -129,12 +129,24 @@ async function renderRecipeDetail(id) {
       ${perms.view_costs ? `<button class="btn btn-secondary" onclick="openPriceSimulator(${recipe.id}, ${recipe.cost_per_portion}, ${recipe.selling_price})"><i data-lucide="sliders" style="width:18px;height:18px"></i> Simuler</button>` : ''}
       ${perms.edit_recipes ? `<a href="#/edit/${recipe.id}" class="btn btn-primary"><i data-lucide="pencil" style="width:18px;height:18px"></i> Modifier</a>` : ''}
       ${perms.export_pdf ? `<button class="btn btn-secondary" onclick="exportRecipe(${recipe.id})"><i data-lucide="download" style="width:18px;height:18px"></i> Exporter</button>` : ''}
-      <button class="btn btn-secondary" onclick="printAllergenSheet(${recipe.id}, '${escapeHtml(recipe.name).replace(/'/g, "\\'")}')"><i data-lucide="printer" style="width:18px;height:18px"></i> Fiche allergènes</button>
+      <button class="btn btn-secondary" data-print-allergens="${recipe.id}" data-recipe-name="${escapeHtml(recipe.name)}"><i data-lucide="printer" style="width:18px;height:18px"></i> Fiche allergènes</button>
       ${perms.edit_recipes ? `<button class="btn btn-danger" onclick="deleteRecipe(${recipe.id})"><i data-lucide="trash-2" style="width:18px;height:18px"></i> Supprimer</button>` : ''}
     </div>
   `;
 
   lucide.createIcons();
+
+  // Bouton « Fiche allergènes » : la donnée (nom de recette) passe par un
+  // data-attribut (contexte attribut HTML, où escapeHtml protège réellement)
+  // + addEventListener, PAS par un onclick inline. Dans un onclick, escapeHtml
+  // échoue : le navigateur redécode &#39; en ' avant de compiler le handler JS,
+  // ce qui referme la chaîne (XSS stockée via recipes.name — audit 2026-07-30).
+  var printBtn = app.querySelector('[data-print-allergens]');
+  if (printBtn) {
+    printBtn.addEventListener('click', function() {
+      printAllergenSheet(Number(printBtn.dataset.printAllergens), printBtn.dataset.recipeName || '');
+    });
+  }
 
   // Load allergens asynchronously
   loadRecipeAllergens(id);
@@ -293,10 +305,10 @@ async function printAllergenSheet(recipeId, recipeName) {
     const allergensHtml = allergens.length > 0
       ? allergens.map(a => `
           <div class="allergen-item">
-            <span class="allergen-icon">${a.icon}</span>
+            <span class="allergen-icon">${escapeHtml(a.icon)}</span>
             <div>
-              <strong>${a.name}</strong>
-              <small>${a.description || ''}</small>
+              <strong>${escapeHtml(a.name)}</strong>
+              <small>${escapeHtml(a.description || '')}</small>
             </div>
           </div>`).join('')
       : '<p class="none">Aucun allergène détecté dans cette recette.</p>';
@@ -306,7 +318,7 @@ async function printAllergenSheet(recipeId, recipeName) {
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Fiche allergènes — ${recipeName}</title>
+  <title>Fiche allergènes — ${escapeHtml(recipeName)}</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; color: #1a1a1a; }
     h1 { font-size: 22px; margin-bottom: 4px; }
@@ -322,7 +334,7 @@ async function printAllergenSheet(recipeId, recipeName) {
   </style>
 </head>
 <body>
-  <h1><i data-lucide="utensils" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>${recipeName}</h1>
+  <h1><i data-lucide="utensils" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>${escapeHtml(recipeName)}</h1>
   <p class="subtitle">Fiche allergènes — Imprimée le ${today}</p>
   <div class="inco-badge">📋 Règlement INCO (UE) — 14 allergènes réglementaires</div>
   <div>${allergensHtml}</div>

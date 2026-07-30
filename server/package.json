@@ -9,10 +9,10 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "jest --forceExit",
+    "test": "jest",
     "test:watch": "jest --watch",
     "seed:demo": "node seed-demo.js",
-    "postinstall": "npm rebuild better-sqlite3-multiple-ciphers"
+    "postinstall": "patch-package && npm rebuild better-sqlite3-multiple-ciphers"
   },
   "dependencies": {
     "apns2": "^12.2.0",
@@ -30,6 +30,7 @@
     "mailparser": "^3.9.8",
     "multer": "^2.1.1",
     "nodemailer": "^9.0.3",
+    "patch-package": "^8.0.1",
     "pdfkit": "^0.18.0",
     "qrcode": "^1.5.4",
     "stripe": "^21.0.1",
@@ -41,6 +42,7 @@
   },
   "overrides": {
     "qs": "^6.15.2",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "brace-expansion": "^5.0.9"
   }
 }

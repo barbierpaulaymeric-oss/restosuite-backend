@@ -2,9 +2,14 @@
 
 /**
  * AI endpoint tests.
- * We don't call Gemini in tests (no API key), so we only verify:
+ * GEMINI_API_KEY est neutralisée par tests/helpers/env.js : aucun appel réseau
+ * réel n'est possible ici (le garde réseau de env.js bloquerait de toute façon
+ * tout hôte externe). On vérifie :
  * 1. Routes require auth (401 without token)
- * 2. Routes exist — return something other than 404 when authenticated
+ * 2. Sans clé configurée, les routes échouent de façon DÉTERMINISTE
+ *    (400 validation ou 500 « not configured ») — jamais 404, jamais 502
+ *    (502 impliquerait qu'une vraie requête Gemini est partie).
+ * Le contrat fonctionnel avec Gemini mocké est couvert par ai-contract.test.js.
  */
 
 const request = require('supertest');
@@ -29,15 +34,24 @@ describe('AI endpoints — require auth (401 without token)', () => {
   });
 });
 
-describe('AI endpoints — routes exist when authenticated (not 404)', () => {
-  test.each(AI_ROUTES)('$method $path with auth → not 404', async ({ method, path }) => {
+describe('AI endpoints — deterministic failure without API key', () => {
+  test.each(AI_ROUTES)('$method $path with auth → 400/500/503, jamais 404 ni 502', async ({ method, path }) => {
     const res = await request(app)
       [method](path)
       .set(AUTH)
       .send({ prompt: 'test', text: 'test' });
-    // May be 200 (unlikely without API key), 400 (missing required body), or 500/503 (no API key)
-    // Should NOT be 404 (route missing) or 401 (auth failure)
-    expect(res.status).not.toBe(404);
-    expect(res.status).not.toBe(401);
+    // Sans GEMINI_API_KEY : 400 (validation du body) ou 500/503 (clé absente).
+    // 404 = route manquante ; 502 = une VRAIE requête Gemini est partie — les
+    // deux sont des régressions.
+    expect([400, 500, 503]).toContain(res.status);
+  });
+
+  test('POST /api/ai/parse-voice sans clé → 500 "not configured" explicite', async () => {
+    const res = await request(app)
+      .post('/api/ai/parse-voice')
+      .set(AUTH)
+      .send({ text: '250g de farine et 3 œufs' });
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/GEMINI_API_KEY/);
   });
 });

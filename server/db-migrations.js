@@ -2297,6 +2297,41 @@ try {
   console.warn('⚠️ analytics composite index migration error:', e.message);
 }
 
+// Attribution d'acquisition (funnel landing/blog → inscription). Renseignée une
+// seule fois à la création du compte owner, valeurs bornées côté serveur —
+// jamais d'email, de téléphone ni d'identifiant personnel dans ces colonnes.
+try {
+  const accountCols = all("PRAGMA table_info(accounts)").map(c => c.name);
+  for (const col of ['acquisition_source', 'acquisition_medium', 'acquisition_campaign', 'acquisition_content', 'acquisition_position']) {
+    if (!accountCols.includes(col)) {
+      db.exec(`ALTER TABLE accounts ADD COLUMN ${col} TEXT`);
+      console.log(`✅ Migration: added ${col} to accounts (attribution funnel)`);
+    }
+  }
+} catch (e) {
+  console.warn('⚠️ acquisition columns migration error:', e.message);
+}
+
+// Événements produit agrégeables (funnel serveur : compte créé, première fiche,
+// activation, checkout, paiement). Table dédiée SANS donnée personnelle en
+// clair : account_id interne uniquement, purgeable (rétention limitée).
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS product_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event TEXT NOT NULL,
+      account_id INTEGER,
+      restaurant_id INTEGER,
+      source TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_product_events_event_created
+           ON product_events(event, created_at)`);
+} catch (e) {
+  console.warn('⚠️ product_events migration error:', e.message);
+}
+
 }
 
 module.exports = { runMigrations };

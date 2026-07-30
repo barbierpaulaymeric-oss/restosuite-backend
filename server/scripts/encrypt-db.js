@@ -27,10 +27,8 @@ if (!/^[0-9a-fA-F]{64}$/.test(key)) {
   process.exit(1);
 }
 
-const dataDir = process.env.NODE_ENV === 'production' && fs.existsSync('/data')
-  ? '/data'
-  : path.join(__dirname, '..', 'data');
-const dbPath = process.argv[2] || process.env.DB_PATH || path.join(dataDir, 'restosuite.db');
+// Résolution partagée avec db.js/backup.js (db-path.js) — argument CLI prioritaire.
+const dbPath = process.argv[2] || require('../db-path').resolveDbPath();
 
 if (!fs.existsSync(dbPath)) {
   console.error(`❌ Database not found: ${dbPath}`);

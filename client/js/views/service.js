@@ -194,8 +194,8 @@ function _salleRenderGrid() {
       <div class="salle-empty">
         <div class="salle-empty__icon">🍽️</div>
         <h2>Aucune table configurée</h2>
-        <p>Configurez votre plan de salle pour commencer.</p>
-        <a href="#/multi-site" class="salle-btn salle-btn--primary" style="text-decoration:none;display:inline-flex;margin-top:12px">Configurer les tables</a>
+        <p>Ajoutez vos tables depuis les réglages de l'établissement pour commencer le service en salle.</p>
+        <a href="#/qrcodes" class="salle-btn salle-btn--primary" style="text-decoration:none;display:inline-flex;margin-top:12px">Gérer mes tables</a>
       </div>
     `;
     return;
@@ -682,7 +682,7 @@ function _salleRenderSent(table, sentOrders) {
       <ul class="salle-sent__items">
         ${(o.items || []).filter(it => it.status !== 'annulé').map(it => `
           <li>
-            <span>${it.quantity}× ${escapeHtml(it.recipe_name)}</span>
+            <span>${escapeHtml(it.quantity)}× ${escapeHtml(it.recipe_name)}</span>
             <span class="salle-sent__item-status">${_salleItemStatusIcon(it.status)}</span>
           </li>
         `).join('')}

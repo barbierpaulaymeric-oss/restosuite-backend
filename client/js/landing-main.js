@@ -52,25 +52,106 @@ setTimeout(function() {
   document.querySelectorAll('.reveal').forEach(function(el) { el.classList.add('visible'); });
 }, 2000);
 
-// Stripe checkout (subscribe button)
+// CTA S'abonner — parcours explicite, plus AUCUN appel Stripe depuis la landing
+// (l'ancien POST /api/stripe/create-checkout non authentifié recevait un 401
+// puis redirigeait silencieusement vers /app). Désormais :
+//   - session existante → directement la page d'abonnement (#/subscribe) ;
+//   - sinon → inscription (#register) avec intention « subscribe » mémorisée en
+//     sessionStorage ; l'app reprend automatiquement vers #/subscribe après
+//     inscription ou connexion (voir consumePostLoginIntent dans app.js).
+// La création de la session Stripe Checkout n'a lieu QUE depuis la page
+// authentifiée (views/subscribe.js), jamais d'ici.
 var subscribeBtn = document.getElementById('subscribe-btn');
 if (subscribeBtn) {
   subscribeBtn.addEventListener('click', function(e) {
     e.preventDefault();
-    subscribeBtn.textContent = 'Redirection vers le paiement...';
-    subscribeBtn.style.pointerEvents = 'none';
-    fetch('/api/stripe/create-checkout', {
+    try { sessionStorage.setItem('rs_intent', 'subscribe'); } catch (err) {}
+    var hasSession = false;
+    try { hasSession = !!localStorage.getItem('restosuite_token'); } catch (err) {}
+    window.location.href = hasSession ? '/app#/subscribe' : '/app#register';
+  });
+}
+
+// Formulaire « Réserver une démo » — POST /api/demo (public). Validation légère
+// côté client, erreurs visibles, bouton désactivé pendant l'envoi et réactivé
+// en cas d'échec. L'accountId n'existe pas ici : c'est un prospect anonyme.
+var demoForm = document.getElementById('demo-form');
+if (demoForm) {
+  demoForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var msg = document.getElementById('demo-form__msg');
+    var btn = document.getElementById('demo-submit');
+    var email = document.getElementById('demo-email').value.trim();
+    var consent = document.getElementById('demo-consent').checked;
+
+    function showMsg(text, kind) {
+      msg.textContent = text;
+      msg.className = kind === 'error' ? 'is-error' : 'is-success';
+      msg.style.display = 'block';
+    }
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showMsg('Merci d\'indiquer un email valide.', 'error');
+      document.getElementById('demo-email').focus();
+      return;
+    }
+    if (!consent) {
+      showMsg('Merci de confirmer que nous pouvons vous recontacter.', 'error');
+      return;
+    }
+
+    var payload = {
+      first_name: document.getElementById('demo-firstname').value.trim(),
+      last_name: document.getElementById('demo-lastname').value.trim(),
+      restaurant: document.getElementById('demo-restaurant').value.trim(),
+      phone: document.getElementById('demo-phone').value.trim(),
+      email: email,
+      website: document.getElementById('demo-website').value, // honeypot
+      consent: true,
+      source: 'landing'
+    };
+
+    btn.disabled = true;
+    var originalText = btn.textContent;
+    btn.textContent = 'Envoi…';
+    msg.style.display = 'none';
+
+    fetch('/api/demo', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accountId: null })
+      body: JSON.stringify(payload)
     }).then(function(res) {
-      return res.json();
-    }).then(function(data) {
-      window.location.href = data.url || '/app';
+      return res.json().then(function(data) { return { ok: res.ok, data: data }; });
+    }).then(function(r) {
+      if (r.ok) {
+        demoForm.reset();
+        showMsg((r.data && r.data.message) || 'Merci ! Nous vous recontactons très vite.', 'success');
+        btn.textContent = 'Demande envoyée ✓';
+        if (window.umami) { try { umami.track('demo_submitted'); } catch (err) {} }
+      } else {
+        showMsg((r.data && r.data.error) || 'Une erreur est survenue. Réessayez.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
     }).catch(function() {
-      window.location.href = '/app';
+      showMsg('Impossible d\'envoyer la demande. Réessayez ou écrivez à contact@restosuite.fr.', 'error');
+      btn.disabled = false;
+      btn.textContent = originalText;
     });
   });
+}
+
+// Migration service worker : les anciennes inscriptions avaient la portée « / »
+// et contrôlaient la landing (rechargement forcé à chaque nouvelle version du
+// cache). On les désenregistre ici ; le SW actuel est limité à /app et sera
+// (ré)enregistré par app-init.js à la prochaine visite de l'application.
+if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    var rootScope = new URL('/', window.location.href).href;
+    regs.forEach(function(reg) {
+      if (reg.scope === rootScope) reg.unregister().catch(function() {});
+    });
+  }).catch(function() {});
 }
 
 // Sticky CTA: show only when hero CTA is not visible (mobile)
@@ -137,7 +218,22 @@ if (heroVideoWrapper && heroVideo) {
 function rsInitCookieBanner() {
   if (localStorage.getItem('rs_cookie_consent')) return; // visitor already chose
   var banner = document.getElementById('cookie-banner');
-  if (banner) banner.style.display = 'flex';
+  if (!banner) return;
+  // Afficher APRÈS le chargement des fontes : ancré en bas, le bandeau voyait
+  // son texte se re-wrapper à l'arrivée d'Inter → son bord haut bougeait
+  // (layout shift mesuré par Lighthouse). Filet 1,5 s si les fontes traînent.
+  var shown = false;
+  var reveal = function() {
+    if (shown) return;
+    shown = true;
+    banner.style.display = 'flex';
+  };
+  if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+    document.fonts.ready.then(reveal).catch(reveal);
+    setTimeout(reveal, 1500);
+  } else {
+    reveal();
+  }
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', rsInitCookieBanner);

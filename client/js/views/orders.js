@@ -1084,7 +1084,7 @@ async function showPOAnalyticsModal() {
         ${data.top_items.slice(0, 10).map(item => `
           <div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:var(--text-sm)">
             <span style="flex:1;font-weight:500">${escapeHtml(item.ingredient_name || 'Inconnu')}</span>
-            <span style="color:var(--text-secondary);margin-right:12px">${item.total_qty} ${item.unit || ''}</span>
+            <span style="color:var(--text-secondary);margin-right:12px">${item.total_qty} ${escapeHtml(item.unit || '')}</span>
             <span style="font-weight:600">${formatCurrency(item.total_spent)}</span>
           </div>
         `).join('')}

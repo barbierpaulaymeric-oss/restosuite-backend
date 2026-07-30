@@ -69,6 +69,9 @@ class LoginView {
     const nav = document.getElementById('nav');
     if (nav) nav.style.display = 'none';
 
+    if (this.mode === 'register' && window.umami) {
+      try { umami.track('signup_started'); } catch (e) { /* consentement refusé → umami absent */ }
+    }
     switch (this.mode) {
       case 'choice': this.renderChoice(app); break;
       case 'restaurant': this.renderRestaurant(app); break;
@@ -291,16 +294,15 @@ class LoginView {
       transition:all 0.15s;
     `;
 
+    // Inscription minimale (décision produit 2026-07-30) : uniquement ce qu'il
+    // faut pour ouvrir un compte et créer sa première fiche. Le prénom/nom, le
+    // mot de passe équipe, les tables, zones, fournisseurs sont configurés APRÈS,
+    // via la checklist progressive du dashboard — jamais bloquants pour la
+    // première valeur. Objectif : première fiche en moins de 3 minutes.
     const restaurantFields = `
-      <div style="display:flex;gap:var(--space-3)">
-        <div class="form-group" style="flex:1">
-          <label for="reg-firstname">Prénom</label>
-          <input type="text" class="form-control" id="reg-firstname" placeholder="Paul" autocomplete="given-name" data-ui="custom">
-        </div>
-        <div class="form-group" style="flex:1">
-          <label for="reg-lastname">Nom</label>
-          <input type="text" class="form-control" id="reg-lastname" placeholder="Dupont" autocomplete="family-name" data-ui="custom">
-        </div>
+      <div class="form-group">
+        <label for="reg-restaurant-name">Nom du restaurant</label>
+        <input type="text" class="form-control" id="reg-restaurant-name" placeholder="Chez Marcel" autocomplete="organization" required data-ui="custom">
       </div>
       <div class="form-group">
         <label for="reg-email">Email</label>
@@ -314,22 +316,9 @@ class LoginView {
         <label for="reg-password2">Confirmer le mot de passe</label>
         <input type="password" class="form-control" id="reg-password2" placeholder="••••••••" autocomplete="new-password" required data-ui="custom">
       </div>
-      <div style="margin-top:var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--border-default)">
-        <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md)">
-          <span style="font-size:1.3rem;line-height:1">💡</span>
-          <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
-            <strong>Deux mots de passe, deux accès :</strong><br>
-            <strong style="color:var(--text-primary)">Votre mot de passe</strong> (ci-dessus) est personnel et donne accès complet au logiciel.<br>
-            <strong style="color:var(--text-primary)">Le mot de passe équipe</strong> (ci-dessous) est un code simple que vous partagez avec votre staff pour qu'ils accèdent à leur espace limité.
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="reg-staff-password">Mot de passe équipe (partagé avec le staff)</label>
-          <input type="password" class="form-control" id="reg-staff-password" placeholder="ex: Resto2026" autocomplete="new-password"
-                 style="font-family:var(--font-mono);letter-spacing:0.05em" data-ui="custom">
-        </div>
-        <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-1)">Optionnel — vous pourrez le configurer plus tard dans Équipe.</p>
-      </div>
+      <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-2)">
+        Votre équipe, vos tables et vos fournisseurs se configurent ensuite, à votre rythme, depuis le tableau de bord.
+      </p>
     `;
 
     const supplierFields = `
@@ -545,16 +534,15 @@ class LoginView {
   }
 
   async handleRegister() {
-    const firstName = document.getElementById('reg-firstname').value.trim();
-    const lastName = document.getElementById('reg-lastname').value.trim();
+    const restaurantName = document.getElementById('reg-restaurant-name').value.trim();
     const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
     const password2 = document.getElementById('reg-password2').value;
-    const staffPassword = document.getElementById('reg-staff-password').value.trim();
     const errorEl = document.getElementById('reg-error');
     const submitBtn = document.getElementById('reg-submit');
 
     errorEl.textContent = '';
+    if (!restaurantName) { errorEl.textContent = 'Le nom du restaurant est requis'; return; }
     if (!email) { errorEl.textContent = "L'email est requis"; return; }
     if (!password || password.length < 8) { errorEl.textContent = 'Le mot de passe doit faire au moins 8 caractères'; return; }
     if (!/[A-Z]/.test(password)) { errorEl.textContent = 'Le mot de passe doit contenir au moins une majuscule'; return; }
@@ -567,19 +555,26 @@ class LoginView {
     submitBtn.textContent = 'Création...';
 
     try {
-      const result = await API.register({ email, password, first_name: firstName, last_name: lastName, staff_password: staffPassword || undefined, accepted_terms: true });
+      // Attribution d'acquisition capturée par app.js (captureAcquisitionIntent)
+      // depuis la query string landing/blog — transmise une seule fois à la
+      // création du compte, jamais d'email/téléphone dedans.
+      let acquisition;
+      try {
+        const raw = sessionStorage.getItem('rs_acquisition');
+        if (raw) acquisition = JSON.parse(raw);
+      } catch (e) { /* ignore */ }
+      const result = await API.register({ email, password, restaurant_name: restaurantName, accepted_terms: true, acquisition });
+      try { sessionStorage.removeItem('rs_acquisition'); } catch (e) {}
+      if (window.umami) { try { umami.track('account_created', acquisition || {}); } catch (e) {} }
       _persistRestaurantLogin(result.token, result.account); /* clears supplier sessionStorage too */
-      /* — handled by _persistRestaurantLogin */
 
+      // Inscription minimale : on N'ouvre PLUS le wizard 7 étapes. On démarre
+      // directement l'application — le dashboard « premier jour » propose de
+      // créer la première fiche (Alto / import Excel / manuel) et la checklist
+      // progressive prend en charge équipe/tables/zones/fournisseurs à part.
       const nav = document.getElementById('nav');
-      if (nav) nav.style.display = 'none';
-      const appEl = document.getElementById('app');
-      if (appEl) appEl.innerHTML = '';
-      const wizard = new OnboardingWizard(() => {
-        if (nav) nav.style.display = '';
-        bootApp(result.account.role, result.account);
-      });
-      wizard.show();
+      if (nav) nav.style.display = '';
+      bootApp(result.account.role, result.account);
     } catch (e) {
       errorEl.textContent = e.message || "Erreur lors de l'inscription";
       submitBtn.disabled = false;

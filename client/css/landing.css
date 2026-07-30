@@ -28,7 +28,7 @@
       --bg-pine: #0F2E26;                /* sections sombres (footer/CTA si besoin) */
       --text-primary: #2A2A28;           /* ink */
       --text-secondary: #6E6A5E;         /* muted (5.2:1) */
-      --text-tertiary: #8A8578;
+      --text-tertiary: #726D60;         /* assombri de #8A8578 : ≥4.5:1 sur crème/blanc/papier (WCAG AA) */
       --text-on-paper: #2A2A28;
       --text-on-paper-muted: #6E6A5E;
       --text-on-pine: #EAF6EF;           /* texte sur sections pine */
@@ -36,9 +36,9 @@
       --border-light: #F0EDE6;
       --border-paper: rgba(42,42,40,0.12);
 
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-sans: 'Inter', 'Inter-fallback', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-mono: 'JetBrains Mono', 'Courier New', monospace;
-      --font-serif: 'Fraunces', 'Georgia', 'Times New Roman', serif;
+      --font-serif: 'Fraunces', 'Fraunces-fallback', 'Georgia', 'Times New Roman', serif;
       --font-hand: 'Caveat', 'Brush Script MT', cursive;
 
       --radius-sm: 6px;
@@ -61,6 +61,20 @@
       --underline-hand: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'><path d='M2 6 Q 18 1 34 5 T 66 5 T 98 5 T 118 6' fill='none' stroke='%23BF8A2E' stroke-width='2.2' stroke-linecap='round'/></svg>");
     }
     
+    /* Fallbacks à métriques calées : la police de repli occupe la même chasse
+       que la fonte web (ratios mesurés) → mêmes retours à la ligne pendant le
+       chargement, donc pas de layout shift au swap (CLS ≈ 0). */
+    @font-face {
+      font-family: 'Fraunces-fallback';
+      src: local('Georgia');
+      size-adjust: 76%;
+    }
+    @font-face {
+      font-family: 'Inter-fallback';
+      src: local('Arial');
+      size-adjust: 106.2%;
+    }
+
     html { scroll-behavior: smooth; }
     
     body {
@@ -89,6 +103,21 @@
     }
 
     header, section, footer, .sticky-cta, .cookie-banner { position: relative; z-index: 2; }
+
+    /* Lien d'évitement clavier — visible uniquement au focus */
+    .skip-link {
+      position: absolute;
+      top: -100px;
+      left: 0;
+      background: var(--color-accent);
+      color: #fff;
+      padding: 8px 16px;
+      z-index: 10000;
+      font-weight: 600;
+      border-radius: 0 0 8px 0;
+      transition: top 0.2s;
+    }
+    .skip-link:focus { top: 0; }
 
     a { color: inherit; text-decoration: none; }
     img { max-width: 100%; display: block; }
@@ -708,6 +737,9 @@
       transform: translateY(-4px);
       box-shadow: 0 12px 32px rgba(42,42,40, 0.4);
     }
+
+    /* <picture> ne doit pas générer de boîte : l'img se dimensionne contre la carte */
+    .screenshot-card picture { display: contents; }
 
     .screenshot-card img {
       width: 100%;
@@ -1513,7 +1545,7 @@
       display: inline-block;
       padding: 4px 10px;
       background: var(--color-accent-light);
-      color: var(--color-accent);
+      color: var(--color-green-text); /* vert texte <18px : 5:1 sur le fond du badge (WCAG AA) */
       border-radius: 999px;
       font-size: 0.8125rem;
       font-weight: 600;
@@ -1695,4 +1727,83 @@
       .cookie-banner { padding: 14px 16px; }
       .cookie-banner__text { font-size: 0.8125rem; }
       .cookie-banner__actions { width: 100%; justify-content: flex-end; }
+    }
+
+    /* ============================================
+       FORMULAIRE RÉSERVER UNE DÉMO
+       ============================================ */
+    .demo-form {
+      max-width: 620px;
+      margin: 0 auto;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .demo-form__row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    .demo-form__field { display: flex; flex-direction: column; gap: 6px; }
+    .demo-form__field label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .demo-form__field label span { color: var(--color-danger); }
+    .demo-form input[type="text"],
+    .demo-form input[type="tel"],
+    .demo-form input[type="email"] {
+      font-family: var(--font-sans);
+      font-size: 1rem;
+      color: var(--text-primary);
+      background: var(--bg-base);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      padding: 11px 14px;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .demo-form input:focus {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px var(--color-accent-light);
+    }
+    /* Honeypot : hors flux, invisible, non focusable au clavier normal */
+    .demo-form__hp {
+      position: absolute;
+      left: -9999px;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+    }
+    .demo-form__consent {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      cursor: pointer;
+    }
+    .demo-form__consent input {
+      margin-top: 3px;
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      accent-color: var(--color-accent);
+      cursor: pointer;
+    }
+    #demo-submit { align-self: flex-start; }
+    #demo-form__msg.is-error { color: var(--color-danger); }
+    #demo-form__msg.is-success { color: var(--color-green-text); }
+
+    @media (max-width: 640px) {
+      .demo-form { padding: 24px; }
+      .demo-form__row { grid-template-columns: 1fr; }
+      #demo-submit { align-self: stretch; text-align: center; }
     }

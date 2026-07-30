@@ -1,6 +1,6 @@
 # RESTOSUITE — Document Maître
 
-_Dernière mise à jour : 5 avril 2026_
+_Dernière mise à jour : 30 juillet 2026_
 
 ---
 
@@ -22,19 +22,23 @@ Un logiciel SaaS tout-en-un pour les restaurateurs : fiches techniques avec food
 | Composant | Techno |
 |-----------|--------|
 | Backend | Node.js + Express |
-| Base de données | SQLite (better-sqlite3) |
+| Base de données | SQLite (better-sqlite3-multiple-ciphers — chiffrement SQLCipher opt-in via `DB_ENCRYPTION_KEY`) |
 | IA | Google Gemini 2.5 Flash |
 | Paiement | Stripe |
 | PDF | pdfkit |
-| Auth | JWT (jsonwebtoken) + bcryptjs |
-| Hébergement | Render (free tier + keep-alive ping) |
-| Frontend | SPA vanilla JS |
-| PWA | Service Worker + manifest.json |
+| Auth | JWT (jsonwebtoken) + bcryptjs, cookie HttpOnly + CSRF |
+| Hébergement | Render (keep-alive ping) — persistance : voir `docs/operations/persistence.md` |
+| Frontend | SPA vanilla JS (bundle esbuild committé) |
+| PWA | Service Worker **limité à /app** + manifest.json |
+| Mobile | Capacitor 8 (`fr.restosuite.app`, UI dédiée `mobile/www`) |
 | QR Codes | qrcode (npm) |
 | Upload | multer |
 
-**Coût mensuel : 0€** (Render free + Gemini quota gratuit)
-**Marge nette estimée : ~95%**
+**Décision d'architecture (2026-07-30)** : SQLite est la base assumée
+(mono-instance, disque persistant Render `/data`, sauvegardes 6 h vérifiées
+`quick_check`). **PostgreSQL n'est PAS pris en charge** — `server/db-adapter.js`
+est une esquisse expérimentale non branchée ; une migration ne se justifiera
+que si le multi-site ou la montée en charge est confirmé.
 
 ---
 
@@ -77,7 +81,7 @@ www.restosuite.fr/demo-presentation.html → slides démo
 - **QR code commande** — page menu publique, commande client → validation serveur
 - **PWA** — installable iPhone/Android, icône écran d'accueil, cache offline
 - **Landing page** — site vitrine avec SEO, structured data, vidéo démo
-- **Blog SEO** — 3 articles (food cost, HACCP, stock)
+- **Blog SEO** — 21 articles + index (CTA vers l'inscription avec attribution `?src=blog&article=…`)
 - **Command palette** — Ctrl+K pour navigation rapide entre modules
 - **Simulateur de prix** — slider interactif sur les fiches techniques
 - **Modales de confirmation** — remplacement de tous les `confirm()` natifs
@@ -90,37 +94,56 @@ www.restosuite.fr/demo-presentation.html → slides démo
 - **Keep-alive** — ping toutes les 14 min (plus de cold start Render)
 - **Alertes proactives** — DLC, stock bas, températures hors seuil, livraisons en attente
 
+### États réels (2026-07-30)
+- **Multi-site : MASQUÉ.** Le lien de navigation est retiré et la création est
+  bloquée côté serveur par un feature flag (`MULTISITE_ENABLED`, désactivé) :
+  plus aucun restaurant orphelin ne peut être créé. La route affiche
+  « Bientôt disponible ». Réactivation = implémenter la vraie tenancy
+  (org ↔ sites) puis passer le flag. Ne pas présenter le multi-site comme
+  disponible.
+- **Chiffrement au repos : ✅ ACTIF en production** (`DB_ENCRYPTION_KEY` définie,
+  constaté au dashboard Render le 2026-07-30). « Données chiffrées » est exact.
+  `GET /api/health/persistence` (`encrypted_at_rest`) le re-vérifie.
+- **Domaine apex `restosuite.fr` : ✅ RÉPARÉ** (certificat émis, `restosuite.fr`
+  → 301 → `www` → 200). Voir `docs/operations/domain-apex.md`.
+- **Persistance : ✅ disque `/data` (1 GB) + snapshots Render quotidiens (7 j).**
+  Mes sauvegardes locales (`server/backup.js`, 6 h) restent sur le même disque ;
+  les snapshots Render fournissent le filet hors-instance. `DB_PATH` non défini
+  (le code résout `/data/restosuite.db` automatiquement) — voir persistence.md.
+
 ### 🔜 À faire
-- Tests end-to-end complets
-- Emails transactionnels (J+1, J+15, J+25, J+30)
-- Multi-établissement réel (plan Business)
+- Emails transactionnels de fin d'essai (J+15, J+25, J+30)
 - Marketplace fournisseur + Stripe Connect
 - Intégration POS/caisse
 - API publique
 
 ---
 
-## 5. Pricing
+## 5. Pricing (offre actuelle — une seule)
 
 | Plan | Prix | Détails |
 |------|------|---------|
-| Essai gratuit | 0€ | 60 jours, accès complet |
-| Pro | 39€/mois | 1 établissement, toutes fonctionnalités |
-| Business | 79€/mois | Multi-sites, support prioritaire |
-| Fondateur | 29€/mois à vie | 200 premiers clients |
+| Essai gratuit | 0€ | 60 jours, accès complet, sans carte bancaire |
+| Pro | 39€ HT/mois | 1 établissement, toutes fonctionnalités, sans engagement (TVA : franchise en base, art. 293 B) |
+
+Les anciens plans « Business 79€ » et « Fondateur 29€ à vie » n'existent plus
+(retirés des CGV — audit homogénéité 2026-07-05). Ne pas les réintroduire dans
+un document sans décision explicite.
 
 **Après expiration trial :** mode lecture seule, export PDF toujours actif (obligation légale HACCP).
 
 ---
 
-## 6. Identité Visuelle
+## 6. Identité Visuelle (DA actuelle — vert/crème)
 
-- **Couleurs :** Orange `#E8722A` (accent), Dark `#0F1923` (fond), Texte `#F7F5F2`
-- **Font :** Inter
-- **Logo :** Couteau + bar chart + point orange (PNG transparent, versions outline)
-- **Style :** Dark mode par défaut, light mode disponible
+- **Couleurs :** Vert d'action `#1F7A4D` (CTA), vert de marque `#2D8B5E`,
+  crème `#FAF8F5` (fond), papier `#F4F1EA`, encre `#2A2A28`, or `#D4A843` (accents)
+- **Fonts :** Inter (texte), Fraunces (titres éditoriaux), Caveat (accents
+  manuscrits), JetBrains Mono (chiffres)
+- **Style :** clair, éditorial, grain léger — landing + app + identité Android alignées (v64)
 
-Détails complets dans `BRAND.md`.
+L'ancienne identité orange/dark (`BRAND.md`) est obsolète — ne plus s'y référer
+pour de nouveaux supports sans décision.
 
 ---
 
@@ -277,6 +300,40 @@ Détails dans `UX_REVIEW.md`, `BUSINESS_REVIEW.md`, `PRODUCT_REVIEW.md`.
 ---
 
 ## 12. Sessions de travail récentes
+
+### Session 30 juillet 2026 (Claude — exécution audit du 30/07)
+- **Funnel réparé** — le CTA « S'abonner » de la landing ne POST plus Stripe sans
+  auth : intention `subscribe` en sessionStorage → inscription/connexion →
+  reprise automatique vers `#/subscribe` (`consumePostLoginIntent`, app.js).
+  Erreurs Stripe visibles (plus de redirection silencieuse), page subscribe
+  passée sur `API.request` (CSRF/cookie corrects).
+- **Service worker limité à `/app`** (v65) — la landing/blog ne sont plus
+  contrôlés ni rechargés ; anciens SW racine désenregistrés ; mise à jour de
+  l'app par bannière « Recharger » au lieu du reload forcé.
+- **44 CTA blog** → inscription directe avec attribution
+  (`?src=blog&article=<slug>&pos=…#register`) + events Umami.
+- **Perf landing** — WebP responsive (−70 %), fontes réduites aux graisses
+  utilisées, `landing.min.css` + versionnage `?v=<hash>` (build.js), en-têtes de
+  cache différenciés (server/app.js).
+- **Accessibilité landing** — `<main>` + skip link, contrastes AA
+  (`--text-tertiary` #726D60, badge prix en `--color-green-text`), dimensions
+  d'images, FAQ « import de recettes » corrigée (Excel/CSV ≠ scan factures).
+- **Persistance** — `server/db-path.js` (résolution unique), backup respecte
+  `DB_PATH` + `quick_check`, script `restore-backup.js` testé, garde
+  anti-disque-éphémère en prod, `GET /api/health/persistence`.
+- **Analytics** — colonnes `acquisition_*` sur accounts, table `product_events`
+  (sans PII), events serveur (account_created, first_recipe, activated,
+  checkout_started, paid), `GET /api/admin/funnel`.
+- **Qualité** — audits npm à 0 (patch brace-expansion≥5 via patch-package +
+  shim minimatch), clés Gemini/Stripe neutralisées en test + garde réseau,
+  `forceExit` retiré, tests de contrat mockés (Gemini, webhook Stripe),
+  smoke tests Playwright (landing, funnel inscription, intention abonnement,
+  modules mobile) — 864 tests Jest + 27 E2E verts.
+- **Android** — test instrumenté corrigé (`fr.restosuite.app`), release sans
+  keystore = échec explicite (plus de fallback debug silencieux), CI Android.
+- **Bugs corrigés au passage** — « Passer » l'étape 1 de l'onboarding ne casse
+  plus `accounts.name` (500) ; le tour guidé ne recouvre plus la page
+  d'abonnement lors d'une reprise d'intention.
 
 ### Session 5 avril 2026 (Claude Opus)
 - **Commandes fournisseurs** — Remplacement du module commandes table par un système de bons de commande matières premières (tables `purchase_orders` + `purchase_order_items`, route `purchase-orders.js`, workflow brouillon→envoyée→confirmée→réceptionnée)

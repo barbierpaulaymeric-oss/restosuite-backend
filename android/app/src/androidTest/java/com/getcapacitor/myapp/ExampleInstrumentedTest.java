@@ -21,6 +21,9 @@ public class ExampleInstrumentedTest {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
 
-        assertEquals("com.getcapacitor.app", appContext.getPackageName());
+        // applicationId réel de l'app (voir android/app/build.gradle), pas le
+        // gabarit Capacitor "com.getcapacitor.app" qui faisait échouer
+        // connectedAndroidTest depuis le renommage.
+        assertEquals("fr.restosuite.app", appContext.getPackageName());
     }
 }

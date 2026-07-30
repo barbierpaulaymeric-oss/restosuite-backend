@@ -93,7 +93,7 @@ function renderCustomerCard(c) {
           </div>
           <div class="text-secondary text-sm">
             ${c.total_visits} visite${c.total_visits > 1 ? 's' : ''} · ${(c.total_spent || 0).toFixed(0)}€ dépensés
-            ${c.phone ? ` · ${c.phone}` : ''}
+            ${c.phone ? ` · ${escapeHtml(c.phone)}` : ''}
           </div>
         </div>
         <div style="text-align:right">

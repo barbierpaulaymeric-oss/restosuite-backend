@@ -129,13 +129,13 @@ function renderMovementsList(movements) {
               <div style="flex:1;min-width:0">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
                   <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(mv.ingredient_name)}</span>
-                  <span class="data-value" style="font-weight:600;color:${cfg.color}">${sign}${mv.quantity} ${mv.unit}</span>
+                  <span class="data-value" style="font-weight:600;color:${cfg.color}">${sign}${escapeHtml(mv.quantity)} ${escapeHtml(mv.unit)}</span>
                 </div>
                 <div style="display:flex;gap:var(--space-3);font-size:var(--text-xs);color:var(--text-tertiary);flex-wrap:wrap">
                   <span>${cfg.label}</span>
                   <span>${time}</span>
                   ${mv.supplier_name ? `<span>Fourn: ${escapeHtml(mv.supplier_name)}</span>` : ''}
-                  ${mv.batch_number ? `<span>Lot: ${mv.batch_number}</span>` : ''}
+                  ${mv.batch_number ? `<span>Lot: ${escapeHtml(mv.batch_number)}</span>` : ''}
                   ${mv.unit_price != null ? `<span>${mv.unit_price.toFixed(2)}€/u</span>` : ''}
                   ${mv.recorded_by_name ? `<span>Par: ${escapeHtml(mv.recorded_by_name)}</span>` : ''}
                 </div>

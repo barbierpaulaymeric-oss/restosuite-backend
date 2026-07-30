@@ -83,6 +83,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         if (accountId && session.subscription) {
           const subscription = await s.subscriptions.retrieve(session.subscription);
           upsertSubscription(accountId, session.customer, session.subscription, subscription);
+          // Funnel serveur : paiement confirmé par Stripe (webhook signé).
+          try {
+            require('../lib/product-events').recordProductEvent('paid', { accountId: Number(accountId) });
+          } catch {}
         }
         break;
       }
@@ -212,6 +216,13 @@ router.post('/create-checkout', async (req, res) => {
         [accountId, customerId, 'incomplete', 'pro']
       );
     }
+
+    // Funnel serveur : Checkout démarré (aucune PII, id interne uniquement).
+    try {
+      require('../lib/product-events').recordProductEvent('checkout_started', {
+        accountId, restaurantId: account.restaurant_id,
+      });
+    } catch {}
 
     res.json({ url: session.url });
   } catch (err) {

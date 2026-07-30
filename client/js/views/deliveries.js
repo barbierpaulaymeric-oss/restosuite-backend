@@ -61,7 +61,7 @@ async function renderDeliveries() {
           <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
             ${alerts.map(a => `
               <span class="badge" style="background:${a.days_remaining <= 1 ? 'var(--color-danger)' : 'var(--color-warning)'};color:white;font-size:var(--text-sm);padding:4px 10px;border-radius:var(--radius-md)">
-                ${escapeHtml(a.product_name)} — Lot ${escapeHtml(a.batch_number || '?')} — DLC ${a.dlc} (${a.days_remaining}j)
+                ${escapeHtml(a.product_name)} — Lot ${escapeHtml(a.batch_number || '?')} — DLC ${escapeHtml(a.dlc)} (${a.days_remaining}j)
               </span>
             `).join('')}
           </div>
@@ -227,10 +227,10 @@ function renderDeliveryItemRow(item, isPending) {
 
   // Extra info (fishing/meat)
   const extraInfo = [];
-  if (item.fishing_zone) extraInfo.push(`🎣 Zone ${item.fishing_zone}`);
-  if (item.fishing_method) extraInfo.push(`🪝 ${item.fishing_method}`);
-  if (item.origin) extraInfo.push(`🏷️ ${item.origin}`);
-  if (item.sanitary_approval) extraInfo.push(`📋 Agr. ${item.sanitary_approval}`);
+  if (item.fishing_zone) extraInfo.push(`🎣 Zone ${escapeHtml(item.fishing_zone)}`);
+  if (item.fishing_method) extraInfo.push(`🪝 ${escapeHtml(item.fishing_method)}`);
+  if (item.origin) extraInfo.push(`🏷️ ${escapeHtml(item.origin)}`);
+  if (item.sanitary_approval) extraInfo.push(`📋 Agr. ${escapeHtml(item.sanitary_approval)}`);
 
   return `
     <tr style="border-bottom:1px solid var(--border-default)" data-item-id="${item.id}">
@@ -238,14 +238,14 @@ function renderDeliveryItemRow(item, isPending) {
       <td style="padding:var(--space-3)">${formatQuantity(item.quantity, item.unit)}</td>
       <td style="padding:var(--space-3);font-family:var(--font-mono,monospace);font-size:var(--text-xs)">${escapeHtml(item.batch_number || '—')}</td>
       <td style="padding:var(--space-3);${dlcWarning ? 'color:var(--color-warning);font-weight:700' : ''}">
-        ${item.dlc || '—'}
+        ${escapeHtml(item.dlc || '—')}
         ${dlcWarning ? `<br><small style="color:${dlcDays <= 1 ? 'var(--color-danger)' : 'var(--color-warning)'}">⚠️ ${dlcDays}j restant${dlcDays > 1 ? 's' : ''}</small>` : ''}
       </td>
       <td style="padding:var(--space-3)">${item.temperature_required != null ? item.temperature_required + '°C' : '—'}</td>
       ${isPending ? `
         <td style="padding:var(--space-3)">
-          <input type="number" class="input item-temp" step="0.1" value="${item.temperature_required ?? ''}"
-                 style="width:80px;font-size:var(--text-sm)" data-item-id="${item.id}" data-temp-required="${item.temperature_required ?? ''}" data-ui="custom">
+          <input type="number" class="input item-temp" step="0.1" value="${escapeHtml(item.temperature_required ?? '')}"
+                 style="width:80px;font-size:var(--text-sm)" data-item-id="${item.id}" data-temp-required="${escapeHtml(item.temperature_required ?? '')}" data-ui="custom">
           <span class="temp-warning" data-item-id="${item.id}" style="display:none;color:var(--color-danger);font-size:var(--text-xs);font-weight:700">⚠️ T° trop haute !</span>
         </td>
       ` : ''}

@@ -44,6 +44,7 @@ function renderSubscribe() {
         <button class="btn btn-primary subscribe-btn" id="subscribe-now">
           S'abonner maintenant
         </button>
+        <p id="subscribe-error" role="alert" style="display:none; color: var(--color-danger, #C4422A); font-size: 0.875rem; margin-top: 12px;"></p>
 
         <div class="subscribe-reassurance">
           <p>Vos données sont préservées.</p>
@@ -55,29 +56,39 @@ function renderSubscribe() {
 
   document.getElementById('subscribe-now').addEventListener('click', async () => {
     const btn = document.getElementById('subscribe-now');
-    btn.textContent = 'Redirection...';
-    btn.disabled = true;
-
-    try {
-      const account = getAccount();
-      const accountId = account ? account.id : null;
-      const res = await fetch('/api/stripe/create-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId })
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        showToast('Erreur lors de la redirection vers le paiement', 'error');
-        btn.textContent = "S'abonner maintenant";
-        btn.disabled = false;
-      }
-    } catch (err) {
-      showToast('Erreur de connexion au service de paiement', 'error');
+    const errorEl = document.getElementById('subscribe-error');
+    const showError = (msg) => {
+      errorEl.textContent = msg;
+      errorEl.style.display = 'block';
+      showToast(msg, 'error');
       btn.textContent = "S'abonner maintenant";
       btn.disabled = false;
+    };
+    errorEl.style.display = 'none';
+    btn.textContent = 'Redirection...';
+    btn.disabled = true;
+    if (window.umami) { try { umami.track('checkout_started'); } catch (e) {} }
+
+    try {
+      // Le compte est identifié par la session serveur (cookie JWT/Bearer via
+      // API.request, qui joint aussi le jeton CSRF) — on n'envoie jamais
+      // d'accountId choisi côté navigateur.
+      const data = await API.request('/stripe/create-checkout', { method: 'POST', body: {} });
+      if (data && data.url) {
+        window.location.href = data.url;
+      } else if (data && data.status === 'active') {
+        errorEl.style.color = 'var(--color-accent, #1F7A4D)';
+        errorEl.textContent = 'Votre abonnement Pro est déjà actif — rien à payer.';
+        errorEl.style.display = 'block';
+        btn.textContent = 'Abonnement déjà actif';
+      } else {
+        showError('Le paiement est momentanément indisponible. Réessayez dans quelques minutes.');
+      }
+    } catch (err) {
+      const msg = (err && err.message && err.message.includes('Stripe'))
+        ? 'Le service de paiement est momentanément indisponible. Réessayez dans quelques minutes ou écrivez à contact@restosuite.fr.'
+        : (err && err.message) || 'Erreur de connexion au service de paiement.';
+      showError(msg);
     }
   });
 }

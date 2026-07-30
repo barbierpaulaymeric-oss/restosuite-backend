@@ -63,7 +63,7 @@ async function renderIngredients() {
             <span class="stat-label">Perte</span>
           </div>
           <div>
-            <span class="stat-value">${ing.default_unit}</span>
+            <span class="stat-value">${escapeHtml(ing.default_unit)}</span>
             <span class="stat-label">Unité</span>
           </div>
           <div>
@@ -268,7 +268,7 @@ function showCSVImportModal() {
             <tr>
               <td>${escapeHtml(r.name)}</td>
               <td>${escapeHtml(r.category || '—')}</td>
-              <td>${r.default_unit}</td>
+              <td>${escapeHtml(r.default_unit)}</td>
               <td>${r.price_per_unit}</td>
               <td>${r.waste_percent}%</td>
             </tr>

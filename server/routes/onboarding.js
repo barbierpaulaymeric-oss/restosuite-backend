@@ -82,9 +82,14 @@ router.put('/step/1', (req, res) => {
   const { first_name, last_name, phone } = req.body;
 
   const name = ((first_name || '').trim() + ' ' + (last_name || '').trim()).trim();
+  // NULLIF/COALESCE : une étape « Passée » (body vide) conserve le name
+  // existant — `name || undefined` liait NULL et violait NOT NULL (500 constaté
+  // en E2E sur le bouton Passer de l'étape profil).
   run(
-    'UPDATE accounts SET first_name = ?, last_name = ?, phone = ?, name = ?, onboarding_step = MAX(onboarding_step, 1) WHERE id = ?',
-    [(first_name || '').trim(), (last_name || '').trim(), (phone || '').trim(), name || undefined, req.user.id]
+    `UPDATE accounts SET first_name = ?, last_name = ?, phone = ?,
+            name = COALESCE(NULLIF(?, ''), name),
+            onboarding_step = MAX(onboarding_step, 1) WHERE id = ?`,
+    [(first_name || '').trim(), (last_name || '').trim(), (phone || '').trim(), name, req.user.id]
   );
 
   res.json({ success: true, step: 1 });

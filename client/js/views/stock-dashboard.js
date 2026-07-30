@@ -183,7 +183,7 @@ function renderStockCard(item) {
         ${isAlert ? '<span class="badge badge--danger" style="font-size:var(--text-xs)">Stock bas</span>' : ''}
       </div>
       <div style="display:flex;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-3)">
-        <span class="data-value" style="font-size:var(--text-xl);font-weight:700;color:${isAlert ? 'var(--color-danger)' : 'var(--text-primary)'}">${formatQuantity(item.quantity, item.unit)}</span>
+        <span class="data-value" style="font-size:var(--text-xl);font-weight:700;color:${isAlert ? 'var(--color-danger)' : 'var(--text-primary)'}">${escapeHtml(formatQuantity(item.quantity, item.unit))}</span>
       </div>
       ${item.min_quantity > 0 ? `
       <div style="margin-bottom:var(--space-2)">

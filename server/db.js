@@ -12,13 +12,21 @@
 const Database = require('better-sqlite3-multiple-ciphers');
 const path = require('path');
 const fs = require('fs');
+const { resolveDbPath, assertProductionPersistence } = require('./db-path');
 
-const dataDir = process.env.NODE_ENV === 'production' && fs.existsSync('/data')
-  ? '/data'
-  : path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+// En production : exiger un stockage persistant (DB_PATH ou /data), sinon
+// arrêt immédiat avec un message actionnable — plutôt qu'une base silencieuse
+// sur disque éphémère effacée au déploiement suivant.
+assertProductionPersistence();
 
-const dbPath = process.env.DB_PATH || path.join(dataDir, 'restosuite.db');
+const dbPath = resolveDbPath();
+// Créer le répertoire parent quel que soit le chemin (y compris DB_PATH custom
+// — auparavant seul le dataDir par défaut était créé et un DB_PATH vers un
+// dossier absent levait SQLITE_CANTOPEN).
+if (dbPath !== ':memory:') {
+  const parent = path.dirname(dbPath);
+  if (!fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
+}
 const db = new Database(dbPath);
 
 // ─── Encryption at rest (RGPD Art. 32) ───

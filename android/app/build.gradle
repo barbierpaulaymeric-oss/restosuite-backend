@@ -38,12 +38,37 @@ android {
     }
     buildTypes {
         release {
-            // Uses the release keystore when keystore.properties is present; else
-            // falls back to debug signing so `assembleRelease` never hard-fails.
-            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+            // Signature release UNIQUEMENT avec le keystore dédié. Plus aucun
+            // repli silencieux sur la clé debug : un APK/AAB release signé debug
+            // est inutilisable pour le Play Store et masquait l'absence du
+            // keystore (cf. audit 2026-07-30). Sans keystore.properties, la
+            // config reste non signée ici et le garde ci-dessous fait échouer
+            // explicitement toute tâche release ; les builds debug ne sont
+            // jamais affectées.
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+// Garde release : échec clair (et actionnable) quand une tâche release est
+// demandée sans keystore, au moment où le graphe de tâches est connu — jamais
+// pendant les builds debug ni la config initiale.
+gradle.taskGraph.whenReady { graph ->
+    def releaseRequested = graph.allTasks.any { task ->
+        task.project == project && task.name.toLowerCase().contains('release') &&
+            (task.name.startsWith('assemble') || task.name.startsWith('bundle') || task.name.startsWith('package'))
+    }
+    if (releaseRequested && !keystorePropertiesFile.exists()) {
+        throw new GradleException(
+            "Build release refusée : android/keystore.properties introuvable.\n" +
+            "  → Copier keystore.properties.example, renseigner le keystore de release\n" +
+            "    (restosuite-release.jks) puis relancer. Voir docs/RELEASE_ANDROID.md.\n" +
+            "  Les builds debug (assembleDebug) fonctionnent sans keystore."
+        )
     }
 }
 

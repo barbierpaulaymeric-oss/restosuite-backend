@@ -96,11 +96,17 @@ const insertFullRecipe = db.transaction((rid, data) => insertFullRecipeInner(rid
 // Best-effort: instrumentation must never break recipe creation.
 function stampFirstRecipeActivation(rid) {
   try {
-    run(
+    const result = run(
       `UPDATE accounts SET first_recipe_at = datetime('now'), activated_at = datetime('now')
        WHERE restaurant_id = ? AND is_owner = 1 AND first_recipe_at IS NULL`,
       [rid]
     );
+    if (result && result.changes > 0) {
+      // Funnel serveur : première fiche = activation (une seule fois par resto).
+      const { recordProductEvent } = require('../lib/product-events');
+      recordProductEvent('first_recipe_completed', { restaurantId: rid });
+      recordProductEvent('activated', { restaurantId: rid });
+    }
   } catch (_) { /* instrumentation non bloquante */ }
 }
 

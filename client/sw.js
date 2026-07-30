@@ -1,3 +1,8 @@
+// Bumped 2026-07-30 (v65): Portée du SW limitée à /app (la landing et le blog ne
+// sont plus contrôlés — plus de rechargement forcé de la landing à l'activation).
+// L'app n'est plus rechargée d'office : app-init.js affiche « Une mise à jour est
+// disponible » et l'utilisateur recharge quand il veut. Les anciens SW de portée
+// « / » sont désenregistrés par app-init.js (app) et landing-main.js (landing).
 // Bumped 2026-07-05 (v64): TVA franchise en base (art. 293 B) — retrait TTC/20%
 // dans CGV, landing, mentions ; prix affiché « 39€ HT » dans l'app (subscribe, app.js).
 // + identité Android régénérée en vert (icônes/splash), config signature release.
@@ -26,10 +31,10 @@
 // restaurateurs trié par date d'inscription avec pastilles d'activité
 // (vert = actif, ambre > 14j, rouge = jamais reconnecté) + compteur de jours
 // depuis la dernière connexion. Le lien Admin de la nav pointe désormais ici.
-const CACHE_NAME = 'restosuite-v64';
+const CACHE_NAME = 'restosuite-v65';
 const STATIC_ASSETS = [
   '/app',
-  '/css/style.css',
+  '/css/style.min.css',
   // The actual bundled SPA is /js/app.bundle.js — pre-cache it on install
   // so the network-first fetch handler has a reliable fallback. The old
   // STATIC_ASSETS list pointed at /js/app.js (the unbundled source) which

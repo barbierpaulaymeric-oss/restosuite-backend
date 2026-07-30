@@ -71,7 +71,7 @@ function renderNCCard(nc, resolved) {
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
             <span class="badge ${sev.class}">${sev.label}</span>
-            <span class="text-secondary text-sm">${cat}</span>
+            <span class="text-secondary text-sm">${escapeHtml(cat)}</span>
             <span class="text-secondary text-sm">· ${detectedDate}</span>
           </div>
           <div style="font-weight:600;margin-bottom:4px">${escapeHtml(nc.title)}</div>

@@ -9,9 +9,11 @@
     "cap:ios": "npx cap sync ios && npx cap open ios",
     "cap:android": "npx cap sync android && npx cap open android",
     "cap:copy": "npx cap copy",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "esbuild": "^0.28.1",
     "patch-package": "^8.0.1",
     "typescript": "^6.0.3"

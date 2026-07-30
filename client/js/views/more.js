@@ -71,11 +71,8 @@ class MoreView {
       <div id="advanced-modules" style="display:${showAdvanced ? 'block' : 'none'}">
         <div class="section-title" style="margin-bottom:var(--space-2);">🔬 Modules avancés</div>
         <div class="more-grid">
-          <a href="#/multi-site" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-            <div class="more-card__icon" style="background:var(--color-info)"><i data-lucide="building-2"></i></div>
-            <div class="more-card__content"><h3>Multi-Sites</h3><span class="badge badge--info">Avancé</span></div>
-            <p class="text-secondary text-sm">Gérez plusieurs établissements</p>
-          </a>
+          <!-- Multi-Sites retiré : fonction masquée tant que la tenancy n'est pas
+               terminée (décision produit 2026-07-30). -->
           <a href="#/api-keys" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
             <div class="more-card__icon" style="background:var(--color-primary)"><i data-lucide="key"></i></div>
             <div class="more-card__content"><h3>API Publique</h3><span class="badge badge--info">Avancé</span></div>

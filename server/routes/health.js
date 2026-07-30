@@ -16,6 +16,63 @@ try {
        ON health_score_history (restaurant_id, date)`);
 } catch {}
 
+// GET /api/health/persistence — État de la persistance (monitoring).
+// Booléens et horodatages uniquement : aucun chemin complet, aucun secret,
+// aucune donnée métier. Sert à détecter un déploiement où la base serait
+// retombée sur le disque éphémère ou dont les sauvegardes ne tournent plus.
+router.get('/persistence', (req, res) => {
+  try {
+    const fs = require('fs');
+    const { resolveDbPath, resolveBackupDir } = require('../db-path');
+    const dbPath = resolveDbPath();
+    const inMemory = dbPath === ':memory:';
+
+    const storage = inMemory
+      ? 'memory'
+      : (process.env.DB_PATH ? 'db-path-env' : (dbPath.startsWith('/data/') ? 'persistent-disk' : 'local-dir'));
+
+    let dbExists = false, encrypted = false, walActive = false;
+    if (!inMemory && fs.existsSync(dbPath)) {
+      dbExists = true;
+      // Chiffrée = l'en-tête n'est plus le magic "SQLite format 3" en clair.
+      try {
+        const fd = fs.openSync(dbPath, 'r');
+        const buf = Buffer.alloc(16);
+        const n = fs.readSync(fd, buf, 0, 16, 0);
+        fs.closeSync(fd);
+        encrypted = n >= 16 && !buf.toString('latin1').startsWith('SQLite format 3');
+      } catch {}
+      walActive = fs.existsSync(dbPath + '-wal');
+    }
+
+    let lastBackupAt = null, backupsCount = 0;
+    const backupDir = resolveBackupDir();
+    if (backupDir && fs.existsSync(backupDir)) {
+      const backups = fs.readdirSync(backupDir)
+        .filter(f => f.startsWith('restosuite-') && f.endsWith('.db'))
+        .sort();
+      backupsCount = backups.length;
+      if (backups.length) {
+        lastBackupAt = fs.statSync(require('path').join(backupDir, backups[backups.length - 1])).mtime.toISOString();
+      }
+    }
+
+    res.json({
+      status: 'ok',
+      storage,                      // 'persistent-disk' | 'db-path-env' | 'local-dir' | 'memory'
+      persistent: storage === 'persistent-disk' || storage === 'db-path-env',
+      db_exists: dbExists,
+      encrypted_at_rest: encrypted,
+      wal_active: walActive,
+      backups_count: backupsCount,
+      last_backup_at: lastBackupAt,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (e) {
+    res.status(500).json({ status: 'error', error: 'Vérification de persistance impossible' });
+  }
+});
+
 // POST /api/health/score — Sauvegarder le health score du jour
 router.post('/score', requireAuth, (req, res) => {
   try {

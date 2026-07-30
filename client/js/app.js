@@ -56,7 +56,9 @@ const NAV_GROUPS = {
       { label: 'Intégrations',        route: '/integrations',    icon: 'plug',         roles: ['gerant'] },
       { label: 'QR Codes',            route: '/qrcodes',         icon: 'qr-code',      roles: ['gerant'] },
       { label: 'Bilan Carbone',       route: '/carbon',          icon: 'leaf',         roles: ['gerant'] },
-      { label: 'Multi-Sites',         route: '/multi-site',      icon: 'building-2',   roles: ['gerant'] },
+      // Multi-Sites masqué (feature flag serveur désactivé, tenancy non terminée
+      // — décision produit 2026-07-30). La route reste montée mais affiche
+      // « Bientôt disponible » ; aucune création de site n'est possible.
       { label: 'Portail Fournisseur', route: '/supplier-portal', icon: 'truck',        roles: ['gerant'] },
       { label: 'Journal erreurs',     route: '/errors-log',         icon: 'bug',          roles: ['gerant'] },
       { label: 'Agrément sanitaire',  route: '/settings/sanitary-approval', icon: 'badge-check', roles: ['gerant'] },
@@ -489,6 +491,7 @@ function bootApp(role, account, opts = {}) {
     location.hash = '#/';
   }
   Router.init();
+  const resumedIntent = consumePostLoginIntent(role);
   if (window.lucide) lucide.createIcons();
   const displayName = account ? account.name : role;
   console.log('%c RestoSuite ', 'background:#2D8B5E;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600', `loaded (${displayName})`);
@@ -502,7 +505,10 @@ function bootApp(role, account, opts = {}) {
 
   // First-login onboarding tour (gérant only, runs once, skips if role-
   // redirected to /kitchen or /service since the nav is hidden there).
-  if (role === 'gerant' && typeof maybeStartOnboardingTour === 'function') {
+  // Différé aussi quand une intention post-login vient d'être reprise
+  // (ex. page d'abonnement) : le backdrop du tour recouvrirait le paiement.
+  // Le flag « tour vu » n'étant pas posé, il se lancera au prochain boot normal.
+  if (role === 'gerant' && !resumedIntent && typeof maybeStartOnboardingTour === 'function') {
     maybeStartOnboardingTour(account);
   }
 }
@@ -754,7 +760,52 @@ function initMobileNav(role) {
   window.addEventListener('hashchange', closeOverlay);
 }
 
+// ─── Intention & attribution d'acquisition ───
+// La landing et le blog transmettent l'attribution en query string
+// (/app?src=blog&article=<slug>&pos=header#register) et l'intention d'abonnement
+// via sessionStorage (rs_intent, posé par landing-main.js) ou le hash #/subscribe.
+// bootApp() écrase systématiquement location.hash et le flux #register fait un
+// history.replaceState : tout doit donc être capturé ICI, avant le boot.
+function captureAcquisitionIntent() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const clean = (v) => (v || '').slice(0, 80).replace(/[^\w\s\-./àâäéèêëîïôöùûüç]/gi, '');
+    const acq = {
+      source: clean(params.get('src') || params.get('utm_source')),
+      medium: clean(params.get('utm_medium')),
+      campaign: clean(params.get('utm_campaign')),
+      content: clean(params.get('article') || params.get('utm_content')),
+      position: clean(params.get('pos')),
+    };
+    if (acq.source || acq.campaign || acq.content) {
+      sessionStorage.setItem('rs_acquisition', JSON.stringify(acq));
+    }
+    if (params.get('intent') === 'subscribe' || location.hash === '#/subscribe') {
+      sessionStorage.setItem('rs_intent', 'subscribe');
+    }
+  } catch (e) { /* sessionStorage indisponible — tant pis pour l'attribution */ }
+}
+
+// Consommée juste après Router.init() (bootApp) : reprend le parcours vers la
+// page d'abonnement si l'utilisateur venait du CTA tarif. Réservée au gérant —
+// pour tout autre rôle l'intention est simplement oubliée. Retourne l'intention
+// reprise (ou null) pour que bootApp puisse, par exemple, différer le tour
+// guidé plutôt que de le superposer à la page de paiement.
+function consumePostLoginIntent(role) {
+  let intent = null;
+  try { intent = sessionStorage.getItem('rs_intent'); } catch (e) { return null; }
+  if (!intent) return null;
+  try { sessionStorage.removeItem('rs_intent'); } catch (e) {}
+  if (intent === 'subscribe' && role === 'gerant') {
+    location.hash = '#/subscribe';
+    return 'subscribe';
+  }
+  return null;
+}
+
 (async function init() {
+  captureAcquisitionIntent();
+
   // Check supplier session first
   const supplierSession = getSupplierSession();
   if (supplierSession && getSupplierToken()) {

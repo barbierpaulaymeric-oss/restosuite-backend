@@ -2484,9 +2484,10 @@ function renderAISuggestions(container, data) {
 }
 function getGreeting(name) {
   const hour = (/* @__PURE__ */ new Date()).getHours();
-  if (hour < 12) return `Bonjour ${name} \u{1F44B}`;
-  if (hour < 17) return `Bon apr\xE8s-midi ${name} \u2600\uFE0F`;
-  return `Bonsoir ${name} \u{1F319}`;
+  const safeName = escapeHtml(name);
+  if (hour < 12) return `Bonjour ${safeName} \u{1F44B}`;
+  if (hour < 17) return `Bon apr\xE8s-midi ${safeName} \u2600\uFE0F`;
+  return `Bonsoir ${safeName} \u{1F319}`;
 }
 function formatFrenchDate(date) {
   const days = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -2754,11 +2755,17 @@ async function renderRecipeDetail(id) {
       ${perms.view_costs ? `<button class="btn btn-secondary" onclick="openPriceSimulator(${recipe.id}, ${recipe.cost_per_portion}, ${recipe.selling_price})"><i data-lucide="sliders" style="width:18px;height:18px"></i> Simuler</button>` : ""}
       ${perms.edit_recipes ? `<a href="#/edit/${recipe.id}" class="btn btn-primary"><i data-lucide="pencil" style="width:18px;height:18px"></i> Modifier</a>` : ""}
       ${perms.export_pdf ? `<button class="btn btn-secondary" onclick="exportRecipe(${recipe.id})"><i data-lucide="download" style="width:18px;height:18px"></i> Exporter</button>` : ""}
-      <button class="btn btn-secondary" onclick="printAllergenSheet(${recipe.id}, '${escapeHtml(recipe.name).replace(/'/g, "\\'")}')"><i data-lucide="printer" style="width:18px;height:18px"></i> Fiche allerg\xE8nes</button>
+      <button class="btn btn-secondary" data-print-allergens="${recipe.id}" data-recipe-name="${escapeHtml(recipe.name)}"><i data-lucide="printer" style="width:18px;height:18px"></i> Fiche allerg\xE8nes</button>
       ${perms.edit_recipes ? `<button class="btn btn-danger" onclick="deleteRecipe(${recipe.id})"><i data-lucide="trash-2" style="width:18px;height:18px"></i> Supprimer</button>` : ""}
     </div>
   `;
   lucide.createIcons();
+  var printBtn = app.querySelector("[data-print-allergens]");
+  if (printBtn) {
+    printBtn.addEventListener("click", function() {
+      printAllergenSheet(Number(printBtn.dataset.printAllergens), printBtn.dataset.recipeName || "");
+    });
+  }
   loadRecipeAllergens(id);
 }
 async function loadRecipeAllergens(recipeId) {
@@ -2903,10 +2910,10 @@ async function printAllergenSheet(recipeId, recipeName) {
     const today = (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR");
     const allergensHtml = allergens.length > 0 ? allergens.map((a) => `
           <div class="allergen-item">
-            <span class="allergen-icon">${a.icon}</span>
+            <span class="allergen-icon">${escapeHtml(a.icon)}</span>
             <div>
-              <strong>${a.name}</strong>
-              <small>${a.description || ""}</small>
+              <strong>${escapeHtml(a.name)}</strong>
+              <small>${escapeHtml(a.description || "")}</small>
             </div>
           </div>`).join("") : '<p class="none">Aucun allerg\xE8ne d\xE9tect\xE9 dans cette recette.</p>';
     const win = window.open("", "_blank");
@@ -2914,7 +2921,7 @@ async function printAllergenSheet(recipeId, recipeName) {
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Fiche allerg\xE8nes \u2014 ${recipeName}</title>
+  <title>Fiche allerg\xE8nes \u2014 ${escapeHtml(recipeName)}</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; color: #1a1a1a; }
     h1 { font-size: 22px; margin-bottom: 4px; }
@@ -2930,7 +2937,7 @@ async function printAllergenSheet(recipeId, recipeName) {
   </style>
 </head>
 <body>
-  <h1><i data-lucide="utensils" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>${recipeName}</h1>
+  <h1><i data-lucide="utensils" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>${escapeHtml(recipeName)}</h1>
   <p class="subtitle">Fiche allerg\xE8nes \u2014 Imprim\xE9e le ${today}</p>
   <div class="inco-badge">\u{1F4CB} R\xE8glement INCO (UE) \u2014 14 allerg\xE8nes r\xE9glementaires</div>
   <div>${allergensHtml}</div>
@@ -4260,7 +4267,7 @@ async function renderIngredients() {
             <span class="stat-label">Perte</span>
           </div>
           <div>
-            <span class="stat-value">${ing.default_unit}</span>
+            <span class="stat-value">${escapeHtml(ing.default_unit)}</span>
             <span class="stat-label">Unit\xE9</span>
           </div>
           <div>
@@ -4459,7 +4466,7 @@ function showCSVImportModal() {
             <tr>
               <td>${escapeHtml(r.name)}</td>
               <td>${escapeHtml(r.category || "\u2014")}</td>
-              <td>${r.default_unit}</td>
+              <td>${escapeHtml(r.default_unit)}</td>
               <td>${r.price_per_unit}</td>
               <td>${r.waste_percent}%</td>
             </tr>
@@ -4709,7 +4716,7 @@ function renderStockCard(item) {
         ${isAlert ? '<span class="badge badge--danger" style="font-size:var(--text-xs)">Stock bas</span>' : ""}
       </div>
       <div style="display:flex;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-3)">
-        <span class="data-value" style="font-size:var(--text-xl);font-weight:700;color:${isAlert ? "var(--color-danger)" : "var(--text-primary)"}">${formatQuantity(item.quantity, item.unit)}</span>
+        <span class="data-value" style="font-size:var(--text-xl);font-weight:700;color:${isAlert ? "var(--color-danger)" : "var(--text-primary)"}">${escapeHtml(formatQuantity(item.quantity, item.unit))}</span>
       </div>
       ${item.min_quantity > 0 ? `
       <div style="margin-bottom:var(--space-2)">
@@ -5142,13 +5149,13 @@ function renderMovementsList(movements) {
               <div style="flex:1;min-width:0">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
                   <span style="font-weight:600;font-size:var(--text-sm)">${escapeHtml(mv.ingredient_name)}</span>
-                  <span class="data-value" style="font-weight:600;color:${cfg.color}">${sign}${mv.quantity} ${mv.unit}</span>
+                  <span class="data-value" style="font-weight:600;color:${cfg.color}">${sign}${escapeHtml(mv.quantity)} ${escapeHtml(mv.unit)}</span>
                 </div>
                 <div style="display:flex;gap:var(--space-3);font-size:var(--text-xs);color:var(--text-tertiary);flex-wrap:wrap">
                   <span>${cfg.label}</span>
                   <span>${time}</span>
                   ${mv.supplier_name ? `<span>Fourn: ${escapeHtml(mv.supplier_name)}</span>` : ""}
-                  ${mv.batch_number ? `<span>Lot: ${mv.batch_number}</span>` : ""}
+                  ${mv.batch_number ? `<span>Lot: ${escapeHtml(mv.batch_number)}</span>` : ""}
                   ${mv.unit_price != null ? `<span>${mv.unit_price.toFixed(2)}\u20AC/u</span>` : ""}
                   ${mv.recorded_by_name ? `<span>Par: ${escapeHtml(mv.recorded_by_name)}</span>` : ""}
                 </div>
@@ -5553,7 +5560,7 @@ async function renderSupplierIntegrations() {
             ${integ.last_sync_error ? `<div style="color:var(--color-warn)">${escapeHtml(integ.last_sync_error)}</div>` : ""}
           </div>
           <div style="display:flex;gap:var(--space-2);margin-top:var(--space-3);flex-wrap:wrap">
-            <button class="btn btn-secondary" onclick="showSupplierIntegrationSync(${integ.id}, '${escapeHtml(s.name)}')">
+            <button class="btn btn-secondary" data-sync-integ="${integ.id}" data-supplier-name="${escapeHtml(s.name)}">
               <i data-lucide="refresh-ccw" style="width:16px;height:16px"></i> Synchroniser
             </button>
             <button class="btn btn-secondary" onclick="disconnectSupplierIntegration(${integ.id})">
@@ -5570,7 +5577,7 @@ async function renderSupplierIntegrations() {
           <span class="badge badge-muted" data-ui="custom">Non connect\xE9</span>
         </div>
         <div style="margin-top:var(--space-3)">
-          <button class="btn btn-primary" onclick="showSupplierIntegrationConnect(${s.id}, '${escapeHtml(s.name)}')">
+          <button class="btn btn-primary" data-connect-supplier="${s.id}" data-supplier-name="${escapeHtml(s.name)}">
             <i data-lucide="plug" style="width:16px;height:16px"></i> Connecter \xE0 FoodFlow
           </button>
         </div>
@@ -5578,6 +5585,16 @@ async function renderSupplierIntegrations() {
     `;
   }).join("");
   lucide.createIcons();
+  listEl.querySelectorAll("[data-sync-integ]").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      showSupplierIntegrationSync(Number(btn.dataset.syncInteg), btn.dataset.supplierName || "");
+    });
+  });
+  listEl.querySelectorAll("[data-connect-supplier]").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      showSupplierIntegrationConnect(Number(btn.dataset.connectSupplier), btn.dataset.supplierName || "");
+    });
+  });
 }
 function showSupplierIntegrationConnect(supplierId, supplierName) {
   const existing = document.querySelector(".modal-overlay");
@@ -6388,7 +6405,7 @@ async function loadRecentReceptions() {
               <div style="display:flex;gap:var(--space-2);align-items:center">
                 ${r.temperature_at_reception != null ? `
                   <span class="badge ${r.temperature_at_reception <= 4 ? "badge--success" : r.temperature_at_reception <= 8 ? "badge--warning" : "badge--danger"}" style="font-size:11px">
-                    ${r.temperature_at_reception}\xB0C
+                    ${escapeHtml(r.temperature_at_reception)}\xB0C
                   </span>` : ""}
                 <span class="text-secondary" style="font-size:11px">${new Date(r.created_at).toLocaleDateString("fr-FR")}</span>
               </div>
@@ -7767,10 +7784,10 @@ function renderTraceRows(logs) {
           ${dlcDays !== null && dlcDays < 0 ? ' <span class="badge badge--danger">D\xE9pass\xE9e</span>' : ""}
         </td>
         <td>${log.ddm ? new Date(log.ddm).toLocaleDateString("fr-FR") : "\u2014"}</td>
-        <td class="mono">${log.temperature_at_reception != null ? log.temperature_at_reception + "\xB0C" : "\u2014"}</td>
+        <td class="mono">${log.temperature_at_reception != null ? escapeHtml(log.temperature_at_reception) + "\xB0C" : "\u2014"}</td>
         <td>${escapeHtml(log.etat_emballage || "\u2014")}</td>
         <td>${escapeHtml(log.conformite_organoleptique || "\u2014")}</td>
-        <td class="mono">${log.quantity != null ? `${log.quantity} ${log.unit || ""}` : "\u2014"}</td>
+        <td class="mono">${log.quantity != null ? `${escapeHtml(log.quantity)} ${escapeHtml(log.unit || "")}` : "\u2014"}</td>
         <td>${escapeHtml(log.received_by_name || "\u2014")}</td>
       </tr>
     `;
@@ -9034,7 +9051,7 @@ function renderNCCard(nc, resolved) {
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
             <span class="badge ${sev.class}">${sev.label}</span>
-            <span class="text-secondary text-sm">${cat}</span>
+            <span class="text-secondary text-sm">${escapeHtml(cat)}</span>
             <span class="text-secondary text-sm">\xB7 ${detectedDate}</span>
           </div>
           <div style="font-weight:600;margin-bottom:4px">${escapeHtml(nc.title)}</div>
@@ -9530,7 +9547,7 @@ async function renderHACCPWater() {
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
             <i data-lucide="${lastAnalysis.conformity ? "check-circle" : "x-circle"}" style="width:18px;height:18px;color:${lastAnalysis.conformity ? "#27ae60" : "#dc3545"}"></i>
             <strong>Derni\xE8re analyse \u2014 ${new Date(lastAnalysis.analysis_date).toLocaleDateString("fr-FR")}</strong>
-            <span class="text-secondary text-sm">${SOURCE_ICONS[lastAnalysis.water_source] || "\u{1F4A7}"} ${lastAnalysis.water_source} \xB7 ${TYPE_LABELS[lastAnalysis.analysis_type] || lastAnalysis.analysis_type}</span>
+            <span class="text-secondary text-sm">${SOURCE_ICONS[lastAnalysis.water_source] || "\u{1F4A7}"} ${escapeHtml(lastAnalysis.water_source)} \xB7 ${escapeHtml(TYPE_LABELS[lastAnalysis.analysis_type] || lastAnalysis.analysis_type)}</span>
           </div>
           <p class="text-sm" style="margin:0 0 6px">${escapeHtml(lastAnalysis.results || "Aucun r\xE9sultat enregistr\xE9")}</p>
           ${lastAnalysis.next_analysis_date ? `<p class="text-sm text-secondary" style="margin:0">Prochaine analyse pr\xE9vue : <strong>${new Date(lastAnalysis.next_analysis_date).toLocaleDateString("fr-FR")}</strong></p>` : ""}
@@ -9559,7 +9576,7 @@ async function renderHACCPWater() {
       return `
                     <tr${!item.conformity ? ' style="background:#fff8f8"' : ""}>
                       <td class="mono">${new Date(item.analysis_date).toLocaleDateString("fr-FR")}</td>
-                      <td class="text-sm">${TYPE_LABELS[item.analysis_type] || item.analysis_type}</td>
+                      <td class="text-sm">${escapeHtml(TYPE_LABELS[item.analysis_type] || item.analysis_type)}</td>
                       <td class="text-sm">${SOURCE_ICONS[item.water_source] || "\u{1F4A7}"} ${escapeHtml(item.water_source || "\u2014")}</td>
                       <td class="text-sm">${escapeHtml(item.provider || "\u2014")}</td>
                       <td class="text-sm" style="max-width:260px;white-space:normal">${escapeHtml(item.results || "\u2014")}</td>
@@ -9727,7 +9744,7 @@ const SEVERITY_CONFIG = {
 };
 function statusBadge(status) {
   const c = PMS_STATUS_CONFIG[status] || { color: "#888", bg: "#f5f5f5", label: status };
-  return `<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:600;color:${c.color};background:${c.bg};border:1px solid ${c.color}33">${c.label}</span>`;
+  return `<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:600;color:${c.color};background:${c.bg};border:1px solid ${c.color}33">${escapeHtml(c.label)}</span>`;
 }
 function scoreColor(score) {
   if (score === null || score === void 0) return "#888";
@@ -9817,11 +9834,11 @@ async function renderHACCPPmsAudit() {
                 <div style="border:1px solid var(--color-border,#e0e0e0);border-radius:8px;overflow:hidden">
                   <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--color-bg-secondary,#f8f9fa);flex-wrap:wrap">
                     <span style="font-weight:700;font-size:15px">${new Date(item.audit_date).toLocaleDateString("fr-FR")}</span>
-                    <span class="text-sm text-secondary">${item.audit_type === "interne" ? "\u{1F3E0} Interne" : "\u{1F3E2} Externe"} \xB7 ${item.scope}</span>
+                    <span class="text-sm text-secondary">${item.audit_type === "interne" ? "\u{1F3E0} Interne" : "\u{1F3E2} Externe"} \xB7 ${escapeHtml(item.scope)}</span>
                     <span class="text-sm">${escapeHtml(item.auditor_name)}</span>
                     ${statusBadge(item.status)}
                     ${item.overall_score !== null ? `
-                      <span style="margin-left:auto;font-size:22px;font-weight:800;color:${scoreColor(item.overall_score)}">${item.overall_score}<span style="font-size:13px;color:var(--color-text-secondary,#888)">/100</span></span>
+                      <span style="margin-left:auto;font-size:22px;font-weight:800;color:${scoreColor(item.overall_score)}">${escapeHtml(item.overall_score)}<span style="font-size:13px;color:var(--color-text-secondary,#888)">/100</span></span>
                     ` : '<span style="margin-left:auto;color:#888;font-size:13px">Score N/A</span>'}
                     <div style="display:flex;gap:6px">
                       <button class="btn btn-ghost btn-sm" onclick="openPmsAuditModal(${item.id})"><i data-lucide="edit-2" style="width:14px;height:14px"></i></button>
@@ -9851,7 +9868,7 @@ async function renderHACCPPmsAudit() {
                             <tr>
                               <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0);font-weight:600">${escapeHtml(f.section)}</td>
                               <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0)">${escapeHtml(f.finding)}</td>
-                              <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0);text-align:center;color:${sc.color};font-weight:600;white-space:nowrap">${sc.label}</td>
+                              <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0);text-align:center;color:${sc.color};font-weight:600;white-space:nowrap">${escapeHtml(sc.label)}</td>
                               <td style="padding:6px 10px;border-bottom:1px solid var(--color-border,#e0e0e0);color:var(--color-text-secondary,#666)">${escapeHtml(f.action_required || "\u2014")}</td>
                             </tr>
                           `;
@@ -10113,7 +10130,7 @@ async function renderHACCPTIAC() {
               <div class="card" style="border-left:4px solid ${statutColors[p.statut] || "var(--border-light)"}">
                 <div class="card-header">
                   <span class="card-title">${escapeHtml(new Date(p.date_incident).toLocaleDateString("fr-FR"))} \u2014 ${escapeHtml(p.nb_personnes)} personne(s) touch\xE9e(s)</span>
-                  <span class="badge" style="background:${statutColors[p.statut] || "var(--color-info)"};color:white;font-size:11px;padding:2px 8px;border-radius:20px">${statutLabels[p.statut] || p.statut}</span>
+                  <span class="badge" style="background:${statutColors[p.statut] || "var(--color-info)"};color:white;font-size:11px;padding:2px 8px;border-radius:20px">${escapeHtml(statutLabels[p.statut] || p.statut)}</span>
                 </div>
                 <p class="text-sm" style="margin:var(--space-2) 0">${escapeHtml(p.description)}</p>
                 ${p.aliments_suspects ? `<p class="text-secondary text-sm">\u{1F37D}\uFE0F <strong>Aliments suspects :</strong> ${escapeHtml(p.aliments_suspects)}</p>` : ""}
@@ -11061,11 +11078,11 @@ async function renderServiceHoursSettings() {
         <div style="display:flex;gap:18px;flex-wrap:wrap">
           <label style="flex:1;min-width:180px">
             <span style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px">Heure de d\xE9but</span>
-            <input type="time" id="svc-hours-start" class="form-control" value="${config.service_start || "11:30"}" lang="fr" style="font-size:1.25rem;text-align:center">
+            <input type="time" id="svc-hours-start" class="form-control" value="${escapeHtml(config.service_start || "11:30")}" lang="fr" style="font-size:1.25rem;text-align:center">
           </label>
           <label style="flex:1;min-width:180px">
             <span style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px">Heure de fin</span>
-            <input type="time" id="svc-hours-end" class="form-control" value="${config.service_end || "14:30"}" lang="fr" style="font-size:1.25rem;text-align:center">
+            <input type="time" id="svc-hours-end" class="form-control" value="${escapeHtml(config.service_end || "14:30")}" lang="fr" style="font-size:1.25rem;text-align:center">
           </label>
         </div>
 
@@ -11791,7 +11808,7 @@ function _recallStatusBadge(status) {
 }
 function _recallReasonLabel(r) {
   const map = { sanitaire: "Sanitaire", qualite: "Qualit\xE9", etiquetage: "\xC9tiquetage", autre: "Autre" };
-  return map[r] || r;
+  return map[r] || escapeHtml(r);
 }
 function renderRecallRows(items) {
   if (items.length === 0) return '<tr><td colspan="9" style="text-align:center;color:var(--text-tertiary)">Aucune alerte</td></tr>';
@@ -16875,7 +16892,7 @@ async function showPOAnalyticsModal() {
         ${data.top_items.slice(0, 10).map((item) => `
           <div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:var(--text-sm)">
             <span style="flex:1;font-weight:500">${escapeHtml(item.ingredient_name || "Inconnu")}</span>
-            <span style="color:var(--text-secondary);margin-right:12px">${item.total_qty} ${item.unit || ""}</span>
+            <span style="color:var(--text-secondary);margin-right:12px">${item.total_qty} ${escapeHtml(item.unit || "")}</span>
             <span style="font-weight:600">${formatCurrency(item.total_spent)}</span>
           </div>
         `).join("")}
@@ -17079,8 +17096,8 @@ function _salleRenderGrid() {
       <div class="salle-empty">
         <div class="salle-empty__icon">\u{1F37D}\uFE0F</div>
         <h2>Aucune table configur\xE9e</h2>
-        <p>Configurez votre plan de salle pour commencer.</p>
-        <a href="#/multi-site" class="salle-btn salle-btn--primary" style="text-decoration:none;display:inline-flex;margin-top:12px">Configurer les tables</a>
+        <p>Ajoutez vos tables depuis les r\xE9glages de l'\xE9tablissement pour commencer le service en salle.</p>
+        <a href="#/qrcodes" class="salle-btn salle-btn--primary" style="text-decoration:none;display:inline-flex;margin-top:12px">G\xE9rer mes tables</a>
       </div>
     `;
     return;
@@ -17563,7 +17580,7 @@ function _salleRenderSent(table, sentOrders) {
       <ul class="salle-sent__items">
         ${(o.items || []).filter((it) => it.status !== "annul\xE9").map((it) => `
           <li>
-            <span>${it.quantity}\xD7 ${escapeHtml(it.recipe_name)}</span>
+            <span>${escapeHtml(it.quantity)}\xD7 ${escapeHtml(it.recipe_name)}</span>
             <span class="salle-sent__item-status">${_salleItemStatusIcon(it.status)}</span>
           </li>
         `).join("")}
@@ -18065,12 +18082,12 @@ function _kdsTicketHTML(ticket, lane) {
   return `
     <article class="kds-ticket ${urgent} ${fresh} ${allergyClass}" data-created-at="${o.created_at}">
       <header class="kds-ticket__head">
-        <span class="kds-ticket__table">T${o.table_number}</span>
+        <span class="kds-ticket__table">T${escapeHtml(o.table_number)}</span>
         <span class="kds-ticket__id">#${o.id}</span>
         <span class="kds-ticket__timer" data-created-at="${o.created_at}">${elapsed}\u2032</span>
       </header>
       <div class="kds-ticket__body">
-        <div class="kds-ticket__qty">${it.quantity}\xD7</div>
+        <div class="kds-ticket__qty">${escapeHtml(it.quantity)}\xD7</div>
         <div class="kds-ticket__name">${escapeHtml(it.recipe_name || "?")}</div>
       </div>
       ${seatBadges}
@@ -19251,11 +19268,8 @@ class MoreView {
       <div id="advanced-modules" style="display:${showAdvanced ? "block" : "none"}">
         <div class="section-title" style="margin-bottom:var(--space-2);">\u{1F52C} Modules avanc\xE9s</div>
         <div class="more-grid">
-          <a href="#/multi-site" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
-            <div class="more-card__icon" style="background:var(--color-info)"><i data-lucide="building-2"></i></div>
-            <div class="more-card__content"><h3>Multi-Sites</h3><span class="badge badge--info">Avanc\xE9</span></div>
-            <p class="text-secondary text-sm">G\xE9rez plusieurs \xE9tablissements</p>
-          </a>
+          <!-- Multi-Sites retir\xE9 : fonction masqu\xE9e tant que la tenancy n'est pas
+               termin\xE9e (d\xE9cision produit 2026-07-30). -->
           <a href="#/api-keys" class="more-card more-card--active" style="text-decoration:none;cursor:pointer">
             <div class="more-card__icon" style="background:var(--color-primary)"><i data-lucide="key"></i></div>
             <div class="more-card__content"><h3>API Publique</h3><span class="badge badge--info">Avanc\xE9</span></div>
@@ -20306,6 +20320,12 @@ class LoginView {
     const app = document.getElementById("app");
     const nav = document.getElementById("nav");
     if (nav) nav.style.display = "none";
+    if (this.mode === "register" && window.umami) {
+      try {
+        umami.track("signup_started");
+      } catch (e) {
+      }
+    }
     switch (this.mode) {
       case "choice":
         this.renderChoice(app);
@@ -20506,15 +20526,9 @@ class LoginView {
       transition:all 0.15s;
     `;
     const restaurantFields = `
-      <div style="display:flex;gap:var(--space-3)">
-        <div class="form-group" style="flex:1">
-          <label for="reg-firstname">Pr\xE9nom</label>
-          <input type="text" class="form-control" id="reg-firstname" placeholder="Paul" autocomplete="given-name" data-ui="custom">
-        </div>
-        <div class="form-group" style="flex:1">
-          <label for="reg-lastname">Nom</label>
-          <input type="text" class="form-control" id="reg-lastname" placeholder="Dupont" autocomplete="family-name" data-ui="custom">
-        </div>
+      <div class="form-group">
+        <label for="reg-restaurant-name">Nom du restaurant</label>
+        <input type="text" class="form-control" id="reg-restaurant-name" placeholder="Chez Marcel" autocomplete="organization" required data-ui="custom">
       </div>
       <div class="form-group">
         <label for="reg-email">Email</label>
@@ -20528,22 +20542,9 @@ class LoginView {
         <label for="reg-password2">Confirmer le mot de passe</label>
         <input type="password" class="form-control" id="reg-password2" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autocomplete="new-password" required data-ui="custom">
       </div>
-      <div style="margin-top:var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--border-default)">
-        <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3);padding:var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-md)">
-          <span style="font-size:1.3rem;line-height:1">\u{1F4A1}</span>
-          <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5">
-            <strong>Deux mots de passe, deux acc\xE8s :</strong><br>
-            <strong style="color:var(--text-primary)">Votre mot de passe</strong> (ci-dessus) est personnel et donne acc\xE8s complet au logiciel.<br>
-            <strong style="color:var(--text-primary)">Le mot de passe \xE9quipe</strong> (ci-dessous) est un code simple que vous partagez avec votre staff pour qu'ils acc\xE8dent \xE0 leur espace limit\xE9.
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="reg-staff-password">Mot de passe \xE9quipe (partag\xE9 avec le staff)</label>
-          <input type="password" class="form-control" id="reg-staff-password" placeholder="ex: Resto2026" autocomplete="new-password"
-                 style="font-family:var(--font-mono);letter-spacing:0.05em" data-ui="custom">
-        </div>
-        <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-1)">Optionnel \u2014 vous pourrez le configurer plus tard dans \xC9quipe.</p>
-      </div>
+      <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-2)">
+        Votre \xE9quipe, vos tables et vos fournisseurs se configurent ensuite, \xE0 votre rythme, depuis le tableau de bord.
+      </p>
     `;
     const supplierFields = `
       <div class="form-group">
@@ -20766,15 +20767,17 @@ class LoginView {
     }
   }
   async handleRegister() {
-    const firstName = document.getElementById("reg-firstname").value.trim();
-    const lastName = document.getElementById("reg-lastname").value.trim();
+    const restaurantName = document.getElementById("reg-restaurant-name").value.trim();
     const email = document.getElementById("reg-email").value.trim();
     const password = document.getElementById("reg-password").value;
     const password2 = document.getElementById("reg-password2").value;
-    const staffPassword = document.getElementById("reg-staff-password").value.trim();
     const errorEl = document.getElementById("reg-error");
     const submitBtn = document.getElementById("reg-submit");
     errorEl.textContent = "";
+    if (!restaurantName) {
+      errorEl.textContent = "Le nom du restaurant est requis";
+      return;
+    }
     if (!email) {
       errorEl.textContent = "L'email est requis";
       return;
@@ -20803,17 +20806,27 @@ class LoginView {
     submitBtn.disabled = true;
     submitBtn.textContent = "Cr\xE9ation...";
     try {
-      const result = await API.register({ email, password, first_name: firstName, last_name: lastName, staff_password: staffPassword || void 0, accepted_terms: true });
+      let acquisition;
+      try {
+        const raw = sessionStorage.getItem("rs_acquisition");
+        if (raw) acquisition = JSON.parse(raw);
+      } catch (e) {
+      }
+      const result = await API.register({ email, password, restaurant_name: restaurantName, accepted_terms: true, acquisition });
+      try {
+        sessionStorage.removeItem("rs_acquisition");
+      } catch (e) {
+      }
+      if (window.umami) {
+        try {
+          umami.track("account_created", acquisition || {});
+        } catch (e) {
+        }
+      }
       _persistRestaurantLogin(result.token, result.account);
       const nav = document.getElementById("nav");
-      if (nav) nav.style.display = "none";
-      const appEl = document.getElementById("app");
-      if (appEl) appEl.innerHTML = "";
-      const wizard = new OnboardingWizard(() => {
-        if (nav) nav.style.display = "";
-        bootApp(result.account.role, result.account);
-      });
-      wizard.show();
+      if (nav) nav.style.display = "";
+      bootApp(result.account.role, result.account);
     } catch (e) {
       errorEl.textContent = e.message || "Erreur lors de l'inscription";
       submitBtn.disabled = false;
@@ -23255,7 +23268,7 @@ async function showSupplierClientOrderDetail(restaurantId, orderId) {
             ${(order.items || []).map((it) => `
               <tr>
                 <td>${escapeHtml(it.product_name)}</td>
-                <td class="text-mono">${it.quantity}</td>
+                <td class="text-mono">${escapeHtml(it.quantity)}</td>
                 <td>${escapeHtml(it.unit || "")}</td>
                 <td style="text-align:right" class="text-mono">${fmtCurrency(it.unit_price)}</td>
                 <td style="text-align:right" class="text-mono">${fmtCurrency(it.total_price)}</td>
@@ -23675,11 +23688,11 @@ async function showSupplierDeliveryDetail(id) {
       return `
                 <tr style="border-bottom:1px solid var(--border-default)">
                   <td style="padding:var(--space-3)">${escapeHtml(item.product_name)}</td>
-                  <td style="padding:var(--space-3)">${item.quantity} ${escapeHtml(item.unit)}</td>
+                  <td style="padding:var(--space-3)">${escapeHtml(item.quantity)} ${escapeHtml(item.unit)}</td>
                   <td style="padding:var(--space-3)">${item.price_per_unit != null ? item.price_per_unit.toFixed(2) + "\u20AC" : "\u2014"}</td>
                   <td style="padding:var(--space-3);font-family:monospace;font-size:var(--text-xs)">${escapeHtml(item.batch_number || "\u2014")}</td>
-                  <td style="padding:var(--space-3)">${item.dlc || "\u2014"}</td>
-                  <td style="padding:var(--space-3);color:${sc[item.status]}">${sl[item.status] || item.status}</td>
+                  <td style="padding:var(--space-3)">${escapeHtml(item.dlc || "\u2014")}</td>
+                  <td style="padding:var(--space-3);color:${sc[item.status]}">${escapeHtml(sl[item.status] || item.status)}</td>
                 </tr>
               `;
     }).join("")}
@@ -24058,7 +24071,7 @@ async function showSupplierOrderDetail(id) {
           <div class="card" style="padding:var(--space-3);display:flex;justify-content:space-between;align-items:center;border-radius:var(--radius-md);background:var(--bg-elevated)">
             <div>
               <strong>${escapeHtml(it.product_name)}</strong>
-              <div class="text-secondary text-sm">${it.quantity} ${escapeHtml(it.unit || "")}</div>
+              <div class="text-secondary text-sm">${escapeHtml(it.quantity)} ${escapeHtml(it.unit || "")}</div>
             </div>
             <div style="text-align:right;font-family:var(--font-mono)">
               ${it.unit_price != null ? formatCurrency(it.unit_price) + "/" + escapeHtml(it.unit || "") : "\u2014"}
@@ -24547,7 +24560,7 @@ async function renderDeliveries() {
           <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
             ${alerts.map((a) => `
               <span class="badge" style="background:${a.days_remaining <= 1 ? "var(--color-danger)" : "var(--color-warning)"};color:white;font-size:var(--text-sm);padding:4px 10px;border-radius:var(--radius-md)">
-                ${escapeHtml(a.product_name)} \u2014 Lot ${escapeHtml(a.batch_number || "?")} \u2014 DLC ${a.dlc} (${a.days_remaining}j)
+                ${escapeHtml(a.product_name)} \u2014 Lot ${escapeHtml(a.batch_number || "?")} \u2014 DLC ${escapeHtml(a.dlc)} (${a.days_remaining}j)
               </span>
             `).join("")}
           </div>
@@ -24696,24 +24709,24 @@ function renderDeliveryItemRow(item, isPending) {
   const statusColors = { accepted: "#22c55e", rejected: "#ef4444", pending: "#888" };
   const statusLabels = { accepted: "\u2705 Accept\xE9", rejected: "\u274C Refus\xE9", pending: "\u23F3 En attente" };
   const extraInfo = [];
-  if (item.fishing_zone) extraInfo.push(`\u{1F3A3} Zone ${item.fishing_zone}`);
-  if (item.fishing_method) extraInfo.push(`\u{1FA9D} ${item.fishing_method}`);
-  if (item.origin) extraInfo.push(`\u{1F3F7}\uFE0F ${item.origin}`);
-  if (item.sanitary_approval) extraInfo.push(`\u{1F4CB} Agr. ${item.sanitary_approval}`);
+  if (item.fishing_zone) extraInfo.push(`\u{1F3A3} Zone ${escapeHtml(item.fishing_zone)}`);
+  if (item.fishing_method) extraInfo.push(`\u{1FA9D} ${escapeHtml(item.fishing_method)}`);
+  if (item.origin) extraInfo.push(`\u{1F3F7}\uFE0F ${escapeHtml(item.origin)}`);
+  if (item.sanitary_approval) extraInfo.push(`\u{1F4CB} Agr. ${escapeHtml(item.sanitary_approval)}`);
   return `
     <tr style="border-bottom:1px solid var(--border-default)" data-item-id="${item.id}">
       <td style="padding:var(--space-3);font-weight:500">${escapeHtml(item.product_name)}</td>
       <td style="padding:var(--space-3)">${formatQuantity(item.quantity, item.unit)}</td>
       <td style="padding:var(--space-3);font-family:var(--font-mono,monospace);font-size:var(--text-xs)">${escapeHtml(item.batch_number || "\u2014")}</td>
       <td style="padding:var(--space-3);${dlcWarning ? "color:var(--color-warning);font-weight:700" : ""}">
-        ${item.dlc || "\u2014"}
+        ${escapeHtml(item.dlc || "\u2014")}
         ${dlcWarning ? `<br><small style="color:${dlcDays <= 1 ? "var(--color-danger)" : "var(--color-warning)"}">\u26A0\uFE0F ${dlcDays}j restant${dlcDays > 1 ? "s" : ""}</small>` : ""}
       </td>
       <td style="padding:var(--space-3)">${item.temperature_required != null ? item.temperature_required + "\xB0C" : "\u2014"}</td>
       ${isPending ? `
         <td style="padding:var(--space-3)">
-          <input type="number" class="input item-temp" step="0.1" value="${(_a = item.temperature_required) != null ? _a : ""}"
-                 style="width:80px;font-size:var(--text-sm)" data-item-id="${item.id}" data-temp-required="${(_b = item.temperature_required) != null ? _b : ""}" data-ui="custom">
+          <input type="number" class="input item-temp" step="0.1" value="${escapeHtml((_a = item.temperature_required) != null ? _a : "")}"
+                 style="width:80px;font-size:var(--text-sm)" data-item-id="${item.id}" data-temp-required="${escapeHtml((_b = item.temperature_required) != null ? _b : "")}" data-ui="custom">
           <span class="temp-warning" data-item-id="${item.id}" style="display:none;color:var(--color-danger);font-size:var(--text-xs);font-weight:700">\u26A0\uFE0F T\xB0 trop haute !</span>
         </td>
       ` : ""}
@@ -24935,13 +24948,18 @@ async function loadPortalAccounts() {
           </div>
         </div>
         <div style="margin-top:var(--space-3);display:flex;gap:var(--space-2)">
-          <button class="btn btn-danger btn-sm" onclick="revokeSupplierAccess(${a.id}, '${escapeHtml(a.supplier_name || a.name)}')">
+          <button class="btn btn-danger btn-sm" data-revoke-id="${a.id}" data-revoke-name="${escapeHtml(a.supplier_name || a.name)}">
             <i data-lucide="user-x" style="width:14px;height:14px"></i> R\xE9voquer
           </button>
         </div>
       </div>
     `).join("");
     lucide.createIcons();
+    container.querySelectorAll("[data-revoke-id]").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        revokeSupplierAccess(Number(btn.dataset.revokeId), btn.dataset.revokeName || "");
+      });
+    });
   } catch (e) {
     container.innerHTML = `<p class="text-danger">Erreur de chargement</p>`;
   }
@@ -26301,6 +26319,7 @@ function renderSubscribe() {
         <button class="btn btn-primary subscribe-btn" id="subscribe-now">
           S'abonner maintenant
         </button>
+        <p id="subscribe-error" role="alert" style="display:none; color: var(--color-danger, #C4422A); font-size: 0.875rem; margin-top: 12px;"></p>
 
         <div class="subscribe-reassurance">
           <p>Vos donn\xE9es sont pr\xE9serv\xE9es.</p>
@@ -26311,28 +26330,38 @@ function renderSubscribe() {
   `;
   document.getElementById("subscribe-now").addEventListener("click", async () => {
     const btn = document.getElementById("subscribe-now");
-    btn.textContent = "Redirection...";
-    btn.disabled = true;
-    try {
-      const account = getAccount();
-      const accountId = account ? account.id : null;
-      const res = await fetch("/api/stripe/create-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountId })
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        showToast("Erreur lors de la redirection vers le paiement", "error");
-        btn.textContent = "S'abonner maintenant";
-        btn.disabled = false;
-      }
-    } catch (err) {
-      showToast("Erreur de connexion au service de paiement", "error");
+    const errorEl = document.getElementById("subscribe-error");
+    const showError = (msg) => {
+      errorEl.textContent = msg;
+      errorEl.style.display = "block";
+      showToast(msg, "error");
       btn.textContent = "S'abonner maintenant";
       btn.disabled = false;
+    };
+    errorEl.style.display = "none";
+    btn.textContent = "Redirection...";
+    btn.disabled = true;
+    if (window.umami) {
+      try {
+        umami.track("checkout_started");
+      } catch (e) {
+      }
+    }
+    try {
+      const data = await API.request("/stripe/create-checkout", { method: "POST", body: {} });
+      if (data && data.url) {
+        window.location.href = data.url;
+      } else if (data && data.status === "active") {
+        errorEl.style.color = "var(--color-accent, #1F7A4D)";
+        errorEl.textContent = "Votre abonnement Pro est d\xE9j\xE0 actif \u2014 rien \xE0 payer.";
+        errorEl.style.display = "block";
+        btn.textContent = "Abonnement d\xE9j\xE0 actif";
+      } else {
+        showError("Le paiement est momentan\xE9ment indisponible. R\xE9essayez dans quelques minutes.");
+      }
+    } catch (err) {
+      const msg = err && err.message && err.message.includes("Stripe") ? "Le service de paiement est momentan\xE9ment indisponible. R\xE9essayez dans quelques minutes ou \xE9crivez \xE0 contact@restosuite.fr." : err && err.message || "Erreur de connexion au service de paiement.";
+      showError(msg);
     }
   });
 }
@@ -29396,6 +29425,35 @@ async function renderMultiSite() {
       </a>
       <h1 style="display:flex;align-items:center;gap:8px">
         <i data-lucide="building-2" style="width:28px;height:28px;color:var(--color-accent)"></i>
+        Multi-\xE9tablissements
+      </h1>
+    </div>
+    <div class="card" style="padding:var(--space-6);text-align:center;max-width:520px;margin:var(--space-4) auto">
+      <div style="font-size:40px;margin-bottom:var(--space-3)">\u{1F3D7}\uFE0F</div>
+      <h2 style="margin-bottom:var(--space-2)">Bient\xF4t disponible</h2>
+      <p class="text-secondary" style="font-size:var(--text-sm);line-height:1.6">
+        La gestion de plusieurs \xE9tablissements depuis un seul compte est en cours de pr\xE9paration.
+        Nous voulons la livrer avec une isolation stricte des donn\xE9es entre vos sites \u2014 nous
+        prenons le temps de bien la faire.
+      </p>
+      <p class="text-secondary" style="font-size:var(--text-sm);margin-top:var(--space-3)">
+        Un besoin urgent sur ce sujet ? \xC9crivez-nous \xE0
+        <a href="mailto:contact@restosuite.fr" style="color:var(--color-accent)">contact@restosuite.fr</a>.
+      </p>
+      <a href="#/" class="btn btn-primary" style="margin-top:var(--space-4);text-decoration:none;display:inline-flex">Retour au tableau de bord</a>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+}
+async function _renderMultiSiteFull() {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="view-header">
+      <a href="#/more" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-1);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)">
+        <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Plus
+      </a>
+      <h1 style="display:flex;align-items:center;gap:8px">
+        <i data-lucide="building-2" style="width:28px;height:28px;color:var(--color-accent)"></i>
         Multi-Sites
       </h1>
       <p class="text-secondary" style="font-size:var(--text-sm)">G\xE9rez tous vos \xE9tablissements depuis un seul tableau de bord</p>
@@ -30270,7 +30328,7 @@ function renderCustomerCard(c) {
           </div>
           <div class="text-secondary text-sm">
             ${c.total_visits} visite${c.total_visits > 1 ? "s" : ""} \xB7 ${(c.total_spent || 0).toFixed(0)}\u20AC d\xE9pens\xE9s
-            ${c.phone ? ` \xB7 ${c.phone}` : ""}
+            ${c.phone ? ` \xB7 ${escapeHtml(c.phone)}` : ""}
           </div>
         </div>
         <div style="text-align:right">
@@ -31162,7 +31220,7 @@ class ErrorsLogView {
     const rows = errors.map((e) => {
       const badge = e.origin === "server" ? '<span class="badge badge--error">Serveur</span>' : '<span class="badge badge--warning">Client</span>';
       const date = new Date(e.ts).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "medium" });
-      const context = e.route ? `<span class="text-secondary text-sm">${escapeHtml(e.route)}</span>` : e.source ? `<span class="text-secondary text-sm">${escapeHtml(e.source)}${e.lineno ? ":" + e.lineno : ""}</span>` : "";
+      const context = e.route ? `<span class="text-secondary text-sm">${escapeHtml(e.route)}</span>` : e.source ? `<span class="text-secondary text-sm">${escapeHtml(e.source)}${e.lineno ? ":" + escapeHtml(e.lineno) : ""}</span>` : "";
       const stackHtml = e.stack ? `<pre class="error-stack">${escapeHtml(e.stack)}</pre>` : "";
       return `
         <div class="error-entry" onclick="this.classList.toggle('error-entry--open')">
@@ -32079,7 +32137,9 @@ const NAV_GROUPS = {
       { label: "Int\xE9grations", route: "/integrations", icon: "plug", roles: ["gerant"] },
       { label: "QR Codes", route: "/qrcodes", icon: "qr-code", roles: ["gerant"] },
       { label: "Bilan Carbone", route: "/carbon", icon: "leaf", roles: ["gerant"] },
-      { label: "Multi-Sites", route: "/multi-site", icon: "building-2", roles: ["gerant"] },
+      // Multi-Sites masqué (feature flag serveur désactivé, tenancy non terminée
+      // — décision produit 2026-07-30). La route reste montée mais affiche
+      // « Bientôt disponible » ; aucune création de site n'est possible.
       { label: "Portail Fournisseur", route: "/supplier-portal", icon: "truck", roles: ["gerant"] },
       { label: "Journal erreurs", route: "/errors-log", icon: "bug", roles: ["gerant"] },
       { label: "Agr\xE9ment sanitaire", route: "/settings/sanitary-approval", icon: "badge-check", roles: ["gerant"] },
@@ -32500,13 +32560,14 @@ function bootApp(role, account, opts = {}) {
     location.hash = "#/";
   }
   Router.init();
+  const resumedIntent = consumePostLoginIntent(role);
   if (window.lucide) lucide.createIcons();
   const displayName = account ? account.name : role;
   console.log("%c RestoSuite ", "background:#2D8B5E;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600", `loaded (${displayName})`);
   fetchTrialStatus().then(() => renderTrialBanner());
   clearTrialStatusInterval();
   _trialStatusIntervalId = setInterval(() => fetchTrialStatus().then(() => renderTrialBanner()), 5 * 60 * 1e3);
-  if (role === "gerant" && typeof maybeStartOnboardingTour === "function") {
+  if (role === "gerant" && !resumedIntent && typeof maybeStartOnboardingTour === "function") {
     maybeStartOnboardingTour(account);
   }
 }
@@ -32721,7 +32782,46 @@ function initMobileNav(role) {
   });
   window.addEventListener("hashchange", closeOverlay);
 }
+function captureAcquisitionIntent() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const clean = (v) => (v || "").slice(0, 80).replace(/[^\w\s\-./àâäéèêëîïôöùûüç]/gi, "");
+    const acq = {
+      source: clean(params.get("src") || params.get("utm_source")),
+      medium: clean(params.get("utm_medium")),
+      campaign: clean(params.get("utm_campaign")),
+      content: clean(params.get("article") || params.get("utm_content")),
+      position: clean(params.get("pos"))
+    };
+    if (acq.source || acq.campaign || acq.content) {
+      sessionStorage.setItem("rs_acquisition", JSON.stringify(acq));
+    }
+    if (params.get("intent") === "subscribe" || location.hash === "#/subscribe") {
+      sessionStorage.setItem("rs_intent", "subscribe");
+    }
+  } catch (e) {
+  }
+}
+function consumePostLoginIntent(role) {
+  let intent = null;
+  try {
+    intent = sessionStorage.getItem("rs_intent");
+  } catch (e) {
+    return null;
+  }
+  if (!intent) return null;
+  try {
+    sessionStorage.removeItem("rs_intent");
+  } catch (e) {
+  }
+  if (intent === "subscribe" && role === "gerant") {
+    location.hash = "#/subscribe";
+    return "subscribe";
+  }
+  return null;
+}
 (async function init() {
+  captureAcquisitionIntent();
   const supplierSession = getSupplierSession();
   if (supplierSession && getSupplierToken()) {
     document.body.classList.add("supplier-mode");

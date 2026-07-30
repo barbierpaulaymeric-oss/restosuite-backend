@@ -169,13 +169,23 @@ async function loadPortalAccounts() {
           </div>
         </div>
         <div style="margin-top:var(--space-3);display:flex;gap:var(--space-2)">
-          <button class="btn btn-danger btn-sm" onclick="revokeSupplierAccess(${a.id}, '${escapeHtml(a.supplier_name || a.name)}')">
+          <button class="btn btn-danger btn-sm" data-revoke-id="${a.id}" data-revoke-name="${escapeHtml(a.supplier_name || a.name)}">
             <i data-lucide="user-x" style="width:14px;height:14px"></i> Révoquer
           </button>
         </div>
       </div>
     `).join('');
     lucide.createIcons();
+    // Bouton « Révoquer » : le nom du fournisseur passe par un data-attribut
+    // (contexte attribut HTML, où escapeHtml protège) + addEventListener, JAMAIS
+    // par un onclick inline — dans un onclick le navigateur redécode &#39; en '
+    // avant de compiler le handler, refermant la chaîne (XSS via suppliers.name,
+    // écrivable par tout compte du restaurant ; audit 2026-07-30).
+    container.querySelectorAll('[data-revoke-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        revokeSupplierAccess(Number(btn.dataset.revokeId), btn.dataset.revokeName || '');
+      });
+    });
   } catch (e) {
     container.innerHTML = `<p class="text-danger">Erreur de chargement</p>`;
   }

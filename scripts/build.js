@@ -124,6 +124,61 @@ function concatSources() {
   return parts.join('\n');
 }
 
+// ─── CSS de production minifié ───
+// landing.css → landing.min.css (landing publique) et style.css → style.min.css
+// (SPA). Les fichiers .min.css sont committés, comme app.bundle.js : le déploiement
+// Render ne lance pas ce script, il sert les fichiers du dépôt.
+const CSS_FILES = [
+  ['css/landing.css', 'css/landing.min.css'],
+  ['css/style.css', 'css/style.min.css'],
+];
+
+async function buildCss() {
+  for (const [src, out] of CSS_FILES) {
+    const srcPath = path.join(CLIENT_DIR, src);
+    const outPath = path.join(CLIENT_DIR, out);
+    if (!fs.existsSync(srcPath)) {
+      console.warn(`  ⚠ CSS manquant : ${src}`);
+      continue;
+    }
+    const result = await esbuild.transform(fs.readFileSync(srcPath, 'utf8'), {
+      loader: 'css',
+      minify: true,
+    });
+    fs.writeFileSync(outPath, result.code, 'utf8');
+    const sizeKB = (fs.statSync(outPath).size / 1024).toFixed(1);
+    console.log(`✓ CSS minifié : client/${out} (${sizeKB} KB)`);
+  }
+}
+
+// ─── Versionnage des actifs de la landing ───
+// La landing n'est pas contrôlée par le service worker (portée /app) : son
+// invalidation de cache repose sur des URLs versionnées (?v=<hash de contenu>).
+// Le serveur (server/app.js) renvoie Cache-Control immutable quand ?v= est
+// présent, et une simple revalidation sinon. Idempotent : relancer le build
+// remplace le hash existant.
+const crypto = require('crypto');
+const VERSIONED_ASSETS = [
+  // [référence dans landing.html, fichier hashé]
+  ['/css/landing.min.css', 'css/landing.min.css'],
+  ['/js/landing-main.js', 'js/landing-main.js'],
+];
+
+function versionLandingAssets() {
+  const landingPath = path.join(CLIENT_DIR, 'landing.html');
+  if (!fs.existsSync(landingPath)) return;
+  let html = fs.readFileSync(landingPath, 'utf8');
+  for (const [ref, file] of VERSIONED_ASSETS) {
+    const filePath = path.join(CLIENT_DIR, file);
+    if (!fs.existsSync(filePath)) continue;
+    const hash = crypto.createHash('md5').update(fs.readFileSync(filePath)).digest('hex').slice(0, 10);
+    const pattern = new RegExp(ref.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&') + '(\\?v=[\\w]+)?', 'g');
+    html = html.replace(pattern, `${ref}?v=${hash}`);
+  }
+  fs.writeFileSync(landingPath, html, 'utf8');
+  console.log('✓ Actifs landing versionnés (?v=<hash>) dans client/landing.html');
+}
+
 async function build() {
   const startTime = Date.now();
   const source = concatSources();
@@ -145,6 +200,9 @@ async function build() {
     if (result.warnings.length > 0) {
       result.warnings.forEach(w => console.warn('  ⚠', w.text));
     }
+
+    await buildCss();
+    versionLandingAssets();
   } catch (err) {
     console.error('✗ Erreur de build :', err.message || err);
     process.exit(1);

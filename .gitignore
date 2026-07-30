@@ -11,3 +11,7 @@ data/backups/
 .git_backup/
 .DS_Store
 .opencode/
+
+# Playwright (smoke tests E2E) — artefacts générés, jamais committés
+test-results/
+playwright-report/

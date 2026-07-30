@@ -149,7 +149,7 @@ function _recallStatusBadge(status) {
 
 function _recallReasonLabel(r) {
   const map = { sanitaire: 'Sanitaire', qualite: 'Qualité', etiquetage: 'Étiquetage', autre: 'Autre' };
-  return map[r] || r;
+  return map[r] || escapeHtml(r);
 }
 
 function renderRecallRows(items) {

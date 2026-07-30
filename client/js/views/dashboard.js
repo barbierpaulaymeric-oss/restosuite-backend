@@ -549,9 +549,10 @@ function renderAISuggestions(container, data) {
 
 function getGreeting(name) {
   const hour = new Date().getHours();
-  if (hour < 12) return `Bonjour ${name} 👋`;
-  if (hour < 17) return `Bon après-midi ${name} ☀️`;
-  return `Bonsoir ${name} 🌙`;
+  const safeName = escapeHtml(name);
+  if (hour < 12) return `Bonjour ${safeName} 👋`;
+  if (hour < 17) return `Bon après-midi ${safeName} ☀️`;
+  return `Bonsoir ${safeName} 🌙`;
 }
 
 function formatFrenchDate(date) {

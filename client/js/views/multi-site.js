@@ -2,7 +2,45 @@
 // Multi-Sites — Gestion multi-établissements
 // ═══════════════════════════════════════════
 
+// Fonction masquée (décision produit 2026-07-30) : le multi-établissement n'est
+// pas prêt (la tenancy ne rattache pas les nouveaux sites au compte créateur).
+// Le lien de nav est retiré (app.js, more.js) et la CRÉATION est bloquée côté
+// serveur (feature flag MULTISITE_ENABLED off, server/routes/multi-site.js).
+// Cet écran « Bientôt disponible » ne s'affiche que si la route #/multi-site est
+// atteinte directement (ancien favori, lien externe). Le code du wizard
+// NewSiteWizant est conservé plus bas pour la future implémentation complète.
 async function renderMultiSite() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="view-header">
+      <a href="#/more" class="back-link" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-1);color:var(--text-secondary);text-decoration:none;font-size:var(--text-sm)">
+        <i data-lucide="arrow-left" style="width:16px;height:16px"></i> Plus
+      </a>
+      <h1 style="display:flex;align-items:center;gap:8px">
+        <i data-lucide="building-2" style="width:28px;height:28px;color:var(--color-accent)"></i>
+        Multi-établissements
+      </h1>
+    </div>
+    <div class="card" style="padding:var(--space-6);text-align:center;max-width:520px;margin:var(--space-4) auto">
+      <div style="font-size:40px;margin-bottom:var(--space-3)">🏗️</div>
+      <h2 style="margin-bottom:var(--space-2)">Bientôt disponible</h2>
+      <p class="text-secondary" style="font-size:var(--text-sm);line-height:1.6">
+        La gestion de plusieurs établissements depuis un seul compte est en cours de préparation.
+        Nous voulons la livrer avec une isolation stricte des données entre vos sites — nous
+        prenons le temps de bien la faire.
+      </p>
+      <p class="text-secondary" style="font-size:var(--text-sm);margin-top:var(--space-3)">
+        Un besoin urgent sur ce sujet ? Écrivez-nous à
+        <a href="mailto:contact@restosuite.fr" style="color:var(--color-accent)">contact@restosuite.fr</a>.
+      </p>
+      <a href="#/" class="btn btn-primary" style="margin-top:var(--space-4);text-decoration:none;display:inline-flex">Retour au tableau de bord</a>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+}
+
+// Ancienne implémentation conservée (inactive) pour la future tenancy complète.
+async function _renderMultiSiteFull() {
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="view-header">

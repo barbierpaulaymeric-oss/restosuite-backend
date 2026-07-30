@@ -58,7 +58,7 @@ async function renderHACCPWater() {
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
             <i data-lucide="${lastAnalysis.conformity ? 'check-circle' : 'x-circle'}" style="width:18px;height:18px;color:${lastAnalysis.conformity ? '#27ae60' : '#dc3545'}"></i>
             <strong>Dernière analyse — ${new Date(lastAnalysis.analysis_date).toLocaleDateString('fr-FR')}</strong>
-            <span class="text-secondary text-sm">${SOURCE_ICONS[lastAnalysis.water_source] || '💧'} ${lastAnalysis.water_source} · ${TYPE_LABELS[lastAnalysis.analysis_type] || lastAnalysis.analysis_type}</span>
+            <span class="text-secondary text-sm">${SOURCE_ICONS[lastAnalysis.water_source] || '💧'} ${escapeHtml(lastAnalysis.water_source)} · ${escapeHtml(TYPE_LABELS[lastAnalysis.analysis_type] || lastAnalysis.analysis_type)}</span>
           </div>
           <p class="text-sm" style="margin:0 0 6px">${escapeHtml(lastAnalysis.results || 'Aucun résultat enregistré')}</p>
           ${lastAnalysis.next_analysis_date ? `<p class="text-sm text-secondary" style="margin:0">Prochaine analyse prévue : <strong>${new Date(lastAnalysis.next_analysis_date).toLocaleDateString('fr-FR')}</strong></p>` : ''}
@@ -89,7 +89,7 @@ async function renderHACCPWater() {
                   return `
                     <tr${!item.conformity ? ' style="background:#fff8f8"' : ''}>
                       <td class="mono">${new Date(item.analysis_date).toLocaleDateString('fr-FR')}</td>
-                      <td class="text-sm">${TYPE_LABELS[item.analysis_type] || item.analysis_type}</td>
+                      <td class="text-sm">${escapeHtml(TYPE_LABELS[item.analysis_type] || item.analysis_type)}</td>
                       <td class="text-sm">${SOURCE_ICONS[item.water_source] || '💧'} ${escapeHtml(item.water_source || '—')}</td>
                       <td class="text-sm">${escapeHtml(item.provider || '—')}</td>
                       <td class="text-sm" style="max-width:260px;white-space:normal">${escapeHtml(item.results || '—')}</td>

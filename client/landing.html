@@ -134,7 +134,7 @@
         "name": "Puis-je importer mes recettes existantes ?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Oui. Vous pouvez saisir vos recettes par la voix, les taper manuellement, ou scanner vos factures fournisseurs. L'IA s'adapte à votre façon de travailler et structure tout automatiquement."
+          "text": "Oui. Importez vos fiches techniques existantes depuis un fichier Excel ou CSV : un modèle est fourni, vous vérifiez l'aperçu, puis tout est importé d'un coup. Vous pouvez aussi dicter vos recettes à la voix ou les saisir manuellement. Le scan de factures, lui, sert à autre chose : mettre à jour automatiquement vos prix fournisseurs."
         }
       }
     ]
@@ -197,16 +197,25 @@
   }
   </script>
   <link rel="shortcut icon" href="assets/favicon.png">
-  <link rel="preload" as="image" href="assets/screenshots/dashboard.jpg" fetchpriority="high">
+  <link rel="preload" as="image" href="assets/screenshots/dashboard.webp" type="image/webp" fetchpriority="high">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Caveat:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Caveat:wght@500;600;700&display=swap" rel="stylesheet"></noscript>
+  <!-- Préchargement des 2 fontes critiques au-dessus de la ligne de flottaison
+       (Fraunces 600 pour le H1, Inter 400 pour le corps) : le swap de fonte a
+       lieu avant/juste après le premier rendu → pas de re-wrap visible (CLS).
+       Les fallbacks à métriques calées (landing.css) couvrent le cas lent. -->
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="https://fonts.gstatic.com/s/fraunces/v38/6NUu8FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0K7iN7iQcIfJD58njt0oc7qv8oRcTn.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2">
+  <!-- Graisses limitées à celles réellement utilisées par landing.css :
+       Fraunces 600 (.serif-display), Caveat 600 (.handwritten), Inter 400-700,
+       JetBrains Mono 400-500. Mêmes familles → identité visuelle inchangée. -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,600&family=Caveat:wght@600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,600&family=Caveat:wght@600&display=swap" rel="stylesheet"></noscript>
   <link rel="alternate" hreflang="fr" href="https://www.restosuite.fr/">
   <link rel="alternate" hreflang="x-default" href="https://www.restosuite.fr/">
   <script src="/js/lucide.min.js" defer></script>
   <script defer src="/js/umami.js"></script>
-  <link rel="stylesheet" href="/css/landing.css">
+  <link rel="stylesheet" href="/css/landing.min.css?v=01a561a3e7">
   <noscript>
     <style>
       .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
@@ -217,15 +226,10 @@
 </head>
 <body>
 
-  <!-- Loading screen (shown during cold start / slow API) -->
-  <div id="loading-screen" style="display:none; position:fixed; inset:0; z-index:9999; background:#FAF8F5; align-items:center; justify-content:center; flex-direction:column;">
-    <img src="assets/logo-full.svg" alt="RestoSuite" style="height:80px; margin-bottom:24px;">
-    <div style="width:200px; height:4px; background:rgba(44,44,44,0.1); border-radius:2px; overflow:hidden;">
-      <div id="loading-bar" style="width:0%; height:100%; background:#1F7A4D; border-radius:2px; transition:width 0.5s;"></div>
-    </div>
-    <div style="color:#6E6A5E; font-size:13px; margin-top:12px;" id="loading-text">Chargement...</div>
-  </div>
-  <script src="/js/app-init.js"></script>
+  <!-- La landing est une page statique : pas d'écran de chargement, pas de
+       service worker (le SW de la SPA est limité à la portée /app — voir
+       app-init.js). landing-main.js désenregistre les anciens SW de portée /. -->
+  <a href="#main" class="skip-link">Aller au contenu principal</a>
 
   <!-- ========== HEADER ========== -->
   <header class="header" id="header">
@@ -243,7 +247,7 @@
       </nav>
       <div class="header__cta">
         <a href="/app" class="btn btn--ghost" style="margin-right:var(--space-2,8px)">Se connecter</a>
-        <a href="/app#register" data-umami-event="cta-essai-gratuit" class="btn btn--primary">Essayer gratuitement</a>
+        <a href="/app?src=landing&amp;pos=header#register" data-umami-event="cta-essai-gratuit" data-umami-event-source="landing" data-umami-event-position="header" class="btn btn--primary">Essayer gratuitement</a>
       </div>
       <button class="header__mobile-toggle" id="mobile-toggle" aria-label="Ouvrir le menu de navigation" aria-expanded="false" aria-controls="mobile-menu">
         <i data-lucide="menu" width="24" height="24"></i>
@@ -257,9 +261,10 @@
     <a href="#tarifs" onclick="closeMobile()">Tarifs</a>
     <a href="#faq" onclick="closeMobile()">FAQ</a>
     <a href="/app" onclick="closeMobile()">Se connecter</a>
-    <a href="/app#register" data-umami-event="cta-essai-gratuit" class="btn btn--primary" onclick="closeMobile()">Essayer gratuitement</a>
+    <a href="/app?src=landing&amp;pos=menu-mobile#register" data-umami-event="cta-essai-gratuit" data-umami-event-source="landing" data-umami-event-position="menu-mobile" class="btn btn--primary" onclick="closeMobile()">Essayer gratuitement</a>
   </nav>
 
+  <main id="main">
   <!-- ========== HERO ========== -->
   <section class="hero">
     <div class="container">
@@ -268,11 +273,13 @@
           <div class="hero__badge">
             <span class="badge badge--accent"><i data-lucide="sparkles" style="width:14px;height:14px"></i> Propulsé par l'IA</span>
           </div>
-          <h1 class="serif-display">Le premier assistant cuisine <span class="accent handwritten">tout-en-un</span> propulsé par l'IA</h1>
+          <!-- « par l'IA » insécable : points de coupe identiques entre la
+               fonte web et son fallback calé → pas de saut de ligne au swap -->
+          <h1 class="serif-display">Le premier assistant cuisine <span class="accent handwritten">tout-en-un</span> propulsé <span style="white-space:nowrap">par l'IA</span></h1>
           <p class="hero__subtitle">Fiches techniques vocales, HACCP complet, commandes fournisseurs, analytics — tout ce dont votre restaurant a besoin, dans un seul outil.</p>
           <div class="hero__actions">
-            <a href="/app#register" data-umami-event="cta-essai-gratuit" class="btn btn--primary btn--large">Démarrer gratuitement</a>
-            <a href="#fonctionnalites-piliers" class="btn btn--secondary btn--large">Découvrir</a>
+            <a href="/app?src=landing&amp;pos=hero#register" data-umami-event="cta-essai-gratuit" data-umami-event-source="landing" data-umami-event-position="hero" class="btn btn--primary btn--large">Démarrer gratuitement</a>
+            <a href="#reserver-demo" data-umami-event="cta-demo" data-umami-event-position="hero" class="btn btn--secondary btn--large">Réserver une démo</a>
           </div>
           <div class="hero__trust">
             <i data-lucide="shield-check"></i>
@@ -291,8 +298,12 @@
               <div class="hero__video-dot"></div>
               <div class="hero__video-url">restosuite.fr/app</div>
             </div>
-            <video id="hero-video" muted loop playsinline preload="none"
-              poster="assets/screenshots/dashboard.jpg">
+            <!-- width/height : réserve le ratio avant l'arrivée du poster
+                 (sinon l'élément video passe du 300×150 par défaut au ratio du
+                 poster → layout shift sous le hero en mobile). Poster en WebP,
+                 préchargé dans le <head>. -->
+            <video id="hero-video" muted loop playsinline preload="none" width="1200" height="586"
+              poster="assets/screenshots/dashboard.webp">
               <source src="assets/demo/restosuite-demo.mp4" type="video/mp4">
             </video>
             <div class="hero__video-overlay" id="hero-video-overlay">
@@ -303,6 +314,33 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== HOW IT WORKS ========== -->
+  <section class="section section--base">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>3 étapes. C'est tout.</h2>
+        <p>De l'inscription à votre première fiche technique en moins d'une minute.</p>
+      </div>
+      <div class="steps">
+        <div class="step reveal reveal-delay-1">
+          <div class="step__number">1</div>
+          <h3>Créez votre compte</h3>
+          <p>30 secondes. Un nom, un code PIN, c'est parti.</p>
+        </div>
+        <div class="step reveal reveal-delay-2">
+          <div class="step__number">2</div>
+          <h3>Dictez votre recette</h3>
+          <p>Parlez naturellement. L'IA comprend « 3 citrons, 125g de beurre ».</p>
+        </div>
+        <div class="step reveal reveal-delay-3">
+          <div class="step__number">3</div>
+          <h3>L'IA fait le reste</h3>
+          <p>Coûts calculés, fiche générée, PDF prêt. Vous gérez, l'IA exécute.</p>
         </div>
       </div>
     </div>
@@ -480,35 +518,59 @@
       </div>
       <div class="screenshots-grid reveal">
         <div class="screenshot-card">
-          <img src="assets/screenshots/fiche-technique.jpg" alt="Fiche technique avec food cost — RestoSuite" loading="lazy">
+          <picture>
+            <source type="image/webp" srcset="assets/screenshots/fiche-technique-600.webp 600w, assets/screenshots/fiche-technique.webp 1200w" sizes="(max-width: 768px) calc(100vw - 48px), 476px">
+            <img src="assets/screenshots/fiche-technique.jpg" alt="Fiche technique avec food cost — RestoSuite" loading="lazy" width="1200" height="586">
+          </picture>
           <div class="screenshot-card__label">Fiche technique avec food cost en temps réel</div>
         </div>
         <div class="screenshot-card">
-          <img src="assets/screenshots/dashboard.jpg" alt="Dashboard cuisine — RestoSuite" loading="lazy">
+          <picture>
+            <source type="image/webp" srcset="assets/screenshots/dashboard-600.webp 600w, assets/screenshots/dashboard.webp 1200w" sizes="(max-width: 768px) calc(100vw - 48px), 476px">
+            <img src="assets/screenshots/dashboard.jpg" alt="Dashboard cuisine — RestoSuite" loading="lazy" width="1200" height="586">
+          </picture>
           <div class="screenshot-card__label">Dashboard cuisine : KPIs et suggestions IA</div>
         </div>
         <div class="screenshot-card">
-          <img src="assets/screenshots/pilotage.jpg" alt="Pilotage et score de santé — RestoSuite" loading="lazy">
+          <picture>
+            <source type="image/webp" srcset="assets/screenshots/pilotage-600.webp 600w, assets/screenshots/pilotage.webp 1200w" sizes="(max-width: 768px) calc(100vw - 48px), 476px">
+            <img src="assets/screenshots/pilotage.jpg" alt="Pilotage et score de santé — RestoSuite" loading="lazy" width="1200" height="586">
+          </picture>
           <div class="screenshot-card__label">Pilotage : score de santé, food cost, stock, HACCP</div>
         </div>
         <div class="screenshot-card">
-          <img src="assets/screenshots/ma-journee-haccp.jpg" alt="Ma journée HACCP — RestoSuite" loading="lazy">
+          <picture>
+            <source type="image/webp" srcset="assets/screenshots/ma-journee-haccp-600.webp 600w, assets/screenshots/ma-journee-haccp.webp 1200w" sizes="(max-width: 768px) calc(100vw - 48px), 476px">
+            <img src="assets/screenshots/ma-journee-haccp.jpg" alt="Ma journée HACCP — RestoSuite" loading="lazy" width="1200" height="586">
+          </picture>
           <div class="screenshot-card__label">Ma journée HACCP : ouverture, service, fermeture</div>
         </div>
         <div class="screenshot-card">
-          <img src="assets/screenshots/haccp-temperatures.jpg" alt="Relevés de température HACCP — RestoSuite" loading="lazy">
+          <picture>
+            <source type="image/webp" srcset="assets/screenshots/haccp-temperatures-600.webp 600w, assets/screenshots/haccp-temperatures.webp 1200w" sizes="(max-width: 768px) calc(100vw - 48px), 476px">
+            <img src="assets/screenshots/haccp-temperatures.jpg" alt="Relevés de température HACCP — RestoSuite" loading="lazy" width="1200" height="586">
+          </picture>
           <div class="screenshot-card__label">Relevés de température : conformes, exportables PDF</div>
         </div>
         <div class="screenshot-card">
-          <img src="assets/screenshots/haccp-saisie-groupee.jpg" alt="Saisie groupée des températures — RestoSuite" loading="lazy">
+          <picture>
+            <source type="image/webp" srcset="assets/screenshots/haccp-saisie-groupee-600.webp 600w, assets/screenshots/haccp-saisie-groupee.webp 1200w" sizes="(max-width: 768px) calc(100vw - 48px), 476px">
+            <img src="assets/screenshots/haccp-saisie-groupee.jpg" alt="Saisie groupée des températures — RestoSuite" loading="lazy" width="1200" height="586">
+          </picture>
           <div class="screenshot-card__label">Saisie groupée : tous les frigos en 30 secondes</div>
         </div>
         <div class="screenshot-card">
-          <img src="assets/screenshots/haccp-nettoyage.jpg" alt="Plan de nettoyage HACCP — RestoSuite" loading="lazy">
+          <picture>
+            <source type="image/webp" srcset="assets/screenshots/haccp-nettoyage-600.webp 600w, assets/screenshots/haccp-nettoyage.webp 1200w" sizes="(max-width: 768px) calc(100vw - 48px), 476px">
+            <img src="assets/screenshots/haccp-nettoyage.jpg" alt="Plan de nettoyage HACCP — RestoSuite" loading="lazy" width="1200" height="586">
+          </picture>
           <div class="screenshot-card__label">Plan de nettoyage : tâches du jour, traçabilité PDF</div>
         </div>
         <div class="screenshot-card">
-          <img src="assets/screenshots/alto.jpg" alt="Alto, assistant culinaire IA — RestoSuite" loading="lazy">
+          <picture>
+            <source type="image/webp" srcset="assets/screenshots/alto-600.webp 600w, assets/screenshots/alto.webp 1200w" sizes="(max-width: 768px) calc(100vw - 48px), 476px">
+            <img src="assets/screenshots/alto.jpg" alt="Alto, assistant culinaire IA — RestoSuite" loading="lazy" width="1200" height="586">
+          </picture>
           <div class="screenshot-card__label">Alto : assistant vocal pour saisir vos relevés</div>
         </div>
       </div>
@@ -569,33 +631,6 @@
     </div>
   </section>
 
-  <!-- ========== HOW IT WORKS ========== -->
-  <section class="section section--base">
-    <div class="container">
-      <div class="section-header reveal">
-        <h2>3 étapes. C'est tout.</h2>
-        <p>De l'inscription à votre première fiche technique en moins d'une minute.</p>
-      </div>
-      <div class="steps">
-        <div class="step reveal reveal-delay-1">
-          <div class="step__number">1</div>
-          <h3>Créez votre compte</h3>
-          <p>30 secondes. Un nom, un code PIN, c'est parti.</p>
-        </div>
-        <div class="step reveal reveal-delay-2">
-          <div class="step__number">2</div>
-          <h3>Dictez votre recette</h3>
-          <p>Parlez naturellement. L'IA comprend « 3 citrons, 125g de beurre ».</p>
-        </div>
-        <div class="step reveal reveal-delay-3">
-          <div class="step__number">3</div>
-          <h3>L'IA fait le reste</h3>
-          <p>Coûts calculés, fiche générée, PDF prêt. Vous gérez, l'IA exécute.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- ========== PRICING ========== -->
   <section class="section section--paper" id="tarifs">
     <div class="container">
@@ -619,7 +654,7 @@
             <li><i data-lucide="check"></i> Multi-comptes</li>
             <li><i data-lucide="check"></i> Aucune carte bancaire requise</li>
           </ul>
-          <a href="/app#register" data-umami-event="cta-essai-gratuit" class="btn btn--secondary">Démarrer mon essai gratuit</a>
+          <a href="/app?src=landing&amp;pos=tarifs#register" data-umami-event="cta-essai-gratuit" data-umami-event-source="landing" data-umami-event-position="tarifs" class="btn btn--secondary">Démarrer mon essai gratuit</a>
         </div>
         <!-- Pro -->
         <div class="pricing-card pricing-card--pro reveal reveal-delay-2">
@@ -744,11 +779,58 @@
           </button>
           <div class="faq-item__answer">
             <div class="faq-item__answer-inner">
-              Oui. Vous pouvez saisir vos recettes par la voix, les taper manuellement, ou scanner vos factures fournisseurs. L'IA s'adapte à votre façon de travailler et structure tout automatiquement.
+              Oui. Importez vos fiches techniques existantes depuis un fichier Excel ou CSV : un modèle est fourni, vous vérifiez l'aperçu, puis tout est importé d'un coup. Vous pouvez aussi dicter vos recettes à la voix ou les saisir manuellement. Le scan de factures, lui, sert à autre chose : mettre à jour automatiquement vos prix fournisseurs.
             </div>
           </div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ========== RÉSERVER UNE DÉMO ========== -->
+  <section class="section section--paper" id="reserver-demo">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>Vous préférez qu'on vous montre ?</h2>
+        <p>Laissez vos coordonnées : on vous rappelle pour une démo personnalisée, adaptée à votre établissement.</p>
+      </div>
+      <form id="demo-form" class="demo-form reveal" novalidate>
+        <div class="demo-form__row">
+          <div class="demo-form__field">
+            <label for="demo-firstname">Prénom</label>
+            <input type="text" id="demo-firstname" name="first_name" autocomplete="given-name" placeholder="Paul">
+          </div>
+          <div class="demo-form__field">
+            <label for="demo-lastname">Nom</label>
+            <input type="text" id="demo-lastname" name="last_name" autocomplete="family-name" placeholder="Dupont">
+          </div>
+        </div>
+        <div class="demo-form__field">
+          <label for="demo-restaurant">Nom du restaurant</label>
+          <input type="text" id="demo-restaurant" name="restaurant" autocomplete="organization" placeholder="Chez Marcel">
+        </div>
+        <div class="demo-form__row">
+          <div class="demo-form__field">
+            <label for="demo-phone">Téléphone</label>
+            <input type="tel" id="demo-phone" name="phone" autocomplete="tel" placeholder="06 12 34 56 78">
+          </div>
+          <div class="demo-form__field">
+            <label for="demo-email">Email <span aria-hidden="true">*</span></label>
+            <input type="email" id="demo-email" name="email" autocomplete="email" required placeholder="votre@email.com">
+          </div>
+        </div>
+        <!-- Honeypot anti-spam : masqué aux humains, ignoré par le lecteur d'écran -->
+        <div class="demo-form__hp" aria-hidden="true">
+          <label for="demo-website">Ne pas remplir</label>
+          <input type="text" id="demo-website" name="website" tabindex="-1" autocomplete="off">
+        </div>
+        <label class="demo-form__consent">
+          <input type="checkbox" id="demo-consent" name="consent" required>
+          <span>J'accepte d'être recontacté(e) par RestoSuite au sujet de ma demande. <a href="/confidentialite" style="color:var(--color-accent)">Politique de confidentialité</a>.</span>
+        </label>
+        <p id="demo-form__msg" role="alert" style="display:none;font-size:0.9375rem;margin:0"></p>
+        <button type="submit" id="demo-submit" data-umami-event="demo-submit" class="btn btn--primary btn--large">Demander une démo</button>
+      </form>
     </div>
   </section>
 
@@ -757,13 +839,14 @@
     <div class="container reveal">
       <h2 class="serif-display">Prêt à simplifier votre cuisine ?</h2>
       <p>Créez votre première fiche technique en moins d'une minute. Gratuit, sans carte bancaire.</p>
-      <a href="/app#register" data-umami-event="cta-essai-gratuit" class="btn btn--primary btn--large">Démarrer gratuitement</a>
+      <a href="/app?src=landing&amp;pos=cta-final#register" data-umami-event="cta-essai-gratuit" data-umami-event-source="landing" data-umami-event-position="cta-final" class="btn btn--primary btn--large">Démarrer gratuitement</a>
       <div class="hero__trust" style="justify-content: center; margin-top: 16px;">
         <i data-lucide="shield-check"></i>
         <span>Aucune carte bancaire requise</span>
       </div>
     </div>
   </section>
+  </main>
 
   <!-- ========== FOOTER ========== -->
   <footer class="footer">
@@ -791,11 +874,11 @@
 
   <!-- Sticky CTA mobile -->
   <div class="sticky-cta" id="sticky-cta">
-    <a href="/app#register" data-umami-event="cta-essai-gratuit" class="btn-sticky">Essai gratuit 60 jours →</a>
+    <a href="/app?src=landing&amp;pos=sticky#register" data-umami-event="cta-essai-gratuit" data-umami-event-source="landing" data-umami-event-position="sticky" class="btn-sticky">Essai gratuit 60 jours →</a>
   </div>
 
   <!-- ========== SCRIPTS ========== -->
-  <script src="/js/landing-main.js"></script>
+  <script src="/js/landing-main.js?v=da92616fb4"></script>
 
 
   <!-- ========== BANDEAU COOKIES RGPD ========== -->

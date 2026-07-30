@@ -391,7 +391,7 @@ async function showSupplierClientOrderDetail(restaurantId, orderId) {
             ${(order.items || []).map(it => `
               <tr>
                 <td>${escapeHtml(it.product_name)}</td>
-                <td class="text-mono">${it.quantity}</td>
+                <td class="text-mono">${escapeHtml(it.quantity)}</td>
                 <td>${escapeHtml(it.unit || '')}</td>
                 <td style="text-align:right" class="text-mono">${fmtCurrency(it.unit_price)}</td>
                 <td style="text-align:right" class="text-mono">${fmtCurrency(it.total_price)}</td>

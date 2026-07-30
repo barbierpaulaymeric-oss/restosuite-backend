@@ -136,7 +136,7 @@ async function showSupplierOrderDetail(id) {
           <div class="card" style="padding:var(--space-3);display:flex;justify-content:space-between;align-items:center;border-radius:var(--radius-md);background:var(--bg-elevated)">
             <div>
               <strong>${escapeHtml(it.product_name)}</strong>
-              <div class="text-secondary text-sm">${it.quantity} ${escapeHtml(it.unit || '')}</div>
+              <div class="text-secondary text-sm">${escapeHtml(it.quantity)} ${escapeHtml(it.unit || '')}</div>
             </div>
             <div style="text-align:right;font-family:var(--font-mono)">
               ${it.unit_price != null ? formatCurrency(it.unit_price) + '/' + escapeHtml(it.unit || '') : '—'}

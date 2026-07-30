@@ -31,6 +31,7 @@ function isExemptPath(p) {
   if (p.startsWith('/api/public/')) return true;
   if (p.startsWith('/api/supplier-portal/')) return true;
   if (p.startsWith('/api/accounts/login')) return true;
+  if (p === '/api/demo') return true; // formulaire public de demande de démo (landing, sans session)
   return false;
 }
 

@@ -115,10 +115,10 @@ function renderTraceRows(logs) {
           ${dlcDays !== null && dlcDays < 0 ? ' <span class="badge badge--danger">Dépassée</span>' : ''}
         </td>
         <td>${log.ddm ? new Date(log.ddm).toLocaleDateString('fr-FR') : '—'}</td>
-        <td class="mono">${log.temperature_at_reception != null ? log.temperature_at_reception + '°C' : '—'}</td>
+        <td class="mono">${log.temperature_at_reception != null ? escapeHtml(log.temperature_at_reception) + '°C' : '—'}</td>
         <td>${escapeHtml(log.etat_emballage || '—')}</td>
         <td>${escapeHtml(log.conformite_organoleptique || '—')}</td>
-        <td class="mono">${log.quantity != null ? `${log.quantity} ${log.unit || ''}` : '—'}</td>
+        <td class="mono">${log.quantity != null ? `${escapeHtml(log.quantity)} ${escapeHtml(log.unit || '')}` : '—'}</td>
         <td>${escapeHtml(log.received_by_name || '—')}</td>
       </tr>
     `;

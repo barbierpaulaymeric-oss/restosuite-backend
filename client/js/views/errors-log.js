@@ -50,7 +50,7 @@ class ErrorsLogView {
       const context = e.route
         ? `<span class="text-secondary text-sm">${escapeHtml(e.route)}</span>`
         : e.source
-        ? `<span class="text-secondary text-sm">${escapeHtml(e.source)}${e.lineno ? ':' + e.lineno : ''}</span>`
+        ? `<span class="text-secondary text-sm">${escapeHtml(e.source)}${e.lineno ? ':' + escapeHtml(e.lineno) : ''}</span>`
         : '';
 
       const stackHtml = e.stack

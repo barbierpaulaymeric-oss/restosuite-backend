@@ -262,7 +262,7 @@ async function loadRecentReceptions() {
               <div style="display:flex;gap:var(--space-2);align-items:center">
                 ${r.temperature_at_reception != null ? `
                   <span class="badge ${r.temperature_at_reception <= 4 ? 'badge--success' : r.temperature_at_reception <= 8 ? 'badge--warning' : 'badge--danger'}" style="font-size:11px">
-                    ${r.temperature_at_reception}°C
+                    ${escapeHtml(r.temperature_at_reception)}°C
                   </span>` : ''}
                 <span class="text-secondary" style="font-size:11px">${new Date(r.created_at).toLocaleDateString('fr-FR')}</span>
               </div>

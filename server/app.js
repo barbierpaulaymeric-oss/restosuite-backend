@@ -159,6 +159,17 @@ app.use('/api/supplier-portal/company-login', supplierAuthLimiter);
 app.use('/api/supplier-portal/member-pin', supplierAuthLimiter);
 app.use('/api/supplier-portal/quick-login', supplierAuthLimiter);
 
+// Formulaire public de demande de démo — envoie un email, donc limite stricte
+// par IP en plus du honeypot (anti-spam).
+const demoLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: IS_TEST ? 100000 : 10,
+  message: { error: 'Trop de demandes. Réessayez plus tard ou écrivez à contact@restosuite.fr.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/demo', demoLimiter);
+
 // Admin endpoints (backup, export-db, etc.) — strict per-IP limit
 const adminLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -204,6 +215,11 @@ app.use(express.json({ limit: '10mb' }));
 
 // Static files and SPA routes (skipped in test mode for speed)
 if (!IS_TEST) {
+  // HTML (et sw.js) : toujours revalidés — un déploiement doit être visible au
+  // rechargement suivant. L'ETag d'express fait le 304 quand rien n'a changé.
+  const NO_CACHE = 'no-cache';
+  const htmlNoCache = (res) => res.set('Cache-Control', NO_CACHE);
+
   app.get('/sitemap.xml', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'client', 'sitemap.xml'));
   });
@@ -211,21 +227,51 @@ if (!IS_TEST) {
     res.sendFile(path.join(__dirname, '..', 'client', 'robots.txt'));
   });
   app.get('/menu', (req, res) => {
+    htmlNoCache(res);
     res.sendFile(path.join(__dirname, '..', 'client', 'menu.html'));
   });
   app.get('/', (req, res) => {
+    htmlNoCache(res);
     res.sendFile(path.join(__dirname, '..', 'client', 'landing.html'));
   });
   app.get(['/blog', '/blog/'], (req, res) => {
+    htmlNoCache(res);
     res.sendFile(path.join(__dirname, '..', 'client', 'blog', 'index.html'));
   });
   app.get('/sw.js', (req, res) => {
+    // Jamais de cache long sur le service worker : c'est lui qui pilote les
+    // mises à jour de l'app — un SW mis en cache longtemps fige tout le reste.
+    htmlNoCache(res);
     res.sendFile(path.join(__dirname, '..', 'client', 'sw.js'));
   });
   app.get('/manifest.json', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'client', 'manifest.json'));
   });
-  app.use(express.static(path.join(__dirname, '..', 'client'), { index: false }));
+
+  // Politique de cache des statiques :
+  //   - actifs versionnés (?v=<hash>, posé par scripts/build.js sur la landing)
+  //     → cache 1 an immutable : l'URL change quand le contenu change ;
+  //   - images/fontes/vidéos (rarement modifiées, non versionnées)
+  //     → 1 jour + stale-while-revalidate : rafraîchissement en arrière-plan ;
+  //   - HTML/CSS/JS non versionnés → no-cache (revalidation ETag, 304 gratuits).
+  //     Les assets de la SPA restent volontairement en no-cache : c'est le
+  //     service worker (network-first + pré-cache versionné) qui gère leur
+  //     fraîcheur et le mode hors ligne.
+  const MEDIA_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.avif', '.gif', '.svg', '.ico', '.mp4', '.webm', '.woff', '.woff2', '.ttf']);
+  app.use(express.static(path.join(__dirname, '..', 'client'), {
+    index: false,
+    setHeaders: (res, filePath) => {
+      const ext = path.extname(filePath).toLowerCase();
+      const versioned = res.req && res.req.query && typeof res.req.query.v === 'string' && res.req.query.v.length > 0;
+      if (versioned && ext !== '.html') {
+        res.set('Cache-Control', 'public, max-age=31536000, immutable');
+      } else if (MEDIA_EXT.has(ext)) {
+        res.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+      } else {
+        res.set('Cache-Control', NO_CACHE);
+      }
+    },
+  }));
 }
 
 // Soft JWT decode — Bearer header OR `jwt` HttpOnly cookie → req.user.
@@ -299,6 +345,7 @@ app.use('/api/sites', require('./routes/multi-site'));
 app.use('/api/predictions', require('./routes/predictions'));
 app.use('/api/health', require('./routes/health'));
 app.use('/api/public', require('./routes/public-api'));
+app.use('/api/demo', require('./routes/demo')); // demande de démo (public, non authentifié)
 app.use('/api/audit-log', require('./routes/audit'));
 app.use('/api/crm', require('./routes/crm'));
 app.use('/api/training', require('./routes/training'));
@@ -365,34 +412,28 @@ app.get('/api/health', (req, res) => {
 });
 
 if (!IS_TEST) {
+  // Toutes ces routes servent du HTML : toujours revalidé (voir bloc statique).
+  const sendHtml = (res, ...segments) => {
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, '..', 'client', ...segments));
+  };
+
   // Legal pages
-  app.get('/mentions-legales', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'client', 'legal', 'mentions.html'));
-  });
-  app.get('/cgv', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'client', 'legal', 'cgv.html'));
-  });
-  app.get('/privacy', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'client', 'legal', 'privacy.html'));
-  });
-  app.get('/confidentialite', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'client', 'legal', 'privacy.html'));
-  });
+  app.get('/mentions-legales', (req, res) => sendHtml(res, 'legal', 'mentions.html'));
+  app.get('/cgv', (req, res) => sendHtml(res, 'legal', 'cgv.html'));
+  app.get('/privacy', (req, res) => sendHtml(res, 'legal', 'privacy.html'));
+  app.get('/confidentialite', (req, res) => sendHtml(res, 'legal', 'privacy.html'));
 
   // SPA app on /app (and sub-routes)
-  app.get('/app', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
-  });
-  app.get('/app/*', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
-  });
+  app.get('/app', (req, res) => sendHtml(res, 'index.html'));
+  app.get('/app/*', (req, res) => sendHtml(res, 'index.html'));
 
   // Catch-all: serve landing for non-file non-API routes
   app.get('*', (req, res) => {
     if (path.extname(req.path)) {
       return res.status(404).send('Not found');
     }
-    res.sendFile(path.join(__dirname, '..', 'client', 'landing.html'));
+    sendHtml(res, 'landing.html');
   });
 }
 

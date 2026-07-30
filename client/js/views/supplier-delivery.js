@@ -127,11 +127,11 @@ async function showSupplierDeliveryDetail(id) {
               return `
                 <tr style="border-bottom:1px solid var(--border-default)">
                   <td style="padding:var(--space-3)">${escapeHtml(item.product_name)}</td>
-                  <td style="padding:var(--space-3)">${item.quantity} ${escapeHtml(item.unit)}</td>
+                  <td style="padding:var(--space-3)">${escapeHtml(item.quantity)} ${escapeHtml(item.unit)}</td>
                   <td style="padding:var(--space-3)">${item.price_per_unit != null ? item.price_per_unit.toFixed(2) + '€' : '—'}</td>
                   <td style="padding:var(--space-3);font-family:monospace;font-size:var(--text-xs)">${escapeHtml(item.batch_number || '—')}</td>
-                  <td style="padding:var(--space-3)">${item.dlc || '—'}</td>
-                  <td style="padding:var(--space-3);color:${sc[item.status]}">${sl[item.status] || item.status}</td>
+                  <td style="padding:var(--space-3)">${escapeHtml(item.dlc || '—')}</td>
+                  <td style="padding:var(--space-3);color:${sc[item.status]}">${escapeHtml(sl[item.status] || item.status)}</td>
                 </tr>
               `;
             }).join('')}
